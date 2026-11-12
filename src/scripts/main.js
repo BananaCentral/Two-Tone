@@ -265,7 +265,7 @@ function executeIndependentSummonTurn(s){
 }
 
 const color={ink:'#0a101f',panel:'rgba(13,17,35,.94)',gold:'#eacb87',white:'#f7f3f8',sub:'#bfc8d9',blue:'#85d9ff',red:'#f47679',green:'#5bebac'};
-let phase='setup',paused=false,turn=0,enemyHp=0,maxEnemyHp=0,sp=3,
+let phase='menu',paused=false,turn=0,enemyHp=0,maxEnemyHp=0,sp=3,
     gauges={},party=[],activeId=null,fx=null,log='',hint='',hintAt=0,
     choiceRects=[],battleToken=0,enemyCount=0,forceSelect=false;
 // Five authored formation positions. Enemy identities and wave queues are independent of these slots.
@@ -494,6 +494,12 @@ function active(){return party.find(x=>x.id===activeId)}
 function say(message){hint=message;hintAt=performance.now()}
 function schedule(fn,ms){const token=battleToken;setTimeout(()=>{if(token===battleToken)fn()},ms)}
 function enterSelection(mandatory=false){saveVitals();cameraPreview=null;selectedAllyId=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;pendingVacancies=[];cancelAllQueuedUltimates('reset');battleToken++;summons=[];turnTimeline.reset();phase='setup';paused=false;forceSelect=mandatory;draft=[...loadTeam()];activeId=null;log='';say(mandatory?'This encounter requires team confirmation.':'Select 1–3 unique owned units.');}
+function enterMainMenu(){
+ saveVitals();if(phase==='setup')saveTeam();
+ battleToken++;cancelAllQueuedUltimates('main-menu');turnTimeline.reset();
+ phase='menu';paused=false;activeId=null;actingEnemyId=null;cameraPreview=null;
+ selectedAllyId=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;fx=null;hint='';
+}
 function addUnit(id){if(phase!=='setup')return;if(draft.includes(id)){say('Already assigned: duplicates are not allowed.');return}if(draft.length>=3){say('Only three playable-character slots are permitted.');return}draft.push(id);}
 function removeUnit(index){if(phase!=='setup')return;if(draft.length<=1){say('At least one playable character is required.');return}draft.splice(index,1);}
 function reorderUnit(index,dir){if(phase!=='setup')return;const j=index+dir;if(j<0||j>=draft.length)return;[draft[index],draft[j]]=[draft[j],draft[index]];}
@@ -585,6 +591,31 @@ function text(s,x,y,size=24,fill=color.white,weight='600',align='left'){ctx.text
 function line(x,y,w,f=1,c='#72e3ae',bg='#303649',h=13){rect(x,y,w,h,bg,null,6);rect(x,y,Math.max(0,w*Math.min(1,Math.max(0,f))),h,c,null,6)}
 function addButton(x,y,w,h,action,label,sub='',enabled=true){choiceRects.push({x,y,w,h,action,enabled});rect(x,y,w,h,enabled?'#263754':'#1d2538',enabled?'#a5c9dc':'#526176',11);text(label,x+w/2,y+h/2-(sub?10:0),19,enabled?'#fff4e6':'#9eafc1','750','center');if(sub)text(sub,x+w/2,y+h/2+16,13,'#bacadb','500','center')}
 function drawBackground(){ctx.imageSmoothingEnabled=false;if(images.arena.complete&&images.arena.naturalWidth)ctx.drawImage(images.arena,0,0,W,H);else{rect(0,0,W,H,'#596f83');rect(0,480,W,420,'#a38f9e')}rect(0,0,W,165,'rgba(8,10,22,.24)');const shade=ctx.createLinearGradient(0,580,0,900);shade.addColorStop(0,'#17122500');shade.addColorStop(1,'#090d23dc');rect(0,560,W,340,shade)}
+function drawMainMenu(){
+ drawBackground();rect(0,0,W,H,'rgba(5,9,22,.68)');
+ text('TWO-TONE',800,112,58,'#f8f4ea','900','center');
+ text('MAIN MENU',800,170,20,'#eacb87','800','center');
+ rect(1293,63,190,66,'rgba(13,17,35,.94)','#eacb87',12);
+ text('RANK',1388,82,13,'#bfc8d9','800','center');text('1',1388,107,25,'#f7f3f8','850','center');
+ const items=[
+  {label:'CHARACTERS',x:220,y:256},
+  {label:'PARTY',x:640,y:256},
+  {label:'EVENTS',x:1060,y:256},
+  {label:'STORE',x:220,y:472},
+  {label:'STORY',x:640,y:472,active:true},
+  {label:'MODES',x:1060,y:472},
+ ];
+ for(const item of items){
+  if(item.active){
+   addButton(item.x,item.y,320,166,'open-story',item.label,'BATTLE PROTOTYPE');
+  }else{
+   rect(item.x,item.y,320,166,'rgba(20,29,47,.82)','rgba(129,164,191,.5)',13);
+   text(item.label,item.x+160,item.y+65,25,'#c2c9d3','800','center');
+   text('COMING SOON',item.x+160,item.y+112,14,'#9ca9b9','650','center');
+  }
+ }
+ text('Select a section to continue',800,704,17,'#d6dceb','550','center');
+}
 function silhouette(x,y,w,h,name){ctx.save();ctx.translate(x,y);const c='#7789a3';ctx.fillStyle=c;ctx.beginPath();ctx.ellipse(w*.5,h*.16,w*.17,h*.14,0,0,Math.PI*2);ctx.fill();rect(w*.32,h*.30,w*.36,h*.38,c,null,13);rect(w*.15,h*.35,w*.15,h*.37,c,null,10);rect(w*.70,h*.35,w*.15,h*.37,c,null,10);rect(w*.34,h*.65,w*.13,h*.35,c,null,7);rect(w*.53,h*.65,w*.13,h*.35,c,null,7);ctx.restore();text('TEST ONLY',x+w/2,y+h*.55,14,'#131e33','800','center')}
 function combatEnemies(){return liveEnemies()}
 // BATTLE SCENE DEVELOPMENT STANDARD v1.0 — provisional rendering implementation.
@@ -1075,20 +1106,20 @@ function drawHud(t){
  if(devPanelOpen&&!['victory','defeat'].includes(phase))drawDeveloperPanel();
  if(paused)drawPause();if(phase==='victory'||phase==='defeat')drawResult();
 }
-function drawPause(){rect(0,0,W,H,'rgba(2,5,15,.68)');rect(366,220,868,443,'#101729f4','#e4cda4',18);text('PAUSED • PARTY LOCKED',800,293,39,'#fff3e9','800','center');text('Testing controls below are NOT approved gameplay mechanics.',800,351,22,'#d6dceb','600','center');addButton(465,420,230,90,'test-ko','DEBUG: K.O.','Knock out non-active ally');addButton(714,420,230,90,'test-revive','DEBUG: REVIVE','Restore same party slot');addButton(964,420,180,90,'unpause','RESUME','');addButton(650,559,300,66,'restart','RESTART BATTLE','')}
-function drawResult(){rect(0,0,W,H,'rgba(3,7,15,.72)');rect(310,215,980,460,'rgba(13,21,38,.98)',color.gold,20);text(phase==='victory'?'VICTORY':'DEFEAT',800,317,58,phase==='victory'?'#f7dd9f':'#f29ba4','900','center');text(phase==='victory'?`All ${totalEnemyDefeats} enemies defeated across ${wavePlan.length} waves.`:'All allies have fallen in training.',800,397,27,'#edf2f7','600','center');text(`Turns processed: ${turn}    •    Team: ${party.length}/3`,800,447,20,'#a9bcce','500','center');addButton(389,532,271,90,'restart','REPLAY','Same party');addButton(678,532,271,90,'change-team','TEAM SELECT','Manual formation');addButton(967,532,275,90,'forced-select','SPECIAL TEST','Force team selection')}
-function drawSetup(){rect(0,0,W,H,'rgba(4,8,20,.77)');rect(180,74,1240,760,'rgba(13,20,39,.98)','#ccb88e',20);text('TEAM FORMATION',228,133,43,'#ffedd1','850');text(`${draft.length}/3 selected • owned roster • unique members`,231,180,22,'#cfdbeb','550');text(forceSelect?'SPECIAL ENCOUNTER: TEAM SELECTION REQUIRED':'STANDARD ENCOUNTER: LAST TEAM RETAINED',1332,173,17,'#e5ca99','700','right');
+function drawPause(){rect(0,0,W,H,'rgba(2,5,15,.68)');rect(366,220,868,443,'#101729f4','#e4cda4',18);text('PAUSED • PARTY LOCKED',800,293,39,'#fff3e9','800','center');text('Testing controls below are NOT approved gameplay mechanics.',800,351,22,'#d6dceb','600','center');addButton(465,420,230,90,'test-ko','DEBUG: K.O.','Knock out non-active ally');addButton(714,420,230,90,'test-revive','DEBUG: REVIVE','Restore same party slot');addButton(964,420,180,90,'unpause','RESUME','');addButton(630,559,220,66,'restart','RESTART BATTLE','');addButton(868,559,210,66,'main-menu','MAIN MENU','')}
+function drawResult(){rect(0,0,W,H,'rgba(3,7,15,.72)');rect(310,215,980,460,'rgba(13,21,38,.98)',color.gold,20);text(phase==='victory'?'VICTORY':'DEFEAT',800,317,58,phase==='victory'?'#f7dd9f':'#f29ba4','900','center');text(phase==='victory'?`All ${totalEnemyDefeats} enemies defeated across ${wavePlan.length} waves.`:'All allies have fallen in training.',800,397,27,'#edf2f7','600','center');text(`Turns processed: ${turn}    •    Team: ${party.length}/3`,800,447,20,'#a9bcce','500','center');addButton(350,532,205,90,'restart','REPLAY','Same party');addButton(568,532,205,90,'change-team','TEAM SELECT','Manual formation');addButton(786,532,205,90,'forced-select','SPECIAL TEST','Force team selection');addButton(1004,532,205,90,'main-menu','MAIN MENU','')}
+function drawSetup(){rect(0,0,W,H,'rgba(4,8,20,.77)');rect(180,74,1240,760,'rgba(13,20,39,.98)','#ccb88e',20);text('TEAM FORMATION',228,133,43,'#ffedd1','850');addButton(1234,96,160,52,'main-menu','MAIN MENU','');text(`${draft.length}/3 selected • owned roster • unique members`,231,180,22,'#cfdbeb','550');text(forceSelect?'SPECIAL ENCOUNTER: TEAM SELECTION REQUIRED':'STANDARD ENCOUNTER: LAST TEAM RETAINED',1332,173,17,'#e5ca99','700','right');
  text('BATTLE SLOTS — MOVE TO CHANGE DISPLAY ORDER',240,218,19,'#bad4e9','800');
  for(let i=0;i<3;i++){const x=241+i*377,y=242,w=358,h=249,p=roster(draft[i]);rect(x,y,w,h,p?'#26364feb':'#152138eb',p?'#9eb8d3':'#4c607a',13);text(`SLOT ${i+1}`,x+18,y+26,19,'#e8ca92','800');if(p){text(p.name,x+18,y+69,27,'#f6eefa','800');text(`Lv. ${progressFor(p.id).level} / 50 • HP ${calculateMaxHp(p.hp,progressFor(p.id).level).toLocaleString()} • test base`,x+18,y+103,16,'#c4d6e5','650');text('Position: visual only',x+18,y+135,17,'#d7dce7','500');addButton(x+14,y+180,89,53,`left:${i}`,'←','',i>0);addButton(x+113,y+180,89,53,`right:${i}`,'→','',i<draft.length-1);addButton(x+212,y+180,128,53,`remove:${i}`,'REMOVE','',draft.length>1)}else{text('EMPTY',x+w/2,y+106,34,'#697f95','800','center');text('Add from roster below',x+w/2,y+159,17,'#9ca9b9','550','center')}}
  text('AVAILABLE OWNED ROSTER',240,533,19,'#bad4e9','800');for(let i=0;i<ROSTER.length;i++){const p=ROSTER[i],x=241+i*377,y=554,selected=draft.includes(p.id);rect(x,y,358,116,selected?'#233b4ce9':'#1d2943',selected?'#8fbcad':'#7e97b0',11);text(p.name,x+16,y+30,24,'#f5e9dc','800');text(p.test?'TEST DATA ONLY • NO CHARACTER ASSET':'OWNED • CHARACTER',x+16,y+61,15,'#bdccdd','600');addButton(x+217,y+75,124,33,`add:${p.id}`,selected?'IN TEAM':'ADD','',!selected&&draft.length<3)}
  text(`TEST WAVES: ${(waveOverride||WAVE_PRESETS[wavePreset]).join(' + ')}  •  UP TO 5 ACTIVE`,240,694,18,'#d2ddec','650');text(`TRAINING RECOVERY: ${trainingRecoveryMode==='restore'?'RESTORE FULL HP':'PRESERVE HP'} • GAME MODE TEST`,240,720,14,'#d2ddec','650');addButton(240,742,250,62,'toggle-waves','CHANGE WAVES','');addButton(518,742,494,62,'toggle-recovery','TOGGLE HP RECOVERY MODE',trainingRecoveryMode==='restore'?'CURRENT: RESTORE':'CURRENT: PRESERVE');addButton(1039,733,313,79,'start','START BATTLE','Lock selected party',validTeam(draft))}
 function drawHint(t){if(hint&&t-hintAt<2300){rect(474,393,652,76,'rgba(15,21,39,.98)','#e6b98a',12);text(hint,800,431,20,'#fff4e8','700','center')}}
-function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase!=='setup'){
+function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='menu'){drawMainMenu()}else if(phase!=='setup'){
   const hit=zeroBasicStage(t);ctx.save();if(hit!==null&&hit>=645&&hit<=760){const q=1-(hit-645)/115;ctx.translate(Math.sin(hit*.42)*q*4,Math.cos(hit*.33)*q*2.5)}
   drawCameraStage(t);drawFx(t);ctx.restore();drawHud(t)
  }else{drawCameraStage(t);drawSetup()}drawHint(t);requestAnimationFrame(loop)}
 function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('left:')){reorderUnit(Number(cmd.slice(5)),-1);return}if(cmd.startsWith('right:')){reorderUnit(Number(cmd.slice(6)),1);return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'){devPanelOpen=!devPanelOpen;return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(phase==='player'&&cameraPreview==='party'){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){queueUltimate(cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){chargeUltimateForTest(cmd.slice(11));return}
- switch(cmd){case 'support-heal':startSupportDemo('heal');break;case 'support-revive':startSupportDemo('revive');break;case 'confirm-support':confirmSupportDemo();break;case 'cancel-support':cancelSupportDemo();break;case 'camera-party':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':toggleWavePreset();break;case 'toggle-recovery':setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterSelection();break;case 'forced-select':enterSelection(true);break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':testKO();break;case 'test-revive':testRevive();break;case 'skill':zeroSkillControl();break;case 'cap-test':cycleSpCapTest();break;case 'hud-status-test':toggleHudStatusDemo();break;case 'f05-advance':addActionAdvance(activeId,25);break;case 'f05-delay':addActionDelay(activeId,25);break;case 'f05-speed':setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':queueSummonForTest('independent');break;case 'f05-summon-controlled':queueSummonForTest('controlled');break;
+ switch(cmd){case 'open-story':enterSelection();break;case 'main-menu':enterMainMenu();break;case 'support-heal':startSupportDemo('heal');break;case 'support-revive':startSupportDemo('revive');break;case 'confirm-support':confirmSupportDemo();break;case 'cancel-support':cancelSupportDemo();break;case 'camera-party':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':toggleWavePreset();break;case 'toggle-recovery':setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterSelection();break;case 'forced-select':enterSelection(true);break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':testKO();break;case 'test-revive':testRevive();break;case 'skill':zeroSkillControl();break;case 'cap-test':cycleSpCapTest();break;case 'hud-status-test':toggleHudStatusDemo();break;case 'f05-advance':addActionAdvance(activeId,25);break;case 'f05-delay':addActionDelay(activeId,25);break;case 'f05-speed':setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':queueSummonForTest('independent');break;case 'f05-summon-controlled':queueSummonForTest('controlled');break;
  case 'progress-test-level':{const a=active();if(a){const cost=requiredExp(a.level),result=testGrantExp(a.id,cost);say(result?`TEST ONLY: level ${result.level}, ${cost} EXP injected.`:'Ascension required or level cap reached.');}break}
  case 'progress-test-ascend':{const a=active();if(a)say(testAscend(a.id)?`TEST ONLY: level ${a.level} ascension unlocked (no materials).`:'Not at a locked ascension gate.');break}
  case 'hp-test-flat':{const a=active();if(a)setHpBonusForTest(a.id,'debug-flat','flat',(a.hpFlatModifiers['debug-flat']||0)+20);break}
