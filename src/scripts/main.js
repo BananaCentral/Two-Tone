@@ -102,12 +102,23 @@ let playerRank=1;
 // Numerical Base HP values are inherited/development-only combat fixtures, NOT
 // approved per-character stats. The unnamed units remain developer test slots.
 const ROSTER=[
- {id:'zero',name:'ZERO',label:'Character',hp:2480,speed:115,art:'zero',test:false},
- {id:'test2',name:'TEST SLOT 2',label:'Placeholder • no approved identity',hp:2300,speed:115,art:null,test:true},
- {id:'test3',name:'TEST SLOT 3',label:'Placeholder • no approved identity',hp:2600,speed:115,art:null,test:true},
+ {id:'zero',name:'ZERO',label:'Character',hp:2480,basePhysicalAttack:null,speed:115,art:'zero',test:false},
+ {id:'test2',name:'TEST SLOT 2',label:'Placeholder • no approved identity',hp:2300,basePhysicalAttack:null,speed:115,art:null,test:true},
+ {id:'test3',name:'TEST SLOT 3',label:'Placeholder • no approved identity',hp:2600,basePhysicalAttack:null,speed:115,art:null,test:true},
 ];
 const ROSTER_IDS=new Set(ROSTER.map(u=>u.id));
 function roundHp(value){return Math.floor(value+0.5)}
+function calculateLevelScaledStat(base,level,flat={},percent={}){
+ if(!Number.isFinite(base)||base<0||!Number.isInteger(level)||level<1||level>CHARACTER_MAX_LEVEL)return null;
+ const flats=Object.values(flat),percents=Object.values(percent);
+ if([...flats,...percents].some(v=>!Number.isFinite(v)))return null;
+ const raw=(base+flats.reduce((a,b)=>a+b,0))*level*(1+percents.reduce((a,b)=>a+b,0));
+ return raw>=0&&Number.isFinite(raw)?roundHp(raw):null;
+}
+function calculatePhysicalAttack(unit){
+ if(!unit||!Number.isFinite(unit.basePhysicalAttack))return null;
+ return calculateLevelScaledStat(unit.basePhysicalAttack,unit.level,unit.physicalAttackFlatModifiers||{},unit.physicalAttackPercentModifiers||{});
+}
 function characterLevelCap(rank=playerRank){return Number.isInteger(rank)&&rank>=1&&rank<=50?Math.ceil(rank/10)*10:0}
 function requiredExp(level){return Number.isInteger(level)&&level>=1&&level<CHARACTER_MAX_LEVEL?level*(10*(1+Math.floor(level/5))):0}
 function defaultProgress(){return {level:1,exp:0,ascended:[]}}
@@ -189,11 +200,9 @@ function setPlayerRankForTest(rank){
 }
 function hpModifiers(unit){return {flat:unit.hpFlatModifiers||{},percent:unit.hpPercentModifiers||{}}}
 function calculateMaxHp(baseHp,level,flat={},percent={}){
- if(!Number.isFinite(baseHp)||baseHp<=0||!Number.isInteger(level)||level<1||level>CHARACTER_MAX_LEVEL)return null;
- const flats=Object.values(flat),percents=Object.values(percent);
- if([...flats,...percents].some(v=>!Number.isFinite(v)))return null;
- const raw=(baseHp+flats.reduce((a,b)=>a+b,0))*level*(1+percents.reduce((a,b)=>a+b,0));
- return raw>=1&&Number.isFinite(raw)?roundHp(raw):null;
+ if(!Number.isFinite(baseHp)||baseHp<=0)return null;
+ const max=calculateLevelScaledStat(baseHp,level,flat,percent);
+ return max!==null&&max>=1?max:null;
 }
 function recomputeUnitMaxHp(unit){
  const max=calculateMaxHp(unit.baseHp,unit.level,unit.hpFlatModifiers,unit.hpPercentModifiers);
@@ -232,7 +241,7 @@ function spawnProgressedUnit(id){
  const savedMax=Number.isFinite(saved?.maxHp)&&saved.maxHp>0?saved.maxHp:maxHp;
  const savedHp=Number.isFinite(saved?.hp)?saved.hp:maxHp;
  const hp=restore?maxHp:savedHp<=0?0:Math.max(0,roundHp(maxHp*(savedHp/savedMax)));
- return {...model,baseHp:model.hp,level:progress.level,hp,maxHp,hpFlatModifiers:{},hpPercentModifiers:{},energy:20,energyReserved:0};
+ return {...model,baseHp:model.hp,level:progress.level,hp,maxHp,hpFlatModifiers:{},hpPercentModifiers:{},physicalAttackFlatModifiers:{},physicalAttackPercentModifiers:{},energy:20,energyReserved:0};
 }
 
 const turnTimeline=new TwoToneTurnTimeline();
@@ -1252,7 +1261,8 @@ window.twoToneStatus=()=>({phase,paused,turn,devPanelOpen,targetingMode,zeroSkil
 window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ULTIMATE_ENERGY_COST)),statusCount:hudStatusList(p).length})),version:'v0.0.17',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
  characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
- unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}}))});
-window.twoToneTest={testGrantExp,testAscend,setPlayerRankForTest,setHpBonusForTest,calculateMaxHp,requiredExp,setTrainingRecoveryMode,roundHp,addActionAdvance,addActionDelay,setSpeedMultiplierForTest,queueSummonForTest,turnTimelineSnapshot:()=>turnTimeline.snapshot(),queueUltimate,chargeUltimateForTest,toggleHudStatusDemo,setHudStatusesForTest:(id,items)=>{const p=party.find(p=>p.id===id);if(!p||!Array.isArray(items)||items.length>80)return false;p.hudStatuses=items.map(e=>({kind:e.kind==='debuff'?'debuff':'buff',icon:String(e.icon||'✦').slice(0,2),turns:e.turns===null?null:(Number.isInteger(e.turns)&&e.turns>=0?e.turns:null)}));return true;},setSpCapTestSource,cycleSpCapTest,canQueueUltimate,debugKOForTest:(id)=>{if(['setup','intro','victory','defeat'].includes(phase))return false;const p=party.find(p=>p.id===id);if(!p||p.hp<=0)return false;p.hp=0;gauges[p.id]=0;saveVitals();cancelQueuedUltimatesOfDefeated();return true},startBattle,addUnit,removeUnit,enterSelection,enterPartySetup,saveParty,testKO,testRevive,play,replay,zeroSkillControl,setTargetingMode,startSupportDemo,confirmSupportDemo,cancelSupportDemo,eligibleAllyTarget:(id,kind)=>eligibleAllyTarget(party.find(p=>p.id===id),kind),setEnemyHpForTest:(id,hp)=>{if(phase!=='player'||attackInProgress)return false;const e=liveEnemies().find(e=>e.id===id);if(!e||!Number.isFinite(hp)||hp<1||hp>e.maxHp)return false;e.hp=hp;syncEnemyHp();return true},setEnemyTarget,setWavePlanForTest,toggleWavePreset,debugDefeatEnemy:(id)=>{const e=liveEnemies().find(e=>e.id===id);if(!e||phase==='setup'||phase==='victory'||phase==='defeat')return false;e.hp=0;resolveEnemyDefeat(e);return true;},selectEnemy:(id)=>setEnemyTarget(id),setCameraPreview:(view)=>{if(phase==='player'){cameraPreview=view;selectedAllyId=activeId}},cameraStatus:()=>cameraShot()};
+ unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}})),
+ unitPhysicalAttack:party.map(p=>({id:p.id,level:p.level,basePhysicalAttack:p.basePhysicalAttack,physicalAttack:calculatePhysicalAttack(p),flat:{...p.physicalAttackFlatModifiers},percent:{...p.physicalAttackPercentModifiers}}))});
+window.twoToneTest={testGrantExp,testAscend,setPlayerRankForTest,setHpBonusForTest,calculateMaxHp,calculateLevelScaledStat,calculatePhysicalAttack,requiredExp,setTrainingRecoveryMode,roundHp,addActionAdvance,addActionDelay,setSpeedMultiplierForTest,queueSummonForTest,turnTimelineSnapshot:()=>turnTimeline.snapshot(),queueUltimate,chargeUltimateForTest,toggleHudStatusDemo,setHudStatusesForTest:(id,items)=>{const p=party.find(p=>p.id===id);if(!p||!Array.isArray(items)||items.length>80)return false;p.hudStatuses=items.map(e=>({kind:e.kind==='debuff'?'debuff':'buff',icon:String(e.icon||'✦').slice(0,2),turns:e.turns===null?null:(Number.isInteger(e.turns)&&e.turns>=0?e.turns:null)}));return true;},setSpCapTestSource,cycleSpCapTest,canQueueUltimate,debugKOForTest:(id)=>{if(['setup','intro','victory','defeat'].includes(phase))return false;const p=party.find(p=>p.id===id);if(!p||p.hp<=0)return false;p.hp=0;gauges[p.id]=0;saveVitals();cancelQueuedUltimatesOfDefeated();return true},startBattle,addUnit,removeUnit,enterSelection,enterPartySetup,saveParty,testKO,testRevive,play,replay,zeroSkillControl,setTargetingMode,startSupportDemo,confirmSupportDemo,cancelSupportDemo,eligibleAllyTarget:(id,kind)=>eligibleAllyTarget(party.find(p=>p.id===id),kind),setEnemyHpForTest:(id,hp)=>{if(phase!=='player'||attackInProgress)return false;const e=liveEnemies().find(e=>e.id===id);if(!e||!Number.isFinite(hp)||hp<1||hp>e.maxHp)return false;e.hp=hp;syncEnemyHp();return true},setEnemyTarget,setWavePlanForTest,toggleWavePreset,debugDefeatEnemy:(id)=>{const e=liveEnemies().find(e=>e.id===id);if(!e||phase==='setup'||phase==='victory'||phase==='defeat')return false;e.hp=0;resolveEnemyDefeat(e);return true;},selectEnemy:(id)=>setEnemyTarget(id),setCameraPreview:(view)=>{if(phase==='player'){cameraPreview=view;selectedAllyId=activeId}},cameraStatus:()=>cameraShot()};
 window.zeroBasicAnimationDebug=()=>({durationMs:ZERO_BASIC_MS,elapsed:fx?.kind==='basic'&&fx.actor==='zero'?Math.max(0,performance.now()-fx.at):null,active:zeroBasicStage(performance.now())!==null,assets:['zero','zeroBasicWindup','zeroBasicSlash'].map(id=>({id,loaded:!!images[id]?.complete&&!!images[id]?.naturalWidth}))});
 requestAnimationFrame(loop);
