@@ -1,5 +1,5 @@
 'use strict';
-const sources={arena:'/assets/embedded-image-01.png',zero:'/assets/embedded-image-02.png',enemy:'/assets/embedded-image-03.png',portrait:'/assets/embedded-image-04.png',zeroFront:'/assets/embedded-image-05.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png'};
+const sources={arena:'/assets/embedded-image-01.png',zero:'/assets/soul-battle.png',enemy:'/assets/embedded-image-03.png',portrait:'/assets/embedded-image-04.png',zeroFront:'/assets/soul-portrait.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png'};
 
 /* Two-Tone Fundamental 05 preview scheduling engine.
    Baseline event allocation follows approved deterministic fractional cycles and
@@ -102,7 +102,7 @@ let playerRank=1;
 // Numerical Base HP values are inherited/development-only combat fixtures, NOT
 // approved per-character stats. The unnamed units remain developer test slots.
 const ROSTER=[
- {id:'zero',name:'ZERO',label:'Character',hp:2480,basePhysicalAttack:null,baseMagicalAttack:null,basePhysicalDefense:null,baseMagicalDefense:null,speed:115,art:'zero',test:false},
+ {id:'zero',name:'SOUL',label:'Character',hp:2480,basePhysicalAttack:null,baseMagicalAttack:null,basePhysicalDefense:null,baseMagicalDefense:null,speed:115,art:'zero',test:false},
  {id:'test2',name:'TEST SLOT 2',label:'Placeholder • no approved identity',hp:2300,basePhysicalAttack:null,baseMagicalAttack:null,basePhysicalDefense:null,baseMagicalDefense:null,speed:115,art:null,test:true},
  {id:'test3',name:'TEST SLOT 3',label:'Placeholder • no approved identity',hp:2600,basePhysicalAttack:null,baseMagicalAttack:null,basePhysicalDefense:null,baseMagicalDefense:null,speed:115,art:null,test:true},
 ];
@@ -512,7 +512,7 @@ function setTargetingMode(mode){if(!['single','aoe','multi','five-hit'].includes
 function zeroSkillControl(){
  if(phase!=='player'||paused||activeId!=='zero')return play('skill');
  if(sp<1){say('Not enough skill points. Use Basic to restore one.');return false}
- if(!zeroSkillArmed){zeroSkillArmed=true;supportDemo=null;cameraPreview='target';selectedAllyId=null;log='ZERO SKILL: AOE preview. Select an enemy, then tap CONFIRM.';return true}
+ if(!zeroSkillArmed){zeroSkillArmed=true;supportDemo=null;cameraPreview='target';selectedAllyId=null;log='SOUL SKILL: AOE preview. Select an enemy, then tap CONFIRM.';return true}
  return play('skill');
 }
 function startSupportDemo(kind){
@@ -701,7 +701,7 @@ function executeCombatAction(a,action,ultimateSeq=null){
   hits:[],defeats:[],finished:false,startedAt:performance.now(),finishedAt:null,
   energyBefore,energyAfter:a.energy,spBefore,spAfter:sp,spMaxBefore,spMaxAfter:effectiveSpMax()};
  phase='resolve';fx={kind:action,at:performance.now(),damage,actor:a.id,targetEnemyId:victim.id,targetGeometry};
- log=`${controlledSummon?'TEST CONTROLLED SUMMON':action==='ultimate'?'ULT QUEUE':a.id==='zero'&&action==='skill'?'ZERO SKILL • AOE':'TEST '+mode.toUpperCase()}: ${a.name} uses ${action} • ${targets.length} initial target(s).`;
+ log=`${controlledSummon?'TEST CONTROLLED SUMMON':action==='ultimate'?'ULT QUEUE':a.id==='zero'&&action==='skill'?'SOUL SKILL • AOE':'TEST '+mode.toUpperCase()}: ${a.name} uses ${action} • ${targets.length} initial target(s).`;
  if(controlledSummon)summonHistory.push({event:'controlled-activation',id:controlledSummon.id,ownerId:a.id,clock:turnTimeline.clock});
  if(mode==='five-hit'){
   let focused=victim,lastSlot=victim.slot;
@@ -718,7 +718,7 @@ function executeCombatAction(a,action,ultimateSeq=null){
    for(let n=0;n<targets.length;n++)if(targets[n].hp>0)applyTrainingHit(targets[n],damage,n+1);
    },a.id==='zero'&&action==='basic'?645:340);
  }
- schedule(()=>finishTrainingAttack(serial),a.id==='zero'&&action==='basic'?ZERO_BASIC_MS:990);
+ schedule(()=>finishTrainingAttack(serial),a.id==='zero'&&action==='basic'?SOUL_BASIC_MS:990);
  return true;
 }
 // Developer-only test helpers. They do not define the game's revival resource, cost, or eligibility rules.
@@ -798,10 +798,10 @@ function clamp01(x){return Math.min(1,Math.max(0,x))}
 // Zero's user-approved basic-attack assembly: 256×512 neutral + wind-up + slash.
 // The motion is presentation-only; all damage, targeting and turn logic stays in combat actions.
 // 1250 ms: dash 0–260, wind-up 260–460, strike 460–650, impact 650–760, return 760–1250.
-const ZERO_BASIC_MS=1250;
+const SOUL_BASIC_MS=1250;
 function zeroBasicStage(t){
  if(phase!=='resolve'||fx?.kind!=='basic'||fx.actor!=='zero')return null;
- const dt=Math.max(0,t-fx.at);return dt<=ZERO_BASIC_MS?dt:null;
+ const dt=Math.max(0,t-fx.at);return dt<=SOUL_BASIC_MS?dt:null;
 }
 function easeOutCubic(x){x=clamp01(x);return 1-(1-x)*(1-x)*(1-x)}
 function lerp(a,b,x){return a+(b-a)*x}
@@ -1014,7 +1014,7 @@ function drawActorsForShot(t,shot){
   ctx.save();ctx.globalAlpha=.92;
   rect(550,130,470,505,'rgba(17,27,51,.76)','#e6c892',22);
   if(images.zeroFront?.complete&&images.zeroFront.naturalWidth){ctx.drawImage(images.zeroFront,644,150,279,475)}
-  text('ZERO  /  ULTIMATE',784,623,29,'#fff1cc','850','center');ctx.restore();
+  text('SOUL  /  ULTIMATE',784,623,29,'#fff1cc','850','center');ctx.restore();
  }
 }
 function drawBattleShot(t,shot){const reverse=shotWorld(shot)==='reverse';
@@ -1032,7 +1032,7 @@ function drawCameraStage(t){prepareCamera(t);
 }
 
 function drawFx(t){
- if(!fx)return;const dt=t-fx.at;const fxDuration=fx.kind==='basic'&&fx.actor==='zero'?ZERO_BASIC_MS:950;if(dt>fxDuration){fx=null;return}
+ if(!fx)return;const dt=t-fx.at;const fxDuration=fx.kind==='basic'&&fx.actor==='zero'?SOUL_BASIC_MS:950;if(dt>fxDuration){fx=null;return}
  const q=dt/fxDuration;
  ctx.save();
  if(fx.kind==='basic'&&fx.actor==='zero'){
@@ -1238,7 +1238,7 @@ function drawHud(t){
  if(phase==='player'){
   const p=active();text(p?.name||'ALLY',730,712,17,'#fae3b9','800');
   const mode=previewTargetMode(),hits=chooseAttackTargets(mode);
-  text(zeroSkillArmed&&p?.id==='zero'?`ZERO SKILL • AOE • ${hits.length} TARGETS`:mode==='aoe'?`AOE • ${hits.length} TARGETS`:mode==='multi'?`ALL ENEMIES • ${hits.length} TARGETS`:'SELECT AN ENEMY',842,712,15,'#d4e9f4','700');
+  text(zeroSkillArmed&&p?.id==='zero'?`SOUL SKILL • AOE • ${hits.length} TARGETS`:mode==='aoe'?`AOE • ${hits.length} TARGETS`:mode==='multi'?`ALL ENEMIES • ${hits.length} TARGETS`:'SELECT AN ENEMY',842,712,15,'#d4e9f4','700');
  }
  // Portrait-focused Ally HUD review layout, without altering combat resource logic.
  ctx.save();ctx.globalAlpha=cinematic?.88:1;
@@ -1330,5 +1330,5 @@ window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLeve
  unitMagicalDefense:party.map(p=>({id:p.id,level:p.level,baseMagicalDefense:p.baseMagicalDefense,magicalDefense:calculateMagicalDefense(p),flat:{...p.magicalDefenseFlatModifiers},percent:{...p.magicalDefensePercentModifiers}})),
  unitTrueDamageBasis:party.map(p=>({id:p.id,trueAttack:calculateTrueAttack(p),trueDefense:calculateTrueDefense(p),selfTrueDamageReduction:calculateTrueDamageReduction(p,p)}))});
 window.twoToneTest={testGrantExp,testAscend,setPlayerRankForTest,setHpBonusForTest,calculateMaxHp,calculateLevelScaledStat,calculatePhysicalAttack,calculateMagicalAttack,calculatePhysicalDefense,calculateMagicalDefense,calculateTrueAttack,calculateTrueDefense,calculateTrueDamageReduction,calculateDamageAfterDefense,calculatePhysicalDamageAfterDefense,calculateMagicalDamageAfterDefense,calculateTrueDamageAfterDefense,calculateTypedActionDamage,requiredExp,setTrainingRecoveryMode,roundHp,addActionAdvance,addActionDelay,setSpeedMultiplierForTest,queueSummonForTest,turnTimelineSnapshot:()=>turnTimeline.snapshot(),queueUltimate,chargeUltimateForTest,toggleHudStatusDemo,setHudStatusesForTest:(id,items)=>{const p=party.find(p=>p.id===id);if(!p||!Array.isArray(items)||items.length>80)return false;p.hudStatuses=items.map(e=>({kind:e.kind==='debuff'?'debuff':'buff',icon:String(e.icon||'✦').slice(0,2),turns:e.turns===null?null:(Number.isInteger(e.turns)&&e.turns>=0?e.turns:null)}));return true;},setSpCapTestSource,cycleSpCapTest,canQueueUltimate,debugKOForTest:(id)=>{if(['setup','intro','victory','defeat'].includes(phase))return false;const p=party.find(p=>p.id===id);if(!p||p.hp<=0)return false;p.hp=0;gauges[p.id]=0;saveVitals();cancelQueuedUltimatesOfDefeated();return true},startBattle,addUnit,removeUnit,enterSelection,enterPartySetup,saveParty,testKO,testRevive,play,replay,zeroSkillControl,setTargetingMode,startSupportDemo,confirmSupportDemo,cancelSupportDemo,eligibleAllyTarget:(id,kind)=>eligibleAllyTarget(party.find(p=>p.id===id),kind),setEnemyHpForTest:(id,hp)=>{if(phase!=='player'||attackInProgress)return false;const e=liveEnemies().find(e=>e.id===id);if(!e||!Number.isFinite(hp)||hp<1||hp>e.maxHp)return false;e.hp=hp;syncEnemyHp();return true},setEnemyTarget,setWavePlanForTest,toggleWavePreset,debugDefeatEnemy:(id)=>{const e=liveEnemies().find(e=>e.id===id);if(!e||phase==='setup'||phase==='victory'||phase==='defeat')return false;e.hp=0;resolveEnemyDefeat(e);return true;},selectEnemy:(id)=>setEnemyTarget(id),setCameraPreview:(view)=>{if(phase==='player'){cameraPreview=view;selectedAllyId=activeId}},cameraStatus:()=>cameraShot()};
-window.zeroBasicAnimationDebug=()=>({durationMs:ZERO_BASIC_MS,elapsed:fx?.kind==='basic'&&fx.actor==='zero'?Math.max(0,performance.now()-fx.at):null,active:zeroBasicStage(performance.now())!==null,assets:['zero','zeroBasicWindup','zeroBasicSlash'].map(id=>({id,loaded:!!images[id]?.complete&&!!images[id]?.naturalWidth}))});
+window.zeroBasicAnimationDebug=()=>({durationMs:SOUL_BASIC_MS,elapsed:fx?.kind==='basic'&&fx.actor==='zero'?Math.max(0,performance.now()-fx.at):null,active:zeroBasicStage(performance.now())!==null,assets:['zero','zeroBasicWindup','zeroBasicSlash'].map(id=>({id,loaded:!!images[id]?.complete&&!!images[id]?.naturalWidth}))});
 requestAnimationFrame(loop);
