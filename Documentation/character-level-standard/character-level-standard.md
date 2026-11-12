@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This standard defines character Levels and Character XP. Level-based stat growth will be defined after the stat system is settled.
+This standard defines character Levels and Character XP. All six primary stats—HP, Physical Attack, Physical Defense, Magical Attack, Magical Defense, and Speed—scale with character Level according to their individual stat standards.
 
 ## Character Levels
 
@@ -42,4 +42,3 @@ This standard defines character Levels and Character XP. Level-based stat growth
 
 - Sources of Character XP.
 - Ascension requirements.
-- Which stats Levels affect and how they grow.
