@@ -102,9 +102,9 @@ let playerRank=1;
 // Numerical Base HP values are inherited/development-only combat fixtures, NOT
 // approved per-character stats. The unnamed units remain developer test slots.
 const ROSTER=[
- {id:'zero',name:'ZERO',label:'Character',hp:2480,basePhysicalAttack:null,speed:115,art:'zero',test:false},
- {id:'test2',name:'TEST SLOT 2',label:'Placeholder • no approved identity',hp:2300,basePhysicalAttack:null,speed:115,art:null,test:true},
- {id:'test3',name:'TEST SLOT 3',label:'Placeholder • no approved identity',hp:2600,basePhysicalAttack:null,speed:115,art:null,test:true},
+ {id:'zero',name:'ZERO',label:'Character',hp:2480,basePhysicalAttack:null,baseMagicalAttack:null,basePhysicalDefense:null,baseMagicalDefense:null,speed:115,art:'zero',test:false},
+ {id:'test2',name:'TEST SLOT 2',label:'Placeholder • no approved identity',hp:2300,basePhysicalAttack:null,baseMagicalAttack:null,basePhysicalDefense:null,baseMagicalDefense:null,speed:115,art:null,test:true},
+ {id:'test3',name:'TEST SLOT 3',label:'Placeholder • no approved identity',hp:2600,basePhysicalAttack:null,baseMagicalAttack:null,basePhysicalDefense:null,baseMagicalDefense:null,speed:115,art:null,test:true},
 ];
 const ROSTER_IDS=new Set(ROSTER.map(u=>u.id));
 function roundHp(value){return Math.floor(value+0.5)}
@@ -118,6 +118,59 @@ function calculateLevelScaledStat(base,level,flat={},percent={}){
 function calculatePhysicalAttack(unit){
  if(!unit||!Number.isFinite(unit.basePhysicalAttack))return null;
  return calculateLevelScaledStat(unit.basePhysicalAttack,unit.level,unit.physicalAttackFlatModifiers||{},unit.physicalAttackPercentModifiers||{});
+}
+function calculateMagicalAttack(unit){
+ if(!unit||!Number.isFinite(unit.baseMagicalAttack))return null;
+ return calculateLevelScaledStat(unit.baseMagicalAttack,unit.level,unit.magicalAttackFlatModifiers||{},unit.magicalAttackPercentModifiers||{});
+}
+function calculatePhysicalDefense(unit){
+ if(!unit||!Number.isFinite(unit.basePhysicalDefense))return null;
+ return calculateLevelScaledStat(unit.basePhysicalDefense,unit.level,unit.physicalDefenseFlatModifiers||{},unit.physicalDefensePercentModifiers||{});
+}
+function calculateMagicalDefense(unit){
+ if(!unit||!Number.isFinite(unit.baseMagicalDefense))return null;
+ return calculateLevelScaledStat(unit.baseMagicalDefense,unit.level,unit.magicalDefenseFlatModifiers||{},unit.magicalDefensePercentModifiers||{});
+}
+function calculateTrueAttack(unit){
+ const physical=calculatePhysicalAttack(unit),magical=calculateMagicalAttack(unit);
+ return physical===null||magical===null?null:(physical+magical)*.5;
+}
+function calculateTrueDefense(unit){
+ const physical=calculatePhysicalDefense(unit),magical=calculateMagicalDefense(unit);
+ return physical===null||magical===null?null:(physical+magical)*.5;
+}
+function calculateTrueDamageReduction(attacker,target){
+ const physicalAttack=calculatePhysicalAttack(attacker),magicalAttack=calculateMagicalAttack(attacker);
+ const physicalDefense=calculatePhysicalDefense(target),magicalDefense=calculateMagicalDefense(target);
+ if(!Number.isFinite(physicalAttack)||physicalAttack<0||!Number.isFinite(magicalAttack)||magicalAttack<0||!Number.isFinite(physicalDefense)||physicalDefense<0||!Number.isFinite(magicalDefense)||magicalDefense<0)return null;
+ const physicalContribution=physicalAttack>0 ? 0.5*Math.min(physicalDefense/physicalAttack,1) : 0;
+ const magicalContribution=magicalAttack>0 ? 0.5*Math.min(magicalDefense/magicalAttack,1) : 0;
+ return physicalContribution+magicalContribution;
+}
+function calculateDamageAfterDefense(damageBeforeDefense,attack,defense){
+ if(!Number.isFinite(damageBeforeDefense)||damageBeforeDefense<0||!Number.isFinite(attack)||attack<=0||!Number.isFinite(defense)||defense<0)return null;
+ const reduction=Math.min(defense/attack,1);
+ return roundHp(damageBeforeDefense*(1-reduction));
+}
+function calculatePhysicalDamageAfterDefense(damageBeforeDefense,attacker,target){
+ return calculateDamageAfterDefense(damageBeforeDefense,calculatePhysicalAttack(attacker),calculatePhysicalDefense(target));
+}
+function calculateMagicalDamageAfterDefense(damageBeforeDefense,attacker,target){
+ return calculateDamageAfterDefense(damageBeforeDefense,calculateMagicalAttack(attacker),calculateMagicalDefense(target));
+}
+function calculateTrueDamageAfterDefense(damageBeforeDefense,attacker,target){
+ const attack=calculateTrueAttack(attacker),reduction=calculateTrueDamageReduction(attacker,target);
+ if(!Number.isFinite(damageBeforeDefense)||damageBeforeDefense<0||!Number.isFinite(attack)||attack<=0||!Number.isFinite(reduction))return null;
+ return roundHp(damageBeforeDefense*(1-reduction));
+}
+function calculateTypedActionDamage(type,attackRate,attacker,target){
+ if(!['physical','magical','true'].includes(type)||!Number.isFinite(attackRate)||attackRate<0)return null;
+ const attack=type==='physical'?calculatePhysicalAttack(attacker):type==='magical'?calculateMagicalAttack(attacker):calculateTrueAttack(attacker);
+ const defense=type==='physical'?calculatePhysicalDefense(target):type==='magical'?calculateMagicalDefense(target):calculateTrueDefense(target);
+ const reduction=type==='true'?calculateTrueDamageReduction(attacker,target):(Number.isFinite(attack)&&attack>0&&Number.isFinite(defense)&&defense>=0?Math.min(defense/attack,1):null);
+ if(!Number.isFinite(attack)||attack<=0||!Number.isFinite(defense)||defense<0||!Number.isFinite(reduction))return null;
+ const damageBeforeDefense=attack*attackRate;
+ return {type,attackBasis:attack,defenseBasis:defense,attackRate,damageBeforeDefense,reduction,damageTaken:roundHp(damageBeforeDefense*(1-reduction))};
 }
 function characterLevelCap(rank=playerRank){return Number.isInteger(rank)&&rank>=1&&rank<=50?Math.ceil(rank/10)*10:0}
 function requiredExp(level){return Number.isInteger(level)&&level>=1&&level<CHARACTER_MAX_LEVEL?level*(10*(1+Math.floor(level/5))):0}
@@ -241,7 +294,7 @@ function spawnProgressedUnit(id){
  const savedMax=Number.isFinite(saved?.maxHp)&&saved.maxHp>0?saved.maxHp:maxHp;
  const savedHp=Number.isFinite(saved?.hp)?saved.hp:maxHp;
  const hp=restore?maxHp:savedHp<=0?0:Math.max(0,roundHp(maxHp*(savedHp/savedMax)));
- return {...model,baseHp:model.hp,level:progress.level,hp,maxHp,hpFlatModifiers:{},hpPercentModifiers:{},physicalAttackFlatModifiers:{},physicalAttackPercentModifiers:{},energy:20,energyReserved:0};
+ return {...model,baseHp:model.hp,level:progress.level,hp,maxHp,hpFlatModifiers:{},hpPercentModifiers:{},physicalAttackFlatModifiers:{},physicalAttackPercentModifiers:{},magicalAttackFlatModifiers:{},magicalAttackPercentModifiers:{},physicalDefenseFlatModifiers:{},physicalDefensePercentModifiers:{},magicalDefenseFlatModifiers:{},magicalDefensePercentModifiers:{},energy:20,energyReserved:0};
 }
 
 const turnTimeline=new TwoToneTurnTimeline();
@@ -1262,7 +1315,11 @@ window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='playe
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
  characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
  unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}})),
- unitPhysicalAttack:party.map(p=>({id:p.id,level:p.level,basePhysicalAttack:p.basePhysicalAttack,physicalAttack:calculatePhysicalAttack(p),flat:{...p.physicalAttackFlatModifiers},percent:{...p.physicalAttackPercentModifiers}}))});
-window.twoToneTest={testGrantExp,testAscend,setPlayerRankForTest,setHpBonusForTest,calculateMaxHp,calculateLevelScaledStat,calculatePhysicalAttack,requiredExp,setTrainingRecoveryMode,roundHp,addActionAdvance,addActionDelay,setSpeedMultiplierForTest,queueSummonForTest,turnTimelineSnapshot:()=>turnTimeline.snapshot(),queueUltimate,chargeUltimateForTest,toggleHudStatusDemo,setHudStatusesForTest:(id,items)=>{const p=party.find(p=>p.id===id);if(!p||!Array.isArray(items)||items.length>80)return false;p.hudStatuses=items.map(e=>({kind:e.kind==='debuff'?'debuff':'buff',icon:String(e.icon||'✦').slice(0,2),turns:e.turns===null?null:(Number.isInteger(e.turns)&&e.turns>=0?e.turns:null)}));return true;},setSpCapTestSource,cycleSpCapTest,canQueueUltimate,debugKOForTest:(id)=>{if(['setup','intro','victory','defeat'].includes(phase))return false;const p=party.find(p=>p.id===id);if(!p||p.hp<=0)return false;p.hp=0;gauges[p.id]=0;saveVitals();cancelQueuedUltimatesOfDefeated();return true},startBattle,addUnit,removeUnit,enterSelection,enterPartySetup,saveParty,testKO,testRevive,play,replay,zeroSkillControl,setTargetingMode,startSupportDemo,confirmSupportDemo,cancelSupportDemo,eligibleAllyTarget:(id,kind)=>eligibleAllyTarget(party.find(p=>p.id===id),kind),setEnemyHpForTest:(id,hp)=>{if(phase!=='player'||attackInProgress)return false;const e=liveEnemies().find(e=>e.id===id);if(!e||!Number.isFinite(hp)||hp<1||hp>e.maxHp)return false;e.hp=hp;syncEnemyHp();return true},setEnemyTarget,setWavePlanForTest,toggleWavePreset,debugDefeatEnemy:(id)=>{const e=liveEnemies().find(e=>e.id===id);if(!e||phase==='setup'||phase==='victory'||phase==='defeat')return false;e.hp=0;resolveEnemyDefeat(e);return true;},selectEnemy:(id)=>setEnemyTarget(id),setCameraPreview:(view)=>{if(phase==='player'){cameraPreview=view;selectedAllyId=activeId}},cameraStatus:()=>cameraShot()};
+ unitPhysicalAttack:party.map(p=>({id:p.id,level:p.level,basePhysicalAttack:p.basePhysicalAttack,physicalAttack:calculatePhysicalAttack(p),flat:{...p.physicalAttackFlatModifiers},percent:{...p.physicalAttackPercentModifiers}})),
+ unitMagicalAttack:party.map(p=>({id:p.id,level:p.level,baseMagicalAttack:p.baseMagicalAttack,magicalAttack:calculateMagicalAttack(p),flat:{...p.magicalAttackFlatModifiers},percent:{...p.magicalAttackPercentModifiers}})),
+ unitPhysicalDefense:party.map(p=>({id:p.id,level:p.level,basePhysicalDefense:p.basePhysicalDefense,physicalDefense:calculatePhysicalDefense(p),flat:{...p.physicalDefenseFlatModifiers},percent:{...p.physicalDefensePercentModifiers}})),
+ unitMagicalDefense:party.map(p=>({id:p.id,level:p.level,baseMagicalDefense:p.baseMagicalDefense,magicalDefense:calculateMagicalDefense(p),flat:{...p.magicalDefenseFlatModifiers},percent:{...p.magicalDefensePercentModifiers}})),
+ unitTrueDamageBasis:party.map(p=>({id:p.id,trueAttack:calculateTrueAttack(p),trueDefense:calculateTrueDefense(p),selfTrueDamageReduction:calculateTrueDamageReduction(p,p)}))});
+window.twoToneTest={testGrantExp,testAscend,setPlayerRankForTest,setHpBonusForTest,calculateMaxHp,calculateLevelScaledStat,calculatePhysicalAttack,calculateMagicalAttack,calculatePhysicalDefense,calculateMagicalDefense,calculateTrueAttack,calculateTrueDefense,calculateTrueDamageReduction,calculateDamageAfterDefense,calculatePhysicalDamageAfterDefense,calculateMagicalDamageAfterDefense,calculateTrueDamageAfterDefense,calculateTypedActionDamage,requiredExp,setTrainingRecoveryMode,roundHp,addActionAdvance,addActionDelay,setSpeedMultiplierForTest,queueSummonForTest,turnTimelineSnapshot:()=>turnTimeline.snapshot(),queueUltimate,chargeUltimateForTest,toggleHudStatusDemo,setHudStatusesForTest:(id,items)=>{const p=party.find(p=>p.id===id);if(!p||!Array.isArray(items)||items.length>80)return false;p.hudStatuses=items.map(e=>({kind:e.kind==='debuff'?'debuff':'buff',icon:String(e.icon||'✦').slice(0,2),turns:e.turns===null?null:(Number.isInteger(e.turns)&&e.turns>=0?e.turns:null)}));return true;},setSpCapTestSource,cycleSpCapTest,canQueueUltimate,debugKOForTest:(id)=>{if(['setup','intro','victory','defeat'].includes(phase))return false;const p=party.find(p=>p.id===id);if(!p||p.hp<=0)return false;p.hp=0;gauges[p.id]=0;saveVitals();cancelQueuedUltimatesOfDefeated();return true},startBattle,addUnit,removeUnit,enterSelection,enterPartySetup,saveParty,testKO,testRevive,play,replay,zeroSkillControl,setTargetingMode,startSupportDemo,confirmSupportDemo,cancelSupportDemo,eligibleAllyTarget:(id,kind)=>eligibleAllyTarget(party.find(p=>p.id===id),kind),setEnemyHpForTest:(id,hp)=>{if(phase!=='player'||attackInProgress)return false;const e=liveEnemies().find(e=>e.id===id);if(!e||!Number.isFinite(hp)||hp<1||hp>e.maxHp)return false;e.hp=hp;syncEnemyHp();return true},setEnemyTarget,setWavePlanForTest,toggleWavePreset,debugDefeatEnemy:(id)=>{const e=liveEnemies().find(e=>e.id===id);if(!e||phase==='setup'||phase==='victory'||phase==='defeat')return false;e.hp=0;resolveEnemyDefeat(e);return true;},selectEnemy:(id)=>setEnemyTarget(id),setCameraPreview:(view)=>{if(phase==='player'){cameraPreview=view;selectedAllyId=activeId}},cameraStatus:()=>cameraShot()};
 window.zeroBasicAnimationDebug=()=>({durationMs:ZERO_BASIC_MS,elapsed:fx?.kind==='basic'&&fx.actor==='zero'?Math.max(0,performance.now()-fx.at):null,active:zeroBasicStage(performance.now())!==null,assets:['zero','zeroBasicWindup','zeroBasicSlash'].map(id=>({id,loaded:!!images[id]?.complete&&!!images[id]?.naturalWidth}))});
 requestAnimationFrame(loop);
