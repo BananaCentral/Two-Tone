@@ -299,7 +299,16 @@ function spawnProgressedUnit(id){
 
 const turnTimeline=new TwoToneTurnTimeline();
 let speedModifiers=Object.create(null),summons=[],summonSerial=0,summonHistory=[];
-function speedOf(unit){return Math.max(1,unit.speed*(speedModifiers[unit.id]||1))}
+function calculateSpeed(unit){
+ if(!unit)return null;
+ const base=Number.isFinite(unit.baseSpeed)?unit.baseSpeed:unit.speed;
+ if(!Number.isFinite(base))return null;
+ const effectMultiplier=speedModifiers[unit.id]||1;
+ return calculateLevelScaledStat(base,Number.isInteger(unit.level)?unit.level:1,
+  {...(unit.speedFlatModifiers||{})},
+  {...(unit.speedPercentModifiers||{}),temporarySpeedEffect:effectMultiplier-1});
+}
+function speedOf(unit){return Math.max(1,calculateSpeed(unit)||1)}
 function timelineEnemyMembers(){
  // In this training encounter, a wave's predefined enemy roster is its speed-averaging team.
  // Defeated and waiting enemy instances remain in the cohort; the rule for non-wave boss
