@@ -199,8 +199,14 @@ function recomputeUnitMaxHp(unit){
  const max=calculateMaxHp(unit.baseHp,unit.level,unit.hpFlatModifiers,unit.hpPercentModifiers);
  if(max===null)return false;
  const oldMax=unit.maxHp||max, oldHp=unit.hp;
- // Preserve current HP proportion during battle, including for max-HP reductions.
- unit.maxHp=max;unit.hp=oldHp<=0?0:Math.max(0,Math.min(max,roundHp(max*(oldHp/oldMax))));
+ // Preserve the current HP ratio, including values above the old Max HP.
+ unit.maxHp=max;unit.hp=oldHp<=0?0:Math.max(0,roundHp(max*(oldHp/oldMax)));
+ saveVitals();return true;
+}
+function healCharacterHp(unit,amount,{allowOverMax=false}={}){
+ if(!unit||unit.hp<=0||!Number.isFinite(amount)||amount<=0)return false;
+ if(!allowOverMax&&unit.hp>unit.maxHp)return false;
+ unit.hp=allowOverMax?unit.hp+amount:Math.min(unit.maxHp,unit.hp+amount);
  saveVitals();return true;
 }
 function setHpBonusForTest(id,source,kind,value){
@@ -223,7 +229,9 @@ function spawnProgressedUnit(id){
  const model=ROSTER.find(x=>x.id===id),progress=progressFor(id);if(!model||!progress)return null;
  const maxHp=calculateMaxHp(model.hp,progress.level);if(maxHp===null)return null;
  const saved=savedVitals[id];const restore=trainingRecoveryMode==='restore'||!saved;
- const hp=restore?maxHp:Math.max(0,Math.min(maxHp,Number.isFinite(saved.hp)?roundHp(saved.hp):maxHp));
+ const savedMax=Number.isFinite(saved?.maxHp)&&saved.maxHp>0?saved.maxHp:maxHp;
+ const savedHp=Number.isFinite(saved?.hp)?saved.hp:maxHp;
+ const hp=restore?maxHp:savedHp<=0?0:Math.max(0,roundHp(maxHp*(savedHp/savedMax)));
  return {...model,baseHp:model.hp,level:progress.level,hp,maxHp,hpFlatModifiers:{},hpPercentModifiers:{},energy:20,energyReserved:0};
 }
 
@@ -419,7 +427,7 @@ function runNextUltimate(){
  if(resume)resume();
 }
 
-function eligibleAllyTarget(p,kind){return !!p&&(kind==='revive'?p.hp<=0:p.hp>0)}
+function eligibleAllyTarget(p,kind){return !!p&&(kind==='revive'?p.hp<=0:kind==='heal'?p.hp>0&&p.hp<=p.maxHp:p.hp>0)}
 function chooseAttackTargets(mode=targetingMode,primary=chosenEnemy()){
  const live=liveEnemies();if(mode==='multi')return live.slice();if(!primary)return [];
  if(mode==='aoe')return live.filter(e=>Math.abs(e.slot-primary.slot)<=1);
@@ -439,7 +447,7 @@ function zeroSkillControl(){
 function startSupportDemo(kind){
  if(phase!=='player'||paused||!['heal','revive'].includes(kind))return false;
  const eligible=party.filter(p=>eligibleAllyTarget(p,kind));
- if(!eligible.length){say(kind==='revive'?'No defeated ally to revive.':'No living allies.');return false}
+ if(!eligible.length){say(kind==='revive'?'No defeated ally to revive.':'No eligible ally to heal.');return false}
  supportDemo=kind;zeroSkillArmed=false;selectedAllyId=eligible.find(p=>p.id===activeId)?.id||eligible[0].id;cameraPreview='party';
  log=`TEST ONLY: choose ${kind==='revive'?'a defeated':'a living'} ally, then confirm.`;return true;
 }
@@ -450,7 +458,7 @@ function confirmSupportDemo(){
  if(!eligibleAllyTarget(p,supportDemo)){say('This ally is not eligible for that action.');return false}
  const kind=supportDemo,before=p.hp;
  // Sandbox test only: no real skill, turn, energy, or SP are consumed; costs remain undecided.
- if(kind==='heal')p.hp=Math.min(p.maxHp,p.hp+160);
+ if(kind==='heal')healCharacterHp(p,160);
  else{p.hp=Math.max(1,roundHp(p.maxHp*.35));gauges[p.id]=0}saveVitals();
  supportTestHistory.push({kind,target:p.id,before,after:p.hp,actor:activeId});
  log=`TEST ONLY: ${kind==='heal'?'healing':'revival'} targeted ${p.name} (${before} → ${p.hp} HP).`;
