@@ -16,9 +16,9 @@ This standard defines where project files belong and how they are grouped.
 ## Documentation
 
 - Use `Documentation` only for project standards.
-- Give each fundamental standard its own folder.
+- Give each fundamental standard its own lowercase kebab-case folder.
 - Place specific standards as documents inside the fundamental standard folder they belong to.
-- For example, naming and file-management standards belong under `Project Standard`; a combat-specific standard belongs under `Combat Standard`.
+- For example, naming and file-management standards belong under `project-standard`; a combat-specific standard belongs under `combat-standard`.
 
 ## Source and Static Files
 
@@ -35,16 +35,16 @@ Two-Tone/
 ├── index.html
 ├── public/
 │   └── assets/
-│       └── [asset type or feature]/
+│       └── [asset-type-or-feature]/
 ├── src/
 │   ├── scripts/
 │   │   └── [feature]/
 │   └── styles/
 ├── Documentation/
-│   ├── Project Standard/
+│   ├── project-standard/
 │   │   ├── naming-scheme-standard.md
 │   │   └── file-management-standard.md
-│   └── [Other Standard]/
+│   └── [other-standard]/
 │       └── [specific-standard].md
 ├── package.json  (when needed)
 └── third-party/  (only when needed)
