@@ -74,7 +74,7 @@ class TwoToneTurnTimeline {
   const first=new Set(Array.from(this.states.values()).filter(s=>s.immediate).map(s=>s.id));
   const result=[],eps=1e-9;
   for(let i=0;i<count;i++){
-   const ordered=Array.from(this.states.values()).map(s=>({s,time:first.has(s.id)?this.clock:this.nominalAt(s,indexes.get(s.id)-s.credit)}))
+   const ordered=Array.from(this.states.values()).map(s=>({s,time:Math.max(this.clock,first.has(s.id)?this.clock:this.nominalAt(s,indexes.get(s.id)-s.credit))}))
      .sort((a,b)=>a.time-b.time || Number(first.has(b.s.id))-Number(first.has(a.s.id)) || b.s.speed-a.s.speed || (a.s.faction==='ally'?-1:1)-(b.s.faction==='ally'?-1:1) || a.s.id.localeCompare(b.s.id));
    if(!ordered.length)break;const {s,time}=ordered[0];result.push({id:s.id,at:Math.max(this.clock,time),summon:s.summon});indexes.set(s.id,indexes.get(s.id)+1);first.delete(s.id);
   }return result;
@@ -97,6 +97,8 @@ const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:f
 const W=1600,H=900, TEAM_KEY='two-tone-demo-team-fundamental-1-v1';
 const PROGRESSION_KEY='two-tone-character-progress-v1',VITALS_KEY='two-tone-character-vitals-v1';
 const CHARACTER_MAX_LEVEL=50,ASCENSION_GATES=[10,20,30,40];
+// Rank progression is not implemented yet; this value is the account Rank hook.
+let playerRank=1;
 // Numerical Base HP values are inherited/development-only combat fixtures, NOT
 // approved per-character stats. The unnamed units remain developer test slots.
 const ROSTER=[
@@ -106,9 +108,20 @@ const ROSTER=[
 ];
 const ROSTER_IDS=new Set(ROSTER.map(u=>u.id));
 function roundHp(value){return Math.floor(value+0.5)}
-function requiredExp(level){return Number.isInteger(level)&&level>=1&&level<CHARACTER_MAX_LEVEL?100*(1+Math.floor((level-1)/5)):0}
+function characterLevelCap(rank=playerRank){return Number.isInteger(rank)&&rank>=1&&rank<=50?Math.ceil(rank/10)*10:0}
+function requiredExp(level){return Number.isInteger(level)&&level>=1&&level<CHARACTER_MAX_LEVEL?level*(10*(1+Math.floor(level/5))):0}
 function defaultProgress(){return {level:1,exp:0,ascended:[]}}
-function validateProgress(value){
+function validateProgress(value,cap=characterLevelCap()){
+ if(!value||!Number.isInteger(value.level)||value.level<1||value.level>cap||
+    !Number.isInteger(value.exp)||value.exp<0||!Array.isArray(value.ascended))return false;
+ const completed=value.ascended;
+ if(completed.some(g=>!ASCENSION_GATES.includes(g))||new Set(completed).size!==completed.length)return false;
+ for(const g of ASCENSION_GATES)if(value.level>g&&!completed.includes(g))return false;
+ if(value.level===cap||ASCENSION_GATES.includes(value.level)&&!completed.includes(value.level))return true;
+ return value.exp<requiredExp(value.level);
+}
+function legacyRequiredExp(level){return Number.isInteger(level)&&level>=1&&level<CHARACTER_MAX_LEVEL?100*(1+Math.floor((level-1)/5)):0}
+function validateLegacyProgress(value){
  if(!value||!Number.isInteger(value.level)||value.level<1||value.level>CHARACTER_MAX_LEVEL||
     !Number.isInteger(value.exp)||value.exp<0||!Array.isArray(value.ascended))return false;
  const completed=value.ascended;
@@ -116,37 +129,63 @@ function validateProgress(value){
  for(const g of ASCENSION_GATES)if(value.level>g&&!completed.includes(g))return false;
  if(value.level===CHARACTER_MAX_LEVEL)return value.exp===0;
  if(ASCENSION_GATES.includes(value.level)&&!completed.includes(value.level))return value.exp===0;
- return value.exp<requiredExp(value.level);
+ return value.exp<legacyRequiredExp(value.level);
+}
+function settleCharacterProgress(progress,cap=characterLevelCap()){
+ let levelsGained=0;
+ while(progress.level<cap){
+  if(ASCENSION_GATES.includes(progress.level)&&!progress.ascended.includes(progress.level))break;
+  const needed=requiredExp(progress.level);if(progress.exp<needed)break;
+  progress.exp-=needed;progress.level++;levelsGained++;
+ }
+ return levelsGained;
 }
 function loadProgress(){
  let stored={};try{stored=JSON.parse(localStorage.getItem(PROGRESSION_KEY)||'{}')||{}}catch(e){}
- const data={};for(const r of ROSTER){const p=stored[r.id];data[r.id]=validateProgress(p)?{level:p.level,exp:p.exp,ascended:[...p.ascended]}:defaultProgress()}return data;
+ const data={},cap=characterLevelCap();for(const r of ROSTER){const p=stored[r.id];
+  if(validateProgress(p,cap))data[r.id]={level:p.level,exp:p.exp,ascended:[...p.ascended]};
+  else if(validateLegacyProgress(p)){
+   const level=Math.min(p.level,cap),ascended=[...p.ascended];let exp=0;
+   if(p.level<=cap){const oldNeed=legacyRequiredExp(p.level),newNeed=requiredExp(p.level);exp=oldNeed?Math.floor(p.exp*newNeed/oldNeed):0;}
+   else{
+    for(let l=cap;l<p.level;l++)exp+=requiredExp(l);
+    const oldNeed=legacyRequiredExp(p.level),newNeed=requiredExp(p.level);if(oldNeed)exp+=Math.floor(p.exp*newNeed/oldNeed);
+   }
+   data[r.id]={level,exp,ascended};
+  }else data[r.id]=defaultProgress();
+  settleCharacterProgress(data[r.id],cap);
+ }return data;
 }
 let characterProgress=loadProgress();
 function progressFor(id){return characterProgress[id]||null}
 function saveProgress(){try{localStorage.setItem(PROGRESSION_KEY,JSON.stringify(characterProgress))}catch(e){}}
 // Resource items/quantities are not approved yet. This debug injection never
-// models inventory consumption. A grant crossing a locked ascension gate/cap
-// is rejected in full rather than inventing an excess-EXP policy.
-function testGrantExp(id,amount){
- const current=progressFor(id);if(!current||!Number.isInteger(amount)||amount<=0||current.level>=CHARACTER_MAX_LEVEL)return false;
+// models inventory consumption. Production Character XP sources are not defined.
+function grantCharacterXp(id,amount){
+ const current=progressFor(id),cap=characterLevelCap();if(!current||!Number.isSafeInteger(amount)||amount<=0||current.level>=cap)return false;
  const temp={level:current.level,exp:current.exp,ascended:[...current.ascended]};
- let remaining=amount;
- while(remaining>0){
-  if(temp.level>=CHARACTER_MAX_LEVEL||ASCENSION_GATES.includes(temp.level)&&!temp.ascended.includes(temp.level))return false;
-  const needed=requiredExp(temp.level)-temp.exp,take=Math.min(needed,remaining);
-  temp.exp+=take;remaining-=take;
-  if(temp.exp===requiredExp(temp.level)){temp.level++;temp.exp=0;}
- }
- if(!validateProgress(temp))return false;
+ if(!Number.isSafeInteger(temp.exp+amount))return false;temp.exp+=amount;settleCharacterProgress(temp,cap);
+ if(!validateProgress(temp,cap))return false;
  const before=current.level;characterProgress[id]=temp;saveProgress();
  const actor=party.find(p=>p.id===id);
  if(actor){actor.level=temp.level;if(before!==temp.level)recomputeUnitMaxHp(actor);}
  return {level:temp.level,exp:temp.exp,levelsGained:temp.level-before,nextExp:requiredExp(temp.level)};
 }
+function testGrantExp(id,amount){return grantCharacterXp(id,amount)}
 function testAscend(id){
  const p=progressFor(id);if(!p||!ASCENSION_GATES.includes(p.level)||p.ascended.includes(p.level))return false;
- p.ascended.push(p.level);saveProgress();return true;
+ p.ascended.push(p.level);settleCharacterProgress(p);saveProgress();
+ const actor=party.find(x=>x.id===id);if(actor){actor.level=p.level;recomputeUnitMaxHp(actor)}
+ return true;
+}
+function setPlayerRankForTest(rank){
+ if(!Number.isInteger(rank)||rank<playerRank||rank>50)return false;
+ playerRank=rank;const cap=characterLevelCap();
+ for(const [id,p] of Object.entries(characterProgress)){
+  const before=p.level;settleCharacterProgress(p,cap);
+  const actor=party.find(x=>x.id===id);if(actor){actor.level=p.level;if(before!==p.level)recomputeUnitMaxHp(actor)}
+ }
+ saveProgress();return true;
 }
 function hpModifiers(unit){return {flat:unit.hpFlatModifiers||{},percent:unit.hpPercentModifiers||{}}}
 function calculateMaxHp(baseHp,level,flat={},percent={}){
@@ -294,17 +333,32 @@ const SP_CAP_SOURCES=new Set(['passive','skill','ultimate','character-potential'
 let spCapModifiers=Object.create(null),ultimateQueue=[],ultimateSequence=0,ultimateHistory=[],
     ultimateResume=null,ultimateExecuting=false;
 function effectiveSpMax(){return Math.max(0,BASE_SP_MAX+Object.values(spCapModifiers).reduce((a,b)=>a+b,0))}
+// Modifier IDs are unique per effect so separate increases stack, even when
+// they share a category. Updating or removing a modifier never clamps current SP.
+function setSpCapModifier(sourceId,amount){
+ if(typeof sourceId!=='string'||!sourceId.trim()||sourceId.length>128||!Number.isSafeInteger(amount))return false;
+ if(amount)spCapModifiers[sourceId]=amount;else delete spCapModifiers[sourceId];
+ return true;
+}
+function gainSp(amount,{allowOvercap=false}={}){
+ if(!Number.isSafeInteger(amount)||amount<0)return false;
+ if(allowOvercap){sp+=amount;return true}
+ const cap=effectiveSpMax();
+ // Ordinary gains cannot add above cap, but preserve SP already above a lowered cap.
+ if(sp>=cap)return true;
+ sp=Math.min(cap,sp+amount);return true;
+}
 function availableEnergy(p){return p?Math.max(0,p.energy-(p.energyReserved||0)):0}
 function isUltPending(id){return ultimateQueue.some(q=>q.actorId===id)||(ultimateExecuting&&lastAttack?.action==='ultimate'&&lastAttack.actor===id)}
-function canQueueUltimate(p){return !!p&&p.hp>0&&!paused&&!['setup','intro','victory','defeat'].includes(phase)
+function canQueueUltimate(p){return !!p&&p.hp>0&&!paused&&['player','enemy','resolve'].includes(phase)
   &&availableEnergy(p)>=ULTIMATE_ENERGY_COST&&!isUltPending(p.id)}
 function resetActionResources(){sp=3;spCapModifiers=Object.create(null);ultimateQueue=[];ultimateSequence=0;ultimateHistory=[];ultimateResume=null;ultimateExecuting=false;
   for(const p of party)p.energyReserved=0;}
 function setSpCapTestSource(source,bonus){
  if(!SP_CAP_SOURCES.has(source)||!Number.isInteger(bonus)||bonus<0||bonus>20)return false;
- if(bonus)spCapModifiers[source]=bonus;else delete spCapModifiers[source];
- // Decrease-under-balance semantics remain outside the approved standard. This
- // preview exposes only nonnegative TEST boosts and never alters current SP.
+ if(!setSpCapModifier(source,bonus))return false;
+ // This preview exposes only nonnegative TEST boosts. General gameplay effects
+ // use setSpCapModifier with a unique source ID and may raise or lower the cap.
  log=`TEST ONLY: ${source} SP limit modifier ${bonus>=0?'+':''}${bonus}. Maximum ${effectiveSpMax()}.`;
  return true;
 }
@@ -557,7 +611,7 @@ function executeCombatAction(a,action,ultimateSeq=null){
  const controlledSummon=action==='skill'&&a.test?summons.find(s=>s.mode==='controlled'&&!s.pendingCreation&&s.ownerId===a.id):null;
  const energyBefore=a.energy,spBefore=sp,spMaxBefore=effectiveSpMax();
  let damage=0;
- if(action==='basic'){damage=280;a.energy=Math.min(120,a.energy+25);sp=Math.min(effectiveSpMax(),sp+1)}
+ if(action==='basic'){damage=280;a.energy=Math.min(120,a.energy+25);gainSp(1)}
  else if(action==='skill'){damage=460;a.energy=Math.min(120,a.energy+35);sp--;addActionAdvance(a.id,25)}
  else damage=980; // energy is deducted when a queued Ultimate BEGINS, never here
  // Damage and energy gains remain existing sandbox values; target modes except
@@ -601,7 +655,7 @@ function drawMainMenu(){
  text('TWO-TONE',800,112,58,'#f8f4ea','900','center');
  text('MAIN MENU',800,170,20,'#eacb87','800','center');
  rect(1293,63,190,66,'rgba(13,17,35,.94)','#eacb87',12);
- text('RANK',1388,82,13,'#bfc8d9','800','center');text('1',1388,107,25,'#f7f3f8','850','center');
+ text('RANK',1388,82,13,'#bfc8d9','800','center');text(playerRank,1388,107,25,'#f7f3f8','850','center');
  const items=[
   {label:'CHARACTERS',x:220,y:256},
   {label:'PARTY',x:640,y:256,active:true,action:'open-party',detail:'MANAGE CURRENT PARTY'},
@@ -1058,7 +1112,7 @@ function drawDeveloperPanel(){
  const actor=active(),prog=actor?progressFor(actor.id):null;
  text(`LEVEL / HP TEST • ${actor?actor.name+' LV '+prog?.level:'NO ACTIVE ALLY'} • MATERIALS & EQUIPMENT NOT DEFINED`,x+23,y+535,13,'#b9c8d8','750');
  const canAct=phase==='player'&&!paused&&!!actor;
- hudButton(x+23,y+548,141,40,'progress-test-level','LEVEL +1',canAct&&actor.level<50&&(!ASCENSION_GATES.includes(actor.level)||prog.ascended.includes(actor.level)));
+ hudButton(x+23,y+548,141,40,'progress-test-level','LEVEL +1',canAct&&actor.level<characterLevelCap()&&(!ASCENSION_GATES.includes(actor.level)||prog.ascended.includes(actor.level)));
  hudButton(x+174,y+548,139,40,'progress-test-ascend','ASCEND',canAct&&ASCENSION_GATES.includes(actor.level)&&!prog.ascended.includes(actor.level));
  hudButton(x+324,y+548,137,40,'hp-test-flat','FLAT +20',canAct);
  hudButton(x+471,y+548,136,40,'hp-test-percent','HP +20%',canAct);
@@ -1179,7 +1233,7 @@ function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='menu'){drawMa
  }else{drawCameraStage(t);drawSetup()}drawHint(t);requestAnimationFrame(loop)}
 function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'){devPanelOpen=!devPanelOpen;return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(phase==='player'&&cameraPreview==='party'){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){queueUltimate(cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){chargeUltimateForTest(cmd.slice(11));return}
  switch(cmd){case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'support-heal':startSupportDemo('heal');break;case 'support-revive':startSupportDemo('revive');break;case 'confirm-support':confirmSupportDemo();break;case 'cancel-support':cancelSupportDemo();break;case 'camera-party':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':toggleWavePreset();break;case 'toggle-recovery':setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':testKO();break;case 'test-revive':testRevive();break;case 'skill':zeroSkillControl();break;case 'cap-test':cycleSpCapTest();break;case 'hud-status-test':toggleHudStatusDemo();break;case 'f05-advance':addActionAdvance(activeId,25);break;case 'f05-delay':addActionDelay(activeId,25);break;case 'f05-speed':setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':queueSummonForTest('independent');break;case 'f05-summon-controlled':queueSummonForTest('controlled');break;
- case 'progress-test-level':{const a=active();if(a){const cost=requiredExp(a.level),result=testGrantExp(a.id,cost);say(result?`TEST ONLY: level ${result.level}, ${cost} EXP injected.`:'Ascension required or level cap reached.');}break}
+ case 'progress-test-level':{const a=active(),p=a&&progressFor(a.id);if(a&&p){const cost=Math.max(1,requiredExp(a.level)-p.exp),result=testGrantExp(a.id,cost);say(result?`TEST ONLY: level ${result.level}, ${cost} EXP injected.`:'Ascension required or level cap reached.');}break}
  case 'progress-test-ascend':{const a=active();if(a)say(testAscend(a.id)?`TEST ONLY: level ${a.level} ascension unlocked (no materials).`:'Not at a locked ascension gate.');break}
  case 'hp-test-flat':{const a=active();if(a)setHpBonusForTest(a.id,'debug-flat','flat',(a.hpFlatModifiers['debug-flat']||0)+20);break}
  case 'hp-test-percent':{const a=active();if(a)setHpBonusForTest(a.id,'debug-percent','percent',(a.hpPercentModifiers['debug-percent']||0)+.2);break}default:zeroSkillArmed=false;play(cmd)}return}}
@@ -1188,9 +1242,9 @@ window.addEventListener('keydown',e=>{if(e.key==='1')play('basic');if(e.key==='2
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 window.twoToneStatus=()=>({phase,paused,turn,devPanelOpen,targetingMode,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,hp:e.hp,maxHp:e.maxHp,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
 window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ULTIMATE_ENERGY_COST)),statusCount:hudStatusList(p).length})),version:'v0.0.17',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
-window.twoToneProgress=()=>({maxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
- characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:requiredExp(progressFor(r.id).level),baseHpTestOnly:r.hp})),
+window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
+ characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
  unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}}))});
-window.twoToneTest={testGrantExp,testAscend,setHpBonusForTest,calculateMaxHp,requiredExp,setTrainingRecoveryMode,roundHp,addActionAdvance,addActionDelay,setSpeedMultiplierForTest,queueSummonForTest,turnTimelineSnapshot:()=>turnTimeline.snapshot(),queueUltimate,chargeUltimateForTest,toggleHudStatusDemo,setHudStatusesForTest:(id,items)=>{const p=party.find(p=>p.id===id);if(!p||!Array.isArray(items)||items.length>80)return false;p.hudStatuses=items.map(e=>({kind:e.kind==='debuff'?'debuff':'buff',icon:String(e.icon||'✦').slice(0,2),turns:e.turns===null?null:(Number.isInteger(e.turns)&&e.turns>=0?e.turns:null)}));return true;},setSpCapTestSource,cycleSpCapTest,canQueueUltimate,debugKOForTest:(id)=>{if(['setup','intro','victory','defeat'].includes(phase))return false;const p=party.find(p=>p.id===id);if(!p||p.hp<=0)return false;p.hp=0;gauges[p.id]=0;saveVitals();cancelQueuedUltimatesOfDefeated();return true},startBattle,addUnit,removeUnit,enterSelection,enterPartySetup,saveParty,testKO,testRevive,play,replay,zeroSkillControl,setTargetingMode,startSupportDemo,confirmSupportDemo,cancelSupportDemo,eligibleAllyTarget:(id,kind)=>eligibleAllyTarget(party.find(p=>p.id===id),kind),setEnemyHpForTest:(id,hp)=>{if(phase!=='player'||attackInProgress)return false;const e=liveEnemies().find(e=>e.id===id);if(!e||!Number.isFinite(hp)||hp<1||hp>e.maxHp)return false;e.hp=hp;syncEnemyHp();return true},setEnemyTarget,setWavePlanForTest,toggleWavePreset,debugDefeatEnemy:(id)=>{const e=liveEnemies().find(e=>e.id===id);if(!e||phase==='setup'||phase==='victory'||phase==='defeat')return false;e.hp=0;resolveEnemyDefeat(e);return true;},selectEnemy:(id)=>setEnemyTarget(id),setCameraPreview:(view)=>{if(phase==='player'){cameraPreview=view;selectedAllyId=activeId}},cameraStatus:()=>cameraShot()};
+window.twoToneTest={testGrantExp,testAscend,setPlayerRankForTest,setHpBonusForTest,calculateMaxHp,requiredExp,setTrainingRecoveryMode,roundHp,addActionAdvance,addActionDelay,setSpeedMultiplierForTest,queueSummonForTest,turnTimelineSnapshot:()=>turnTimeline.snapshot(),queueUltimate,chargeUltimateForTest,toggleHudStatusDemo,setHudStatusesForTest:(id,items)=>{const p=party.find(p=>p.id===id);if(!p||!Array.isArray(items)||items.length>80)return false;p.hudStatuses=items.map(e=>({kind:e.kind==='debuff'?'debuff':'buff',icon:String(e.icon||'✦').slice(0,2),turns:e.turns===null?null:(Number.isInteger(e.turns)&&e.turns>=0?e.turns:null)}));return true;},setSpCapTestSource,cycleSpCapTest,canQueueUltimate,debugKOForTest:(id)=>{if(['setup','intro','victory','defeat'].includes(phase))return false;const p=party.find(p=>p.id===id);if(!p||p.hp<=0)return false;p.hp=0;gauges[p.id]=0;saveVitals();cancelQueuedUltimatesOfDefeated();return true},startBattle,addUnit,removeUnit,enterSelection,enterPartySetup,saveParty,testKO,testRevive,play,replay,zeroSkillControl,setTargetingMode,startSupportDemo,confirmSupportDemo,cancelSupportDemo,eligibleAllyTarget:(id,kind)=>eligibleAllyTarget(party.find(p=>p.id===id),kind),setEnemyHpForTest:(id,hp)=>{if(phase!=='player'||attackInProgress)return false;const e=liveEnemies().find(e=>e.id===id);if(!e||!Number.isFinite(hp)||hp<1||hp>e.maxHp)return false;e.hp=hp;syncEnemyHp();return true},setEnemyTarget,setWavePlanForTest,toggleWavePreset,debugDefeatEnemy:(id)=>{const e=liveEnemies().find(e=>e.id===id);if(!e||phase==='setup'||phase==='victory'||phase==='defeat')return false;e.hp=0;resolveEnemyDefeat(e);return true;},selectEnemy:(id)=>setEnemyTarget(id),setCameraPreview:(view)=>{if(phase==='player'){cameraPreview=view;selectedAllyId=activeId}},cameraStatus:()=>cameraShot()};
 window.zeroBasicAnimationDebug=()=>({durationMs:ZERO_BASIC_MS,elapsed:fx?.kind==='basic'&&fx.actor==='zero'?Math.max(0,performance.now()-fx.at):null,active:zeroBasicStage(performance.now())!==null,assets:['zero','zeroBasicWindup','zeroBasicSlash'].map(id=>({id,loaded:!!images[id]?.complete&&!!images[id]?.naturalWidth}))});
 requestAnimationFrame(loop);
