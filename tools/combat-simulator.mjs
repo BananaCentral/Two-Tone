@@ -140,11 +140,11 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
   if (targets.length > 1) attacker.aoeCount++;
   return hits;
 }
-function triggerFollowUps(state, sourceId, affectedTargets) {
+function triggerFollowUps(state, sourceId, sourceActorId, affectedTargets) {
   const targets = [...new Set(affectedTargets.filter(target => target.hp > 0))];
   if (!targets.length) return;
   for (const soul of state.allies) {
-    if (soul.hp <= 0) continue;
+    if (soul.hp <= 0 || soul.id === sourceActorId) continue;
     for (const passive of soul.passives.filter(p => p.type === 'followUp')) {
       if (passive.remaining <= 0 || passive.seenSources.has(sourceId)) continue;
       const activeTargets = targets.filter(target => target.hp > 0);
@@ -184,7 +184,7 @@ function resolveAllyAction(state, actor) {
     actor.energy -= ultimate.energyCost ?? 100;
     actor.ultimateCount++;
     const hits = runAttack(state, actor, foes, ultimate);
-    triggerFollowUps(state, ++state.sourceSerial, hits.map(hit => hit.target));
+    triggerFollowUps(state, ++state.sourceSerial, actor.id, hits.map(hit => hit.target));
     if (ultimate.refillFollowUps) refillPassives(actor);
     foes = state.enemies.filter(unit => unit.hp > 0);
     if (!foes.length) return;
@@ -206,7 +206,7 @@ function resolveAllyAction(state, actor) {
   actor.energy = Math.min(actor.maxEnergy, actor.energy + (basic.energyGain ?? 0) + stacks * (skill?.energyPerStack ?? 0));
   state.skillPoints = Math.min(state.skillPointCap, state.skillPoints + (basic.skillPointGain ?? 0));
   actor.enhanceStacks = 0;
-  triggerFollowUps(state, ++state.sourceSerial, hits.map(hit => hit.target));
+  triggerFollowUps(state, ++state.sourceSerial, actor.id, hits.map(hit => hit.target));
 }
 function resolveEnemyAction(state, actor) {
   const targets = state.allies.filter(unit => unit.hp > 0);

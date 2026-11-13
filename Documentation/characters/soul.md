@@ -21,12 +21,13 @@ Calculated stats scale with Level and use the matching stat standards.
 
 ## Passive: Follow Up
 
-- When an ally action deals damage to one or more enemies, Soul makes one automatic Follow Up attack if a proc remains.
+- When another ally's action deals damage to one or more enemies, Soul makes one automatic Follow Up attack if a proc remains.
+- Soul's own Basic and Ultimate do not trigger Follow Up.
 - Follow Up deals True damage at a 0.5× multiplier.
 - Each allied action instance is one unique source. A multi-hit or multi-target action can trigger at most one Follow Up.
 - Follow Up has 5 procs at battle start. The Ultimate refills it to 5 after its damage resolves.
 - If the triggering action damaged multiple enemies, the Follow Up's total damage is distributed as evenly as possible across the surviving enemies it hit. Any remainder is assigned in target order.
-- Follow Up cannot trigger itself.
+- A Follow Up attack cannot trigger another Follow Up.
 
 ## Basic Attack
 
@@ -54,4 +55,4 @@ Calculated stats scale with Level and use the matching stat standards.
 ## Implementation Notes
 
 - The runtime retains the historical internal ID `zero` so existing saved parties and progression remain valid; the player-facing name and character sheet use Soul.
-- Unique source means one allied action instance, including one source action that hits multiple targets or has multiple hits.
+- Unique source means one damaging action instance from another ally, including a source action that hits multiple targets or has multiple hits.

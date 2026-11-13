@@ -623,7 +623,7 @@ function resolveSoulFollowUp(sourceAttack){
 function finishTrainingAttack(serial){
  if(!attackInProgress||!lastAttack||lastAttack.serial!==serial)return;
  attackInProgress=false;lastAttack.finished=true;lastAttack.finishedAt=performance.now();
- if(lastAttack.actor&&party.some(p=>p.id===lastAttack.actor))resolveSoulFollowUp(lastAttack);
+ if(lastAttack.actor&&lastAttack.actor!=='zero'&&party.some(p=>p.id===lastAttack.actor))resolveSoulFollowUp(lastAttack);
  if(lastAttack.actor==='zero'&&lastAttack.action==='ultimate'){soulFollowUpProcs=5;soulFollowUpSources.clear();lastAttack.followUpRefill=5}
  settleAfterAttack();
  if(!encounterCleared&&lastAttack?.action!=='ultimate')finishSummonCreationForTest(lastAttack?.actor);
