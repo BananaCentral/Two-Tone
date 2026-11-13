@@ -768,7 +768,7 @@ function drawBackground(){ctx.imageSmoothingEnabled=false;if(images.arena.comple
 const RUNE_STATS=['hp','physicalAttack','magicalAttack','physicalDefense','magicalDefense','speed'];
 const RUNE_STAT_INFO={
  hp:{label:'HP',main:100},physicalAttack:{label:'Physical Attack',main:20},
- magicalAttack:{label:'Magical Attack',main:20},physicalDefense:{label:'Physical Defense',main:2},
+ magicalAttack:{label:'Magical Attack',main:20},physicalDefense:{label:'Physical Defense',main:4},
  magicalDefense:{label:'Magical Defense',main:4},speed:{label:'Speed',main:20}
 };
 const CELESTIALS=[['passive','PASSIVE'],['basic','BASIC'],['skill','SKILL'],['ultimate','ULTIMATE']];
