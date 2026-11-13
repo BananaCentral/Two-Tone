@@ -1,5 +1,7 @@
 # Enemy Battle HUD and Sprite Standard
 
+Enemy Critical Rate and Critical Damage are hidden combat values governed by the [Critical Hit Standard](critical-hit-standard.md); do not add them to visible enemy stat cards.
+
 ## Battle Sprite Shape and Grounding
 
 - Each enemy archetype defines `battleAspectRatio` as `width:height`, for example `1:1` or `1:2`. Width and height are positive whole numbers.

@@ -43,6 +43,9 @@ function validateConfig(config) {
       assert(archetype.stats && Number.isFinite(archetype.stats.hp) && Number.isFinite(archetype.stats.speed), 'Archetype ' + instance.archetype + ' needs HP and Speed stats.');
       const barrierPercent = instance.barrierPercent ?? archetype.barrierPercent ?? 0.2;
       assert(Number.isFinite(barrierPercent) && barrierPercent >= 0 && barrierPercent <= 1, 'Enemy barrierPercent must be from 0 to 1.');
+      const critical=instance.critical??archetype.critical??{};
+      assert((critical.rate===undefined||(Number.isFinite(critical.rate)&&critical.rate>=0))&&(critical.damage===undefined||(Number.isFinite(critical.damage)&&critical.damage>=0)),'Critical rate and damage must be finite non-negative values.');
+      assert([instance.criticalRateBonus,archetype.criticalRateBonus,instance.criticalDamageBonus,archetype.criticalDamageBonus].every(value=>value===undefined||(Number.isFinite(value)&&value>=0)),'Critical bonuses must be finite non-negative values.');
       assert(archetype.basic && Number.isFinite(archetype.basic.multiplier) && ['physical', 'magical', 'true'].includes(archetype.basic.damageType), 'Archetype ' + instance.archetype + ' needs a typed Basic Attack.');
       assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage', 'exposed'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
       for (const passive of archetype.passives || []) {
@@ -110,6 +113,11 @@ function instantiate(config, side) {
       stats,
       hp: stats.hp,
       maxHp: stats.hp,
+      criticalRate:instance.critical?.rate??archetype.critical?.rate??.1,
+      criticalDamage:instance.critical?.damage??archetype.critical?.damage??.5,
+      criticalRateBonus:(archetype.criticalRateBonus||0)+(instance.criticalRateBonus||0)+(instance.archetype==='soul'&&premiumWeaponDuplicates>=2?.1:0),
+      criticalDamageBonus:(archetype.criticalDamageBonus||0)+(instance.criticalDamageBonus||0)+(instance.archetype==='soul'&&premiumWeaponDuplicates>=2?.25:0),
+      criticalHits:0,
       maxBarrier: side === 'enemies' ? roundStat(stats.hp * (instance.barrierPercent ?? archetype.barrierPercent ?? 0.2)) : 0,
       barrier: side === 'enemies' ? roundStat(stats.hp * (instance.barrierPercent ?? archetype.barrierPercent ?? 0.2)) : 0,
       barrierPercent: instance.barrierPercent ?? archetype.barrierPercent ?? 0.2,
@@ -167,6 +175,13 @@ function damageFor(attacker, target, type, multiplier) {
   if(exposedStacks)reduction*=Math.pow(.9,exposedStacks);
   return roundStat(attack * multiplier * (1 - reduction));
 }
+function rollCritical(state,unit,damage){
+ if(damage<=0)return {damage,critical:false};
+ const rate=Math.min(1,Math.max(0,(unit.criticalRate??.1)+(unit.criticalRateBonus||0)));
+ const critical=state.random()<rate;
+ if(critical){state.criticalHits++;unit.criticalHits=(unit.criticalHits||0)+1}
+ return {damage:critical?roundStat(damage*(1+(unit.criticalDamage??.5)+(unit.criticalDamageBonus||0))):damage,critical};
+}
 function applyExposed(attacker,targets){
  if(attacker.archetypeId!=='lily')return;
  const duplicate=attacker.characterDuplicates||0;
@@ -185,8 +200,8 @@ function applyRicochet(state,sourceActor,sourceId,hits){
  for(const enemy of targets){const mark=enemy.marks.find(m=>m.id==='ricochet');mark.sources ||= [];if(mark.sources.includes(sourceId))continue;mark.sources.push(sourceId);
   const base=roundStat(sourceDamage*.1);
   const repeats=lily.characterDuplicates>=4?2:1;
-  for(let i=0;i<repeats&&enemy.hp>0;i++){const raw=base*(i===1?.5:1),trueAttack=attackValue(lily,'true'),damage=roundStat(raw*(trueAttack>0?damageFor(lily,enemy,'true',1)/trueAttack:0));
-   const before=enemy.hp;enemy.hp=Math.max(0,enemy.hp-damage);enemy.damageTaken+=damage;lily.damageDealt+=damage;state.damageBySide.allies+=damage;
+  for(let i=0;i<repeats&&enemy.hp>0;i++){const raw=base*(i===1?.5:1),trueAttack=attackValue(lily,'true'),uncrit=roundStat(raw*(trueAttack>0?damageFor(lily,enemy,'true',1)/trueAttack:0)),roll=rollCritical(state,lily,uncrit);
+   const before=enemy.hp,damage=Math.min(before,roll.damage);enemy.hp=Math.max(0,enemy.hp-damage);enemy.damageTaken+=damage;lily.damageDealt+=damage;state.damageBySide.allies+=damage;
    if(before>0&&enemy.hp===0)restoreSoulFollowUpOnKill(lily);
   }
  }
@@ -217,7 +232,7 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
   for (const target of targets) {
     const hpBefore = target.hp;
     const baseDamage = damageFor(attacker, target, spec.damageType, options.multiplier ?? spec.multiplier);
-    const damage = roundStat(baseDamage * (target.side === 'enemies' && target.brokenTurns > 0 ? 1.5 : 1));
+    const roll=rollCritical(state,attacker,baseDamage),damage = roundStat(roll.damage * (target.side === 'enemies' && target.brokenTurns > 0 ? 1.5 : 1));
     target.hp = Math.max(0, target.hp - damage);
     const hpDamage=Math.min(hpBefore,damage);
     let barrierDamage = 0, breakDamage = 0, broken = false;
@@ -238,7 +253,7 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
     target.damageTaken += hpDamage + breakDamage;
     attacker.damageDealt += hpDamage + breakDamage;
     state.damageBySide[attacker.side] += hpDamage + breakDamage;
-    hits.push({ target, damage: hpDamage + breakDamage, barrierDamage, breakDamage, barrierRemaining: target.barrier, broken });
+    hits.push({ target, damage: hpDamage + breakDamage, barrierDamage, breakDamage, barrierRemaining: target.barrier, broken,critical:roll.critical });
   }
   if (targets.length > 1) attacker.aoeCount++;
   return hits;
@@ -269,7 +284,7 @@ function triggerFollowUps(state, sourceId, sourceActorId, affectedTargets) {
       activeTargets.forEach((target, index) => {
         const share = base + (index < remainder ? 1 : 0);
         const divisor = attackValue(soul, passive.damageType);
-        const damage = Math.min(target.hp,damageFor(soul, target, passive.damageType, share / divisor));
+        const uncrit=damageFor(soul, target, passive.damageType, share / divisor),damage=Math.min(target.hp,rollCritical(state,soul,uncrit).damage);
         const hpBefore = target.hp;
         target.hp = Math.max(0, target.hp - damage);
         if (hpBefore > 0 && target.hp <= 0) restoreSoulFollowUpOnKill(soul);
@@ -391,7 +406,7 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
     skillUses: 0,
     damageBySide: { allies: 0, enemies: 0 },
     actions: 0, allyTurns: 0, enemyTurns: 0, enemyAverage, slowerAverage,
-    maxActions: maxActionsOverride ?? settings.maxActions ?? 2000, currentTime:0
+    maxActions: maxActionsOverride ?? settings.maxActions ?? 2000, currentTime:0,criticalHits:0
   };
   while (state.actions < state.maxActions && allies.some(unit => unit.hp > 0) && enemies.some(unit => unit.hp > 0)) {
     const living = [...allies, ...enemies].filter(unit => unit.hp > 0);
@@ -421,9 +436,9 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
   const winner = !allies.some(unit => unit.hp > 0) ? 'enemies' : !enemies.some(unit => unit.hp > 0) ? 'allies' : 'draw';
   return {
     winner, actions: state.actions, allyTurns: state.allyTurns, enemyTurns: state.enemyTurns, elapsedTime:state.currentTime,
-    skillUses: state.skillUses, skillPointsRemaining: state.skillPoints,
+    skillUses: state.skillUses, skillPointsRemaining: state.skillPoints,criticalHits:state.criticalHits,
     damageDealt: state.damageBySide,
-    unitStats:allies.reduce((out,unit)=>{const key=unit.archetypeId;if(!out[key])out[key]={damage:0,turns:0};out[key].damage+=unit.damageDealt;out[key].turns+=unit.turns;return out;},{}),
+    unitStats:allies.reduce((out,unit)=>{const key=unit.archetypeId;if(!out[key])out[key]={damage:0,turns:0,criticalHits:0};out[key].damage+=unit.damageDealt;out[key].turns+=unit.turns;out[key].criticalHits+=unit.criticalHits||0;return out;},{}),
     followUps: allies.reduce((sum, unit) => sum + unit.followUpCount, 0),
     ultimates: allies.reduce((sum, unit) => sum + unit.ultimateCount, 0),
     aoeAttacks: [...allies, ...enemies].reduce((sum, unit) => sum + unit.aoeCount, 0),
@@ -444,7 +459,7 @@ function simulateBatch(config, runs = 100, seed = 1, maxActions = null) {
     runs, seed, wins,
     winRate: { allies: wins.allies / runs, enemies: wins.enemies / runs, draws: wins.draws / runs },
     averageActions: meanOf('actions'), averageAllyTurns: meanOf('allyTurns'), averageEnemyTurns: meanOf('enemyTurns'), averageElapsedTime:meanOf('elapsedTime'),
-    averageSkillUses: meanOf('skillUses'), averageFollowUps: meanOf('followUps'),
+    averageSkillUses: meanOf('skillUses'), averageFollowUps: meanOf('followUps'),averageCriticalHits:meanOf('criticalHits'),
     averageUltimates: meanOf('ultimates'), averageAoeAttacks: meanOf('aoeAttacks'),
     averageDamageDealt: {
       allies: results.reduce((sum, result) => sum + result.damageDealt.allies, 0) / runs,
@@ -452,7 +467,7 @@ function simulateBatch(config, runs = 100, seed = 1, maxActions = null) {
     },
     averageAllyDps:results.reduce((sum,result)=>sum+result.damageDealt.allies/Math.max(result.elapsedTime,EPSILON),0)/runs,
     averageDamagePerAllyTurn:results.reduce((sum,result)=>sum+result.damageDealt.allies/Math.max(result.allyTurns,1),0)/runs,
-    averageUnitStats:Object.fromEntries([...new Set(results.flatMap(result=>Object.keys(result.unitStats)))].map(id=>[id,{damage:results.reduce((sum,result)=>sum+(result.unitStats[id]?.damage||0),0)/runs,turns:results.reduce((sum,result)=>sum+(result.unitStats[id]?.turns||0),0)/runs,dps:results.reduce((sum,result)=>sum+(result.unitStats[id]?.damage||0)/Math.max(result.elapsedTime,EPSILON),0)/runs}])),
+    averageUnitStats:Object.fromEntries([...new Set(results.flatMap(result=>Object.keys(result.unitStats)))].map(id=>[id,{damage:results.reduce((sum,result)=>sum+(result.unitStats[id]?.damage||0),0)/runs,turns:results.reduce((sum,result)=>sum+(result.unitStats[id]?.turns||0),0)/runs,dps:results.reduce((sum,result)=>sum+(result.unitStats[id]?.damage||0)/Math.max(result.elapsedTime,EPSILON),0)/runs,criticalHits:results.reduce((sum,result)=>sum+(result.unitStats[id]?.criticalHits||0),0)/runs}])),
     averageSurvivors: {
       allies: results.reduce((sum, result) => sum + result.survivors.allies.length, 0) / runs,
       enemies: results.reduce((sum, result) => sum + result.survivors.enemies.length, 0) / runs
@@ -498,7 +513,7 @@ async function main() {
     console.log('Wins: allies ' + summary.wins.allies + ' (' + (summary.winRate.allies * 100).toFixed(1) + '%), enemies ' + summary.wins.enemies + ' (' + (summary.winRate.enemies * 100).toFixed(1) + '%), draws ' + summary.wins.draws);
     console.log('Avg turns: allies ' + summary.averageAllyTurns.toFixed(1) + ', enemies ' + summary.averageEnemyTurns.toFixed(1) + ' | avg actions ' + summary.averageActions.toFixed(1));
     console.log('Avg damage: allies ' + summary.averageDamageDealt.allies.toFixed(1) + ', enemies ' + summary.averageDamageDealt.enemies.toFixed(1));
-    console.log('Avg Follow Ups: ' + summary.averageFollowUps.toFixed(1) + ' | Ultimates: ' + summary.averageUltimates.toFixed(1) + ' | AoE attacks: ' + summary.averageAoeAttacks.toFixed(1));
+    console.log('Avg Follow Ups: ' + summary.averageFollowUps.toFixed(1) + ' | Ultimates: ' + summary.averageUltimates.toFixed(1) + ' | AoE attacks: ' + summary.averageAoeAttacks.toFixed(1) + ' | Critical hits: ' + summary.averageCriticalHits.toFixed(1));
   }
 }
 const invokedPath = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : '';

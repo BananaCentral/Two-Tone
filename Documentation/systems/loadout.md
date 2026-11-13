@@ -46,7 +46,7 @@ Each Celestial level adds 10% of the ability's base multiplier. This is applied 
 
 Character Duplicates are separate from weapon Potential and persist on each character's Loadout. Soul's Duplicate effects are listed in the Soul Character Sheet. Lily's Duplicate effects are listed in the Lily Character Sheet.
 
-Soul's Premium signature effect at Potential 1 and above refunds 1 Skill Point after each three Skill Points spent on Enhance. Soul's Premium signature duplicates map to Premium Potential 2–5: each potential above 1 is one duplicate. Duplicate 1 doubles Basic's base multiplier; Duplicate 2 restores one Follow Up after Soul kills an enemy; Duplicate 3 makes a 3-stack Enhanced Basic AoE; Duplicate 4 restores one Follow Up after every two Follow Up activations. Premium weapon effects only apply while Soul owns and has selected the Premium weapon.
+Soul's Premium signature effect at Potential 1 and above refunds 1 Skill Point after each three Skill Points spent on Enhance. Soul's Premium signature duplicates map to Premium Potential 2–5: each potential above 1 is one duplicate. Duplicate 1 doubles Basic's base multiplier; Duplicate 2 restores one Follow Up after Soul kills an enemy and adds 10 percentage points of Critical Rate and 25 percentage points of Critical Damage; Duplicate 3 makes a 3-stack Enhanced Basic AoE; Duplicate 4 restores one Follow Up after every two Follow Up activations. Premium weapon effects only apply while Soul owns and has selected the Premium weapon.
 
 ## Prototype boundaries
 

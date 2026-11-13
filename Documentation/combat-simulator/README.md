@@ -34,6 +34,8 @@ Optional `weapon` settings accept `type: standard|premium` and `potential: 1–5
 
 Supported attack damage types are `physical`, `magical`, and `true`. Basic and Ultimate attacks define a multiplier and target shape (`single`, `blast`, or `aoe`). `random` and `lowestHp` are primary-target selection policies. Units start with zero Energy unless `energy.start` or an instance `energy` is supplied; Energy is capped at 120 by default.
 
+All simulated units default to 10% Critical Rate and 50% Critical Damage. These are hidden stats. An archetype or instance may override them with `critical: { "rate": 0.25, "damage": 0.75 }`; `criticalRateBonus` and `criticalDamageBonus` add temporary or other source bonuses. Soul's Premium Weapon Duplicate 2 adds 10 percentage points of Critical Rate and 25 percentage points of Critical Damage. Each damage instance rolls independently, including AoE targets and multi-hit actions. Use `--seed` to reproduce crit rolls. Batch output includes average Critical Hits.
+
 Supported Skill and Passive effect types:
 
 - `enhanceBasic`: consumes available shared Skill Points before that unit's Basic. Configure added multiplier, Energy per stack, and the stack threshold that changes Basic to Blast (Premium Soul Weapon Duplicate 3 changes it to AoE).
@@ -46,7 +48,7 @@ Supported Skill and Passive effect types:
 Lily's Ultimate creates an independent Hauntling after its initial AoE. It acts immediately, then takes two more scheduled turns, dealing AoE True damage with Lily's stats. Duplicate 1 applies a one-turn 10% enemy damage reduction; Duplicate 3 doubles initial Ultimate damage and adds a Hauntling turn. Lily's Premium weapon effects are not modeled.
 
 
-Soul's `characterDuplicates` field (0–4) enables his four character Duplicate effects. With a Premium weapon, potential levels 2–5 correspond to weapon duplicates 1–4. Soul's Premium weapon refunds one shared Skill Point per three Enhance points spent, starting at Potential 1. The simulator models this effect, Soul's configured character and weapon duplicates, and configured Celestial levels.
+Soul's `characterDuplicates` field (0–4) enables his four character Duplicate effects. With a Premium weapon, potential levels 2–5 correspond to weapon duplicates 1–4. Soul's Premium weapon refunds one shared Skill Point per three Enhance points spent, starting at Potential 1. The simulator models this effect, Soul's configured character and weapon duplicates (including Duplicate 2's critical bonuses), and configured Celestial levels.
 
 ## Output
 

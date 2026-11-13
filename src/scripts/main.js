@@ -183,6 +183,8 @@ function calculateTypedActionDamage(type,attackRate,attacker,target){
  const damageBeforeDefense=attack*attackRate;
  return {type,attackBasis:attack,defenseBasis:defense,attackRate,damageBeforeDefense,reduction,damageTaken:roundHp(damageBeforeDefense*(1-reduction))};
 }
+function criticalRateOf(unit){return Math.min(1,Math.max(0,(Number.isFinite(unit?.criticalRate)?unit.criticalRate:.1)+(Number.isFinite(unit?.criticalRateBonus)?unit.criticalRateBonus:0)+Object.values(unit?.criticalRateModifiers||{}).reduce((sum,value)=>sum+(Number.isFinite(value)?value:0),0)))}
+function criticalDamageOf(unit){return Math.max(0,(Number.isFinite(unit?.criticalDamage)?unit.criticalDamage:.5)+(Number.isFinite(unit?.criticalDamageBonus)?unit.criticalDamageBonus:0)+Object.values(unit?.criticalDamageModifiers||{}).reduce((sum,value)=>sum+(Number.isFinite(value)?value:0),0))}
 function characterLevelCap(rank=playerRank){return Number.isInteger(rank)&&rank>=1&&rank<=50?Math.ceil(rank/10)*10:0}
 function requiredExp(level){return Number.isInteger(level)&&level>=1&&level<CHARACTER_MAX_LEVEL?level*(10*(1+Math.floor(level/5))):0}
 function defaultProgress(){return {level:1,exp:0,ascended:[]}}
@@ -392,7 +394,7 @@ function executeIndependentSummonTurn(s){
  fx={kind:'basic',at:performance.now(),actor:owner?.id||s.ownerId,targetEnemyId:foe?.id,targetGeometry:foe?{x:foe.x,y:foe.y,w:foe.w,h:foe.h}:null};
  const source={serial:++attackSerial,actor:'lily',action:'summon',hits:[]};
  for(const enemy of liveEnemies().slice()){
-  const lily=party.find(p=>p.id==='lily'),raw=calculateTypedActionDamage('true',1,lily,enemy),dealt=applyEnemyDamage(enemy,raw?.damageTaken||0);
+  const lily=party.find(p=>p.id==='lily'),raw=calculateTypedActionDamage('true',1,lily,enemy),dealt=applyEnemyDamage(enemy,raw?.damageTaken||0,lily);
   source.hits.push({target:enemy.id,damage:dealt.damage,summon:true});if(enemy.hp<=0)resolveEnemyDefeat(enemy);
   else{enemy.marks=enemy.marks||[];const dup=characterDuplicateRank('lily'),existing=enemy.marks.filter(m=>m.id==='exposed').length;enemy.marks=enemy.marks.filter(m=>m.id!=='exposed');for(let i=0;i<(dup>=2?Math.min(2,existing+1):1);i++)enemy.marks.push({id:'exposed',turns:dup>=2?3:2});applyLilyUltimateDebuff(enemy);triggerRicochet(source,enemy,dealt.damage);if(lily&&loadoutFor('lily').weapon.selected==='premium'&&loadoutFor('lily').weapon.premiumOwned)lily.energy=Math.min(120,lily.energy+5)}
  }
@@ -640,9 +642,10 @@ function settleAfterAttack(){
 }
 function applyTrainingHit(enemy,damage,hitNumber){
  if(!enemy||enemy.hp<=0||!attackInProgress)return false;
- const dealt=applyEnemyDamage(enemy,damage);
+ const source=party.find(p=>p.id===lastAttack.actor)||summons.find(s=>s.id===lastAttack.actor)||null;
+ const dealt=applyEnemyDamage(enemy,damage,source);
  if((lastAttack.actor!=='lily'||lastAttack.action==='summon')&&enemy.marks?.some(m=>m.id==='exposed')&&premiumWeaponDuplicateRank('lily')>=0){const lily=party.find(p=>p.id==='lily');if(lily&&loadoutFor('lily').weapon.selected==='premium'&&loadoutFor('lily').weapon.premiumOwned)lily.energy=Math.min(120,lily.energy+5)}
- lastAttack.hits.push({index:hitNumber,target:enemy.id,slot:enemy.slot,damage:dealt.damage+dealt.breakDamage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,breakDamage:dealt.breakDamage,barrierAfter:enemy.barrier,broken:dealt.broken});
+ lastAttack.hits.push({index:hitNumber,target:enemy.id,slot:enemy.slot,damage:dealt.damage+dealt.breakDamage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,breakDamage:dealt.breakDamage,barrierAfter:enemy.barrier,broken:dealt.broken,critical:dealt.critical,criticalMultiplier:dealt.criticalMultiplier});
  if(lastAttack.actor==='lily'&&(lastAttack.action==='skill'||lastAttack.action==='ultimate')){
   enemy.marks=enemy.marks||[];const dup=characterDuplicateRank('lily');
   if(dup>=2){const stacks=Math.min(2,(enemy.marks.filter(m=>m.id==='exposed').length||0)+1);enemy.marks=enemy.marks.filter(m=>m.id!=='exposed');for(let i=0;i<stacks;i++)enemy.marks.push({id:'exposed',turns:3})}
@@ -663,7 +666,7 @@ function triggerRicochet(sourceAttack,hitEnemy,sourceDamage){
  const lily=party.find(p=>p.id==='lily');if(!lily)return;
  sourceAttack.ricochetFollowUp=true;const repetitions=characterDuplicateRank('lily')>=4?2:1;
  for(const enemy of triggered){const mark=enemy.marks.find(m=>m.id==='ricochet');mark.sources=[...(mark.sources||[]),sourceAttack.serial];
-  for(let n=0;n<repetitions&&enemy.hp>0;n++){const reduction=calculateTrueDamageReduction(lily,enemy),amount=roundHp(sourceDamage*.1*(n===1?.5:1)*(1-(Number.isFinite(reduction)?reduction:0))),dealt=applyEnemyDamage(enemy,amount);sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,damage:dealt.damage,barrierDamage:dealt.barrierDamage,ricochet:true,ricochetSource:sourceAttack.serial});if(enemy.hp<=0)resolveEnemyDefeat(enemy)}
+  for(let n=0;n<repetitions&&enemy.hp>0;n++){const reduction=calculateTrueDamageReduction(lily,enemy),amount=roundHp(sourceDamage*.1*(n===1?.5:1)*(1-(Number.isFinite(reduction)?reduction:0))),dealt=applyEnemyDamage(enemy,amount,lily);sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,damage:dealt.damage,barrierDamage:dealt.barrierDamage,ricochet:true,ricochetSource:sourceAttack.serial,critical:dealt.critical});if(enemy.hp<=0)resolveEnemyDefeat(enemy)}
  }
  sourceAttack.ricochetFollowUp=false;syncEnemyHp();
 }
@@ -677,8 +680,9 @@ function teamBaseTurns(faction){
 function brokenDuration(speed,baseTurns){
  return Math.max(1,roundHp(baseTurns*Math.max(.5,Math.min(1.5,2-speed/100))));
 }
-function applyEnemyDamage(enemy,rawDamage){
- const damage=roundHp(rawDamage*(enemy.brokenTurns>0?1.5:1));
+function applyEnemyDamage(enemy,rawDamage,attacker=null){
+ const critical=!!attacker&&rawDamage>0&&Math.random()<criticalRateOf(attacker),criticalMultiplier=critical?1+criticalDamageOf(attacker):1;
+ const damage=roundHp(rawDamage*criticalMultiplier*(enemy.brokenTurns>0?1.5:1));
  enemy.hp=Math.max(0,enemy.hp-damage);
  let barrierDamage=0,breakDamage=0,broken=false;
  if(enemy.barrier>0){
@@ -686,14 +690,14 @@ function applyEnemyDamage(enemy,rawDamage){
   barrierDamage=damage*.25*(1+(premiumWeaponDuplicateRank('lily')>=2?exposed*.1:0));enemy.barrier=Math.max(0,enemy.barrier-barrierDamage);
   if(enemy.barrier===0){enemy.brokenTurns=brokenDuration(speedOf(enemy),teamBaseTurns('enemy'));breakDamage=roundHp(enemy.maxHp*(.1+(premiumWeaponDuplicateRank('lily')>=3?exposed*.05:0)));enemy.hp=Math.max(0,enemy.hp-breakDamage);broken=true;}
  }
- syncEnemyHp();return {damage,barrierDamage,breakDamage,broken};
+ syncEnemyHp();return {damage,barrierDamage,breakDamage,broken,critical,criticalMultiplier};
 }
 function resolveSoulFollowUp(sourceAttack){
  const soul=party.find(p=>p.id==='zero'&&p.hp>0);if(!soul||soulFollowUpProcs<=0||soulFollowUpSources.has(sourceAttack.serial))return false;
  const affected=[...new Set(sourceAttack.hits.filter(h=>h.damage>0).map(h=>h.target))].map(id=>enemies.find(e=>e.id===id)).filter(e=>e&&e.hp>0);
  if(!affected.length)return false;soulFollowUpSources.add(sourceAttack.serial);soulFollowUpProcs--;
  const attack=calculateTrueAttack(soul),dupeBonus=characterDuplicateRank(soul.id)>=2?2:1,rawTotal=Number.isFinite(attack)?roundHp(attack*.5*dupeBonus*celestialMultiplier(soul.id,'passive')):0,base=Math.floor(rawTotal/affected.length),remainder=rawTotal%affected.length;let total=0;
- for(let i=0;i<affected.length;i++){const share=base+(i<remainder?1:0),rate=attack>0?share/attack:0,amount=soulDamageForTarget(soul,affected[i],rate);if(amount<=0)continue;const enemy=affected[i],dealt=applyEnemyDamage(enemy,amount);total+=dealt.damage;sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,slot:enemy.slot,damage:dealt.damage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,barrierAfter:enemy.barrier,broken:dealt.broken,followUp:true});if(enemy.hp<=0){resolveEnemyDefeat(enemy);onSoulEnemyKill()}}
+ for(let i=0;i<affected.length;i++){const share=base+(i<remainder?1:0),rate=attack>0?share/attack:0,amount=soulDamageForTarget(soul,affected[i],rate);if(amount<=0)continue;const enemy=affected[i],dealt=applyEnemyDamage(enemy,amount,soul);total+=dealt.damage;sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,slot:enemy.slot,damage:dealt.damage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,barrierAfter:enemy.barrier,broken:dealt.broken,followUp:true,critical:dealt.critical});if(enemy.hp<=0){resolveEnemyDefeat(enemy);onSoulEnemyKill()}}
  soulFollowUpActivationCount++;
   if(premiumWeaponDuplicateRank(soul.id)>=4&&soulFollowUpActivationCount%2===0)soulFollowUpProcs=Math.min(soulFollowUpLimit(),soulFollowUpProcs+1);
   sourceAttack.followUp={sourceSerial:sourceAttack.serial,damage:total,targets:affected.map(e=>e.id),procsRemaining:soulFollowUpProcs};syncEnemyHp();return total>0;
@@ -773,8 +777,8 @@ function resolveEnemyBasicAttack(attacker,candidates){
  const hits=targets.map(target=>{
   const calculated=basic.damageType?calculateTypedActionDamage(basic.damageType,multiplier,attacker,target):null;
   const damage=calculated?.damageTaken??(basic.damageType?0:92+((turn*37)%51));
-  const dealt=applyEnemyDamage(target,damage);target.energy=Math.min(120,target.energy+10);
-  return {target:target.id,damage:dealt.damage+dealt.breakDamage,barrierDamage:dealt.barrierDamage,breakDamage:dealt.breakDamage,barrierAfter:target.barrier,broken:dealt.broken};
+  const dealt=applyEnemyDamage(target,damage,attacker);target.energy=Math.min(120,target.energy+10);
+  return {target:target.id,damage:dealt.damage+dealt.breakDamage,barrierDamage:dealt.barrierDamage,breakDamage:dealt.breakDamage,barrierAfter:target.barrier,broken:dealt.broken,critical:dealt.critical};
  });
  if(rampage&&hits.some(hit=>hit.damage>0))attacker.rampageStacks=Math.min(attacker.passive.maxStacks??4,(attacker.rampageStacks||0)+1);
  return {hits,enhanced};
@@ -861,7 +865,7 @@ function defaultLoadout(){return {characterDuplicates:0,weapon:{selected:'standa
 function normalizeRune(value){
  if(!value||typeof value!=='object'||!RUNE_STATS.includes(value.main)||!Array.isArray(value.subs))return null;
  const subs=value.subs.filter((x,i,a)=>RUNE_STATS.includes(x)&&x!==value.main&&a.indexOf(x)===i).slice(0,3);
- return subs.length===3?{level:Number.isInteger(value.level)?Math.max(1,Math.min(5,value.level)):1,main:value.main,subs,setId:typeof value.setId==='string'?value.setId:null}:null
+ return subs.length===3?{level:Number.isInteger(value.level)?Math.max(1,Math.min(5,value.level)):1,main:value.main,subs,setId:typeof value.setId==='string'?value.setId:null,criticalRateBonus:Number.isFinite(value.criticalRateBonus)?Math.max(0,value.criticalRateBonus):0,criticalDamageBonus:Number.isFinite(value.criticalDamageBonus)?Math.max(0,value.criticalDamageBonus):0}:null
 }
 function normalizeLoadout(value){
  const base=defaultLoadout();if(!value||typeof value!=='object')return base;
@@ -883,13 +887,13 @@ function weaponBonus(record){const w=record.weapon;return w.selected==='premium'
 function loadoutStatModifiers(id,characterLevel=1){
  const record=loadoutFor(id),bonus=weaponBonus(record),totals=Object.fromEntries(RUNE_STATS.map(k=>[k,0]));
  for(const rune of record.runes){if(!rune)continue;totals[rune.main]+=RUNE_STAT_INFO[rune.main].main*rune.level;for(const sub of rune.subs)totals[sub]+=RUNE_STAT_INFO[sub].main*.25*rune.level}
- const pct={signatureWeapon:bonus};
+ const pct={signatureWeapon:bonus},criticalRateFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalRateBonus||0),0),criticalDamageFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalDamageBonus||0),0);
  return {hpFlatModifiers:{},hpPercentModifiers:pct,hpEquipmentFlatModifiers:{runes:totals.hp},
  physicalAttackFlatModifiers:{},physicalAttackPercentModifiers:pct,physicalAttackEquipmentFlatModifiers:{runes:totals.physicalAttack},
  magicalAttackFlatModifiers:{},magicalAttackPercentModifiers:pct,magicalAttackEquipmentFlatModifiers:{runes:totals.magicalAttack},
  physicalDefenseFlatModifiers:{},physicalDefensePercentModifiers:pct,physicalDefenseEquipmentFlatModifiers:{runes:totals.physicalDefense},
  magicalDefenseFlatModifiers:{},magicalDefensePercentModifiers:pct,magicalDefenseEquipmentFlatModifiers:{runes:totals.magicalDefense},
- speedFlatModifiers:{},speedPercentModifiers:pct,speedEquipmentFlatModifiers:{runes:totals.speed}}
+ speedFlatModifiers:{},speedPercentModifiers:pct,speedEquipmentFlatModifiers:{runes:totals.speed},criticalRateModifiers:{runes:criticalRateFromRunes,premiumWeaponDuplicate2:id==='zero'&&premiumWeaponDuplicateRank(id)>=2 ? .1 : 0},criticalDamageModifiers:{runes:criticalDamageFromRunes,premiumWeaponDuplicate2:id==='zero'&&premiumWeaponDuplicateRank(id)>=2 ? .25 : 0}}
 }
 function celestialMultiplier(id,key){return 1+.10*(loadoutFor(id).celestials[key]||1)}
 function characterDuplicateRank(id='zero'){return loadoutFor(id).characterDuplicates||0}
@@ -1430,8 +1434,8 @@ function drawFx(t){
  }
  ctx.restore();
  if(dt>100&&!(fx.kind==='basic'&&fx.actor==='zero')){if(fx.kind==='enemy'){
-  const hits=fx.hits?.length?fx.hits:[{target:fx.target,damage:fx.damage}];for(const hit of hits){const pos=cameraAllyPosition(hit.target,"command");if(pos)text('-'+hit.damage,pos.x+pos.w/2,pos.baseY-pos.h*.73-70*q,42,'#ff9d9e','900','center')}
- }else{const foe=enemies.find(e=>e.id===fx.targetEnemyId)||fx.targetGeometry;const x=foe?foe.x+foe.w/2+camera.currentX*.43:1142,y=foe?foe.y+foe.h*.12:355;text('-'+fx.damage,x,y-70*q,42,'#fff0ba','900','center')}}
+  const hits=fx.hits?.length?fx.hits:[{target:fx.target,damage:fx.damage}];for(const hit of hits){const pos=cameraAllyPosition(hit.target,"command");if(pos){text('-'+hit.damage,pos.x+pos.w/2,pos.baseY-pos.h*.73-70*q,42,hit.critical?'#ffd66e':'#ff9d9e','900','center');if(hit.critical)text('CRITICAL',pos.x+pos.w/2,pos.baseY-pos.h*.73-106*q,15,'#ffe9a9','900','center')}}
+ }else{const foe=enemies.find(e=>e.id===fx.targetEnemyId)||fx.targetGeometry;const x=foe?foe.x+foe.w/2+camera.currentX*.43:1142,y=foe?foe.y+foe.h*.12:355;text('-'+fx.damage,x,y-70*q,42,'#fff0ba','900','center');for(const hit of lastAttack?.hits||[]){if(!hit.critical)continue;const target=enemies.find(e=>e.id===hit.target);if(target)text('CRITICAL',target.x+target.w/2+camera.currentX*.43,target.y+target.h*.05,15,'#ffe9a9','900','center')}}}
 }
 function getOrder(n){
  const predicted=turnTimeline.preview(n).map(x=>x.id);
