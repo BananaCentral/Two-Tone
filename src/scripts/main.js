@@ -975,13 +975,12 @@ function drawMainMenu(){
  rect(1293,63,190,66,'rgba(13,17,35,.94)','#eacb87',12);
  text('RANK',1388,82,13,'#bfc8d9','800','center');text(playerRank,1388,107,25,'#f7f3f8','850','center');
  const items=[
-  {label:'LOADOUT',x:220,y:256,active:true,action:'open-loadout',detail:'WEAPONS • RUNES • CELESTIALS'},
-
-  {label:'PARTY',x:640,y:256,active:true,action:'open-party',detail:'MANAGE CURRENT PARTY'},
-  {label:'EVENTS',x:1060,y:256},
+  {label:'STORY',x:220,y:256,active:true,action:'open-story',detail:'BATTLE PROTOTYPE'},
+  {label:'EVENTS',x:640,y:256},
+  {label:'GAME MODE',x:1060,y:256},
   {label:'STORE',x:220,y:472},
-  {label:'STORY',x:640,y:472,active:true,action:'open-story',detail:'BATTLE PROTOTYPE'},
-  {label:'MODES',x:1060,y:472},
+  {label:'LOADOUT',x:640,y:472,active:true,action:'open-loadout',detail:'WEAPONS • RUNES • CELESTIALS'},
+  {label:'PARTY',x:1060,y:472,active:true,action:'open-party',detail:'MANAGE CURRENT PARTY'},
  ];
  for(const item of items){
   if(item.active){
