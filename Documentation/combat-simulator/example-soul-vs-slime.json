@@ -52,12 +52,12 @@
       "name": "Slime",
       "level": 1,
       "stats": {
-        "hp": 100,
+        "hp": 200,
         "physicalAttack": 0,
-        "magicalAttack": 5,
-        "physicalDefense": 1,
-        "magicalDefense": 2,
-        "speed": 10
+        "magicalAttack": 10,
+        "physicalDefense": 2,
+        "magicalDefense": 4,
+        "speed": 20
       },
       "basic": {
         "damageType": "magical",
@@ -70,7 +70,7 @@
           "id": "slimy",
           "every": 3,
           "damageBonus": 0.25,
-          "target": "all"
+          "target": "aoe"
         }
       ]
     }

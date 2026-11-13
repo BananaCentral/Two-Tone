@@ -401,8 +401,8 @@ const ENEMY_FORMATIONS=[
  {id:'slot4',x:1201,y:312,w:156,h:205},
  {id:'slot5',x:1389,y:355,w:151,h:198},
 ];
-const ENEMY_ARCHETYPES={slime:{id:'slime',category:'common',name:'SLIME',level:1,hp:100,
- basePhysicalAttack:0,baseMagicalAttack:5,basePhysicalDefense:1,baseMagicalDefense:2,speed:10,battleSprite:'slimeBattle',artwork:'slimeArtwork',
+const ENEMY_ARCHETYPES={slime:{id:'slime',category:'common',name:'SLIME',level:1,hp:200,
+ basePhysicalAttack:0,baseMagicalAttack:10,basePhysicalDefense:2,baseMagicalDefense:4,speed:20,battleSprite:'slimeBattle',artwork:'slimeArtwork',
  passive:{id:'slimy',every:3,damageBonus:.25},basicAttack:{damageType:'magical',multiplier:1.0}}};
 // Any encounter may supply its own finite number of waves, each with 1–15 enemies.
 // Presets are only review scenarios; they are NOT a global wave-count limit.
