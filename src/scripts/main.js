@@ -1274,8 +1274,9 @@ function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&camera
  if(images[e.battleSprite]?.complete&&images[e.battleSprite].naturalWidth){const img=images[e.battleSprite];ctx.imageSmoothingEnabled=e.battleSprite==='slimeBattle';if(e.battleSprite==='slimeBattle'){const scale=Math.min(ww/img.naturalWidth,hh/img.naturalHeight),iw=img.naturalWidth*scale,ih=img.naturalHeight*scale;ctx.drawImage(img,xx+(ww-iw)/2,yy+(hh-ih)/2,iw,ih)}else ctx.drawImage(img,xx,yy,ww,hh)}
  ctx.restore();
  if(e.hp<=0)continue;
- if(isFocus||isActor||patternHit){ctx.strokeStyle=isFocus?'#ffe2a0':patternHit?'#69e8d4':'#b7e6ff';ctx.lineWidth=isFocus?5:4;ctx.strokeRect(xx-8,yy-6,ww+16,hh+13);if(patternHit){rect(xx+ww-29,yy-23,32,22,'#124d53ee','#a0f7e6',5);text('✓',xx+ww-13,yy-12,17,'#d7fff4','800','center')}}
- rect(xx-3,yy-58,ww+6,30,isFocus?'#54464ff0':'#1c2843e8',isFocus?'#f6dfa7':'#8d96a9',6);
+ if(isActor){ctx.strokeStyle='#b7e6ff';ctx.lineWidth=4;ctx.strokeRect(xx-8,yy-6,ww+16,hh+13)}
+ if(patternHit){ctx.beginPath();ctx.arc(xx+ww/2,yy-67,7,0,Math.PI*2);ctx.fillStyle='#55aaff';ctx.fill();ctx.strokeStyle='#eaf6ff';ctx.lineWidth=2;ctx.stroke()}
+ rect(xx-3,yy-58,ww+6,30,'#1c2843e8','#8d96a9',6);
  text(e.name,xx+ww/2,yy-43,14,'#fff4e8','800','center');
  line(xx+2,yy-23,ww-4,e.maxBarrier?e.barrier/e.maxBarrier:0,'#55aaff','#263b59',5);
  line(xx+2,yy-13,ww-4,e.hp/e.maxHp,isFocus?'#ffd88e':'#ff8276','#4b2637',8);
