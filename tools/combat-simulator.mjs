@@ -159,7 +159,7 @@ function triggerFollowUps(state, sourceId, affectedTargets) {
       activeTargets.forEach((target, index) => {
         const share = base + (index < remainder ? 1 : 0);
         const divisor = attackValue(soul, passive.damageType);
-        const damage = damageFor(soul, target, 'true', share / divisor);
+        const damage = damageFor(soul, target, passive.damageType, share / divisor);
         target.hp = Math.max(0, target.hp - damage);
         target.damageTaken += damage;
         soul.damageDealt += damage;
@@ -281,7 +281,7 @@ function simulateBatch(config, runs = 100, seed = 1, maxActions = null) {
   const results = Array.from({ length: runs }, (_, index) => simulateBattle(config, seed + index, maxActions));
   const meanOf = key => results.reduce((sum, result) => sum + result[key], 0) / runs;
   const wins = { allies: 0, enemies: 0, draws: 0 };
-  for (const result of results) wins[result.winner]++;
+  for (const result of results) wins[result.winner === 'draw' ? 'draws' : result.winner]++;
   return {
     runs, seed, wins,
     winRate: { allies: wins.allies / runs, enemies: wins.enemies / runs, draws: wins.draws / runs },
