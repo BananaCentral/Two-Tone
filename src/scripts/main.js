@@ -404,7 +404,7 @@ const ENEMY_FORMATIONS=[
  {id:'slot5',x:1389,y:355,w:151,h:198},
 ];
 const ENEMY_ARCHETYPES={slime:{id:'slime',category:'common',name:'SLIME',level:1,hp:100,
- basePhysicalAttack:0,baseMagicalAttack:20,basePhysicalDefense:4,baseMagicalDefense:8,speed:20,battleSprite:'slimeBattle',artwork:'slimeArtwork',
+ basePhysicalAttack:0,baseMagicalAttack:20,basePhysicalDefense:4,baseMagicalDefense:8,speed:20,battleSprite:'slimeBattle',battleAspectRatio:'1:1',artwork:'slimeArtwork',
  passive:{id:'slimy',every:3,damageBonus:.25},basicAttack:{damageType:'magical',multiplier:1.0}}};
 // Any encounter may supply its own finite number of waves, each with 1–15 enemies.
 // Presets are only review scenarios; they are NOT a global wave-count limit.
@@ -561,7 +561,7 @@ function buildWavePlan(sizes){
    wave:wi+1,order:i+1,category:validateEnemyCategory(model.category),level:model.level,maxHp:model.hp,speed:model.speed,
    basePhysicalAttack:model.basePhysicalAttack,baseMagicalAttack:model.baseMagicalAttack,
    basePhysicalDefense:model.basePhysicalDefense,baseMagicalDefense:model.baseMagicalDefense,
-   battleSprite:model.battleSprite,artwork:model.artwork,barrierPercent:model.barrierPercent??.2,passive:{...model.passive},basicAttack:{...model.basicAttack},basicAttackCount:0};
+   battleSprite:model.battleSprite,battleAspectRatio:model.battleAspectRatio,artwork:model.artwork,barrierPercent:model.barrierPercent??.2,passive:{...model.passive},basicAttack:{...model.basicAttack},basicAttackCount:0};
  }));
 }
 function initialSlots(count){return ({1:[2],2:[1,3],3:[1,2,3],4:[0,1,3,4],5:[0,1,2,3,4]})[count].slice()}
@@ -1269,14 +1269,14 @@ function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&camera
  const shimmer=isFocus?Math.sin(t*.004)*2:0;
  const zbHit=fx?.kind==='basic'&&fx?.actor==='zero'&&fx.targetEnemyId===e.id?t-fx.at:null;
   const hitKick=zbHit!==null&&zbHit>=645&&zbHit<745?Math.sin((zbHit-645)*.18)*(1-(zbHit-645)/100)*4:0;
- let spriteCenterY=yy+hh/2;
- ctx.save();ctx.globalAlpha=e.hp>0?1:Math.max(.02,.8-(t-fx.at)/1050);ctx.translate(shimmer+hitKick,Math.sin(t*.0026+e.x)*2.2);
+ let spriteCenterY=yy+hh/2;const spriteOffsetX=shimmer+hitKick,spriteOffsetY=Math.sin(t*.0026+e.x)*2.2;
+ ctx.save();ctx.globalAlpha=e.hp>0?1:Math.max(.02,.8-(t-fx.at)/1050);ctx.translate(spriteOffsetX,spriteOffsetY);
  ctx.beginPath();ctx.ellipse(xx+ww/2,yy+hh-4,ww*.48,13,0,0,Math.PI*2);ctx.fillStyle='#1b213c70';ctx.fill();
- if(images[e.battleSprite]?.complete&&images[e.battleSprite].naturalWidth){const img=images[e.battleSprite];ctx.imageSmoothingEnabled=e.battleSprite==='slimeBattle';if(e.battleSprite==='slimeBattle'){const scale=Math.min(ww/img.naturalWidth,hh/img.naturalHeight),iw=img.naturalWidth*scale,ih=img.naturalHeight*scale,drawX=xx+(ww-iw)/2,drawY=yy+hh-ih;spriteCenterY=drawY+ih/2;ctx.drawImage(img,drawX,drawY,iw,ih)}else ctx.drawImage(img,xx,yy,ww,hh)}
+ if(images[e.battleSprite]?.complete&&images[e.battleSprite].naturalWidth){const img=images[e.battleSprite];ctx.imageSmoothingEnabled=e.battleSprite==='slimeBattle';const ratioParts=String(e.battleAspectRatio||'').split(':').map(Number),aspect=ratioParts.length===2&&ratioParts.every(Number.isFinite)&&ratioParts[0]>0&&ratioParts[1]>0?ratioParts[0]/ratioParts[1]:img.naturalWidth/img.naturalHeight,iw=Math.min(ww,hh*aspect),ih=iw/aspect,drawX=xx+(ww-iw)/2,drawY=yy+hh-ih;spriteCenterY=drawY+ih/2;ctx.drawImage(img,drawX,drawY,iw,ih)}
  ctx.restore();
  if(e.hp<=0)continue;
  if(isActor){ctx.strokeStyle='#b7e6ff';ctx.lineWidth=4;ctx.strokeRect(xx-8,yy-6,ww+16,hh+13)}
- if(patternHit){ctx.beginPath();ctx.arc(xx+ww/2,spriteCenterY,7,0,Math.PI*2);ctx.fillStyle='#55aaff';ctx.fill();ctx.strokeStyle='#eaf6ff';ctx.lineWidth=2;ctx.stroke()}
+ if(patternHit){ctx.beginPath();ctx.arc(xx+ww/2+spriteOffsetX,spriteCenterY+spriteOffsetY,7,0,Math.PI*2);ctx.fillStyle='#55aaff';ctx.fill();ctx.strokeStyle='#eaf6ff';ctx.lineWidth=2;ctx.stroke()}
  rect(xx-3,yy-58,ww+6,30,'#1c2843e8','#8d96a9',6);
  text(e.name,xx+ww/2,yy-43,14,'#fff4e8','800','center');
  line(xx+2,yy-25,ww-4,e.maxBarrier?e.barrier/e.maxBarrier:0,'#55aaff','#263b59',8);

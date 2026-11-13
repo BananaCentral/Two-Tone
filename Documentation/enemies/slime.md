@@ -31,6 +31,14 @@ Every third Basic Attack is empowered: it deals 25% more damage and hits all liv
 - Deals Magical damage at a 1.0× multiplier.
 - On every third attack, Slimy changes the target pattern to all living allies and increases the multiplier to 1.25×.
 
+## Barrier
+
+Slime has a Barrier equal to 20% of maximum HP. Damage still applies fully to HP; each damaging hit also removes Barrier equal to 25% of that hit. Breaking Barrier deals an additional hit equal to 10% of maximum HP and starts Broken state, following the [Turn Order Standard](../turn-order-standard/turn-order-standard.md).
+
+## Battle Display
+
+The Slime battle sprite uses a 1:1 width-to-height aspect ratio. It is drawn at that ratio, centered horizontally in its formation slot, and aligned to the slot baseline so it appears grounded. Its target dot is centered on the rendered sprite.
+
 ## Artwork
 
 The two supplied images are stored separately:

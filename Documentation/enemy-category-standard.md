@@ -20,7 +20,7 @@ Category classifies an enemy's encounter role. It does not itself define stat mu
 
 - Category does not define enemy Level or level-based stat growth.
 - The current Slime training encounter is explicitly Level 1. The current enemy runtime uses authored archetype stats directly. No enemy level-scaling or progression standard is defined; do not infer a Level 50 Slime by multiplying its stats by 50.
-- Enemy archetypes currently define HP, Attack, Defense, and Speed. The runtime has no separate Barrier or Shield resource or mechanic.
+- Enemy archetypes define HP, Attack, Defense, and Speed. Enemy Barrier and Broken State rules are defined in the [Turn Order Standard](turn-order-standard/turn-order-standard.md).
 
 ## Current roster
 
