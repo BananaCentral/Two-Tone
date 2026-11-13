@@ -16,4 +16,4 @@ Target selection policy is separate from target shape. For example, an automated
 
 - Basic is `single` by default.
 - After spending at least three Skill Points on Enhance, the next Basic is `blast`. Each target receives the full damage.
-- Ultimate is `blast` and hits its primary target plus up to two adjacent living enemies.
+- Ultimate is `aoe` and hits every living enemy.

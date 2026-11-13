@@ -34,7 +34,7 @@
       "ultimate": {
         "damageType": "true",
         "multiplier": 2,
-        "target": "blast",
+        "target": "aoe",
         "energyCost": 100,
         "refillFollowUps": true
       },

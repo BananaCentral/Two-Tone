@@ -514,7 +514,7 @@ function chooseAttackTargets(mode=targetingMode,primary=chosenEnemy()){
 }
 function closestSurvivingEnemy(slot){return liveEnemies().slice().sort((a,b)=>Math.abs(a.slot-slot)-Math.abs(b.slot-slot)||a.slot-b.slot)[0]||null}
 // Soul's Basic becomes Blast at three Enhance stacks; the Ultimate is AoE.
-function actionTargetMode(actor,action){if(actor?.id==='zero'&&action==='ultimate')return 'blast';if(actor?.id==='zero'&&action==='basic')return soulEnhanceStacks>=3?'blast':'single';return actor?.id==='zero'&&action==='skill'?'blast':targetingMode}
+function actionTargetMode(actor,action){if(actor?.id==='zero'&&action==='ultimate')return 'aoe';if(actor?.id==='zero'&&action==='basic')return soulEnhanceStacks>=3?'blast':'single';return actor?.id==='zero'&&action==='skill'?'blast':targetingMode}
 function previewTargetMode(){return phase==='player'&&activeId==='zero'&&zeroSkillArmed?'blast':targetingMode}
 function setTargetingMode(mode){if(!['single','blast','aoe','five-hit'].includes(mode)||phase!=='player'||paused)return false;targetingMode=mode;zeroSkillArmed=false;supportDemo=null;cameraPreview='target';return true}
 function zeroSkillControl(){return activateSoulEnhance();}
