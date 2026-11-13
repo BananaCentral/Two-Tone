@@ -10,12 +10,12 @@
 
 | Stat | Base value |
 |---|---:|
-| HP | 100 |
-| Physical Attack | 10 |
-| Magical Attack | 10 |
-| Physical Defense | 1 |
-| Magical Defense | 1 |
-| Speed | 10 |
+| HP | 200 |
+| Physical Attack | 20 |
+| Magical Attack | 20 |
+| Physical Defense | 2 |
+| Magical Defense | 2 |
+| Speed | 20 |
 
 Calculated stats scale with Level and use the matching stat standards.
 

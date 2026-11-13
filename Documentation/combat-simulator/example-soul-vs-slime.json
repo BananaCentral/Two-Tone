@@ -11,12 +11,12 @@
       "name": "Soul",
       "level": 1,
       "stats": {
-        "hp": 100,
-        "physicalAttack": 10,
-        "magicalAttack": 10,
-        "physicalDefense": 1,
-        "magicalDefense": 1,
-        "speed": 10
+        "hp": 200,
+        "physicalAttack": 20,
+        "magicalAttack": 20,
+        "physicalDefense": 2,
+        "magicalDefense": 2,
+        "speed": 20
       },
       "basic": {
         "damageType": "true",
@@ -54,10 +54,10 @@
       "stats": {
         "hp": 100,
         "physicalAttack": 0,
-        "magicalAttack": 10,
+        "magicalAttack": 5,
         "physicalDefense": 1,
         "magicalDefense": 2,
-        "speed": 5
+        "speed": 10
       },
       "basic": {
         "damageType": "magical",

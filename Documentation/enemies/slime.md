@@ -12,10 +12,10 @@
 |---|---:|
 | HP | 100 |
 | Physical Attack | 0 |
-| Magical Attack | 10 |
+| Magical Attack | 5 |
 | Physical Defense | 1 |
 | Magical Defense | 2 |
-| Speed | 5 |
+| Speed | 10 |
 
 ## Passive: Slimy
 
