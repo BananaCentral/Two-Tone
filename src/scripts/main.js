@@ -1408,7 +1408,7 @@ function drawAllyUltimate(p,x,y,sz){
 }
 function drawAllyPortraitHud(){
  // Wide lower-screen cards emphasize the portrait and ultimate while keeping HP and passive indicators legible.
- const cardW=248,cardH=180,gap=12,top=678,total=party.length*cardW+Math.max(0,party.length-1)*gap;
+ const cardW=248,cardH=184,gap=12,top=678,total=party.length*cardW+Math.max(0,party.length-1)*gap;
  let x=Math.max(16,Math.round((1060-total)/2));
  for(const p of party){
   const activeAlly=phase==='player'&&activeId===p.id&&p.hp>0,ko=p.hp<=0;
@@ -1417,14 +1417,14 @@ function drawAllyPortraitHud(){
   rect(x,top,cardW,cardH,'rgba(14,23,42,.96)',activeAlly?'#f3d79e':'rgba(129,164,191,.82)',12);
   hudPortrait(p.id==='zero'?images.zeroFront:null,portraitX,portraitY,portraitSize,portraitSize,true);
   if(ko)rect(portraitX,portraitY,portraitSize,portraitSize,'rgba(30,17,23,.62)',null,10);
-  drawAllyUltimate(p,x+116,top-1,128);
+  drawAllyUltimate(p,x+106,top-1,128);
   drawAllyStatuses(p,portraitX,portraitY,portraitSize);
   text(ko?'0 / '+p.maxHp:`${p.hp} / ${p.maxHp}`,x+cardW-12,top+136,14,ko?'#f0afb7':'#e4f3ef','750','right');
   line(x+12,top+146,cardW-24,ko?0:p.hp/p.maxHp,ko?'#b16b76':'#67e3b4','#23374d',14);
   if(p.id==='zero'){
    const maximum=soulFollowUpLimit(),current=Math.max(0,Math.min(maximum,soulFollowUpProcs));
    const dotSize=12,pitch=22,rowWidth=(maximum-1)*pitch+dotSize,startX=x+(cardW-rowWidth)/2;
-   for(let i=0;i<maximum;i++)hudCircle(startX+i*pitch+dotSize/2,top+168,dotSize/2,i<current?'#72d8f5':'rgba(65,84,108,.9)',i<current?'#d7f6ff':'#8295a9',1.8);
+   for(let i=0;i<maximum;i++)hudCircle(startX+i*pitch+dotSize/2,top+174,dotSize/2,i<current?'#72d8f5':'rgba(65,84,108,.9)',i<current?'#d7f6ff':'#8295a9',1.8);
   }
   ctx.restore();
   x+=cardW+gap;
