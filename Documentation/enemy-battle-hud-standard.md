@@ -11,7 +11,7 @@
 ## Enemy Bars
 
 - Show the Barrier bar above the HP bar.
-- The Barrier bar is blue; the HP bar is red, with the selected target's HP fill highlighted gold.
+- The Barrier bar is grey; the HP bar is red, with the selected target's HP fill highlighted gold.
 - Both bars use the same width and have rounded ends. The current canvas sizes are 8 px for Barrier and 11 px for HP.
 - Barrier amount and recovery follow the Enemy Barrier and Broken State rules in the Turn Order Standard.
 

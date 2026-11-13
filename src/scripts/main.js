@@ -1290,7 +1290,7 @@ function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&camera
  if(patternHit){const ringRadius=Math.max(spriteVisibleW,spriteVisibleH)/2+8;ctx.beginPath();ctx.arc(xx+ww/2+spriteOffsetX,spriteCenterY+spriteOffsetY,ringRadius,0,Math.PI*2);ctx.strokeStyle='#55aaff';ctx.lineWidth=4;ctx.stroke()}
  rect(xx-3,yy-58,ww+6,30,'#1c2843e8','#8d96a9',6);
  text(e.name,xx+ww/2,yy-43,14,'#fff4e8','800','center');
- line(xx+2,yy-25,ww-4,e.maxBarrier?e.barrier/e.maxBarrier:0,'#55aaff','#263b59',8);
+ line(xx+2,yy-25,ww-4,e.maxBarrier?e.barrier/e.maxBarrier:0,'#c4c9d2','#626a75',8);
  line(xx+2,yy-13,ww-4,e.hp/e.maxHp,isFocus?'#ffd88e':'#ff8276','#4b2637',11);
  if(e.brokenTurns>0)text('BROKEN '+e.brokenTurns,xx+ww/2,yy+9,12,'#9cecff','800','center');
  if(phase==='player'&&!paused&&cameraPreview!=='party')choiceRects.push({x:xx-13,y:yy-64,w:ww+26,h:hh+74,action:'enemy-target:'+e.id,enabled:true});
