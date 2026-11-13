@@ -52,11 +52,38 @@ function validateConfig(config) {
     }
   }
 }
+
+const RUNE_STAT_VALUES={hp:200,physicalAttack:20,magicalAttack:20,physicalDefense:2,magicalDefense:2,speed:20};
+function signatureWeaponBonus(weapon){
+ if(!weapon)return 0;
+ assert(['standard','premium'].includes(weapon.type),'Weapon type must be standard or premium.');
+ assert(Number.isInteger(weapon.potential)&&weapon.potential>=1&&weapon.potential<=5,'Weapon potential must be from 1 to 5.');
+ return weapon.type==='standard'?.8+(weapon.potential-1)*.05:1+(weapon.potential-1)*.25;
+}
+function runeStatTotals(runes=[]){
+ assert(Array.isArray(runes)&&runes.length<=4,'A character may equip up to four runes.');
+ const totals=Object.fromEntries(Object.keys(RUNE_STAT_VALUES).map(key=>[key,0]));let setId=null;
+ for(const rune of runes){
+  assert(rune&&Object.hasOwn(RUNE_STAT_VALUES,rune.main),'Rune needs a valid main stat.');
+  assert(Number.isInteger(rune.level)&&rune.level>=1&&rune.level<=5,'Rune level must be from 1 to 5.');
+  assert(Array.isArray(rune.subs)&&rune.subs.length===3,'Rune needs exactly three substats.');
+  assert(new Set([rune.main,...rune.subs]).size===4&&rune.subs.every(key=>Object.hasOwn(RUNE_STAT_VALUES,key)),'Rune stats must be unique within the rune.');
+  if(rune.setId){assert(setId===null||setId===rune.setId,'All equipped runes must belong to one set.');setId=rune.setId;}
+  totals[rune.main]+=RUNE_STAT_VALUES[rune.main]*rune.level;
+  for(const key of rune.subs)totals[key]+=RUNE_STAT_VALUES[key]*.5*rune.level;
+ }
+ return totals;
+}
+function celestialFactor(unit,key){const level=unit.celestials?.[key]??0;assert(Number.isInteger(level)&&level>=0&&level<=10,'Celestial level must be from 1 to 10.');return 1+.1*level}
+
 function instantiate(config, side) {
   return config.teams[side].map((instance, index) => {
     const archetype = config.archetypes[instance.archetype];
     const level = instance.level ?? archetype.level ?? 1;
-    const stats = Object.fromEntries(Object.entries(archetype.stats).map(([name, value]) => [name, statAtLevel(value, level)]));
+    const weapon = instance.weapon ?? archetype.weapon ?? null;
+    const weaponMultiplier = 1 + signatureWeaponBonus(weapon);
+    const runeTotals = runeStatTotals(instance.runes ?? archetype.runes ?? []);
+    const stats = Object.fromEntries(Object.entries(archetype.stats).map(([name, value]) => [name, roundStat((statAtLevel(value, level) + (runeTotals[name] || 0)) * weaponMultiplier)]));
     assert(stats.physicalAttack !== undefined && stats.magicalAttack !== undefined && stats.physicalDefense !== undefined && stats.magicalDefense !== undefined, 'Archetype ' + instance.archetype + ' needs all six standard stats.');
     const maxEnergy = archetype.energy?.max ?? 120;
     const passives = (archetype.passives || []).map((passive, index) => ({
@@ -78,6 +105,7 @@ function instantiate(config, side) {
       maxHp: stats.hp,
       energy: Math.max(0, Math.min(maxEnergy, instance.energy ?? archetype.energy?.start ?? 0)),
       maxEnergy,
+      celestials: instance.celestials ?? archetype.celestials ?? {},
       basic: archetype.basic,
       skill: archetype.skill || null,
       ultimate: archetype.ultimate || null,
@@ -152,7 +180,7 @@ function triggerFollowUps(state, sourceId, sourceActorId, affectedTargets) {
       if (passive.remaining <= 0 || passive.seenSources.has(sourceId)) continue;
       const activeTargets = targets.filter(target => target.hp > 0);
       if (!activeTargets.length) break;
-      const rawTotal = roundStat(attackValue(soul, passive.damageType) * passive.multiplier);
+      const rawTotal = roundStat(attackValue(soul, passive.damageType) * passive.multiplier * celestialFactor(soul, 'passive'));
       if (rawTotal <= 0) continue;
       passive.seenSources.add(sourceId);
       passive.remaining--;
@@ -186,7 +214,7 @@ function resolveAllyAction(state, actor) {
   if (ultimate && actor.energy >= (ultimate.energyCost ?? 100)) {
     actor.energy -= ultimate.energyCost ?? 100;
     actor.ultimateCount++;
-    const hits = runAttack(state, actor, foes, ultimate);
+    const hits = runAttack(state, actor, foes, ultimate, { multiplier: ultimate.multiplier * celestialFactor(actor, 'ultimate') });
     triggerFollowUps(state, ++state.sourceSerial, actor.id, hits.map(hit => hit.target));
     if (ultimate.refillFollowUps) refillPassives(actor);
     foes = state.enemies.filter(unit => unit.hp > 0);
@@ -202,7 +230,7 @@ function resolveAllyAction(state, actor) {
   }
   const basic = actor.basic;
   const stacks = actor.enhanceStacks;
-  const multiplier = basic.multiplier + stacks * (skill?.damagePerStack ?? 0);
+  const multiplier = basic.multiplier * celestialFactor(actor, 'basic') + stacks * (skill?.damagePerStack ?? 0) * celestialFactor(actor, 'skill');
   const targetMode = skill && stacks >= (skill.blastAtStacks ?? Infinity) ? 'blast' : basic.target;
   const hits = runAttack(state, actor, foes, basic, { multiplier, targetMode });
   actor.basicAttackCount++;

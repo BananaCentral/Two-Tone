@@ -52,6 +52,13 @@ Calculated stats scale with Level and use the matching stat standards.
 - Deals True damage to all enemies at a 2.0× multiplier.
 - After its damage resolves, refills Follow Up to 5 procs.
 
+## Loadout
+
+- Soul starts with his Standard signature weapon at Potential 1, granting +80% to all six stats. Potential 5 grants +100%; each intermediate potential adds 5 percentage points.
+- His Premium signature weapon is a separate, character-locked option. It grants +100% at Potential 1 and +200% at Potential 5, with 25 percentage points per potential. Store ownership and its character-specific effect are not configured yet.
+- Soul's four Celestials start at level 1. Each level increases the corresponding ability multiplier by 10% of its base value. At the default level, Follow Up is 0.55×, Basic is 1.1×, each Enhance stack adds 1.1×, and Ultimate is 2.2×.
+- Runes add flat stats: main stat value × rune level; each of three distinct substats contributes half that value. Rune-set options and their passive effects are not defined yet.
+
 ## Implementation Notes
 
 - The runtime retains the historical internal ID `zero` so existing saved parties and progression remain valid; the player-facing name and character sheet use Soul.

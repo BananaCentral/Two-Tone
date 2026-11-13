@@ -95,7 +95,7 @@ sources.zeroBasicSlash='/assets/embedded-image-10.png';
 const images={};for(const [k,src] of Object.entries(sources)){const img=new Image();img.src=src;images[k]=img;}
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:false});
 const W=1600,H=900, TEAM_KEY='two-tone-demo-team-fundamental-1-v1';
-const PROGRESSION_KEY='two-tone-character-progress-v1',VITALS_KEY='two-tone-character-vitals-v1';
+const PROGRESSION_KEY='two-tone-character-progress-v1',VITALS_KEY='two-tone-character-vitals-v1',LOADOUT_KEY='two-tone-character-loadouts-v1';
 const CHARACTER_MAX_LEVEL=50,ASCENSION_GATES=[10,20,30,40],MAX_PARTY_SIZE=4;
 // Rank progression is not implemented yet; this value is the account Rank hook.
 let playerRank=1;
@@ -109,28 +109,28 @@ const ROSTER=[
 ];
 const ROSTER_IDS=new Set(ROSTER.map(u=>u.id));
 function roundHp(value){return Math.floor(value+0.5)}
-function calculateLevelScaledStat(base,level,flat={},percent={}){
+function calculateLevelScaledStat(base,level,flat={},percent={},equipmentFlat={}){
  if(!Number.isFinite(base)||base<0||!Number.isInteger(level)||level<1||level>CHARACTER_MAX_LEVEL)return null;
- const flats=Object.values(flat),percents=Object.values(percent);
- if([...flats,...percents].some(v=>!Number.isFinite(v)))return null;
- const raw=(base+flats.reduce((a,b)=>a+b,0))*level*(1+percents.reduce((a,b)=>a+b,0));
+ const flats=Object.values(flat),percents=Object.values(percent),equipment=Object.values(equipmentFlat);
+ if([...flats,...percents,...equipment].some(v=>!Number.isFinite(v)))return null;
+ const raw=((base+flats.reduce((a,b)=>a+b,0))*level+equipment.reduce((a,b)=>a+b,0))*(1+percents.reduce((a,b)=>a+b,0));
  return raw>=0&&Number.isFinite(raw)?roundHp(raw):null;
 }
 function calculatePhysicalAttack(unit){
  if(!unit||!Number.isFinite(unit.basePhysicalAttack))return null;
- return calculateLevelScaledStat(unit.basePhysicalAttack,unit.level,unit.physicalAttackFlatModifiers||{},unit.physicalAttackPercentModifiers||{});
+ return calculateLevelScaledStat(unit.basePhysicalAttack,unit.level,unit.physicalAttackFlatModifiers||{},unit.physicalAttackPercentModifiers||{},unit.physicalAttackEquipmentFlatModifiers||{});
 }
 function calculateMagicalAttack(unit){
  if(!unit||!Number.isFinite(unit.baseMagicalAttack))return null;
- return calculateLevelScaledStat(unit.baseMagicalAttack,unit.level,unit.magicalAttackFlatModifiers||{},unit.magicalAttackPercentModifiers||{});
+ return calculateLevelScaledStat(unit.baseMagicalAttack,unit.level,unit.magicalAttackFlatModifiers||{},unit.magicalAttackPercentModifiers||{},unit.magicalAttackEquipmentFlatModifiers||{});
 }
 function calculatePhysicalDefense(unit){
  if(!unit||!Number.isFinite(unit.basePhysicalDefense))return null;
- return calculateLevelScaledStat(unit.basePhysicalDefense,unit.level,unit.physicalDefenseFlatModifiers||{},unit.physicalDefensePercentModifiers||{});
+ return calculateLevelScaledStat(unit.basePhysicalDefense,unit.level,unit.physicalDefenseFlatModifiers||{},unit.physicalDefensePercentModifiers||{},unit.physicalDefenseEquipmentFlatModifiers||{});
 }
 function calculateMagicalDefense(unit){
  if(!unit||!Number.isFinite(unit.baseMagicalDefense))return null;
- return calculateLevelScaledStat(unit.baseMagicalDefense,unit.level,unit.magicalDefenseFlatModifiers||{},unit.magicalDefensePercentModifiers||{});
+ return calculateLevelScaledStat(unit.baseMagicalDefense,unit.level,unit.magicalDefenseFlatModifiers||{},unit.magicalDefensePercentModifiers||{},unit.magicalDefenseEquipmentFlatModifiers||{});
 }
 function calculateTrueAttack(unit){
  const physical=calculatePhysicalAttack(unit),magical=calculateMagicalAttack(unit);
@@ -253,13 +253,13 @@ function setPlayerRankForTest(rank){
  saveProgress();return true;
 }
 function hpModifiers(unit){return {flat:unit.hpFlatModifiers||{},percent:unit.hpPercentModifiers||{}}}
-function calculateMaxHp(baseHp,level,flat={},percent={}){
+function calculateMaxHp(baseHp,level,flat={},percent={},equipmentFlat={}){
  if(!Number.isFinite(baseHp)||baseHp<=0)return null;
- const max=calculateLevelScaledStat(baseHp,level,flat,percent);
+ const max=calculateLevelScaledStat(baseHp,level,flat,percent,equipmentFlat);
  return max!==null&&max>=1?max:null;
 }
 function recomputeUnitMaxHp(unit){
- const max=calculateMaxHp(unit.baseHp,unit.level,unit.hpFlatModifiers,unit.hpPercentModifiers);
+ const max=calculateMaxHp(unit.baseHp,unit.level,unit.hpFlatModifiers,unit.hpPercentModifiers,unit.hpEquipmentFlatModifiers);
  if(max===null)return false;
  const oldMax=unit.maxHp||max, oldHp=unit.hp;
  // Preserve the current HP ratio, including values above the old Max HP.
@@ -275,7 +275,7 @@ function healCharacterHp(unit,amount,{allowOverMax=false}={}){
 function setHpBonusForTest(id,source,kind,value){
  const p=party.find(u=>u.id===id);if(!p||!source||!Number.isFinite(value)||!['flat','percent'].includes(kind))return false;
  const key=kind==='flat'?'hpFlatModifiers':'hpPercentModifiers',next={...p[key],[source]:value};
- const max=calculateMaxHp(p.baseHp,p.level,kind==='flat'?next:p.hpFlatModifiers,kind==='percent'?next:p.hpPercentModifiers);
+ const max=calculateMaxHp(p.baseHp,p.level,kind==='flat'?next:p.hpFlatModifiers,kind==='percent'?next:p.hpPercentModifiers,p.hpEquipmentFlatModifiers);
  if(max===null)return false;p[key]=next;recomputeUnitMaxHp(p);return true;
 }
 function loadVitals(){try{const x=JSON.parse(localStorage.getItem(VITALS_KEY)||'{}');return x&&typeof x==='object'?x:{}}catch(e){return {}}}
@@ -290,12 +290,13 @@ let trainingRecoveryMode='restore';
 function setTrainingRecoveryMode(mode){if(phase!=='setup'||!['restore','preserve'].includes(mode))return false;trainingRecoveryMode=mode;return true}
 function spawnProgressedUnit(id){
  const model=ROSTER.find(x=>x.id===id),progress=progressFor(id);if(!model||!progress)return null;
- const maxHp=calculateMaxHp(model.hp,progress.level);if(maxHp===null)return null;
+ const modifiers=loadoutStatModifiers(id,progress.level);
+ const maxHp=calculateMaxHp(model.hp,progress.level,modifiers.hpFlatModifiers,modifiers.hpPercentModifiers,modifiers.hpEquipmentFlatModifiers);if(maxHp===null)return null;
  const saved=savedVitals[id];const restore=trainingRecoveryMode==='restore'||!saved;
  const savedMax=Number.isFinite(saved?.maxHp)&&saved.maxHp>0?saved.maxHp:maxHp;
  const savedHp=Number.isFinite(saved?.hp)?saved.hp:maxHp;
  const hp=restore?maxHp:savedHp<=0?0:Math.max(0,roundHp(maxHp*(savedHp/savedMax)));
- return {...model,baseHp:model.hp,level:progress.level,hp,maxHp,hpFlatModifiers:{},hpPercentModifiers:{},physicalAttackFlatModifiers:{},physicalAttackPercentModifiers:{},magicalAttackFlatModifiers:{},magicalAttackPercentModifiers:{},physicalDefenseFlatModifiers:{},physicalDefensePercentModifiers:{},magicalDefenseFlatModifiers:{},magicalDefensePercentModifiers:{},energy:20,energyReserved:0};
+ return {...model,baseHp:model.hp,level:progress.level,hp,maxHp,...modifiers,energy:20,energyReserved:0};
 }
 
 const turnTimeline=new TwoToneTurnTimeline();
@@ -307,7 +308,7 @@ function calculateSpeed(unit){
  const effectMultiplier=speedModifiers[unit.id]||1;
  return calculateLevelScaledStat(base,Number.isInteger(unit.level)?unit.level:1,
   {...(unit.speedFlatModifiers||{})},
-  {...(unit.speedPercentModifiers||{}),temporarySpeedEffect:effectMultiplier-1});
+  {...(unit.speedPercentModifiers||{}),temporarySpeedEffect:effectMultiplier-1},unit.speedEquipmentFlatModifiers||{});
 }
 function speedOf(unit){return Math.max(1,calculateSpeed(unit)||1)}
 function timelineEnemyMembers(){
@@ -617,7 +618,7 @@ function resolveSoulFollowUp(sourceAttack){
  const soul=party.find(p=>p.id==='zero'&&p.hp>0);if(!soul||soulFollowUpProcs<=0||soulFollowUpSources.has(sourceAttack.serial))return false;
  const affected=[...new Set(sourceAttack.hits.filter(h=>h.damage>0).map(h=>h.target))].map(id=>enemies.find(e=>e.id===id)).filter(e=>e&&e.hp>0);
  if(!affected.length)return false;soulFollowUpSources.add(sourceAttack.serial);soulFollowUpProcs--;
- const attack=calculateTrueAttack(soul),rawTotal=Number.isFinite(attack)?roundHp(attack*.5):0,base=Math.floor(rawTotal/affected.length),remainder=rawTotal%affected.length;let total=0;
+ const attack=calculateTrueAttack(soul),rawTotal=Number.isFinite(attack)?roundHp(attack*.5*celestialMultiplier(soul.id,'passive')):0,base=Math.floor(rawTotal/affected.length),remainder=rawTotal%affected.length;let total=0;
  for(let i=0;i<affected.length;i++){const share=base+(i<remainder?1:0),rate=attack>0?share/attack:0,amount=soulDamageForTarget(soul,affected[i],rate);if(amount<=0)continue;const enemy=affected[i];enemy.hp=Math.max(0,enemy.hp-amount);total+=amount;sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,slot:enemy.slot,damage:amount,hpAfter:enemy.hp,followUp:true});if(enemy.hp<=0)resolveEnemyDefeat(enemy)}
  sourceAttack.followUp={sourceSerial:sourceAttack.serial,damage:total,targets:affected.map(e=>e.id),procsRemaining:soulFollowUpProcs};syncEnemyHp();return total>0;
 }
@@ -728,9 +729,9 @@ function executeCombatAction(a,action,ultimateSeq=null){
  const energyBefore=a.energy,spBefore=sp,spMaxBefore=effectiveSpMax();
  let damage=0,enhanceSpent=0,soulRate=null;
  if(a.id==='zero'&&action==='basic'){
-  enhanceSpent=soulEnhanceStacks;soulEnhanceStacks=0;soulRate=1+enhanceSpent;
+  enhanceSpent=soulEnhanceStacks;soulEnhanceStacks=0;soulRate=celestialMultiplier(a.id,'basic')+enhanceSpent*celestialMultiplier(a.id,'skill');
   damage=soulDamageForTarget(a,targets[0],soulRate);a.energy=Math.min(120,a.energy+10+10*enhanceSpent);gainSp(1);
- }else if(a.id==='zero'&&action==='ultimate'){soulRate=2;damage=soulDamageForTarget(a,targets[0],soulRate)}
+ }else if(a.id==='zero'&&action==='ultimate'){soulRate=2*celestialMultiplier(a.id,'ultimate');damage=soulDamageForTarget(a,targets[0],soulRate)}
  else if(action==='basic'){damage=280;a.energy=Math.min(120,a.energy+25);gainSp(1)}
  else if(action==='skill'){damage=460;a.energy=Math.min(120,a.energy+35);sp--;addActionAdvance(a.id,25)}
  else damage=980;
@@ -759,6 +760,100 @@ function text(s,x,y,size=24,fill=color.white,weight='600',align='left'){ctx.text
 function line(x,y,w,f=1,c='#72e3ae',bg='#303649',h=13){rect(x,y,w,h,bg,null,6);rect(x,y,Math.max(0,w*Math.min(1,Math.max(0,f))),h,c,null,6)}
 function addButton(x,y,w,h,action,label,sub='',enabled=true){choiceRects.push({x,y,w,h,action,enabled});rect(x,y,w,h,enabled?'#263754':'#1d2538',enabled?'#a5c9dc':'#526176',11);text(label,x+w/2,y+h/2-(sub?10:0),19,enabled?'#fff4e6':'#9eafc1','750','center');if(sub)text(sub,x+w/2,y+h/2+16,13,'#bacadb','500','center')}
 function drawBackground(){ctx.imageSmoothingEnabled=false;if(images.arena.complete&&images.arena.naturalWidth)ctx.drawImage(images.arena,0,0,W,H);else{rect(0,0,W,H,'#596f83');rect(0,480,W,420,'#a38f9e')}rect(0,0,W,165,'rgba(8,10,22,.24)');const shade=ctx.createLinearGradient(0,580,0,900);shade.addColorStop(0,'#17122500');shade.addColorStop(1,'#090d23dc');rect(0,560,W,340,shade)}
+
+const RUNE_STATS=['hp','physicalAttack','magicalAttack','physicalDefense','magicalDefense','speed'];
+const RUNE_STAT_INFO={
+ hp:{label:'HP',main:200},physicalAttack:{label:'Physical Attack',main:20},
+ magicalAttack:{label:'Magical Attack',main:20},physicalDefense:{label:'Physical Defense',main:2},
+ magicalDefense:{label:'Magical Defense',main:2},speed:{label:'Speed',main:20}
+};
+const CELESTIALS=[['passive','PASSIVE'],['basic','BASIC'],['skill','SKILL'],['ultimate','ULTIMATE']];
+function defaultLoadout(){return {weapon:{selected:'standard',standardPotential:1,premiumPotential:1,premiumOwned:false},runes:[null,null,null,null],celestials:{passive:1,basic:1,skill:1,ultimate:1}}}
+function normalizeRune(value){
+ if(!value||typeof value!=='object'||!RUNE_STATS.includes(value.main)||!Array.isArray(value.subs))return null;
+ const subs=value.subs.filter((x,i,a)=>RUNE_STATS.includes(x)&&x!==value.main&&a.indexOf(x)===i).slice(0,3);
+ return subs.length===3?{level:Number.isInteger(value.level)?Math.max(1,Math.min(5,value.level)):1,main:value.main,subs,setId:typeof value.setId==='string'?value.setId:null}:null
+}
+function normalizeLoadout(value){
+ const base=defaultLoadout();if(!value||typeof value!=='object')return base;
+ const weapon=value.weapon&&typeof value.weapon==='object'?value.weapon:{};
+ base.weapon.standardPotential=Number.isInteger(weapon.standardPotential)?Math.max(1,Math.min(5,weapon.standardPotential)):1;
+ base.weapon.premiumPotential=Number.isInteger(weapon.premiumPotential)?Math.max(1,Math.min(5,weapon.premiumPotential)):1;
+ base.weapon.premiumOwned=weapon.premiumOwned===true;
+ base.weapon.selected=weapon.selected==='premium'&&base.weapon.premiumOwned?'premium':'standard';
+ if(Array.isArray(value.runes))base.runes=Array.from({length:4},(_,i)=>normalizeRune(value.runes[i]));
+ if(value.celestials&&typeof value.celestials==='object')for(const [key] of CELESTIALS){const n=value.celestials[key];base.celestials[key]=Number.isInteger(n)?Math.max(1,Math.min(10,n)):1}
+ return base
+}
+function loadCharacterLoadouts(){let stored={};try{stored=JSON.parse(localStorage.getItem(LOADOUT_KEY)||'{}')||{}}catch(e){}return Object.fromEntries(ROSTER.map(model=>[model.id,normalizeLoadout(stored[model.id])]))}
+let characterLoadouts=loadCharacterLoadouts(),loadoutCharacterId='zero',selectedLoadoutRune=0;
+function loadoutFor(id=loadoutCharacterId){return characterLoadouts[id]||(characterLoadouts[id]=defaultLoadout())}
+function saveLoadouts(){try{localStorage.setItem(LOADOUT_KEY,JSON.stringify(characterLoadouts))}catch(e){}}
+function weaponBonus(record){const w=record.weapon;return w.selected==='premium'&&w.premiumOwned?1+(w.premiumPotential-1)*.25:.8+(w.standardPotential-1)*.05}
+function loadoutStatModifiers(id,characterLevel=1){
+ const record=loadoutFor(id),bonus=weaponBonus(record),totals=Object.fromEntries(RUNE_STATS.map(k=>[k,0]));
+ for(const rune of record.runes){if(!rune)continue;totals[rune.main]+=RUNE_STAT_INFO[rune.main].main*rune.level;for(const sub of rune.subs)totals[sub]+=RUNE_STAT_INFO[sub].main*.5*rune.level}
+ const pct={signatureWeapon:bonus};
+ return {hpFlatModifiers:{},hpPercentModifiers:pct,hpEquipmentFlatModifiers:{runes:totals.hp},
+ physicalAttackFlatModifiers:{},physicalAttackPercentModifiers:pct,physicalAttackEquipmentFlatModifiers:{runes:totals.physicalAttack},
+ magicalAttackFlatModifiers:{},magicalAttackPercentModifiers:pct,magicalAttackEquipmentFlatModifiers:{runes:totals.magicalAttack},
+ physicalDefenseFlatModifiers:{},physicalDefensePercentModifiers:pct,physicalDefenseEquipmentFlatModifiers:{runes:totals.physicalDefense},
+ magicalDefenseFlatModifiers:{},magicalDefensePercentModifiers:pct,magicalDefenseEquipmentFlatModifiers:{runes:totals.magicalDefense},
+ speedFlatModifiers:{},speedPercentModifiers:pct,speedEquipmentFlatModifiers:{runes:totals.speed}}
+}
+function celestialMultiplier(id,key){return 1+.10*(loadoutFor(id).celestials[key]||1)}
+function loadoutStats(id){
+ const model=ROSTER.find(x=>x.id===id),level=progressFor(id)?.level||1;if(!model)return null;
+ const unit={...model,level,...loadoutStatModifiers(id,level)};
+ return {HP:calculateMaxHp(model.hp,level,unit.hpFlatModifiers,unit.hpPercentModifiers,unit.hpEquipmentFlatModifiers),
+ 'Physical Attack':calculatePhysicalAttack(unit),'Magical Attack':calculateMagicalAttack(unit),
+ 'Physical Defense':calculatePhysicalDefense(unit),'Magical Defense':calculateMagicalDefense(unit),Speed:calculateSpeed(unit)}
+}
+function enterLoadout(){loadoutCharacterId='zero';selectedLoadoutRune=0;phase='loadout';hint=''}
+function handleLoadoutAction(action){
+ const [kind,arg]=action.split(':'),record=loadoutFor(),weapon=record.weapon,rune=record.runes[selectedLoadoutRune];
+ if(kind==='back'){phase='menu';return}
+ if(kind==='character'){if(ROSTER_IDS.has(arg)&&!roster(arg)?.test)loadoutCharacterId=arg;return}
+ if(kind==='weapon-standard')weapon.selected='standard';
+ else if(kind==='weapon-premium'){if(weapon.premiumOwned)weapon.selected='premium'}
+ else if(kind==='potential'){const [type,delta]=arg.split(','),key=type==='premium'?'premiumPotential':'standardPotential';weapon[key]=Math.max(1,Math.min(5,weapon[key]+Number(delta)))}
+ else if(kind==='rune-select')selectedLoadoutRune=Math.max(0,Math.min(3,Number(arg)||0));
+ else if(kind==='rune-equip'){const index=Math.max(0,Math.min(3,Number(arg)||0));record.runes[index]={level:1,main:'hp',subs:['physicalAttack','magicalAttack','physicalDefense'],setId:null};selectedLoadoutRune=index}
+ else if(kind==='rune-remove')record.runes[selectedLoadoutRune]=null;
+ else if(kind==='rune-level'&&rune)rune.level=Math.max(1,Math.min(5,rune.level+Number(arg)));
+ else if(kind==='rune-main'&&rune){const next=RUNE_STATS[(RUNE_STATS.indexOf(rune.main)+1)%RUNE_STATS.length];rune.main=next;rune.subs=RUNE_STATS.filter(x=>x!==next).slice(0,3)}
+ else if(kind==='rune-sub'&&rune){const index=Number(arg),current=rune.subs[index];if(Number.isInteger(index)&&index>=0&&index<3){const choices=RUNE_STATS.filter(x=>x!==rune.main&&!rune.subs.some((v,i)=>i!==index&&v===x));rune.subs[index]=choices[(choices.indexOf(current)+1)%choices.length]}}
+ else if(kind==='celestial'){const [key,delta]=arg.split(',');if(Object.hasOwn(record.celestials,key))record.celestials[key]=Math.max(1,Math.min(10,record.celestials[key]+Number(delta)))}
+ saveLoadouts()
+}
+function drawLoadout(){
+ drawBackground();rect(0,0,W,H,'rgba(5,9,22,.76)');rect(74,40,1452,820,'rgba(13,20,39,.98)','#ccb88e',20);
+ text('LOADOUT',120,95,42,'#ffedd1','850');text('Configure weapons, runes, and celestials.',120,135,17,'#c4d6e5','550');addButton(1300,66,180,54,'loadout:back','MAIN MENU');
+ for(let i=0;i<ROSTER.length;i++){const p=ROSTER[i],y=192+i*116,active=loadoutCharacterId===p.id;addButton(112,y,240,90,'loadout:character:'+p.id,p.name,p.test?'PLACEHOLDER • NO LOADOUT':'LEVEL '+progressFor(p.id).level,!p.test);if(active)rect(108,y-4,248,98,'rgba(0,0,0,0)','#f2d39c',12)}
+ const model=roster(loadoutCharacterId),record=loadoutFor(loadoutCharacterId),w=record.weapon,stats=loadoutStats(loadoutCharacterId);
+ text(model.name+' • SIGNATURE LOADOUT',405,94,24,'#f3dfb9','850');
+ rect(390,165,530,192,'rgba(25,37,58,.94)','#718ba4',12);text('SIGNATURE WEAPON',416,190,17,'#d6e2ef','850');
+ addButton(414,214,220,52,'loadout:weapon-standard','STANDARD • '+w.standardPotential+'/5','+'+Math.round((.8+(w.standardPotential-1)*.05)*100)+'% ALL STATS',w.selected==='standard');
+ addButton(650,214,242,52,'loadout:weapon-premium',w.premiumOwned?'PREMIUM • '+w.premiumPotential+'/5':'PREMIUM • STORE LOCKED',w.premiumOwned?'+'+Math.round((1+(w.premiumPotential-1)*.25)*100)+'% ALL STATS':'Acquired in Store',w.premiumOwned);
+ text('Potential',416,294,15,'#c4d6e5','700');addButton(505,274,54,40,'loadout:potential:standard,-1','−','',w.standardPotential>1);addButton(563,274,54,40,'loadout:potential:standard,1','+','',w.standardPotential<5);
+ if(w.premiumOwned){addButton(670,274,54,40,'loadout:potential:premium,-1','−','',w.premiumPotential>1);addButton(728,274,54,40,'loadout:potential:premium,1','+','',w.premiumPotential<5)}
+ text('Signature effects are character-specific. Upgrade costs are not configured.',416,337,13,'#aebfd0','550');
+ rect(390,376,530,434,'rgba(25,37,58,.94)','#718ba4',12);text('COMBAT STATS • LEVEL '+progressFor(loadoutCharacterId).level,416,405,18,'#d6e2ef','850');
+ const statsList=Object.entries(stats||{});for(let i=0;i<statsList.length;i++){const [name,value]=statsList[i],yy=443+i*37;text(name,420,yy,15,'#d6dceb','600');text(value===null?'—':Math.round(value),875,yy,17,'#fff1d5','800','right')}
+ text('Weapon bonus: +'+Math.round(weaponBonus(record)*100)+'% to all six stats',416,680,15,'#f4d99c','750');
+ text('Rune stats are flat. Substats contribute 50% of main-stat value.',416,706,12,'#aebfd0','550');
+ text('CELESTIALS • +10% MULTIPLIER PER LEVEL • MAX 10',416,739,13,'#d6e2ef','800');
+ for(let i=0;i<CELESTIALS.length;i++){const [key,label]=CELESTIALS[i],x=410+i*124,level=record.celestials[key];text(label+' '+level, x+54,766,12,'#f1dfbf','750','center');addButton(x,784,50,34,'loadout:celestial:'+key+',-1','−','',level>1);addButton(x+57,784,50,34,'loadout:celestial:'+key+',1','+','',level<10)}
+ rect(948,165,540,645,'rgba(25,37,58,.94)','#718ba4',12);text('RUNES • UP TO FOUR • ONE SET',974,192,18,'#d6e2ef','850');text('Rune-set names/passives and rune inventory are pending definition.',974,219,13,'#aebfd0','550');
+ for(let i=0;i<4;i++){const y=246+i*126,rune=record.runes[i],selected=i===selectedLoadoutRune;rect(970,y,494,116,'rgba(17,27,45,.9)',selected?'#edcf98':'#536983',9);addButton(978,y+8,72,38,'loadout:rune-select:'+i,'RUNE '+(i+1),'',selected);
+  if(!rune)addButton(1060,y+8,174,38,'loadout:rune-equip:'+i,'ADD RUNE • PREVIEW','',true);
+  else{text('Lv '+rune.level+'/5',1070,y+25,14,'#f1dfbf','750');addButton(1140,y+7,42,36,'loadout:rune-level:-1','−','',rune.level>1);addButton(1186,y+7,42,36,'loadout:rune-level:1','+','',rune.level<5);addButton(1240,y+7,96,36,'loadout:rune-remove','UNEQUIP','');
+   text('MAIN '+RUNE_STAT_INFO[rune.main].label+' +'+RUNE_STAT_INFO[rune.main].main*rune.level,986,y+65,12,'#f3d69d','700');addButton(986,y+78,142,31,'loadout:rune-main','CHANGE MAIN','');
+   for(let j=0;j<3;j++){const sub=rune.subs[j],x=1137+j*106;addButton(x,y+72,100,37,'loadout:rune-sub:'+j,RUNE_STAT_INFO[sub].label,'+'+(RUNE_STAT_INFO[sub].main*.5*rune.level),true)}
+  }
+ }
+}
+
 function drawMainMenu(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.68)');
  text('TWO-TONE',800,112,58,'#f8f4ea','900','center');
@@ -766,7 +861,8 @@ function drawMainMenu(){
  rect(1293,63,190,66,'rgba(13,17,35,.94)','#eacb87',12);
  text('RANK',1388,82,13,'#bfc8d9','800','center');text(playerRank,1388,107,25,'#f7f3f8','850','center');
  const items=[
-  {label:'CHARACTERS',x:220,y:256},
+  {label:'LOADOUT',x:220,y:256,active:true,action:'open-loadout',detail:'WEAPONS • RUNES • CELESTIALS'},
+
   {label:'PARTY',x:640,y:256,active:true,action:'open-party',detail:'MANAGE CURRENT PARTY'},
   {label:'EVENTS',x:1060,y:256},
   {label:'STORE',x:220,y:472},
@@ -1345,12 +1441,12 @@ function drawSetup(){
  addButton(1039,733,313,79,'start','START BATTLE','Current party',validTeam(draft));
 }
 function drawHint(t){if(hint&&t-hintAt<2300){rect(474,393,652,76,'rgba(15,21,39,.98)','#e6b98a',12);text(hint,800,431,20,'#fff4e8','700','center')}}
-function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='menu'){drawMainMenu()}else if(phase==='partySetup'){drawPartySetup()}else if(phase!=='setup'){
+function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='menu'){drawMainMenu()}else if(phase==='partySetup'){drawPartySetup()}else if(phase==='loadout'){drawLoadout()}else if(phase!=='setup'){
   const hit=zeroBasicStage(t);ctx.save();if(hit!==null&&hit>=645&&hit<=760){const q=1-(hit-645)/115;ctx.translate(Math.sin(hit*.42)*q*4,Math.cos(hit*.33)*q*2.5)}
   drawCameraStage(t);drawFx(t);ctx.restore();drawHud(t)
  }else{drawCameraStage(t);drawSetup()}drawHint(t);requestAnimationFrame(loop)}
-function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'){devPanelOpen=!devPanelOpen;return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(phase==='player'&&cameraPreview==='party'){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){queueUltimate(cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){chargeUltimateForTest(cmd.slice(11));return}
- switch(cmd){case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'support-heal':startSupportDemo('heal');break;case 'support-revive':startSupportDemo('revive');break;case 'confirm-support':confirmSupportDemo();break;case 'cancel-support':cancelSupportDemo();break;case 'camera-party':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':toggleWavePreset();break;case 'toggle-recovery':setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':testKO();break;case 'test-revive':testRevive();break;case 'skill':zeroSkillControl();break;case 'cap-test':cycleSpCapTest();break;case 'hud-status-test':toggleHudStatusDemo();break;case 'f05-advance':addActionAdvance(activeId,25);break;case 'f05-delay':addActionDelay(activeId,25);break;case 'f05-speed':setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':queueSummonForTest('independent');break;case 'f05-summon-controlled':queueSummonForTest('controlled');break;
+function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('loadout:')){handleLoadoutAction(cmd.slice(8));return}if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'){devPanelOpen=!devPanelOpen;return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(phase==='player'&&cameraPreview==='party'){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){queueUltimate(cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){chargeUltimateForTest(cmd.slice(11));return}
+ switch(cmd){case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'support-heal':startSupportDemo('heal');break;case 'support-revive':startSupportDemo('revive');break;case 'confirm-support':confirmSupportDemo();break;case 'cancel-support':cancelSupportDemo();break;case 'camera-party':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':toggleWavePreset();break;case 'toggle-recovery':setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':testKO();break;case 'test-revive':testRevive();break;case 'skill':zeroSkillControl();break;case 'cap-test':cycleSpCapTest();break;case 'hud-status-test':toggleHudStatusDemo();break;case 'f05-advance':addActionAdvance(activeId,25);break;case 'f05-delay':addActionDelay(activeId,25);break;case 'f05-speed':setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':queueSummonForTest('independent');break;case 'f05-summon-controlled':queueSummonForTest('controlled');break;
  case 'progress-test-level':{const a=active(),p=a&&progressFor(a.id);if(a&&p){const cost=Math.max(1,requiredExp(a.level)-p.exp),result=testGrantExp(a.id,cost);say(result?`TEST ONLY: level ${result.level}, ${cost} EXP injected.`:'Ascension required or level cap reached.');}break}
  case 'progress-test-ascend':{const a=active();if(a)say(testAscend(a.id)?`TEST ONLY: level ${a.level} ascension unlocked (no materials).`:'Not at a locked ascension gate.');break}
  case 'hp-test-flat':{const a=active();if(a)setHpBonusForTest(a.id,'debug-flat','flat',(a.hpFlatModifiers['debug-flat']||0)+20);break}

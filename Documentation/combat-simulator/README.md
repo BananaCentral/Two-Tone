@@ -24,6 +24,8 @@ Each scenario defines stat and ability archetypes, then creates team instances b
 
 Every archetype provides the six standard stats under `stats`: HP, Physical Attack, Magical Attack, Physical Defense, Magical Defense, and Speed. Stats use the project's level scaling (`base × level`, rounded to the nearest integer) for levels 1–50. Teams are listed as `teams.allies` and `teams.enemies`.
 
+Optional `weapon` settings accept `type: standard|premium` and `potential: 1–5`; the weapon percentage applies to all six stats. Standard grants 80% at Potential 1, then 5 percentage points per potential; Premium grants 100% at Potential 1, then 25 points per potential. Optional `runes` are limited to four per unit. Each rune defines `level` 1–5, one `main` stat, three unique `subs`, and an optional shared `setId`; main values are HP 200 or other stats 20 per rune level, and substats contribute half. Optional `celestials` maps `passive`, `basic`, `skill`, and `ultimate` to levels 1–10; each level adds 10% of that ability's base multiplier. Rune set passives and weapon signature effects are not modeled until their character-specific definitions are supplied.
+
 Supported attack damage types are `physical`, `magical`, and `true`. Basic and Ultimate attacks define a multiplier and target shape (`single`, `blast`, or `aoe`). `random` and `lowestHp` are primary-target selection policies. Units start with zero Energy unless `energy.start` or an instance `energy` is supplied; Energy is capped at 120 by default.
 
 Supported Skill and Passive effect types:
