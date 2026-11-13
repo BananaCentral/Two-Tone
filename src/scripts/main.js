@@ -411,10 +411,10 @@ const WAVE_PRESETS={stress:[15,12,6],quick:[1,5,6],sizes:[1,5,6,12,15]};
 let wavePreset='stress',waveOverride=null,wavePlan=[],waveIndex=-1,waveQueue=[],waveKills=0,
     totalEnemyDefeats=0,encounterCleared=false,spawnHistory=[],enemies=[],selectedEnemyId=null,actingEnemyId=null;
 // Fundamental 3 target rules and Fundamental 2 v1.1 post-attack reinforcement boundary.
-// Soul Enhanced Basic uses Blast (Premium Weapon Duplicate 3 changes it to AoE); the Ultimate is AoE. The pattern toolbar,
+// Soul Enhanced Basic uses Blast unless Premium Weapon Duplicate 3 changes it to AoE; Ultimate is AoE. The pattern toolbar,
 // 5-hit and support actions remain development-only controls. Damage/cost values are provisional.
 let targetingMode='single',supportDemo=null,zeroSkillArmed=false,attackInProgress=false,attackSerial=0,
-     pendingVacancies=[],lastAttack=null,supportTestHistory=[],soulEnhanceStacks=0,soulFollowUpProcs=5,soulFollowUpSources=new Set();
+     pendingVacancies=[],lastAttack=null,supportTestHistory=[],soulEnhanceStacks=0,soulFollowUpProcs=5,soulFollowUpSources=new Set(),soulEnhanceSpendingRemainder=0,soulFollowUpActivationCount=0;
 // Fundamental 4. Numerical energy costs and debug bonuses are inherited/provisional,
 // not character-balancing approvals. No gameplay source grants an SP-cap bonus by default.
 const ULTIMATE_ENERGY_COST=100,BASE_SP_MAX=5;
@@ -441,7 +441,7 @@ function availableEnergy(p){return p?Math.max(0,p.energy-(p.energyReserved||0)):
 function isUltPending(id){return ultimateQueue.some(q=>q.actorId===id)||(ultimateExecuting&&lastAttack?.action==='ultimate'&&lastAttack.actor===id)}
 function canQueueUltimate(p){return !!p&&p.hp>0&&!paused&&['player','enemy','resolve'].includes(phase)
   &&availableEnergy(p)>=ULTIMATE_ENERGY_COST&&!isUltPending(p.id)}
-function resetActionResources(){sp=3;soulEnhanceStacks=0;soulFollowUpProcs=5;soulFollowUpSources=new Set();spCapModifiers=Object.create(null);ultimateQueue=[];ultimateSequence=0;ultimateHistory=[];ultimateResume=null;ultimateExecuting=false;
+function resetActionResources(){sp=3;soulEnhanceStacks=0;soulFollowUpProcs=soulFollowUpLimit();soulFollowUpSources=new Set();soulEnhanceSpendingRemainder=0;soulFollowUpActivationCount=0;spCapModifiers=Object.create(null);ultimateQueue=[];ultimateSequence=0;ultimateHistory=[];ultimateResume=null;ultimateExecuting=false;
   for(const p of party)p.energyReserved=0;}
 function setSpCapTestSource(source,bonus){
  if(!SP_CAP_SOURCES.has(source)||!Number.isInteger(bonus)||bonus<0||bonus>20)return false;
@@ -516,15 +516,17 @@ function chooseAttackTargets(mode=targetingMode,primary=chosenEnemy()){
 }
 function closestSurvivingEnemy(slot){return liveEnemies().slice().sort((a,b)=>Math.abs(a.slot-slot)-Math.abs(b.slot-slot)||a.slot-b.slot)[0]||null}
 // Soul's Basic becomes Blast at three Enhance stacks; the Ultimate is AoE.
-function actionTargetMode(actor,action){if(actor?.id==='zero'&&action==='ultimate')return 'aoe';if(actor?.id==='zero'&&action==='basic')return soulEnhanceStacks>=3?'blast':'single';return actor?.id==='zero'&&action==='skill'?'blast':targetingMode}
-function previewTargetMode(){return phase==='player'&&activeId==='zero'&&zeroSkillArmed?'blast':targetingMode}
+function actionTargetMode(actor,action){if(actor?.id==='zero'&&action==='ultimate')return 'aoe';if(actor?.id==='zero'&&action==='basic')return soulEnhancedBasicTargetMode(soulEnhanceStacks);return actor?.id==='zero'&&action==='skill'?'blast':targetingMode}
+function previewTargetMode(){return phase==='player'&&activeId==='zero'&&zeroSkillArmed?(premiumWeaponDuplicateRank()>=3?'aoe':'blast'):targetingMode}
 function setTargetingMode(mode){if(!['single','blast','aoe','five-hit'].includes(mode)||phase!=='player'||paused)return false;targetingMode=mode;zeroSkillArmed=false;supportDemo=null;cameraPreview='target';return true}
 function zeroSkillControl(){return activateSoulEnhance();}
 function activateSoulEnhance(){
  const a=active();if(phase!=='player'||paused||!a||a.id!=='zero'){say('Enhance is available on Soul’s turn.');return false}
  if(sp<1){say('Soul Enhance needs 1 Skill Point.');return false}
- sp--;soulEnhanceStacks++;zeroSkillArmed=false;cameraPreview=null;
- log='SOUL ENHANCE: '+soulEnhanceStacks+' Skill Point(s) banked for the next Basic Attack.';return true;
+ sp--;soulEnhanceStacks++;let refunded=false;
+ if(loadoutFor('zero').weapon.selected==='standard'){soulEnhanceSpendingRemainder++;if(soulEnhanceSpendingRemainder>=3){soulEnhanceSpendingRemainder-=3;gainSp(1);refunded=true}}
+ zeroSkillArmed=false;cameraPreview=null;
+ log='SOUL ENHANCE: '+soulEnhanceStacks+' Skill Point(s) banked for the next Basic Attack.'+(refunded?' Standard signature weapon restored 1 Skill Point.':'');return true;
 }
 function startSupportDemo(kind){
  if(phase!=='player'||paused||!['heal','revive'].includes(kind))return false;
@@ -611,22 +613,24 @@ function applyTrainingHit(enemy,damage,hitNumber){
  if(!enemy||enemy.hp<=0||!attackInProgress)return false;
  enemy.hp=Math.max(0,enemy.hp-damage);
  lastAttack.hits.push({index:hitNumber,target:enemy.id,slot:enemy.slot,damage,hpAfter:enemy.hp});
- if(enemy.hp<=0)resolveEnemyDefeat(enemy);else syncEnemyHp();
+ if(enemy.hp<=0){resolveEnemyDefeat(enemy);if(lastAttack.actor==='zero')onSoulEnemyKill()}else syncEnemyHp();
  return true;
 }
 function resolveSoulFollowUp(sourceAttack){
  const soul=party.find(p=>p.id==='zero'&&p.hp>0);if(!soul||soulFollowUpProcs<=0||soulFollowUpSources.has(sourceAttack.serial))return false;
  const affected=[...new Set(sourceAttack.hits.filter(h=>h.damage>0).map(h=>h.target))].map(id=>enemies.find(e=>e.id===id)).filter(e=>e&&e.hp>0);
  if(!affected.length)return false;soulFollowUpSources.add(sourceAttack.serial);soulFollowUpProcs--;
- const attack=calculateTrueAttack(soul),rawTotal=Number.isFinite(attack)?roundHp(attack*.5*celestialMultiplier(soul.id,'passive')):0,base=Math.floor(rawTotal/affected.length),remainder=rawTotal%affected.length;let total=0;
- for(let i=0;i<affected.length;i++){const share=base+(i<remainder?1:0),rate=attack>0?share/attack:0,amount=soulDamageForTarget(soul,affected[i],rate);if(amount<=0)continue;const enemy=affected[i];enemy.hp=Math.max(0,enemy.hp-amount);total+=amount;sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,slot:enemy.slot,damage:amount,hpAfter:enemy.hp,followUp:true});if(enemy.hp<=0)resolveEnemyDefeat(enemy)}
- sourceAttack.followUp={sourceSerial:sourceAttack.serial,damage:total,targets:affected.map(e=>e.id),procsRemaining:soulFollowUpProcs};syncEnemyHp();return total>0;
+ const attack=calculateTrueAttack(soul),dupeBonus=characterDuplicateRank(soul.id)>=2?2:1,rawTotal=Number.isFinite(attack)?roundHp(attack*.5*dupeBonus*celestialMultiplier(soul.id,'passive')):0,base=Math.floor(rawTotal/affected.length),remainder=rawTotal%affected.length;let total=0;
+ for(let i=0;i<affected.length;i++){const share=base+(i<remainder?1:0),rate=attack>0?share/attack:0,amount=soulDamageForTarget(soul,affected[i],rate);if(amount<=0)continue;const enemy=affected[i];enemy.hp=Math.max(0,enemy.hp-amount);total+=amount;sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,slot:enemy.slot,damage:amount,hpAfter:enemy.hp,followUp:true});if(enemy.hp<=0){resolveEnemyDefeat(enemy);onSoulEnemyKill()}}
+ soulFollowUpActivationCount++;
+  if(premiumWeaponDuplicateRank(soul.id)>=4&&soulFollowUpActivationCount%2===0)soulFollowUpProcs=Math.min(soulFollowUpLimit(),soulFollowUpProcs+1);
+  sourceAttack.followUp={sourceSerial:sourceAttack.serial,damage:total,targets:affected.map(e=>e.id),procsRemaining:soulFollowUpProcs};syncEnemyHp();return total>0;
 }
 function finishTrainingAttack(serial){
  if(!attackInProgress||!lastAttack||lastAttack.serial!==serial)return;
  attackInProgress=false;lastAttack.finished=true;lastAttack.finishedAt=performance.now();
  if(lastAttack.actor&&lastAttack.actor!=='zero'&&party.some(p=>p.id===lastAttack.actor))resolveSoulFollowUp(lastAttack);
- if(lastAttack.actor==='zero'&&lastAttack.action==='ultimate'){soulFollowUpProcs=5;soulFollowUpSources.clear();lastAttack.followUpRefill=5}
+ if(lastAttack.actor==='zero'&&lastAttack.action==='ultimate'){soulFollowUpProcs=soulFollowUpLimit();soulFollowUpSources.clear();lastAttack.followUpRefill=soulFollowUpProcs}
  settleAfterAttack();
  if(!encounterCleared&&lastAttack?.action!=='ultimate')finishSummonCreationForTest(lastAttack?.actor);
  if(phase!=='resolve')return;
@@ -729,9 +733,9 @@ function executeCombatAction(a,action,ultimateSeq=null){
  const energyBefore=a.energy,spBefore=sp,spMaxBefore=effectiveSpMax();
  let damage=0,enhanceSpent=0,soulRate=null;
  if(a.id==='zero'&&action==='basic'){
-  enhanceSpent=soulEnhanceStacks;soulEnhanceStacks=0;soulRate=celestialMultiplier(a.id,'basic')+enhanceSpent*celestialMultiplier(a.id,'skill');
+  enhanceSpent=soulEnhanceStacks;soulEnhanceStacks=0;const basicDupe=premiumWeaponDuplicateRank(a.id)>=1?2:1,skillPerPoint=characterDuplicateRank(a.id)>=4?2:1;soulRate=basicDupe*celestialMultiplier(a.id,'basic')+enhanceSpent*skillPerPoint*celestialMultiplier(a.id,'skill');
   damage=soulDamageForTarget(a,targets[0],soulRate);a.energy=Math.min(120,a.energy+10+10*enhanceSpent);gainSp(1);
- }else if(a.id==='zero'&&action==='ultimate'){soulRate=2*celestialMultiplier(a.id,'ultimate');damage=soulDamageForTarget(a,targets[0],soulRate)}
+ }else if(a.id==='zero'&&action==='ultimate'){const ultimateDupe=characterDuplicateRank(a.id)>=3?2:1;soulRate=2*ultimateDupe*celestialMultiplier(a.id,'ultimate');damage=soulDamageForTarget(a,targets[0],soulRate)}
  else if(action==='basic'){damage=280;a.energy=Math.min(120,a.energy+25);gainSp(1)}
  else if(action==='skill'){damage=460;a.energy=Math.min(120,a.energy+35);sp--;addActionAdvance(a.id,25)}
  else damage=980;
@@ -768,7 +772,7 @@ const RUNE_STAT_INFO={
  magicalDefense:{label:'Magical Defense',main:2},speed:{label:'Speed',main:20}
 };
 const CELESTIALS=[['passive','PASSIVE'],['basic','BASIC'],['skill','SKILL'],['ultimate','ULTIMATE']];
-function defaultLoadout(){return {weapon:{selected:'standard',standardPotential:1,premiumPotential:1,premiumOwned:false},runes:[null,null,null,null],celestials:{passive:1,basic:1,skill:1,ultimate:1}}}
+function defaultLoadout(){return {characterDuplicates:0,weapon:{selected:'standard',standardPotential:1,premiumPotential:1,premiumOwned:false},runes:[null,null,null,null],celestials:{passive:1,basic:1,skill:1,ultimate:1}}}
 function normalizeRune(value){
  if(!value||typeof value!=='object'||!RUNE_STATS.includes(value.main)||!Array.isArray(value.subs))return null;
  const subs=value.subs.filter((x,i,a)=>RUNE_STATS.includes(x)&&x!==value.main&&a.indexOf(x)===i).slice(0,3);
@@ -776,6 +780,7 @@ function normalizeRune(value){
 }
 function normalizeLoadout(value){
  const base=defaultLoadout();if(!value||typeof value!=='object')return base;
+ base.characterDuplicates=Number.isInteger(value.characterDuplicates)?Math.max(0,Math.min(4,value.characterDuplicates)):0;
  const weapon=value.weapon&&typeof value.weapon==='object'?value.weapon:{};
  base.weapon.standardPotential=Number.isInteger(weapon.standardPotential)?Math.max(1,Math.min(5,weapon.standardPotential)):1;
  base.weapon.premiumPotential=Number.isInteger(weapon.premiumPotential)?Math.max(1,Math.min(5,weapon.premiumPotential)):1;
@@ -802,6 +807,12 @@ function loadoutStatModifiers(id,characterLevel=1){
  speedFlatModifiers:{},speedPercentModifiers:pct,speedEquipmentFlatModifiers:{runes:totals.speed}}
 }
 function celestialMultiplier(id,key){return 1+.10*(loadoutFor(id).celestials[key]||1)}
+function characterDuplicateRank(id='zero'){return loadoutFor(id).characterDuplicates||0}
+function premiumWeaponDuplicateRank(id='zero'){const w=loadoutFor(id).weapon;return w.selected==='premium'&&w.premiumOwned?Math.max(0,w.premiumPotential-1):0}
+function soulFollowUpLimit(){return characterDuplicateRank('zero')>=1?7:5}
+function soulEnhancedBasicTargetMode(stacks){if(stacks<3)return 'single';return premiumWeaponDuplicateRank()>=3?'aoe':'blast'}
+function onSoulEnemyKill(){if(premiumWeaponDuplicateRank()>=2)soulFollowUpProcs=Math.min(soulFollowUpLimit(),soulFollowUpProcs+1)}
+
 function loadoutStats(id){
  const model=ROSTER.find(x=>x.id===id),level=progressFor(id)?.level||1;if(!model)return null;
  const unit={...model,level,...loadoutStatModifiers(id,level)};
@@ -814,7 +825,8 @@ function handleLoadoutAction(action){
  const [kind,arg]=action.split(':'),record=loadoutFor(),weapon=record.weapon,rune=record.runes[selectedLoadoutRune];
  if(kind==='back'){phase='menu';return}
  if(kind==='character'){if(ROSTER_IDS.has(arg)&&!roster(arg)?.test)loadoutCharacterId=arg;return}
- if(kind==='weapon-standard')weapon.selected='standard';
+ if(kind==='character-duplicate')record.characterDuplicates=Math.max(0,Math.min(4,record.characterDuplicates+Number(arg)));
+ else if(kind==='weapon-standard')weapon.selected='standard';
  else if(kind==='weapon-premium'){if(weapon.premiumOwned)weapon.selected='premium'}
  else if(kind==='potential'){const [type,delta]=arg.split(','),key=type==='premium'?'premiumPotential':'standardPotential';weapon[key]=Math.max(1,Math.min(5,weapon[key]+Number(delta)))}
  else if(kind==='rune-select')selectedLoadoutRune=Math.max(0,Math.min(3,Number(arg)||0));
@@ -831,13 +843,13 @@ function drawLoadout(){
  text('LOADOUT',120,95,42,'#ffedd1','850');text('Configure weapons, runes, and celestials.',120,135,17,'#c4d6e5','550');addButton(1300,66,180,54,'loadout:back','MAIN MENU');
  for(let i=0;i<ROSTER.length;i++){const p=ROSTER[i],y=192+i*116,active=loadoutCharacterId===p.id;addButton(112,y,240,90,'loadout:character:'+p.id,p.name,p.test?'PLACEHOLDER • NO LOADOUT':'LEVEL '+progressFor(p.id).level,!p.test);if(active)rect(108,y-4,248,98,'rgba(0,0,0,0)','#f2d39c',12)}
  const model=roster(loadoutCharacterId),record=loadoutFor(loadoutCharacterId),w=record.weapon,stats=loadoutStats(loadoutCharacterId);
- text(model.name+' • SIGNATURE LOADOUT',405,94,24,'#f3dfb9','850');
+ text(model.name+' • SIGNATURE LOADOUT',405,94,24,'#f3dfb9','850');text('CHARACTER DUPLICATES '+record.characterDuplicates+'/4',405,135,14,'#d6e2ef','750');addButton(700,117,48,36,'loadout:character-duplicate:-1','−','',record.characterDuplicates>0);addButton(754,117,48,36,'loadout:character-duplicate:1','+','',record.characterDuplicates<4);
  rect(390,165,530,192,'rgba(25,37,58,.94)','#718ba4',12);text('SIGNATURE WEAPON',416,190,17,'#d6e2ef','850');
  addButton(414,214,220,52,'loadout:weapon-standard','STANDARD • '+w.standardPotential+'/5','+'+Math.round((.8+(w.standardPotential-1)*.05)*100)+'% ALL STATS',w.selected==='standard');
- addButton(650,214,242,52,'loadout:weapon-premium',w.premiumOwned?'PREMIUM • '+w.premiumPotential+'/5':'PREMIUM • STORE LOCKED',w.premiumOwned?'+'+Math.round((1+(w.premiumPotential-1)*.25)*100)+'% ALL STATS':'Acquired in Store',w.premiumOwned);
+ addButton(650,214,242,52,'loadout:weapon-premium',w.premiumOwned?'PREMIUM • '+w.premiumPotential+'/5':'PREMIUM • STORE LOCKED',w.premiumOwned?'+'+Math.round((1+(w.premiumPotential-1)*.25)*100)+'% • DUPLICATES '+(w.premiumPotential-1):'Acquired in Store',w.premiumOwned);
  text('Potential',416,294,15,'#c4d6e5','700');addButton(505,274,54,40,'loadout:potential:standard,-1','−','',w.standardPotential>1);addButton(563,274,54,40,'loadout:potential:standard,1','+','',w.standardPotential<5);
  if(w.premiumOwned){addButton(670,274,54,40,'loadout:potential:premium,-1','−','',w.premiumPotential>1);addButton(728,274,54,40,'loadout:potential:premium,1','+','',w.premiumPotential<5)}
- text('Signature effects are character-specific. Upgrade costs are not configured.',416,337,13,'#aebfd0','550');
+ text('Standard effect: spend 3 Enhance points to restore 1 SP. Costs are not configured.',416,337,13,'#aebfd0','550');
  rect(390,376,530,434,'rgba(25,37,58,.94)','#718ba4',12);text('COMBAT STATS • LEVEL '+progressFor(loadoutCharacterId).level,416,405,18,'#d6e2ef','850');
  const statsList=Object.entries(stats||{});for(let i=0;i<statsList.length;i++){const [name,value]=statsList[i],yy=443+i*37;text(name,420,yy,15,'#d6dceb','600');text(value===null?'—':Math.round(value),875,yy,17,'#fff1d5','800','right')}
  text('Weapon bonus: +'+Math.round(weaponBonus(record)*100)+'% to all six stats',416,680,15,'#f4d99c','750');

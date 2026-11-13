@@ -36,7 +36,7 @@ Calculated stats scale with Level and use the matching stat standards.
 - Restores 1 party Skill Point under the shared Basic default.
 - If Soul has Enhanced Basic stacks, each stack adds 1.0× to this Basic's multiplier and restores an additional 10 Energy.
 - Enhanced Basic stacks are consumed by the next Basic Attack.
-- With at least 3 stacks, Basic becomes a Blast: it hits the selected enemy and up to two adjacent enemies, with full damage to each.
+- With at least 3 stacks, Basic becomes a Blast: it hits the selected enemy and up to two adjacent enemies, with full damage to each. Premium Weapon Duplicate 3 changes this to AoE.
 
 ## Skill: Enhance
 
@@ -50,14 +50,24 @@ Calculated stats scale with Level and use the matching stat standards.
 
 - Costs 100 Energy.
 - Deals True damage to all enemies at a 2.0× multiplier.
-- After its damage resolves, refills Follow Up to 5 procs.
+- After its damage resolves, refills Follow Up to its current limit (5 by default, or 7 with Character Duplicate 1).
 
 ## Loadout
 
 - Soul starts with his Standard signature weapon at Potential 1, granting +80% to all six stats. Potential 5 grants +100%; each intermediate potential adds 5 percentage points.
-- His Premium signature weapon is a separate, character-locked option. It grants +100% at Potential 1 and +200% at Potential 5, with 25 percentage points per potential. Store ownership and its character-specific effect are not configured yet.
-- Soul's four Celestials start at level 1. Each level increases the corresponding ability multiplier by 10% of its base value. At the default level, Follow Up is 0.55×, Basic is 1.1×, each Enhance stack adds 1.1×, and Ultimate is 2.2×.
-- Runes add flat stats: main stat value × rune level; each of three distinct substats contributes half that value. Rune-set options and their passive effects are not defined yet.
+- The Standard signature effect refunds 1 Skill Point after every 3 Skill Points spent on Enhance during battle.
+- His Premium signature weapon is a separate, character-locked option. It grants +100% at Potential 1 and +200% at Potential 5, with 25 percentage points per potential. Store ownership remains unavailable until the Store is implemented.
+- Premium Potential 2–5 correspond to weapon Duplicates 1–4. Duplicate 1 doubles Basic's base multiplier; Duplicate 2 restores one Follow Up proc when Soul kills an enemy; Duplicate 3 changes a 3-stack Enhanced Basic from Blast to AoE; Duplicate 4 restores one Follow Up proc for every two Follow Up activations.
+- Soul's four Celestials start at Level 1. Each level increases its corresponding ability multiplier by 10% of its base value. At Level 1, Follow Up is 0.55×, Basic is 1.1×, each Enhance stack adds 1.1×, and Ultimate is 2.2×.
+- Runes add flat stats: main-stat value × rune level; each of three distinct substats contributes half that value. Rune-set names and passive effects are not defined yet.
+
+## Character Duplicates
+
+- Duplicate 1 raises Follow Up capacity from 5 to 7.
+- Duplicate 2 doubles Follow Up's base multiplier from 0.5× to 1.0×.
+- Duplicate 3 doubles Ultimate's base multiplier from 2.0× to 4.0×.
+- Duplicate 4 raises each Enhance stack's Basic damage increase from +100% to +200%.
+- Character Duplicate levels are separate from weapon Potential. Their acquisition costs are not defined yet.
 
 ## Implementation Notes
 

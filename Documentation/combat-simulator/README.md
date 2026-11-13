@@ -30,11 +30,14 @@ Supported attack damage types are `physical`, `magical`, and `true`. Basic and U
 
 Supported Skill and Passive effect types:
 
-- `enhanceBasic`: consumes available shared Skill Points before that unit's Basic. Configure added multiplier, Energy per stack, and the stack threshold that changes Basic to Blast.
+- `enhanceBasic`: consumes available shared Skill Points before that unit's Basic. Configure added multiplier, Energy per stack, and the stack threshold that changes Basic to Blast (Premium Soul Weapon Duplicate 3 changes it to AoE).
 - `followUp`: triggers once for each unique damaging action from another ally while charges remain. The source actor cannot trigger its own Follow Up. Each follow-up uses its own unit's stats; damage is shared evenly among surviving targets hit by the source action.
 - `everyNthBasic`: on each Nth Basic by that unit, changes its target mode and applies its damage bonus. The counter is per unit.
 
 Additional ability effects require adding a handler to the simulator before configs can use them.
+
+
+Soul's `characterDuplicates` field (0–4) enables his four character Duplicate effects. With a Premium weapon, potential levels 2–5 correspond to weapon duplicates 1–4. The Standard Soul weapon refunds one shared Skill Point per three Enhance points spent. The simulator models these Soul-specific effects and the default Level 1 Celestials.
 
 ## Output
 
