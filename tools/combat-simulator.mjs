@@ -41,6 +41,8 @@ function validateConfig(config) {
       const archetype = config.archetypes[instance.archetype];
       assert(archetype, 'Unknown archetype ' + instance.archetype + ' for ' + instance.id + '.');
       assert(archetype.stats && Number.isFinite(archetype.stats.hp) && Number.isFinite(archetype.stats.speed), 'Archetype ' + instance.archetype + ' needs HP and Speed stats.');
+      const barrierPercent = instance.barrierPercent ?? archetype.barrierPercent ?? 0.2;
+      assert(Number.isFinite(barrierPercent) && barrierPercent >= 0 && barrierPercent <= 1, 'Enemy barrierPercent must be from 0 to 1.');
       assert(archetype.basic && Number.isFinite(archetype.basic.multiplier) && ['physical', 'magical', 'true'].includes(archetype.basic.damageType), 'Archetype ' + instance.archetype + ' needs a typed Basic Attack.');
       assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
       for (const passive of archetype.passives || []) {
@@ -107,6 +109,13 @@ function instantiate(config, side) {
       stats,
       hp: stats.hp,
       maxHp: stats.hp,
+      maxBarrier: side === 'enemies' ? roundStat(stats.hp * (instance.barrierPercent ?? archetype.barrierPercent ?? 0.2)) : 0,
+      barrier: side === 'enemies' ? roundStat(stats.hp * (instance.barrierPercent ?? archetype.barrierPercent ?? 0.2)) : 0,
+      barrierPercent: instance.barrierPercent ?? archetype.barrierPercent ?? 0.2,
+      brokenTurns: 0,
+      debuffs: [],
+      marks: [],
+      barriersBroken: 0,
       energy: Math.max(0, Math.min(maxEnergy, instance.energy ?? archetype.energy?.start ?? 0)),
       maxEnergy,
       celestials: instance.celestials ?? archetype.celestials ?? {},
@@ -155,6 +164,14 @@ function damageFor(attacker, target, type, multiplier) {
   }
   return roundStat(attack * multiplier * (1 - reduction));
 }
+function cleanse(unit, full = true) {
+  if (full) { unit.debuffs = []; unit.marks = []; return; }
+  unit.debuffs.shift(); unit.marks.shift();
+}
+function brokenDuration(speed, baseTurns) {
+  const speedFactor = Math.max(0.5, Math.min(1.5, 2 - speed / 100));
+  return Math.max(1, roundStat(baseTurns * speedFactor));
+}
 function chooseTarget(actor, candidates, mode, random) {
   if (!candidates.length) return [];
   if (mode === 'aoe') return [...candidates];
@@ -171,13 +188,26 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
   const hits = [];
   for (const target of targets) {
     const hpBefore = target.hp;
-    const damage = damageFor(attacker, target, spec.damageType, options.multiplier ?? spec.multiplier);
+    const baseDamage = damageFor(attacker, target, spec.damageType, options.multiplier ?? spec.multiplier);
+    const damage = roundStat(baseDamage * (target.side === 'enemies' && target.brokenTurns > 0 ? 1.5 : 1));
     target.hp = Math.max(0, target.hp - damage);
+    let barrierDamage = 0, breakDamage = 0, broken = false;
+    if (target.side === 'enemies' && target.barrier > 0) {
+      barrierDamage = damage * 0.25;
+      target.barrier = Math.max(0, target.barrier - barrierDamage);
+      if (target.barrier === 0) {
+        target.brokenTurns = brokenDuration(target.stats.speed, Math.max(1, state.enemyAverage / state.slowerAverage));
+        breakDamage = roundStat(target.maxHp * 0.1);
+        target.hp = Math.max(0, target.hp - breakDamage);
+        target.barriersBroken++;
+        broken = true;
+      }
+    }
     if (hpBefore > 0 && target.hp <= 0) restoreSoulFollowUpOnKill(attacker);
-    target.damageTaken += damage;
-    attacker.damageDealt += damage;
-    state.damageBySide[attacker.side] += damage;
-    hits.push({ target, damage });
+    target.damageTaken += damage + breakDamage;
+    attacker.damageDealt += damage + breakDamage;
+    state.damageBySide[attacker.side] += damage + breakDamage;
+    hits.push({ target, damage: damage + breakDamage, barrierDamage, breakDamage, barrierRemaining: target.barrier, broken });
   }
   if (targets.length > 1) attacker.aoeCount++;
   return hits;
@@ -303,7 +333,7 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
     skillPoints: Math.min(settings.skillPointCap ?? 5, settings.initialSkillPoints ?? 3),
     skillUses: 0,
     damageBySide: { allies: 0, enemies: 0 },
-    actions: 0, allyTurns: 0, enemyTurns: 0,
+    actions: 0, allyTurns: 0, enemyTurns: 0, enemyAverage, slowerAverage,
     maxActions: maxActionsOverride ?? settings.maxActions ?? 2000
   };
   while (state.actions < state.maxActions && allies.some(unit => unit.hp > 0) && enemies.some(unit => unit.hp > 0)) {
@@ -319,7 +349,14 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
       resolveAllyAction(state, actor);
     } else {
       state.enemyTurns++;
-      resolveEnemyAction(state, actor);
+      if (actor.brokenTurns > 0) {
+        actor.brokenTurns--;
+        if (actor.brokenTurns === 0) {
+          actor.barrier = actor.maxBarrier;
+          cleanse(actor);
+          actor.timeToNextTurn = Math.min(actor.timeToNextTurn, nextAt);
+        }
+      } else resolveEnemyAction(state, actor);
     }
   }
   const winner = !allies.some(unit => unit.hp > 0) ? 'enemies' : !enemies.some(unit => unit.hp > 0) ? 'allies' : 'draw';
@@ -330,9 +367,10 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
     followUps: allies.reduce((sum, unit) => sum + unit.followUpCount, 0),
     ultimates: allies.reduce((sum, unit) => sum + unit.ultimateCount, 0),
     aoeAttacks: [...allies, ...enemies].reduce((sum, unit) => sum + unit.aoeCount, 0),
+    barriersBroken: enemies.reduce((sum, unit) => sum + unit.barriersBroken, 0),
     survivors: {
       allies: allies.filter(unit => unit.hp > 0).map(unit => ({ id: unit.id, hp: unit.hp, maxHp: unit.maxHp })),
-      enemies: enemies.filter(unit => unit.hp > 0).map(unit => ({ id: unit.id, hp: unit.hp, maxHp: unit.maxHp }))
+      enemies: enemies.filter(unit => unit.hp > 0).map(unit => ({ id: unit.id, hp: unit.hp, maxHp: unit.maxHp, barrier: unit.barrier, maxBarrier: unit.maxBarrier, brokenTurns: unit.brokenTurns }))
     }
   };
 }

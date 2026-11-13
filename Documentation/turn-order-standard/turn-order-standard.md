@@ -12,7 +12,9 @@ This standard defines how combat turns are scheduled and how actions affect turn
 
   `Turn rate = max(1, (unit Speed + team average Speed) / (2 × slower team average Speed))`
 
-- The unit's Speed and its team average have equal weight in this calculation.
+- The unit's Speed and its team average have equal weight in this calculation. The result is that unit's individual turn rate.
+- Team base turns are calculated from team average Speed: `max(1, team average Speed / slower team's average Speed)`. The slower team therefore has at least 1 base turn.
+- Example: if ally average Speed is 200 and enemy average Speed is 50, the ally team has 4 base turns per cycle (`200 / 50`) and the enemy team has 1 (`50 / 50`). Each unit still has its own turn rate under the formula above.
 - Fractional turns carry between cycles. Turns earned in a cycle are spaced evenly through that cycle.
 - If two turns occur at the same time, resolve an immediate turn first, then use higher Speed, ally before enemy, and alphabetical unit ID to break ties.
 
@@ -50,3 +52,21 @@ This standard defines how combat turns are scheduled and how actions affect turn
 - Speed values for each character and enemy.
 - Which characters can create summons and the abilities that control them.
 - How a revived character re-enters the timeline.
+
+## Enemy Barriers and Broken State
+
+- Every enemy has Barrier HP. Unless its data overrides `barrierPercent`, maximum Barrier HP is 20% of maximum HP.
+- Each damaging hit applies its normal HP damage and also deals Barrier damage equal to 25% of that hit's damage. Barrier does not absorb damage, reduce HP damage, or prevent HP damage.
+- When Barrier reaches zero, the enemy immediately takes one additional hit equal to 10% of its maximum HP and enters Broken state. Damage beyond the amount needed to break Barrier is discarded; it does not carry into the restored Barrier.
+- While Broken, an enemy takes 50% more damage and cannot receive Action Advance.
+- Broken duration starts from the enemy team's base turns, calculated as `max(1, enemy team average Speed / slower team's average Speed)`. Adjust that team base turn count using the Broken enemy's individual Speed:
+
+  `Broken turns = max(1, round(base turns × clamp(2 − Speed / 100, 0.5, 1.5)))`
+
+- `clamp(value, 0.5, 1.5)` means values below 0.5 become 0.5, and values above 1.5 become 1.5. `round` rounds to the nearest whole turn.
+- At Speed 100, duration equals base turns. Speed 25 uses the maximum 1.5 multiplier; Speed 400 uses the minimum 0.5 multiplier. For 8 base turns, these produce 12 and 4 Broken turns. Broken duration can never be lower than 1 turn.
+- Each scheduled enemy turn while Broken is counted as one lost turn and the enemy does not act. After the final lost turn, the enemy recovers before it can act again.
+- Recovery fully cleanses all debuffs and marks, restores Barrier to maximum, and gives the enemy 100% Action Advance.
+- A full cleanse removes every debuff and every mark. A normal cleanse removes one debuff type and one mark type, clearing every stack of each selected type.
+
+The simulator uses the enemy team's average Speed ratio for base turns and the individual enemy's Speed for the Broken duration adjustment.
