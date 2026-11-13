@@ -1330,7 +1330,7 @@ function drawSetup(){
  text('STORY BATTLE SETUP',228,133,39,'#ffedd1','850');
  addButton(1234,96,160,52,'main-menu','MAIN MENU','');
  text('Party membership is managed from Party on the main menu.',231,180,18,'#c4d6e5','550');
- text('CURRENT PARTY  '+draft.length+'/5',240,231,20,'#bad4e9','800');
+ text('CURRENT PARTY  '+draft.length+'/'+MAX_PARTY_SIZE,240,231,20,'#bad4e9','800');
  for(let i=0;i<MAX_PARTY_SIZE;i++){
   const x=218+i*285,y=256,w=260,h=142,p=roster(draft[i]);
   rect(x,y,w,h,p?'rgba(38,54,79,.94)':'rgba(21,33,56,.88)',p?'#9eb8d3':'#4c607a',12);
