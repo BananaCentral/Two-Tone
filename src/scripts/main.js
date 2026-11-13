@@ -388,12 +388,17 @@ let phase='menu',paused=false,turn=0,enemyHp=0,maxEnemyHp=0,sp=3,
     choiceRects=[],battleToken=0,enemyCount=0,forceSelect=false;
 // Five authored formation positions. Enemy identities and wave queues are independent of these slots.
 // Encounter presets and enemy stats below are DEMO DATA; Approved Fundamental 2 defines the rules.
+const ENEMY_CATEGORIES=Object.freeze(['common','elite','boss']);
+function validateEnemyCategory(category){
+ if(!ENEMY_CATEGORIES.includes(category))throw Error(`Enemy category must be one of: ${ENEMY_CATEGORIES.join(', ')}`);
+ return category;
+}
 const ENEMY_DESIGNS=[
- {id:'enemy1',name:'AUTOMATON 1',x:646,y:359,w:151,h:198,maxHp:1050,speed:66,basePhysicalDefense:0,baseMagicalDefense:0},
- {id:'enemy2',name:'AUTOMATON 2',x:822,y:314,w:156,h:205,maxHp:1050,speed:69,basePhysicalDefense:0,baseMagicalDefense:0},
- {id:'enemy3',name:'AUTOMATON 3',x:1010,y:274,w:167,h:220,maxHp:1350,speed:65,basePhysicalDefense:0,baseMagicalDefense:0},
- {id:'enemy4',name:'AUTOMATON 4',x:1201,y:312,w:156,h:205,maxHp:1050,speed:68,basePhysicalDefense:0,baseMagicalDefense:0},
- {id:'enemy5',name:'AUTOMATON 5',x:1389,y:355,w:151,h:198,maxHp:1050,speed:67,basePhysicalDefense:0,baseMagicalDefense:0},
+ {id:'enemy1',category:'common',name:'AUTOMATON 1',x:646,y:359,w:151,h:198,maxHp:1050,speed:66,basePhysicalDefense:0,baseMagicalDefense:0},
+ {id:'enemy2',category:'common',name:'AUTOMATON 2',x:822,y:314,w:156,h:205,maxHp:1050,speed:69,basePhysicalDefense:0,baseMagicalDefense:0},
+ {id:'enemy3',category:'common',name:'AUTOMATON 3',x:1010,y:274,w:167,h:220,maxHp:1350,speed:65,basePhysicalDefense:0,baseMagicalDefense:0},
+ {id:'enemy4',category:'common',name:'AUTOMATON 4',x:1201,y:312,w:156,h:205,maxHp:1050,speed:68,basePhysicalDefense:0,baseMagicalDefense:0},
+ {id:'enemy5',category:'common',name:'AUTOMATON 5',x:1389,y:355,w:151,h:198,maxHp:1050,speed:67,basePhysicalDefense:0,baseMagicalDefense:0},
 ];
 // Any encounter may supply its own finite number of waves, each with 1–15 enemies.
 // Presets are only review scenarios; they are NOT a global wave-count limit.
@@ -545,7 +550,7 @@ function buildWavePlan(sizes){
  if(!Array.isArray(sizes)||!sizes.length||!sizes.every(n=>Number.isInteger(n)&&n>=1&&n<=15))throw Error('Wave sizes must each be 1–15');
  return sizes.map((size,wi)=>Array.from({length:size},(_,i)=>{
   const model=ENEMY_DESIGNS[i%5];return {id:`wave${wi+1}-enemy${i+1}`,name:`AUTOMATON ${i+1}`,
-   wave:wi+1,order:i+1,maxHp:model.maxHp,speed:model.speed,art:'enemy',test:true};
+   wave:wi+1,order:i+1,category:validateEnemyCategory(model.category),maxHp:model.maxHp,speed:model.speed,art:'enemy',test:true};
  }));
 }
 function initialSlots(count){return ({1:[2],2:[1,3],3:[1,2,3],4:[0,1,3,4],5:[0,1,2,3,4]})[count].slice()}
