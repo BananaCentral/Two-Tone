@@ -102,7 +102,7 @@ let playerRank=1;
 // Numerical Base HP values are inherited/development-only combat fixtures, NOT
 // approved per-character stats. The unnamed units remain developer test slots.
 const ROSTER=[
- {id:'zero',name:'SOUL',label:'Character',hp:2480,basePhysicalAttack:null,baseMagicalAttack:null,basePhysicalDefense:null,baseMagicalDefense:null,speed:115,art:'zero',test:false},
+ {id:'zero',name:'SOUL',label:'Character',hp:100,basePhysicalAttack:10,baseMagicalAttack:10,basePhysicalDefense:1,baseMagicalDefense:1,speed:10,art:'zero',test:false},
  {id:'test2',name:'TEST SLOT 2',label:'Placeholder • no approved identity',hp:2300,basePhysicalAttack:null,baseMagicalAttack:null,basePhysicalDefense:null,baseMagicalDefense:null,speed:115,art:null,test:true},
  {id:'test3',name:'TEST SLOT 3',label:'Placeholder • no approved identity',hp:2600,basePhysicalAttack:null,baseMagicalAttack:null,basePhysicalDefense:null,baseMagicalDefense:null,speed:115,art:null,test:true},
 ];
@@ -389,11 +389,11 @@ let phase='menu',paused=false,turn=0,enemyHp=0,maxEnemyHp=0,sp=3,
 // Five authored formation positions. Enemy identities and wave queues are independent of these slots.
 // Encounter presets and enemy stats below are DEMO DATA; Approved Fundamental 2 defines the rules.
 const ENEMY_DESIGNS=[
- {id:'enemy1',name:'AUTOMATON 1',x:646,y:359,w:151,h:198,maxHp:1050,speed:66},
- {id:'enemy2',name:'AUTOMATON 2',x:822,y:314,w:156,h:205,maxHp:1050,speed:69},
- {id:'enemy3',name:'AUTOMATON 3',x:1010,y:274,w:167,h:220,maxHp:1350,speed:65},
- {id:'enemy4',name:'AUTOMATON 4',x:1201,y:312,w:156,h:205,maxHp:1050,speed:68},
- {id:'enemy5',name:'AUTOMATON 5',x:1389,y:355,w:151,h:198,maxHp:1050,speed:67},
+ {id:'enemy1',name:'AUTOMATON 1',x:646,y:359,w:151,h:198,maxHp:1050,speed:66,basePhysicalDefense:0,baseMagicalDefense:0},
+ {id:'enemy2',name:'AUTOMATON 2',x:822,y:314,w:156,h:205,maxHp:1050,speed:69,basePhysicalDefense:0,baseMagicalDefense:0},
+ {id:'enemy3',name:'AUTOMATON 3',x:1010,y:274,w:167,h:220,maxHp:1350,speed:65,basePhysicalDefense:0,baseMagicalDefense:0},
+ {id:'enemy4',name:'AUTOMATON 4',x:1201,y:312,w:156,h:205,maxHp:1050,speed:68,basePhysicalDefense:0,baseMagicalDefense:0},
+ {id:'enemy5',name:'AUTOMATON 5',x:1389,y:355,w:151,h:198,maxHp:1050,speed:67,basePhysicalDefense:0,baseMagicalDefense:0},
 ];
 // Any encounter may supply its own finite number of waves, each with 1–15 enemies.
 // Presets are only review scenarios; they are NOT a global wave-count limit.
@@ -404,10 +404,10 @@ let wavePreset='stress',waveOverride=null,wavePlan=[],waveIndex=-1,waveQueue=[],
 // Zero's Skill target pattern is now an AOE character decision; the pattern toolbar,
 // 5-hit and support actions remain development-only controls. Damage/cost values are provisional.
 let targetingMode='single',supportDemo=null,zeroSkillArmed=false,attackInProgress=false,attackSerial=0,
-     pendingVacancies=[],lastAttack=null,supportTestHistory=[];
+     pendingVacancies=[],lastAttack=null,supportTestHistory=[],soulEnhanceStacks=0,soulFollowUpProcs=5,soulFollowUpSources=new Set();
 // Fundamental 4. Numerical energy costs and debug bonuses are inherited/provisional,
 // not character-balancing approvals. No gameplay source grants an SP-cap bonus by default.
-const ULTIMATE_ENERGY_COST=120,BASE_SP_MAX=5;
+const ULTIMATE_ENERGY_COST=100,BASE_SP_MAX=5;
 const SP_CAP_SOURCES=new Set(['passive','skill','ultimate','character-potential','signature-premium-weapon-effect','premium-weapon-potential','other-combat-effect']);
 let spCapModifiers=Object.create(null),ultimateQueue=[],ultimateSequence=0,ultimateHistory=[],
     ultimateResume=null,ultimateExecuting=false;
@@ -431,7 +431,7 @@ function availableEnergy(p){return p?Math.max(0,p.energy-(p.energyReserved||0)):
 function isUltPending(id){return ultimateQueue.some(q=>q.actorId===id)||(ultimateExecuting&&lastAttack?.action==='ultimate'&&lastAttack.actor===id)}
 function canQueueUltimate(p){return !!p&&p.hp>0&&!paused&&['player','enemy','resolve'].includes(phase)
   &&availableEnergy(p)>=ULTIMATE_ENERGY_COST&&!isUltPending(p.id)}
-function resetActionResources(){sp=3;spCapModifiers=Object.create(null);ultimateQueue=[];ultimateSequence=0;ultimateHistory=[];ultimateResume=null;ultimateExecuting=false;
+function resetActionResources(){sp=3;soulEnhanceStacks=0;soulFollowUpProcs=5;soulFollowUpSources=new Set();spCapModifiers=Object.create(null);ultimateQueue=[];ultimateSequence=0;ultimateHistory=[];ultimateResume=null;ultimateExecuting=false;
   for(const p of party)p.energyReserved=0;}
 function setSpCapTestSource(source,bonus){
  if(!SP_CAP_SOURCES.has(source)||!Number.isInteger(bonus)||bonus<0||bonus>20)return false;
@@ -506,14 +506,15 @@ function chooseAttackTargets(mode=targetingMode,primary=chosenEnemy()){
 }
 function closestSurvivingEnemy(slot){return liveEnemies().slice().sort((a,b)=>Math.abs(a.slot-slot)-Math.abs(b.slot-slot)||a.slot-b.slot)[0]||null}
 // Zero's Skill is an actual AOE action; no toolbar mode can override its target shape.
-function actionTargetMode(actor,action){return actor?.id==='zero'&&action==='skill'?'aoe':targetingMode}
+function actionTargetMode(actor,action){if(actor?.id==='zero'&&action==='ultimate')return 'multi';if(actor?.id==='zero'&&action==='basic')return soulEnhanceStacks>=3?'multi':'single';return actor?.id==='zero'&&action==='skill'?'aoe':targetingMode}
 function previewTargetMode(){return phase==='player'&&activeId==='zero'&&zeroSkillArmed?'aoe':targetingMode}
 function setTargetingMode(mode){if(!['single','aoe','multi','five-hit'].includes(mode)||phase!=='player'||paused)return false;targetingMode=mode;zeroSkillArmed=false;supportDemo=null;cameraPreview='target';return true}
-function zeroSkillControl(){
- if(phase!=='player'||paused||activeId!=='zero')return play('skill');
- if(sp<1){say('Not enough skill points. Use Basic to restore one.');return false}
- if(!zeroSkillArmed){zeroSkillArmed=true;supportDemo=null;cameraPreview='target';selectedAllyId=null;log='SOUL SKILL: AOE preview. Select an enemy, then tap CONFIRM.';return true}
- return play('skill');
+function zeroSkillControl(){return activateSoulEnhance();}
+function activateSoulEnhance(){
+ const a=active();if(phase!=='player'||paused||!a||a.id!=='zero'){say('Enhance is available on Soul’s turn.');return false}
+ if(sp<1){say('Soul Enhance needs 1 Skill Point.');return false}
+ sp--;soulEnhanceStacks++;zeroSkillArmed=false;cameraPreview=null;
+ log='SOUL ENHANCE: '+soulEnhanceStacks+' Skill Point(s) banked for the next Basic Attack.';return true;
 }
 function startSupportDemo(kind){
  if(phase!=='player'||paused||!['heal','revive'].includes(kind))return false;
@@ -600,17 +601,25 @@ function applyTrainingHit(enemy,damage,hitNumber){
  if(enemy.hp<=0)resolveEnemyDefeat(enemy);else syncEnemyHp();
  return true;
 }
+function resolveSoulFollowUp(sourceAttack){
+ const soul=party.find(p=>p.id==='zero'&&p.hp>0);if(!soul||soulFollowUpProcs<=0||soulFollowUpSources.has(sourceAttack.serial))return false;
+ const affected=[...new Set(sourceAttack.hits.filter(h=>h.damage>0).map(h=>h.target))].map(id=>enemies.find(e=>e.id===id)).filter(e=>e&&e.hp>0);
+ if(!affected.length)return false;soulFollowUpSources.add(sourceAttack.serial);soulFollowUpProcs--;
+ const attack=calculateTrueAttack(soul),rawTotal=Number.isFinite(attack)?roundHp(attack*.5):0,base=Math.floor(rawTotal/affected.length),remainder=rawTotal%affected.length;let total=0;
+ for(let i=0;i<affected.length;i++){const share=base+(i<remainder?1:0),rate=attack>0?share/attack:0,amount=soulDamageForTarget(soul,affected[i],rate);if(amount<=0)continue;const enemy=affected[i];enemy.hp=Math.max(0,enemy.hp-amount);total+=amount;sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,slot:enemy.slot,damage:amount,hpAfter:enemy.hp,followUp:true});if(enemy.hp<=0)resolveEnemyDefeat(enemy)}
+ sourceAttack.followUp={sourceSerial:sourceAttack.serial,damage:total,targets:affected.map(e=>e.id),procsRemaining:soulFollowUpProcs};syncEnemyHp();return total>0;
+}
 function finishTrainingAttack(serial){
  if(!attackInProgress||!lastAttack||lastAttack.serial!==serial)return;
  attackInProgress=false;lastAttack.finished=true;lastAttack.finishedAt=performance.now();
+ if(lastAttack.actor&&party.some(p=>p.id===lastAttack.actor))resolveSoulFollowUp(lastAttack);
+ if(lastAttack.actor==='zero'&&lastAttack.action==='ultimate'){soulFollowUpProcs=5;soulFollowUpSources.clear();lastAttack.followUpRefill=5}
  settleAfterAttack();
  if(!encounterCleared&&lastAttack?.action!=='ultimate')finishSummonCreationForTest(lastAttack?.actor);
  if(phase!=='resolve')return;
- if(encounterCleared){cancelAllQueuedUltimates('victory');phase='victory';log='All enemies in every wave defeated.';return;}
-  if(lastAttack?.action==='ultimate'){
-   ultimateHistory.push({event:'finished',actor:lastAttack.actor,seq:lastAttack.ultimateSeq,turn});
-   ultimateExecuting=false;runNextUltimate();
-  }else drainUltimateQueueBefore(()=>nextTurn());
+ if(encounterCleared){cancelAllQueuedUltimates('victory');phase='victory';log='All enemies in every wave defeated.';return}
+ if(lastAttack?.action==='ultimate'){ultimateHistory.push({event:'finished',actor:lastAttack.actor,seq:lastAttack.ultimateSeq,turn});ultimateExecuting=false;runNextUltimate()}
+ else drainUltimateQueueBefore(()=>nextTurn());
 }
 function setEnemyTarget(id){if(phase!=='player'||paused)return false;const e=enemies.find(e=>e.id===id&&e.hp>0);if(!e)return false;selectedEnemyId=id;cameraPreview='target';selectedAllyId=null;log=`Camera test: targeting ${e.name} (wave ${e.wave}, slot ${e.slot+1}).`;return true;}
 function setWavePlanForTest(sizes){if(phase!=='setup')return false;try{buildWavePlan(sizes)}catch(e){return false}waveOverride=[...sizes];return true;}
@@ -679,9 +688,11 @@ function play(action){
  if(action==='ultimate')return queueUltimate(activeId);
  if(phase!=='player'||paused||!['basic','skill'].includes(action))return false;
  const a=active();if(!a||a.hp<=0)return false;
+ if(action==='skill'&&a.id==='zero')return activateSoulEnhance();
  if(action==='skill'&&sp<1){say('Not enough shared SP. Basic restores 1 SP.');return false;}
  return executeCombatAction(a,action,null);
 }
+function soulDamageForTarget(actor,target,rate){return calculateTypedActionDamage('true',rate,actor,target)?.damageTaken??0}
 function executeCombatAction(a,action,ultimateSeq=null){
  if(!a||a.hp<=0||!['basic','skill','ultimate'].includes(action))return false;
  const victim=chosenEnemy();if(!victim){say('No available enemy target.');return false;}
@@ -689,35 +700,28 @@ function executeCombatAction(a,action,ultimateSeq=null){
  const mode=actionTargetMode(a,action),targets=chooseAttackTargets(mode,victim);
  const controlledSummon=action==='skill'&&a.test?summons.find(s=>s.mode==='controlled'&&!s.pendingCreation&&s.ownerId===a.id):null;
  const energyBefore=a.energy,spBefore=sp,spMaxBefore=effectiveSpMax();
- let damage=0;
- if(action==='basic'){damage=280;a.energy=Math.min(120,a.energy+25);gainSp(1)}
+ let damage=0,enhanceSpent=0,soulRate=null;
+ if(a.id==='zero'&&action==='basic'){
+  enhanceSpent=soulEnhanceStacks;soulEnhanceStacks=0;soulRate=1+enhanceSpent;
+  damage=soulDamageForTarget(a,targets[0],soulRate);a.energy=Math.min(120,a.energy+10+10*enhanceSpent);gainSp(1);
+ }else if(a.id==='zero'&&action==='ultimate'){soulRate=2;damage=soulDamageForTarget(a,targets[0],soulRate)}
+ else if(action==='basic'){damage=280;a.energy=Math.min(120,a.energy+25);gainSp(1)}
  else if(action==='skill'){damage=460;a.energy=Math.min(120,a.energy+35);sp--;addActionAdvance(a.id,25)}
- else damage=980; // energy is deducted when a queued Ultimate BEGINS, never here
- // Damage and energy gains remain existing sandbox values; target modes except
- // Zero Skill AOE remain TEST patterns, not newly defined character abilities.
+ else damage=980;
  const serial=++attackSerial;
  attackInProgress=true;supportDemo=null;zeroSkillArmed=false;cameraPreview=null;selectedAllyId=null;
  lastAttack={serial,actor:a.id,action,mode,ultimateSeq,controlledSummonId:controlledSummon?.id||null,initialTarget:victim.id,initialTargets:targets.map(e=>e.id),
-  hits:[],defeats:[],finished:false,startedAt:performance.now(),finishedAt:null,
-  energyBefore,energyAfter:a.energy,spBefore,spAfter:sp,spMaxBefore,spMaxAfter:effectiveSpMax()};
+  hits:[],defeats:[],finished:false,startedAt:performance.now(),finishedAt:null,energyBefore,energyAfter:a.energy,spBefore,spAfter:sp,spMaxBefore,spMaxAfter:effectiveSpMax(),enhanceSpent,soulRate};
  phase='resolve';fx={kind:action,at:performance.now(),damage,actor:a.id,targetEnemyId:victim.id,targetGeometry};
- log=`${controlledSummon?'TEST CONTROLLED SUMMON':action==='ultimate'?'ULT QUEUE':a.id==='zero'&&action==='skill'?'SOUL SKILL • AOE':'TEST '+mode.toUpperCase()}: ${a.name} uses ${action} • ${targets.length} initial target(s).`;
+ log=a.id==='zero'?(action==='ultimate'?'SOUL ULTIMATE • TRUE AOE':action==='basic'?'SOUL BASIC • TRUE DAMAGE':'SOUL '+action.toUpperCase()):'TEST '+mode.toUpperCase()+': '+a.name+' uses '+action+' • '+targets.length+' initial target(s).';
  if(controlledSummon)summonHistory.push({event:'controlled-activation',id:controlledSummon.id,ownerId:a.id,clock:turnTimeline.clock});
  if(mode==='five-hit'){
   let focused=victim,lastSlot=victim.slot;
-  for(let n=0;n<5;n++)schedule(()=>{
-   if(phase!=='resolve'||!attackInProgress||lastAttack?.serial!==serial)return;
-   if(!focused||focused.hp<=0)focused=closestSurvivingEnemy(lastSlot);
-   if(!focused)return;lastSlot=focused.slot;
-   const part=Math.floor(damage/5)+(n<damage%5?1:0);
-   applyTrainingHit(focused,part,n+1);
-  },160+n*135);
- }else{
-  schedule(()=>{
-   if(phase!=='resolve'||!attackInProgress||lastAttack?.serial!==serial)return;
-   for(let n=0;n<targets.length;n++)if(targets[n].hp>0)applyTrainingHit(targets[n],damage,n+1);
-   },a.id==='zero'&&action==='basic'?645:340);
- }
+  for(let n=0;n<5;n++)schedule(()=>{if(phase!=='resolve'||!attackInProgress||lastAttack?.serial!==serial)return;if(!focused||focused.hp<=0)focused=closestSurvivingEnemy(lastSlot);if(!focused)return;lastSlot=focused.slot;const part=Math.floor(damage/5)+(n<damage%5?1:0);applyTrainingHit(focused,part,n+1)},160+n*135);
+ }else schedule(()=>{
+  if(phase!=='resolve'||!attackInProgress||lastAttack?.serial!==serial)return;
+  for(let n=0;n<targets.length;n++)if(targets[n].hp>0){const hitDamage=a.id==='zero'&&(action==='basic'||action==='ultimate')?soulDamageForTarget(a,targets[n],soulRate):damage;applyTrainingHit(targets[n],hitDamage,n+1)}
+ },a.id==='zero'&&action==='basic'?645:340);
  schedule(()=>finishTrainingAttack(serial),a.id==='zero'&&action==='basic'?SOUL_BASIC_MS:990);
  return true;
 }
@@ -1258,7 +1262,7 @@ function drawHud(t){
  const playerReady=phase==='player'&&!paused;
  const actions=[
   {key:'basic',cx:1353,cy:816,r:51,enabled:playerReady,icon:'⚔',label:'BASIC'},
-  {key:'skill',cx:1508,cy:800,r:64,enabled:playerReady&&sp>0,icon:'✦',label:zeroSkillArmed&&activeId==='zero'?'CONFIRM':'SKILL'},
+  {key:'skill',cx:1508,cy:800,r:64,enabled:playerReady&&sp>0,icon:'✦',label:activeId==='zero'?'ENHANCE '+soulEnhanceStacks:'SKILL'},
  ];
  for(const a of actions){
   const enabled=a.enabled;
