@@ -30,6 +30,12 @@ At rune level L, the main stat adds:
 
 Each substat adds 25% of its corresponding main stat value at that rune level.
 
+## Rune selection UI
+
+- Each rune card shows the main stat as a prominent clickable control above its three clickable substats.
+- Selecting the main stat or a substat opens a picker showing all six available stats at once.
+- Choices that would duplicate another stat within that rune are disabled.
+
 ## Celestials
 
 Each character has four Celestials, corresponding to Passive, Basic Attack, Skill, and Ultimate. Each starts at Level 1 and can be upgraded to Level 10.

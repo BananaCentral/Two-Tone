@@ -22,9 +22,13 @@ Use `--json` for machine-readable output, `--max-actions 2000` to set a battle l
 
 Each scenario defines stat and ability archetypes, then creates team instances by referencing those archetypes. Instance IDs must be unique; archetypes may be repeated, so a scenario can model five Soul instances without duplicating their definitions.
 
-Every archetype provides the six standard stats under `stats`: HP, Physical Attack, Magical Attack, Physical Defense, Magical Defense, and Speed. Stats use the project's level scaling (`base × level`, rounded to the nearest integer) for levels 1–50. Teams are listed as `teams.allies` and `teams.enemies`.
+Every archetype provides the six standard stats under `stats`: HP, Physical Attack, Magical Attack, Physical Defense, Magical Defense, and Speed. Every archetype uses the simulator's level scaling for levels 1–50. Final stats follow:
 
-Optional `weapon` settings accept `type: standard|premium` and `potential: 1–5`; the weapon percentage applies to all six stats. Standard grants 80% at Potential 1, then 5 percentage points per potential; Premium grants 100% at Potential 1, then 25 points per potential. Optional `runes` are limited to four per unit. Each rune defines `level` 1–5, one `main` stat, three unique `subs`, and an optional shared `setId`; main values are HP 100, defense 4, or attack/speed 20 per rune level, and substats contribute 25%. Optional `celestials` maps `passive`, `basic`, `skill`, and `ultimate` to levels 1–10; each level adds 10% of that ability's base multiplier. Rune set passives and weapon signature effects are not modeled until their character-specific definitions are supplied.
+`round(((base + non-equipment flat modifiers) × level + equipment flat modifiers) × (1 + percentage modifiers))`
+
+Rune equipment flats are applied after Level scaling; signature weapon percentage bonuses apply after both. This scaling is standardized for characters in the game, but enemy level growth is not. The live Slime encounter uses its authored Level 1 stats directly; simulator enemy levels above 1 are hypothetical until enemy scaling is defined. Teams are listed as `teams.allies` and `teams.enemies`. The shipped Soul vs Slime example is a focused 1v1 baseline, not a full four-character party benchmark.
+
+Optional `weapon` settings accept `type: standard|premium` and `potential: 1–5`; the weapon percentage applies to all six stats. Standard grants 80% at Potential 1, then 5 percentage points per potential; Premium grants 100% at Potential 1, then 25 points per potential. Optional `runes` are limited to four per unit. Each rune defines `level` 1–5, one `main` stat, three unique `subs`, and an optional shared `setId`; main values are HP 100, defense 4, or attack/speed 20 per rune level, and substats contribute 25%. Optional `celestials` maps `passive`, `basic`, `skill`, and `ultimate` to levels 1–10; each level adds 10% of that ability's base multiplier. Rune-set passives and signature effects without implemented character-specific handlers are not modeled. Soul's current Premium refund and duplicate effects are supported as described below.
 
 Supported attack damage types are `physical`, `magical`, and `true`. Basic and Ultimate attacks define a multiplier and target shape (`single`, `blast`, or `aoe`). `random` and `lowestHp` are primary-target selection policies. Units start with zero Energy unless `energy.start` or an instance `energy` is supplied; Energy is capped at 120 by default.
 
@@ -37,7 +41,7 @@ Supported Skill and Passive effect types:
 Additional ability effects require adding a handler to the simulator before configs can use them.
 
 
-Soul's `characterDuplicates` field (0–4) enables his four character Duplicate effects. With a Premium weapon, potential levels 2–5 correspond to weapon duplicates 1–4. Soul's Premium weapon refunds one shared Skill Point per three Enhance points spent. The simulator models these Soul-specific effects and the default Level 1 Celestials.
+Soul's `characterDuplicates` field (0–4) enables his four character Duplicate effects. With a Premium weapon, potential levels 2–5 correspond to weapon duplicates 1–4. Soul's Premium weapon refunds one shared Skill Point per three Enhance points spent, starting at Potential 1. The simulator models this effect, Soul's configured character and weapon duplicates, and configured Celestial levels.
 
 ## Output
 

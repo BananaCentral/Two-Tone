@@ -9,10 +9,11 @@ This standard defines how Magical Defense is calculated and how it reduces incom
 - Each character has an individual Base Magical Defense.
 - Magical Defense is calculated as:
 
-  `Magical Defense = round((Base Magical Defense + total flat modifiers) × Level × (1 + total percentage modifiers))`
+  `Magical Defense = round(((Base Magical Defense + total non-equipment flat modifiers) × Level + total equipment flat modifiers) × (1 + total percentage modifiers))`
 
-- Flat modifiers add to Base Magical Defense before Level is applied.
-- Percentage modifiers add together and apply after Level scaling.
+- Non-equipment flat modifiers add to Base Magical Defense before Level is applied.
+- Equipment flat modifiers, including Runes, are added after Level scaling.
+- Percentage modifiers add together and apply after Level scaling and equipment flats.
 - The final value rounds to the nearest whole number.
 
 ## Magical Damage Reduction

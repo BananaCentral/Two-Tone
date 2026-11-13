@@ -8,12 +8,12 @@ The main menu is the player's primary way to navigate the game. It replaces over
 
 Show these sections in this order:
 
-1. Characters
-2. Party
-3. Events
+1. Story
+2. Events
+3. Game Mode
 4. Store
-5. Story
-6. Modes
+5. Loadout
+6. Party
 
 The main menu displays the player's Rank, as defined in the Rank Standard.
 

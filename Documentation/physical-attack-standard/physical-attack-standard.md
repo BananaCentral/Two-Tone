@@ -9,10 +9,11 @@ This standard defines how Physical Attack is calculated and used by actions.
 - Each character has an individual Base Physical Attack.
 - Physical Attack is calculated as:
 
-  `Physical Attack = round((Base Physical Attack + total flat modifiers) × Level × (1 + total percentage modifiers))`
+  `Physical Attack = round(((Base Physical Attack + total non-equipment flat modifiers) × Level + total equipment flat modifiers) × (1 + total percentage modifiers))`
 
-- Flat modifiers add to Base Physical Attack before Level is applied.
-- Percentage modifiers add together and apply after Level scaling.
+- Non-equipment flat modifiers add to Base Physical Attack before Level is applied.
+- Equipment flat modifiers, including Runes, are added after Level scaling.
+- Percentage modifiers add together and apply after Level scaling and equipment flats.
 - The final value rounds to the nearest whole number.
 
 ## Action Usage

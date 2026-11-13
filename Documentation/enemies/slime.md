@@ -17,6 +17,10 @@
 | Magical Defense | 8 |
 | Speed | 20 |
 
+## Level Scaling
+
+Slime is Level 1 in the current training encounter, and the game uses its authored base stats directly. Enemy level-based stat growth has not been defined. A hypothetical Level 50 Slime should not be calculated by applying the character level formula.
+
 ## Passive: Slimy
 
 Every third Basic Attack is empowered: it deals 25% more damage and hits all living allied targets. Each target receives the full damage; it is not divided among them. The attack counter resets after the empowered attack, so attacks 3, 6, 9, and so on are empowered.

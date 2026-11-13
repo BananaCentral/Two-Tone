@@ -7,7 +7,7 @@ This standard defines the rules for the player's party: which characters belong 
 ## Party Rules
 
 - The player chooses which characters belong to the current party.
-- A party contains at least one and no more than five characters.
+- A party contains at least one and no more than four characters.
 - The same character cannot occupy more than one party slot.
 - The game has one current party. Players cannot save or switch between multiple party presets.
 - The player manages party membership through menus.

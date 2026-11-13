@@ -9,10 +9,11 @@ This standard defines Base HP, Max HP, current HP, and the default rules for HP 
 - Each character has a Base HP value.
 - Max HP is calculated as:
 
-  `Max HP = round((Base HP + total flat HP modifiers) × Level × (1 + total percentage modifiers))`
+  `Max HP = round(((Base HP + total non-equipment flat HP modifiers) × Level + total equipment flat HP modifiers) × (1 + total percentage modifiers))`
 
-- Flat modifiers add together before Level is applied.
-- Percentage modifiers add together and apply after Level scaling.
+- Non-equipment flat modifiers add to Base HP before Level is applied.
+- Equipment flat modifiers, including Runes, are added after Level scaling.
+- Percentage modifiers add together and apply after Level scaling and equipment flats.
 - Max HP rounds to the nearest whole number.
 - Each character's Base HP value is set individually.
 

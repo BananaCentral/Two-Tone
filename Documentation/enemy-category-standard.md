@@ -16,6 +16,12 @@ Runtime data must validate the value against these three categories before the e
 
 Category classifies an enemy's encounter role. It does not itself define stat multipliers, HP scaling, turn frequency, abilities, or other combat behavior. Those rules must be specified separately.
 
+## Enemy Levels and Barriers
+
+- Category does not define enemy Level or level-based stat growth.
+- The current Slime training encounter is explicitly Level 1. The current enemy runtime uses authored archetype stats directly. No enemy level-scaling or progression standard is defined; do not infer a Level 50 Slime by multiplying its stats by 50.
+- Enemy archetypes currently define HP, Attack, Defense, and Speed. The runtime has no separate Barrier or Shield resource or mechanic.
+
 ## Current roster
 
 Slime is the first defined Common enemy. Every wave instance receives the validated category from its enemy archetype. The five formation slots define placement only. No Elite or Boss enemy is currently defined.
