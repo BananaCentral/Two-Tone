@@ -409,7 +409,7 @@ const WAVE_PRESETS={stress:[15,12,6],quick:[1,5,6],sizes:[1,5,6,12,15]};
 let wavePreset='stress',waveOverride=null,wavePlan=[],waveIndex=-1,waveQueue=[],waveKills=0,
     totalEnemyDefeats=0,encounterCleared=false,spawnHistory=[],enemies=[],selectedEnemyId=null,actingEnemyId=null;
 // Fundamental 3 target rules and Fundamental 2 v1.1 post-attack reinforcement boundary.
-// Zero's Skill target pattern is now an AOE character decision; the pattern toolbar,
+// Soul Enhanced Basic uses Blast; the Ultimate targets all enemies with AoE. The pattern toolbar,
 // 5-hit and support actions remain development-only controls. Damage/cost values are provisional.
 let targetingMode='single',supportDemo=null,zeroSkillArmed=false,attackInProgress=false,attackSerial=0,
      pendingVacancies=[],lastAttack=null,supportTestHistory=[],soulEnhanceStacks=0,soulFollowUpProcs=5,soulFollowUpSources=new Set();
@@ -508,15 +508,15 @@ function runNextUltimate(){
 
 function eligibleAllyTarget(p,kind){return !!p&&(kind==='revive'?p.hp<=0:kind==='heal'?p.hp>0&&p.hp<=p.maxHp:p.hp>0)}
 function chooseAttackTargets(mode=targetingMode,primary=chosenEnemy()){
- const live=liveEnemies();if(mode==='multi')return live.slice();if(!primary)return [];
- if(mode==='aoe')return live.filter(e=>Math.abs(e.slot-primary.slot)<=1);
+ const live=liveEnemies();if(mode==='aoe')return live.slice();if(!primary)return [];
+ if(mode==='blast')return live.filter(e=>Math.abs(e.slot-primary.slot)<=1);
  return [primary];
 }
 function closestSurvivingEnemy(slot){return liveEnemies().slice().sort((a,b)=>Math.abs(a.slot-slot)-Math.abs(b.slot-slot)||a.slot-b.slot)[0]||null}
-// Zero's Skill is an actual AOE action; no toolbar mode can override its target shape.
-function actionTargetMode(actor,action){if(actor?.id==='zero'&&action==='ultimate')return 'multi';if(actor?.id==='zero'&&action==='basic')return soulEnhanceStacks>=3?'multi':'single';return actor?.id==='zero'&&action==='skill'?'aoe':targetingMode}
-function previewTargetMode(){return phase==='player'&&activeId==='zero'&&zeroSkillArmed?'aoe':targetingMode}
-function setTargetingMode(mode){if(!['single','aoe','multi','five-hit'].includes(mode)||phase!=='player'||paused)return false;targetingMode=mode;zeroSkillArmed=false;supportDemo=null;cameraPreview='target';return true}
+// Soul's Basic becomes Blast at three Enhance stacks; the Ultimate is AoE.
+function actionTargetMode(actor,action){if(actor?.id==='zero'&&action==='ultimate')return 'aoe';if(actor?.id==='zero'&&action==='basic')return soulEnhanceStacks>=3?'blast':'single';return actor?.id==='zero'&&action==='skill'?'blast':targetingMode}
+function previewTargetMode(){return phase==='player'&&activeId==='zero'&&zeroSkillArmed?'blast':targetingMode}
+function setTargetingMode(mode){if(!['single','blast','aoe','five-hit'].includes(mode)||phase!=='player'||paused)return false;targetingMode=mode;zeroSkillArmed=false;supportDemo=null;cameraPreview='target';return true}
 function zeroSkillControl(){return activateSoulEnhance();}
 function activateSoulEnhance(){
  const a=active();if(phase!=='player'||paused||!a||a.id!=='zero'){say('Enhance is available on Soul’s turn.');return false}
@@ -999,7 +999,7 @@ function drawUnit(p,pos,view,t,acting=false){
  }
 
 }
-function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&cameraPreview!=='party'&&previewTargetMode()==='multi'&&all.length){ctx.save();ctx.strokeStyle='rgba(102,243,211,.82)';ctx.lineWidth=5;ctx.setLineDash([22,12]);ctx.beginPath();ctx.ellipse(1093+camera.currentX*.43,558,453,67,0,0,Math.PI*2);ctx.stroke();ctx.restore()}for(const e of all){
+function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&cameraPreview!=='party'&&previewTargetMode()==='aoe'&&all.length){ctx.save();ctx.strokeStyle='rgba(102,243,211,.82)';ctx.lineWidth=5;ctx.setLineDash([22,12]);ctx.beginPath();ctx.ellipse(1093+camera.currentX*.43,558,453,67,0,0,Math.PI*2);ctx.stroke();ctx.restore()}for(const e of all){
  const isFocus=phase==='player'&&chosenEnemy()?.id===e.id;
  const patternHit=phase==='player'&&cameraPreview!=='party'&&chooseAttackTargets(previewTargetMode()).some(x=>x.id===e.id);
  const isActor=(shot==='enemy-windup'&&actingEnemyId===e.id)||(fx?.kind==='enemy'&&fx?.actorEnemyId===e.id&&shot==='enemy-impact');
@@ -1207,7 +1207,7 @@ function drawDeveloperPanel(){
  const x=938,y=92,w=633,h=591;
  rect(x,y,w,h,'rgba(12,19,32,.97)','#aab9ce',16);
  text('COMBAT TEST CONTROLS',x+24,y+31,23,'#f2dfbd','800');text('Preview tools only — not canonical abilities',x+24,y+61,15,'#a9bfd2','600');
- const modes=[['single','SINGLE'],['aoe','AOE'],['multi','MULTI'],['five-hit','5-HIT']];
+ const modes=[['single','SINGLE'],['blast','BLAST'],['aoe','AOE'],['five-hit','5-HIT']];
  for(let i=0;i<modes.length;i++){const [mode,label]=modes[i];hudButton(x+23+i*150,y+82,139,49,'mode:'+mode, label,phase==='player'&&!paused,targetingMode===mode)}
  text('TARGET / CAMERA',x+23,y+153,14,'#b9c8d8','800');
  hudButton(x+23,y+174,184,49,'camera-party','ALLY VIEW',phase==='player'&&!paused,cameraPreview==='party');
@@ -1275,7 +1275,7 @@ function drawHud(t){
  if(phase==='player'){
   const p=active();text(p?.name||'ALLY',730,712,17,'#fae3b9','800');
   const mode=previewTargetMode(),hits=chooseAttackTargets(mode);
-  text(zeroSkillArmed&&p?.id==='zero'?`SOUL SKILL • AOE • ${hits.length} TARGETS`:mode==='aoe'?`AOE • ${hits.length} TARGETS`:mode==='multi'?`ALL ENEMIES • ${hits.length} TARGETS`:'SELECT AN ENEMY',842,712,15,'#d4e9f4','700');
+  text(zeroSkillArmed&&p?.id==='zero'?`SOUL ENHANCE • BLAST • ${hits.length} TARGETS`:mode==='blast'?`BLAST • ${hits.length} TARGETS`:mode==='aoe'?`AOE • ALL ${hits.length} ENEMIES`:'SELECT AN ENEMY',842,712,15,'#d4e9f4','700');
  }
  // Portrait-focused Ally HUD review layout, without altering combat resource logic.
  ctx.save();ctx.globalAlpha=cinematic?.88:1;
@@ -1354,7 +1354,7 @@ function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRect
  case 'hp-test-flat':{const a=active();if(a)setHpBonusForTest(a.id,'debug-flat','flat',(a.hpFlatModifiers['debug-flat']||0)+20);break}
  case 'hp-test-percent':{const a=active();if(a)setHpBonusForTest(a.id,'debug-percent','percent',(a.hpPercentModifiers['debug-percent']||0)+.2);break}default:zeroSkillArmed=false;play(cmd)}return}}
 canvas.addEventListener('pointerdown',e=>{e.preventDefault();const r=canvas.getBoundingClientRect();choose((e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height)},{passive:false});
-window.addEventListener('keydown',e=>{if(e.key==='1')play('basic');if(e.key==='2')zeroSkillControl();if(e.key==='3')play('ultimate');if(e.key.toLowerCase()==='m'&&phase==='player')cycleSpCapTest();if(['q','w','e','f'].includes(e.key.toLowerCase())&&phase==='player')setTargetingMode(({q:'single',w:'aoe',e:'multi',f:'five-hit'})[e.key.toLowerCase()]);if(e.key.toLowerCase()==='v'&&phase==='player'){cameraPreview=cameraPreview==='party'?null:'party';selectedAllyId=activeId}if(e.key.toLowerCase()==='t'&&phase==='player')cameraPreview=cameraPreview==='target'?null:'target';if(e.key.toLowerCase()==='r'&&phase!=='setup')replay()});window.addEventListener('contextmenu',e=>e.preventDefault());
+window.addEventListener('keydown',e=>{if(e.key==='1')play('basic');if(e.key==='2')zeroSkillControl();if(e.key==='3')play('ultimate');if(e.key.toLowerCase()==='m'&&phase==='player')cycleSpCapTest();if(['q','w','e','f'].includes(e.key.toLowerCase())&&phase==='player')setTargetingMode(({q:'single',w:'blast',e:'aoe',f:'five-hit'})[e.key.toLowerCase()]);if(e.key.toLowerCase()==='v'&&phase==='player'){cameraPreview=cameraPreview==='party'?null:'party';selectedAllyId=activeId}if(e.key.toLowerCase()==='t'&&phase==='player')cameraPreview=cameraPreview==='target'?null:'target';if(e.key.toLowerCase()==='r'&&phase!=='setup')replay()});window.addEventListener('contextmenu',e=>e.preventDefault());
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 window.twoToneStatus=()=>({phase,paused,turn,devPanelOpen,targetingMode,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,hp:e.hp,maxHp:e.maxHp,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
 window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ULTIMATE_ENERGY_COST)),statusCount:hudStatusList(p).length})),version:'v0.0.17',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});

@@ -36,7 +36,7 @@ Calculated stats scale with Level and use the matching stat standards.
 - Restores 1 party Skill Point under the shared Basic default.
 - If Soul has Enhanced Basic stacks, each stack adds 1.0× to this Basic's multiplier and restores an additional 10 Energy.
 - Enhanced Basic stacks are consumed by the next Basic Attack.
-- With at least 3 stacks, Basic hits every enemy and deals full damage to each target.
+- With at least 3 stacks, Basic becomes a Blast: it hits the selected enemy and up to two adjacent enemies, with full damage to each.
 
 ## Skill: Enhance
 
@@ -44,7 +44,7 @@ Calculated stats scale with Level and use the matching stat standards.
 - Each activation spends 1 party Skill Point and adds one Enhanced Basic stack.
 - Soul may activate Enhance repeatedly while Skill Points remain.
 - Each stack adds 1.0× Basic damage and 10 Energy to the next Basic Attack.
-- At 3 or more stacks, that Basic becomes an all-enemy attack.
+- At 3 or more stacks, that Basic becomes a Blast targeting up to three adjacent enemies.
 
 ## Ultimate
 

@@ -53,7 +53,7 @@ function validateConfig(config) {
   }
 }
 function instantiate(config, side) {
-  return config.teams[side].map(instance => {
+  return config.teams[side].map((instance, index) => {
     const archetype = config.archetypes[instance.archetype];
     const level = instance.level ?? archetype.level ?? 1;
     const stats = Object.fromEntries(Object.entries(archetype.stats).map(([name, value]) => [name, statAtLevel(value, level)]));
@@ -68,6 +68,7 @@ function instantiate(config, side) {
     }));
     return {
       id: instance.id,
+      slot: instance.slot ?? index,
       archetypeId: instance.archetype,
       name: instance.name || archetype.name || instance.archetype,
       side,
@@ -119,10 +120,12 @@ function damageFor(attacker, target, type, multiplier) {
 }
 function chooseTarget(actor, candidates, mode, random) {
   if (!candidates.length) return [];
-  if (mode === 'all') return [...candidates];
-  if (mode === 'lowestHp') return [candidates.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp || a.id.localeCompare(b.id))[0]];
-  if (actor.side === 'enemies' || mode === 'random') return [candidates[Math.floor(random() * candidates.length)]];
-  return [candidates.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp || a.id.localeCompare(b.id))[0]];
+  if (mode === 'aoe') return [...candidates];
+  const primary = mode === 'lowestHp' || (actor.side !== 'enemies' && mode !== 'random')
+    ? candidates.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp || a.id.localeCompare(b.id))[0]
+    : candidates[Math.floor(random() * candidates.length)];
+  if (mode === 'blast') return candidates.filter(unit => Math.abs(unit.slot - primary.slot) <= 1).sort((a, b) => a.slot - b.slot);
+  return [primary];
 }
 function runAttack(state, attacker, candidates, spec, options = {}) {
   if (!candidates.length) return [];
@@ -200,7 +203,7 @@ function resolveAllyAction(state, actor) {
   const basic = actor.basic;
   const stacks = actor.enhanceStacks;
   const multiplier = basic.multiplier + stacks * (skill?.damagePerStack ?? 0);
-  const targetMode = skill && stacks >= (skill.aoeAtStacks ?? Infinity) ? 'all' : basic.target;
+  const targetMode = skill && stacks >= (skill.blastAtStacks ?? Infinity) ? 'blast' : basic.target;
   const hits = runAttack(state, actor, foes, basic, { multiplier, targetMode });
   actor.basicAttackCount++;
   actor.energy = Math.min(actor.maxEnergy, actor.energy + (basic.energyGain ?? 0) + stacks * (skill?.energyPerStack ?? 0));

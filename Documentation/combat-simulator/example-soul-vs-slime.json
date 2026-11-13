@@ -29,12 +29,12 @@
         "type": "enhanceBasic",
         "damagePerStack": 1,
         "energyPerStack": 10,
-        "aoeAtStacks": 3
+        "blastAtStacks": 3
       },
       "ultimate": {
         "damageType": "true",
         "multiplier": 2,
-        "target": "all",
+        "target": "aoe",
         "energyCost": 100,
         "refillFollowUps": true
       },
