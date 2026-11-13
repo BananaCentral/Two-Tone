@@ -954,7 +954,14 @@ function drawUnit(p,pos,view,t,acting=false){
  const art=p.id==='zero'?(view==='party'?'zeroFront':'zero'):null;
  const zb=view==='command'&&p.id==='zero'?zeroBasicStage(t):null;
   if(zb!==null)zeroBasicPaint(x,baseY,w,h,zb);
-  else if(art&&images[art]?.complete&&images[art].naturalWidth){ctx.imageSmoothingEnabled=false;ctx.drawImage(images[art],x,top,w,h)}else silhouette(x,top,w,h,p.name);
+  else if(art&&images[art]?.complete&&images[art].naturalWidth){
+  const img=images[art];ctx.imageSmoothingEnabled=art==='zeroFront';
+  if(art==='zeroFront'){
+   // Party portraits use a centered upper-body crop; the full-body art remains available as the source asset.
+   const cropH=img.naturalHeight*.6,cropW=cropH*.5,sx=(img.naturalWidth-cropW)/2;
+   ctx.drawImage(img,sx,0,cropW,cropH,x,top,w,h);
+  }else ctx.drawImage(img,x,top,w,h);
+ }else silhouette(x,top,w,h,p.name);
  ctx.restore();
  const xx=x+camera.currentX*(view==='party'?.32:.52);
  if(view==='party'){
