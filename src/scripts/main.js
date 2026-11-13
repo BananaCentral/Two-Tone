@@ -1275,12 +1275,12 @@ function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&camera
  ctx.restore();
  if(e.hp<=0)continue;
  if(isFocus||isActor||patternHit){ctx.strokeStyle=isFocus?'#ffe2a0':patternHit?'#69e8d4':'#b7e6ff';ctx.lineWidth=isFocus?5:4;ctx.strokeRect(xx-8,yy-6,ww+16,hh+13);if(patternHit){rect(xx+ww-29,yy-23,32,22,'#124d53ee','#a0f7e6',5);text('✓',xx+ww-13,yy-12,17,'#d7fff4','800','center')}}
- rect(xx-3,yy-50,ww+6,30,isFocus?'#54464ff0':'#1c2843e8',isFocus?'#f6dfa7':'#8d96a9',6);
- text(e.name,xx+ww/2,yy-35,14,'#fff4e8','800','center');
- line(xx+2,yy-16,ww-4,e.hp/e.maxHp,isFocus?'#ffd88e':'#ff8276','#4b2637',8);
- line(xx+2,yy-5,ww-4,e.maxBarrier?e.barrier/e.maxBarrier:0,'#c4c9d2','#626a75',5);
+ rect(xx-3,yy-58,ww+6,30,isFocus?'#54464ff0':'#1c2843e8',isFocus?'#f6dfa7':'#8d96a9',6);
+ text(e.name,xx+ww/2,yy-43,14,'#fff4e8','800','center');
+ line(xx+2,yy-23,ww-4,e.maxBarrier?e.barrier/e.maxBarrier:0,'#55aaff','#263b59',5);
+ line(xx+2,yy-13,ww-4,e.hp/e.maxHp,isFocus?'#ffd88e':'#ff8276','#4b2637',8);
  if(e.brokenTurns>0)text('BROKEN '+e.brokenTurns,xx+ww/2,yy+9,12,'#9cecff','800','center');
- if(phase==='player'&&!paused&&cameraPreview!=='party')choiceRects.push({x:xx-13,y:yy-55,w:ww+26,h:hh+65,action:'enemy-target:'+e.id,enabled:true});
+ if(phase==='player'&&!paused&&cameraPreview!=='party')choiceRects.push({x:xx-13,y:yy-64,w:ww+26,h:hh+74,action:'enemy-target:'+e.id,enabled:true});
  }}
 function drawActorsForShot(t,shot){
  const view=shotWorld(shot)==='reverse'?'party':'command';
