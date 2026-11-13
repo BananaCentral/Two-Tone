@@ -25,6 +25,6 @@
 
 ## Ability Targeting Flow
 
-- The player selects Basic, Skill, or an available Ultimate before selecting an enemy. Selecting an ability enters target mode; the circles show every enemy the selected ability will hit. Tapping a circled enemy confirms the action. Tapping the selected ability again or pressing Escape cancels target mode.
+- The player selects Basic, Skill, or an available Ultimate before selecting an enemy. Selecting an ability enters target mode; the circles show every enemy the selected ability will hit. Tapping a circled enemy confirms the action. Pressing the same ability again confirms an attack against the currently selected enemy. Selecting a different ability switches the pending action. Escape or the explicit Cancel Target control cancels target mode.
 - A target-requiring Ultimate selected from a character's portrait keeps that character as the acting character. Show the Ultimate user while selecting a target and in the Ultimate camera cut-in. An AoE Ultimate that hits every enemy activates immediately because it has no primary target to choose.
 - Self-targeted skills do not require enemy selection. Soul's Enhance remains immediate because it adds a stack to Soul rather than attacking an enemy.
