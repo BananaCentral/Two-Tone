@@ -1308,9 +1308,9 @@ function drawUnit(p,pos,view,t,acting=false){
    // Party portraits use a centered upper-body crop; the full-body art remains available as the source asset.
    const cropH=img.naturalHeight*.6,cropW=cropH*.5,sx=(img.naturalWidth-cropW)/2;
    ctx.drawImage(img,sx,0,cropW,cropH,x,top,w,h);
-  }else if(art==='lilyBack'){
-   // The northeast view has transparent side margins. Fit its visible silhouette
-   // to the battle-stage height so the face and upper body remain prominent.
+  }else if(art==='zero'||art==='lilyBack'){
+   // Fit the visible cutout to the same enlarged battle-stage height across
+   // playable characters, removing transparent source-image margins.
    const b=spriteAlphaBounds(img),scale=(h*1.12)/b.h,drawW=b.w*scale,drawH=b.h*scale;
    ctx.drawImage(img,b.x,b.y,b.w,b.h,x+(w-drawW)/2,baseY-drawH,drawW,drawH);
   }else ctx.drawImage(img,x,top,w,h);
