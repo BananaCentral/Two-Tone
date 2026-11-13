@@ -10,6 +10,7 @@ This standard defines how the party's shared Skill Points are gained, spent, and
 - A battle starts with 3 SP.
 - The base SP cap is 5.
 - Multiple SP-cap increases stack additively.
+- Dawn's Resourceful passive adds 2 to the party cap and starts that battle with 5 SP instead of 3. At the default cap, the party can hold 7 SP.
 
 ## SP Gains and Costs
 

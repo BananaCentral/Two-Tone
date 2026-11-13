@@ -20,4 +20,5 @@ This standard applies to full-body character art rendered in battle-stage views.
 |---|---|---|
 | Soul | `assets/soul-battle.png` | `assets/soul-portrait.png` |
 | Lily | `assets/lily-back.png` (northeast-facing) | `assets/lily-front.png` |
+| Dawn | `assets/dawn-battle.png` (side-facing) | `assets/dawn-front.png` |
 

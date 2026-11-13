@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "name": "Soul, Lily, and Dawn vs Slime",
+  "settings": {
+    "initialSkillPoints": 3,
+    "skillPointCap": 5,
+    "maxActions": 2000
+  },
+  "archetypes": {
+    "soul": {
+      "name": "Soul",
+      "level": 1,
+      "stats": { "hp": 100, "physicalAttack": 20, "magicalAttack": 20, "physicalDefense": 4, "magicalDefense": 4, "speed": 20 },
+      "basic": { "damageType": "true", "multiplier": 1, "target": "single", "energyGain": 10, "skillPointGain": 1 },
+      "skill": { "type": "enhanceBasic", "damagePerStack": 1, "energyPerStack": 10, "blastAtStacks": 3 },
+      "ultimate": { "damageType": "true", "multiplier": 2, "target": "aoe", "energyCost": 100, "refillFollowUps": true },
+      "passives": [{ "type": "followUp", "id": "followUp", "damageType": "true", "multiplier": 0.5, "charges": 5 }],
+      "weapon": { "type": "standard", "potential": 1 },
+      "celestials": { "passive": 1, "basic": 1, "skill": 1, "ultimate": 1 },
+      "energy": { "start": 20 },
+      "characterDuplicates": 0
+    },
+    "lily": {
+      "name": "Lily",
+      "level": 1,
+      "stats": { "hp": 100, "physicalAttack": 0, "magicalAttack": 30, "physicalDefense": 4, "magicalDefense": 4, "speed": 30 },
+      "basic": { "damageType": "magical", "multiplier": 1, "target": "single", "energyGain": 10, "skillPointGain": 0 },
+      "skill": { "type": "ricochet", "damageType": "magical", "multiplier": 1, "target": "aoe", "energyGain": 20, "markTurns": 2 },
+      "ultimate": { "damageType": "magical", "multiplier": 1, "target": "aoe", "energyCost": 100 },
+      "passives": [{ "type": "exposed", "defenseReduction": 0.1, "duration": 2 }],
+      "weapon": { "type": "standard", "potential": 1 },
+      "celestials": { "passive": 1, "basic": 1, "skill": 1, "ultimate": 1 },
+      "energy": { "start": 20 },
+      "characterDuplicates": 0
+    },
+    "dawn": {
+      "name": "Dawn",
+      "level": 1,
+      "stats": { "hp": 50, "physicalAttack": 0, "magicalAttack": 40, "physicalDefense": 2, "magicalDefense": 6, "speed": 30 },
+      "basic": { "damageType": "magical", "multiplier": 2, "target": "single", "energyGain": 10, "skillPointGain": 1 },
+      "skill": { "type": "tune", "energyGain": 20 },
+      "ultimate": { "type": "dawnSupport", "energyCost": 100 },
+      "passives": [{ "type": "resourceful" }],
+      "weapon": { "type": "standard", "potential": 1 },
+      "celestials": { "passive": 1, "basic": 1, "skill": 1, "ultimate": 1 },
+      "energy": { "start": 20 },
+      "characterDuplicates": 0
+    },
+    "slime": {
+      "name": "Slime",
+      "level": 1,
+      "barrierPercent": 0.2,
+      "stats": { "hp": 100, "physicalAttack": 0, "magicalAttack": 20, "physicalDefense": 4, "magicalDefense": 8, "speed": 20 },
+      "basic": { "damageType": "magical", "multiplier": 1, "target": "random" },
+      "passives": [{ "type": "everyNthBasic", "id": "slimy", "every": 3, "damageBonus": 0.25, "target": "aoe" }]
+    }
+  },
+  "teams": {
+    "allies": [
+      { "id": "soul-1", "archetype": "soul" },
+      { "id": "lily-1", "archetype": "lily" },
+      { "id": "dawn-1", "archetype": "dawn" }
+    ],
+    "enemies": [
+      { "id": "slime-1", "archetype": "slime", "slot": 2 }
+    ]
+  }
+}
