@@ -93,6 +93,17 @@ if(typeof module!=='undefined'&&module.exports)module.exports={TwoToneTurnTimeli
 sources.zeroBasicWindup='/assets/embedded-image-09.png';
 sources.zeroBasicSlash='/assets/embedded-image-10.png';
 const images={};for(const [k,src] of Object.entries(sources)){const img=new Image();img.src=src;images[k]=img;}
+const visibleSpriteBounds=new WeakMap();
+function spriteAlphaBounds(img){
+ if(visibleSpriteBounds.has(img))return visibleSpriteBounds.get(img);
+ const canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
+ const c=canvas.getContext('2d',{willReadFrequently:true});let bounds={x:0,y:0,w:img.naturalWidth,h:img.naturalHeight};
+ try{c.drawImage(img,0,0);const pixels=c.getImageData(0,0,canvas.width,canvas.height).data;let left=canvas.width,top=canvas.height,right=-1,bottom=-1;
+  for(let y=0;y<canvas.height;y++)for(let x=0;x<canvas.width;x++)if(pixels[(y*canvas.width+x)*4+3]>0){if(x<left)left=x;if(x>right)right=x;if(y<top)top=y;if(y>bottom)bottom=y}
+  if(right>=left&&bottom>=top)bounds={x:left,y:top,w:right-left+1,h:bottom-top+1};
+ }catch(e){}
+ visibleSpriteBounds.set(img,bounds);return bounds;
+}
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:false});
 const W=1600,H=900, TEAM_KEY='two-tone-demo-team-fundamental-1-v1';
 const PROGRESSION_KEY='two-tone-character-progress-v1',VITALS_KEY='two-tone-character-vitals-v1',LOADOUT_KEY='two-tone-character-loadouts-v1';
@@ -1269,14 +1280,14 @@ function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&camera
  const shimmer=isFocus?Math.sin(t*.004)*2:0;
  const zbHit=fx?.kind==='basic'&&fx?.actor==='zero'&&fx.targetEnemyId===e.id?t-fx.at:null;
   const hitKick=zbHit!==null&&zbHit>=645&&zbHit<745?Math.sin((zbHit-645)*.18)*(1-(zbHit-645)/100)*4:0;
- let spriteCenterY=yy+hh/2;const spriteOffsetX=shimmer+hitKick,spriteOffsetY=Math.sin(t*.0026+e.x)*2.2;
+ let spriteCenterY=yy+hh/2,spriteVisibleW=ww,spriteVisibleH=hh;const spriteOffsetX=shimmer+hitKick,spriteOffsetY=Math.sin(t*.0026+e.x)*2.2;
  ctx.save();ctx.globalAlpha=e.hp>0?1:Math.max(.02,.8-(t-fx.at)/1050);ctx.translate(spriteOffsetX,spriteOffsetY);
  ctx.beginPath();ctx.ellipse(xx+ww/2,yy+hh-4,ww*.48,13,0,0,Math.PI*2);ctx.fillStyle='#1b213c70';ctx.fill();
- if(images[e.battleSprite]?.complete&&images[e.battleSprite].naturalWidth){const img=images[e.battleSprite];ctx.imageSmoothingEnabled=e.battleSprite==='slimeBattle';const ratioParts=String(e.battleAspectRatio||'').split(':').map(Number),aspect=ratioParts.length===2&&ratioParts.every(Number.isFinite)&&ratioParts[0]>0&&ratioParts[1]>0?ratioParts[0]/ratioParts[1]:img.naturalWidth/img.naturalHeight,iw=Math.min(ww,hh*aspect),ih=iw/aspect,drawX=xx+(ww-iw)/2,drawY=yy+hh-ih;spriteCenterY=drawY+ih/2;ctx.drawImage(img,drawX,drawY,iw,ih)}
+ if(images[e.battleSprite]?.complete&&images[e.battleSprite].naturalWidth){const img=images[e.battleSprite];ctx.imageSmoothingEnabled=e.battleSprite==='slimeBattle';const ratioParts=String(e.battleAspectRatio||'').split(':').map(Number),aspect=ratioParts.length===2&&ratioParts.every(Number.isFinite)&&ratioParts[0]>0&&ratioParts[1]>0?ratioParts[0]/ratioParts[1]:img.naturalWidth/img.naturalHeight,canvasW=Math.min(ww,hh*aspect),canvasH=canvasW/aspect,scaleX=canvasW/img.naturalWidth,scaleY=canvasH/img.naturalHeight,bounds=spriteAlphaBounds(img),drawW=bounds.w*scaleX,drawH=bounds.h*scaleY,drawX=xx+(ww-drawW)/2,drawY=yy+hh-drawH;spriteVisibleW=drawW;spriteVisibleH=drawH;spriteCenterY=drawY+drawH/2;ctx.drawImage(img,bounds.x,bounds.y,bounds.w,bounds.h,drawX,drawY,drawW,drawH)}
  ctx.restore();
  if(e.hp<=0)continue;
  if(isActor){ctx.strokeStyle='#b7e6ff';ctx.lineWidth=4;ctx.strokeRect(xx-8,yy-6,ww+16,hh+13)}
- if(patternHit){ctx.beginPath();ctx.arc(xx+ww/2+spriteOffsetX,spriteCenterY+spriteOffsetY,7,0,Math.PI*2);ctx.fillStyle='#55aaff';ctx.fill();ctx.strokeStyle='#eaf6ff';ctx.lineWidth=2;ctx.stroke()}
+ if(patternHit){const ringRadius=Math.max(spriteVisibleW,spriteVisibleH)/2+8;ctx.beginPath();ctx.arc(xx+ww/2+spriteOffsetX,spriteCenterY+spriteOffsetY,ringRadius,0,Math.PI*2);ctx.strokeStyle='#55aaff';ctx.lineWidth=4;ctx.stroke()}
  rect(xx-3,yy-58,ww+6,30,'#1c2843e8','#8d96a9',6);
  text(e.name,xx+ww/2,yy-43,14,'#fff4e8','800','center');
  line(xx+2,yy-25,ww-4,e.maxBarrier?e.barrier/e.maxBarrier:0,'#55aaff','#263b59',8);

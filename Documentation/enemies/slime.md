@@ -37,7 +37,7 @@ Slime has a Barrier equal to 20% of maximum HP. Damage still applies fully to HP
 
 ## Battle Display
 
-The Slime battle sprite uses a 1:1 width-to-height aspect ratio. It is drawn at that ratio, centered horizontally in its formation slot, and aligned to the slot baseline so it appears grounded. Its target dot is centered on the rendered sprite.
+The Slime battle sprite asset is a 1:1 256 × 256 PNG. Its visible non-transparent artwork occupies pixels x=20–235 and y=68–196. Rendering trims transparent padding for placement, aligns the visible artwork bottom to its formation-slot baseline, and centers the target circle on the visible sprite.
 
 ## Artwork
 
