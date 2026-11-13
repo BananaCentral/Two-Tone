@@ -22,7 +22,7 @@ Use `--json` for machine-readable output, `--max-actions 2000` to set a battle l
 
 Each scenario defines stat and ability archetypes, then creates team instances by referencing those archetypes. Instance IDs must be unique; archetypes may be repeated, so a scenario can model five Soul instances without duplicating their definitions.
 
-Every archetype provides the six standard stats under `stats`: HP, Physical Attack, Magical Attack, Physical Defense, Magical Defense, and Speed. Stats use the project's level scaling (`base × level`, rounded to the nearest integer). Teams are listed as `teams.allies` and `teams.enemies`.
+Every archetype provides the six standard stats under `stats`: HP, Physical Attack, Magical Attack, Physical Defense, Magical Defense, and Speed. Stats use the project's level scaling (`base × level`, rounded to the nearest integer) for levels 1–50. Teams are listed as `teams.allies` and `teams.enemies`.
 
 Supported attack damage types are `physical`, `magical`, and `true`. Basic and Ultimate attacks define a multiplier and target mode (`single`, `random`, `lowestHp`, or `all`). Units start with zero Energy unless `energy.start` or an instance `energy` is supplied; Energy is capped at 120 by default.
 
@@ -36,6 +36,6 @@ Additional ability effects require adding a handler to the simulator before conf
 
 ## Output
 
-The batch summary reports each team's win rate, average action counts, damage, Skill uses, Follow Ups, Ultimates, AoE attacks, and surviving unit counts. A battle reaching its action limit is counted as a draw.
+The automated policy uses a ready Ultimate before that ally's next turn action, spends available shared Skill Points on supported Enhance skills, and has allies focus the lowest-HP enemy. Enemies choose a random living ally. The batch summary reports each team's win rate, average action counts, damage, Skill uses, Follow Ups, Ultimates, AoE attacks, and surviving unit counts. A battle reaching its action limit is counted as a draw.
 
 The simulator uses the game's stat scaling, typed damage reduction, follow-up distribution, shared Skill Point rules, and Speed rate formula. It schedules turns by each unit's rate and does not model canvas presentation, random encounter reinforcements, action advance/delay effects, or status effects that are not represented by the supported ability handlers. Keep scenario archetypes aligned with the approved character and enemy sheets.

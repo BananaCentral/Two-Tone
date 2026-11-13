@@ -12,7 +12,7 @@ function assert(condition, message) {
 function roundStat(value) { return Math.floor(value + 0.5); }
 function statAtLevel(value, level) {
   assert(Number.isFinite(value) && value >= 0, 'Stats must be finite non-negative numbers.');
-  assert(Number.isInteger(level) && level >= 1, 'Unit level must be a positive integer.');
+  assert(Number.isInteger(level) && level >= 1 && level <= 50, 'Unit level must be an integer from 1 to 50.');
   return roundStat(value * level);
 }
 function mean(values) { return values.length ? values.reduce((sum, n) => sum + n, 0) / values.length : 1; }
