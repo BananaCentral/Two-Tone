@@ -16,6 +16,6 @@ Runtime data must validate the value against these three categories before the e
 
 Category classifies an enemy's encounter role. It does not itself define stat multipliers, HP scaling, turn frequency, abilities, or other combat behavior. Those rules must be specified separately.
 
-## Current demo enemies
+## Current roster
 
-Automaton 1–5 are demo enemies and are categorized as `common`. Wave construction carries the category from each enemy design to each spawned instance. No Elite or Boss demo enemy is currently defined.
+Slime is the first defined Common enemy. Every wave instance receives the validated category from its enemy archetype. The five formation slots define placement only. No Elite or Boss enemy is currently defined.

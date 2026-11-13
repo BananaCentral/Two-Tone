@@ -1,5 +1,5 @@
 'use strict';
-const sources={arena:'/assets/embedded-image-01.png',zero:'/assets/soul-battle.png',enemy:'/assets/embedded-image-03.png',portrait:'/assets/embedded-image-04.png',zeroFront:'/assets/soul-portrait.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png'};
+const sources={arena:'/assets/embedded-image-01.png',zero:'/assets/soul-battle.png',enemy:'/assets/embedded-image-03.png',slime:'/assets/slime.png',portrait:'/assets/embedded-image-04.png',zeroFront:'/assets/soul-portrait.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png'};
 
 /* Two-Tone Fundamental 05 preview scheduling engine.
    Baseline event allocation follows approved deterministic fractional cycles and
@@ -393,13 +393,16 @@ function validateEnemyCategory(category){
  if(!ENEMY_CATEGORIES.includes(category))throw Error(`Enemy category must be one of: ${ENEMY_CATEGORIES.join(', ')}`);
  return category;
 }
-const ENEMY_DESIGNS=[
- {id:'enemy1',category:'common',name:'AUTOMATON 1',x:646,y:359,w:151,h:198,maxHp:1050,speed:66,basePhysicalDefense:0,baseMagicalDefense:0},
- {id:'enemy2',category:'common',name:'AUTOMATON 2',x:822,y:314,w:156,h:205,maxHp:1050,speed:69,basePhysicalDefense:0,baseMagicalDefense:0},
- {id:'enemy3',category:'common',name:'AUTOMATON 3',x:1010,y:274,w:167,h:220,maxHp:1350,speed:65,basePhysicalDefense:0,baseMagicalDefense:0},
- {id:'enemy4',category:'common',name:'AUTOMATON 4',x:1201,y:312,w:156,h:205,maxHp:1050,speed:68,basePhysicalDefense:0,baseMagicalDefense:0},
- {id:'enemy5',category:'common',name:'AUTOMATON 5',x:1389,y:355,w:151,h:198,maxHp:1050,speed:67,basePhysicalDefense:0,baseMagicalDefense:0},
+const ENEMY_FORMATIONS=[
+ {id:'slot1',x:646,y:359,w:151,h:198},
+ {id:'slot2',x:822,y:314,w:156,h:205},
+ {id:'slot3',x:1010,y:274,w:167,h:220},
+ {id:'slot4',x:1201,y:312,w:156,h:205},
+ {id:'slot5',x:1389,y:355,w:151,h:198},
 ];
+const ENEMY_ARCHETYPES={slime:{id:'slime',category:'common',name:'SLIME',level:1,hp:100,
+ basePhysicalAttack:0,baseMagicalAttack:10,basePhysicalDefense:1,baseMagicalDefense:2,speed:5,art:'slime',
+ passive:{id:'slimy',every:3,damageBonus:.25},basicAttack:{damageType:'magical',multiplier:1.0}}};
 // Any encounter may supply its own finite number of waves, each with 1–15 enemies.
 // Presets are only review scenarios; they are NOT a global wave-count limit.
 const WAVE_PRESETS={stress:[15,12,6],quick:[1,5,6],sizes:[1,5,6,12,15]};
@@ -549,14 +552,17 @@ function chosenEnemy(){return liveEnemies().find(e=>e.id===selectedEnemyId)||liv
 function buildWavePlan(sizes){
  if(!Array.isArray(sizes)||!sizes.length||!sizes.every(n=>Number.isInteger(n)&&n>=1&&n<=15))throw Error('Wave sizes must each be 1–15');
  return sizes.map((size,wi)=>Array.from({length:size},(_,i)=>{
-  const model=ENEMY_DESIGNS[i%5];return {id:`wave${wi+1}-enemy${i+1}`,name:`AUTOMATON ${i+1}`,
-   wave:wi+1,order:i+1,category:validateEnemyCategory(model.category),maxHp:model.maxHp,speed:model.speed,art:'enemy',test:true};
+  const model=ENEMY_ARCHETYPES.slime;return {id:`wave${wi+1}-enemy${i+1}`,archetypeId:model.id,name:model.name,
+   wave:wi+1,order:i+1,category:validateEnemyCategory(model.category),level:model.level,maxHp:model.hp,speed:model.speed,
+   basePhysicalAttack:model.basePhysicalAttack,baseMagicalAttack:model.baseMagicalAttack,
+   basePhysicalDefense:model.basePhysicalDefense,baseMagicalDefense:model.baseMagicalDefense,
+   art:model.art,passive:{...model.passive},basicAttack:{...model.basicAttack},basicAttackCount:0};
  }));
 }
 function initialSlots(count){return ({1:[2],2:[1,3],3:[1,2,3],4:[0,1,3,4],5:[0,1,2,3,4]})[count].slice()}
 function enterEnemy(slot){
  if(!waveQueue.length||enemies.some(e=>e.slot===slot)||enemies.length>=5)return null;
- const incoming=waveQueue.shift(),formation=ENEMY_DESIGNS[slot];
+ const incoming=waveQueue.shift(),formation=ENEMY_FORMATIONS[slot];
  const e={...incoming,slot,x:formation.x,y:formation.y,w:formation.w,h:formation.h,hp:incoming.maxHp};
  enemies.push(e);enemies.sort((a,b)=>a.slot-b.slot);gauges[e.id]=0;
  spawnHistory.push({wave:e.wave,id:e.id,slot,initial:waveKills===0,duringAttack:attackInProgress});
@@ -673,6 +679,20 @@ function startFromBattle(){
  log=`Wave test restarted: ${wavePlan.length} waves, ${wavePlan.reduce((n,w)=>n+w.length,0)} total enemies.`;
  schedule(()=>{if(phase==='intro')nextTurn()},380);
 }
+function resolveEnemyBasicAttack(attacker,candidates){
+ const basic=attacker.basicAttack||{},passive=attacker.passive?.id==='slimy'?attacker.passive:null;
+ if(passive)attacker.basicAttackCount=(attacker.basicAttackCount||0)+1;
+ const enhanced=!!passive&&attacker.basicAttackCount%passive.every===0;
+ const targets=enhanced?[...candidates]:[candidates[Math.floor(Math.random()*candidates.length)]];
+ const multiplier=(basic.multiplier??1)*(enhanced?1+passive.damageBonus:1);
+ const hits=targets.map(target=>{
+  const calculated=basic.damageType?calculateTypedActionDamage(basic.damageType,multiplier,attacker,target):null;
+  const damage=calculated?.damageTaken??(basic.damageType?0:92+((turn*37)%51));
+  target.hp=Math.max(0,target.hp-damage);target.energy=Math.min(120,target.energy+10);
+  return {target:target.id,damage};
+ });
+ return {hits,enhanced};
+}
 function nextTurn(){
  if(paused||['setup','victory','defeat'].includes(phase))return;
  if(liveEnemies().length===0){if(encounterCleared){phase='victory';return}say('Wave state has no active enemies.');return}
@@ -685,7 +705,7 @@ function nextTurn(){
  if(actingSummon){executeIndependentSummonTurn(actingSummon);return;}
  const attacking=enemies.find(e=>e.id===next&&e.hp>0);
  if(attacking){activeId=null;zeroSkillArmed=false;actingEnemyId=next;cameraPreview=null;phase='enemy';log=`${attacking.name} prepares an attack.`;
-  schedule(()=>{if(phase!=='enemy'||paused)return;if(attacking.hp<=0){nextTurn();return}const candidates=alive();if(!candidates.length){cancelAllQueuedUltimates('defeat');phase='defeat';return}const target=candidates[Math.floor(Math.random()*candidates.length)];enemyCount++;const damage=92+((turn*37)%51);target.hp=Math.max(0,target.hp-damage);target.energy=Math.min(120,target.energy+10);saveVitals();cancelQueuedUltimatesOfDefeated();fx={kind:'enemy',at:performance.now(),damage,target:target.id,actorEnemyId:attacking.id};log=`${attacking.name} hits ${target.name} for ${damage}.`;phase='resolve';schedule(()=>drainUltimateQueueBefore(()=>{if(!alive().length){phase='defeat';log='All allied characters were defeated.'}else nextTurn()}),1000)},780);
+  schedule(()=>{if(phase!=='enemy'||paused)return;if(attacking.hp<=0){nextTurn();return}const candidates=alive();if(!candidates.length){cancelAllQueuedUltimates('defeat');phase='defeat';return}enemyCount++;const attack=resolveEnemyBasicAttack(attacking,candidates),firstHit=attack.hits[0];saveVitals();cancelQueuedUltimatesOfDefeated();fx={kind:'enemy',at:performance.now(),damage:firstHit.damage,target:firstHit.target,hits:attack.hits,actorEnemyId:attacking.id};log=attack.enhanced?`${attacking.name} uses Slimy against all allied characters.`:`${attacking.name} hits ${party.find(p=>p.id===firstHit.target)?.name||'an ally'} for ${firstHit.damage}.`;phase='resolve';schedule(()=>drainUltimateQueueBefore(()=>{if(!alive().length){phase='defeat';log='All allied characters were defeated.'}else nextTurn()}),1000)},780);
  }else{actingEnemyId=null;activeId=next;zeroSkillArmed=false;cameraPreview=null;turnCamera={fromId:previousActor,toId:next,start:performance.now(),duration:560};phase='player';log=`${active().name}'s turn — tap an enemy to select its target.`;}
 }
 // Normal turns can use Basic or Skill. Ultimate is off-turn and never spends a turn.
@@ -990,7 +1010,7 @@ function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&camera
   const hitKick=zbHit!==null&&zbHit>=645&&zbHit<745?Math.sin((zbHit-645)*.18)*(1-(zbHit-645)/100)*4:0;
   ctx.save();ctx.globalAlpha=e.hp>0?1:Math.max(.02,.8-(t-fx.at)/1050);ctx.translate(shimmer+hitKick,Math.sin(t*.0026+e.x)*2.2);
  ctx.beginPath();ctx.ellipse(xx+ww/2,yy+hh-4,ww*.48,13,0,0,Math.PI*2);ctx.fillStyle='#1b213c70';ctx.fill();
- if(images[e.art]?.complete&&images[e.art].naturalWidth){ctx.imageSmoothingEnabled=false;ctx.drawImage(images[e.art],xx,yy,ww,hh)}
+ if(images[e.art]?.complete&&images[e.art].naturalWidth){const img=images[e.art];ctx.imageSmoothingEnabled=e.art==='slime';if(e.art==='slime'){const scale=Math.min(ww/img.naturalWidth,hh/img.naturalHeight),iw=img.naturalWidth*scale,ih=img.naturalHeight*scale;ctx.drawImage(img,xx+(ww-iw)/2,yy+(hh-ih)/2,iw,ih)}else ctx.drawImage(img,xx,yy,ww,hh)}
  ctx.restore();
  if(e.hp<=0)continue;
  if(isFocus||isActor||patternHit){ctx.strokeStyle=isFocus?'#ffe2a0':patternHit?'#69e8d4':'#b7e6ff';ctx.lineWidth=isFocus?5:4;ctx.strokeRect(xx-8,yy-6,ww+16,hh+13);if(patternHit){rect(xx+ww-29,yy-23,32,22,'#124d53ee','#a0f7e6',5);text('✓',xx+ww-13,yy-12,17,'#d7fff4','800','center')}}
@@ -1071,13 +1091,14 @@ function drawFx(t){
   ctx.lineWidth=fx.kind==='ultimate'?28:14;ctx.beginPath();ctx.ellipse(0,0,120+80*q,30+150*q,0,0,Math.PI*1.5);ctx.stroke();
   ctx.beginPath();ctx.moveTo(-140,-50);ctx.lineTo(140,75);ctx.stroke();
  }else{
-  const pos=cameraAllyPosition(fx.target,"command");const xx=pos?pos.x+pos.w/2:440,yy=pos?pos.baseY-pos.h*.58:500;
-  ctx.strokeStyle=`rgba(255,98,121,${1-q})`;ctx.lineWidth=18;ctx.beginPath();ctx.moveTo(xx-65,yy-85);ctx.lineTo(xx+65,yy+70);ctx.stroke();
+  const hits=fx.hits?.length?fx.hits:[{target:fx.target}];
+  for(const hit of hits){const pos=cameraAllyPosition(hit.target,"command");if(!pos)continue;const xx=pos.x+pos.w/2,yy=pos.baseY-pos.h*.58;
+   ctx.strokeStyle=`rgba(255,98,121,${1-q})`;ctx.lineWidth=18;ctx.beginPath();ctx.moveTo(xx-65,yy-85);ctx.lineTo(xx+65,yy+70);ctx.stroke();}
  }
  ctx.restore();
- if(dt>100&&!(fx.kind==='basic'&&fx.actor==='zero')){const pos=fx.kind==='enemy'?cameraAllyPosition(fx.target,"command"):null;
-  const foe=fx.kind!=='enemy'?(enemies.find(e=>e.id===fx.targetEnemyId)||fx.targetGeometry):null;const x=foe?foe.x+foe.w/2+camera.currentX*.43:pos?pos.x+pos.w/2:1142,y=foe?foe.y+foe.h*.12:pos?pos.baseY-pos.h*.73:355;
-  text('-'+fx.damage,x,y-70*q,42,fx.kind==='enemy'?'#ff9d9e':'#fff0ba','900','center')}
+ if(dt>100&&!(fx.kind==='basic'&&fx.actor==='zero')){if(fx.kind==='enemy'){
+  const hits=fx.hits?.length?fx.hits:[{target:fx.target,damage:fx.damage}];for(const hit of hits){const pos=cameraAllyPosition(hit.target,"command");if(pos)text('-'+hit.damage,pos.x+pos.w/2,pos.baseY-pos.h*.73-70*q,42,'#ff9d9e','900','center')}
+ }else{const foe=enemies.find(e=>e.id===fx.targetEnemyId)||fx.targetGeometry;const x=foe?foe.x+foe.w/2+camera.currentX*.43:1142,y=foe?foe.y+foe.h*.12:355;text('-'+fx.damage,x,y-70*q,42,'#fff0ba','900','center')}}
 }
 function getOrder(n){
  const predicted=turnTimeline.preview(n).map(x=>x.id);
