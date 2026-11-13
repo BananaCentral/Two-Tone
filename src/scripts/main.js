@@ -1509,7 +1509,7 @@ function drawAllyPortraitHud(){
   const portraitX=x+12,portraitY=top+10,portraitSize=112;
   ctx.save();ctx.globalAlpha=ko?.57:activeAlly?1:.84;
   rect(x,top,cardW,cardH,'rgba(14,23,42,.96)',activeAlly?'#f3d79e':'rgba(129,164,191,.82)',12);
-  hudPortrait(p.id==='zero'?images.zeroFront:null,portraitX,portraitY,portraitSize,portraitSize,true);
+  hudPortrait(p.id==='zero'?images.zeroFront:p.id==='lily'?images.lilyFront:null,portraitX,portraitY,portraitSize,portraitSize,true);
   if(ko)rect(portraitX,portraitY,portraitSize,portraitSize,'rgba(30,17,23,.62)',null,10);
   drawAllyUltimate(p,x+95,top-11,136);
   drawAllyStatuses(p,portraitX,portraitY,portraitSize);
@@ -1582,6 +1582,7 @@ function drawHud(t){
   if(foe)hudPortrait(images[foe.art],xx+7,yy+5,49,44);
   else if(summon){hudCircle(xx+31,yy+25,19,'#508c8f','#d4f5ed',2);text('✧',xx+31,yy+25,22,'#ffffff','800','center');}
   else if(id==='zero')hudPortrait(images.zeroFront,xx+7,yy+5,49,44);
+  else if(id==='lily')hudPortrait(images.lilyFront,xx+7,yy+5,49,44);
   else{hudCircle(xx+31,yy+21,13,'#6e8eac');rect(xx+19,yy+33,24,16,'#6784a1',null,7)}
   text(now?'NOW':String(i+1),xx+54,yy+48,10,now?'#fff2cb':'#bacbdf','850','right');
  }
