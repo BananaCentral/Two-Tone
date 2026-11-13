@@ -1,5 +1,7 @@
 # Lily Character Sheet
 
+Battle-stage artwork uses the northeast-facing `assets/lily-back.png` under the shared Character Battle Sprite Standard. Her HUD and party portrait uses the front-facing `assets/lily-front.png`.
+
 ## Identity and base stats
 
 Character ID: `lily`. Lily starts at Level 1. Her base stats are HP 100, Physical Attack 0, Magical Attack 30, Physical Defense 4, Magical Defense 4, and Speed 30. Stats use the shared character-level and loadout formulas.

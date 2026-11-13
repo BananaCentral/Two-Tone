@@ -1,5 +1,7 @@
 # Soul Character Sheet
 
+Battle-stage artwork uses `assets/soul-battle.png` under the shared Character Battle Sprite Standard. The HUD portrait uses `assets/soul-portrait.png`.
+
 ## Identity
 
 - Character ID: `soul` (legacy runtime key: `zero`)

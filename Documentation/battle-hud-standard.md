@@ -1,5 +1,7 @@
 # Battle Character Card Standard
 
+Battle-stage character art follows the [Character Battle Sprite Standard](character-battle-sprite-standard.md). Card portraits are front-facing portrait assets and are sized independently from full-body battle sprites.
+
 ## Card Layout
 
 Each allied character card presents combat information in this order:
