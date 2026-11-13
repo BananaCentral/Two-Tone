@@ -1,5 +1,5 @@
 'use strict';
-const sources={arena:'/assets/embedded-image-01.png',zero:'/assets/soul-battle.png',enemy:'/assets/embedded-image-03.png',slime:'/assets/slime.png',portrait:'/assets/embedded-image-04.png',zeroFront:'/assets/soul-portrait.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png'};
+const sources={arena:'/assets/embedded-image-01.png',zero:'/assets/soul-battle.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',zeroFront:'/assets/soul-portrait.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png'};
 
 /* Two-Tone Fundamental 05 preview scheduling engine.
    Baseline event allocation follows approved deterministic fractional cycles and
@@ -401,7 +401,7 @@ const ENEMY_FORMATIONS=[
  {id:'slot5',x:1389,y:355,w:151,h:198},
 ];
 const ENEMY_ARCHETYPES={slime:{id:'slime',category:'common',name:'SLIME',level:1,hp:100,
- basePhysicalAttack:0,baseMagicalAttack:10,basePhysicalDefense:1,baseMagicalDefense:2,speed:5,art:'slime',
+ basePhysicalAttack:0,baseMagicalAttack:10,basePhysicalDefense:1,baseMagicalDefense:2,speed:5,battleSprite:'slimeBattle',artwork:'slimeArtwork',
  passive:{id:'slimy',every:3,damageBonus:.25},basicAttack:{damageType:'magical',multiplier:1.0}}};
 // Any encounter may supply its own finite number of waves, each with 1–15 enemies.
 // Presets are only review scenarios; they are NOT a global wave-count limit.
@@ -556,7 +556,7 @@ function buildWavePlan(sizes){
    wave:wi+1,order:i+1,category:validateEnemyCategory(model.category),level:model.level,maxHp:model.hp,speed:model.speed,
    basePhysicalAttack:model.basePhysicalAttack,baseMagicalAttack:model.baseMagicalAttack,
    basePhysicalDefense:model.basePhysicalDefense,baseMagicalDefense:model.baseMagicalDefense,
-   art:model.art,passive:{...model.passive},basicAttack:{...model.basicAttack},basicAttackCount:0};
+   battleSprite:model.battleSprite,artwork:model.artwork,passive:{...model.passive},basicAttack:{...model.basicAttack},basicAttackCount:0};
  }));
 }
 function initialSlots(count){return ({1:[2],2:[1,3],3:[1,2,3],4:[0,1,3,4],5:[0,1,2,3,4]})[count].slice()}
@@ -1010,7 +1010,7 @@ function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&camera
   const hitKick=zbHit!==null&&zbHit>=645&&zbHit<745?Math.sin((zbHit-645)*.18)*(1-(zbHit-645)/100)*4:0;
   ctx.save();ctx.globalAlpha=e.hp>0?1:Math.max(.02,.8-(t-fx.at)/1050);ctx.translate(shimmer+hitKick,Math.sin(t*.0026+e.x)*2.2);
  ctx.beginPath();ctx.ellipse(xx+ww/2,yy+hh-4,ww*.48,13,0,0,Math.PI*2);ctx.fillStyle='#1b213c70';ctx.fill();
- if(images[e.art]?.complete&&images[e.art].naturalWidth){const img=images[e.art];ctx.imageSmoothingEnabled=e.art==='slime';if(e.art==='slime'){const scale=Math.min(ww/img.naturalWidth,hh/img.naturalHeight),iw=img.naturalWidth*scale,ih=img.naturalHeight*scale;ctx.drawImage(img,xx+(ww-iw)/2,yy+(hh-ih)/2,iw,ih)}else ctx.drawImage(img,xx,yy,ww,hh)}
+ if(images[e.battleSprite]?.complete&&images[e.battleSprite].naturalWidth){const img=images[e.battleSprite];ctx.imageSmoothingEnabled=e.battleSprite==='slimeBattle';if(e.battleSprite==='slimeBattle'){const scale=Math.min(ww/img.naturalWidth,hh/img.naturalHeight),iw=img.naturalWidth*scale,ih=img.naturalHeight*scale;ctx.drawImage(img,xx+(ww-iw)/2,yy+(hh-ih)/2,iw,ih)}else ctx.drawImage(img,xx,yy,ww,hh)}
  ctx.restore();
  if(e.hp<=0)continue;
  if(isFocus||isActor||patternHit){ctx.strokeStyle=isFocus?'#ffe2a0':patternHit?'#69e8d4':'#b7e6ff';ctx.lineWidth=isFocus?5:4;ctx.strokeRect(xx-8,yy-6,ww+16,hh+13);if(patternHit){rect(xx+ww-29,yy-23,32,22,'#124d53ee','#a0f7e6',5);text('✓',xx+ww-13,yy-12,17,'#d7fff4','800','center')}}

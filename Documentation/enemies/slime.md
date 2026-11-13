@@ -29,4 +29,7 @@ Every third Basic Attack is empowered: it deals 25% more damage and hits all liv
 
 ## Artwork
 
-The game uses the supplied 256 × 256 slime artwork for this enemy.
+The two supplied images are stored separately:
+
+- Battle sprite: `assets/slime.png` (transparent 256 × 256 PNG), used for the in-battle enemy rendering.
+- Character artwork: `assets/slime-artwork.jpg` (1254 × 1254 JPEG), registered as the enemy's artwork asset.
