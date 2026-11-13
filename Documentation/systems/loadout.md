@@ -44,10 +44,10 @@ Each Celestial level adds 10% of the ability's base multiplier. This is applied 
 
 ## Character and weapon duplicates
 
-Soul has four character Duplicate effects, separate from weapon Potential. Character Duplicate levels 0–4 persist on his Loadout. Duplicate 1 raises Follow Up capacity to 7, Duplicate 2 doubles Follow Up's base multiplier, Duplicate 3 doubles Ultimate's base multiplier, and Duplicate 4 changes each Enhance stack from +100% to +200% Basic damage.
+Character Duplicates are separate from weapon Potential and persist on each character's Loadout. Soul's Duplicate effects are listed in the Soul Character Sheet. Lily's Duplicate effects are listed in the Lily Character Sheet.
 
 Soul's Premium signature effect at Potential 1 and above refunds 1 Skill Point after each three Skill Points spent on Enhance. Soul's Premium signature duplicates map to Premium Potential 2–5: each potential above 1 is one duplicate. Duplicate 1 doubles Basic's base multiplier; Duplicate 2 restores one Follow Up after Soul kills an enemy; Duplicate 3 makes a 3-stack Enhanced Basic AoE; Duplicate 4 restores one Follow Up after every two Follow Up activations. Premium weapon effects only apply while Soul owns and has selected the Premium weapon.
 
 ## Prototype boundaries
 
-The Loadout screen persists weapon potential, rune configuration, Celestial levels, and Soul's character Duplicate level locally. Its upgrade controls do not charge resources because upgrade costs have not been defined. Premium weapons remain locked until Store acquisition is implemented. Rune-set choices/passives and weapon effects without character-specific definitions remain pending; Soul's Premium Potential 1 Skill Point refund effect is implemented. Premium Potential 2–5 map to weapon Duplicates 1–4. The current character roster has Soul's real stats; placeholder slots are not loadout-enabled.
+The Loadout screen persists weapon potential, rune configuration, Celestial levels, and character Duplicate level locally. Its upgrade controls do not charge resources because upgrade costs have not been defined. Premium weapons remain locked until Store acquisition is implemented. Rune-set choices/passives and weapon effects without character-specific definitions remain pending. Premium Potential 2–5 map to weapon Duplicates 1–4. The current playable roster is Soul and Lily; Lily's Premium effects are documented in her Character Sheet and require an owned, equipped Premium weapon.
