@@ -53,7 +53,7 @@ function validateConfig(config) {
   }
 }
 
-const RUNE_STAT_VALUES={hp:200,physicalAttack:20,magicalAttack:20,physicalDefense:2,magicalDefense:2,speed:20};
+const RUNE_STAT_VALUES={hp:100,physicalAttack:20,magicalAttack:20,physicalDefense:4,magicalDefense:4,speed:20};
 function signatureWeaponBonus(weapon){
  if(!weapon)return 0;
  assert(['standard','premium'].includes(weapon.type),'Weapon type must be standard or premium.');
@@ -70,7 +70,7 @@ function runeStatTotals(runes=[]){
   assert(new Set([rune.main,...rune.subs]).size===4&&rune.subs.every(key=>Object.hasOwn(RUNE_STAT_VALUES,key)),'Rune stats must be unique within the rune.');
   if(rune.setId){assert(setId===null||setId===rune.setId,'All equipped runes must belong to one set.');setId=rune.setId;}
   totals[rune.main]+=RUNE_STAT_VALUES[rune.main]*rune.level;
-  for(const key of rune.subs)totals[key]+=RUNE_STAT_VALUES[key]*.5*rune.level;
+  for(const key of rune.subs)totals[key]+=RUNE_STAT_VALUES[key]*.25*rune.level;
  }
  return totals;
 }

@@ -21,14 +21,14 @@ At rune level L, the main stat adds:
 
 | Stat | Main stat bonus |
 |---|---:|
-| HP | 200 × L |
+| HP | 100 × L |
 | Physical Attack | 20 × L |
 | Magical Attack | 20 × L |
-| Physical Defense | 2 × L |
-| Magical Defense | 2 × L |
+| Physical Defense | 4 × L |
+| Magical Defense | 4 × L |
 | Speed | 20 × L |
 
-Each substat adds 50% of its corresponding main stat value at that rune level.
+Each substat adds 25% of its corresponding main stat value at that rune level.
 
 ## Celestials
 

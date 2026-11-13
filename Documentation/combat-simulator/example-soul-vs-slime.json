@@ -11,11 +11,11 @@
       "name": "Soul",
       "level": 1,
       "stats": {
-        "hp": 200,
+        "hp": 100,
         "physicalAttack": 20,
         "magicalAttack": 20,
-        "physicalDefense": 2,
-        "magicalDefense": 2,
+        "physicalDefense": 4,
+        "magicalDefense": 4,
         "speed": 20
       },
       "basic": {
@@ -64,11 +64,11 @@
       "name": "Slime",
       "level": 1,
       "stats": {
-        "hp": 200,
+        "hp": 100,
         "physicalAttack": 0,
-        "magicalAttack": 10,
-        "physicalDefense": 2,
-        "magicalDefense": 4,
+        "magicalAttack": 20,
+        "physicalDefense": 4,
+        "magicalDefense": 8,
         "speed": 20
       },
       "basic": {

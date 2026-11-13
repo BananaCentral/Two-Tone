@@ -102,7 +102,7 @@ let playerRank=1;
 // Numerical Base HP values are inherited/development-only combat fixtures, NOT
 // approved per-character stats. The unnamed units remain developer test slots.
 const ROSTER=[
- {id:'zero',name:'SOUL',label:'Character',hp:200,basePhysicalAttack:20,baseMagicalAttack:20,basePhysicalDefense:2,baseMagicalDefense:2,speed:20,art:'zero',test:false},
+ {id:'zero',name:'SOUL',label:'Character',hp:100,basePhysicalAttack:20,baseMagicalAttack:20,basePhysicalDefense:4,baseMagicalDefense:4,speed:20,art:'zero',test:false},
  {id:'test2',name:'TEST SLOT 2',label:'Placeholder • no approved identity',hp:2300,basePhysicalAttack:null,baseMagicalAttack:null,basePhysicalDefense:null,baseMagicalDefense:null,speed:115,art:null,test:true},
  {id:'test3',name:'TEST SLOT 3',label:'Placeholder • no approved identity',hp:2600,basePhysicalAttack:null,baseMagicalAttack:null,basePhysicalDefense:null,baseMagicalDefense:null,speed:115,art:null,test:true},
  {id:'test4',name:'TEST SLOT 4',label:'Placeholder • no approved identity',hp:2600,basePhysicalAttack:null,baseMagicalAttack:null,basePhysicalDefense:null,baseMagicalDefense:null,speed:115,art:null,test:true},
@@ -402,8 +402,8 @@ const ENEMY_FORMATIONS=[
  {id:'slot4',x:1201,y:312,w:156,h:205},
  {id:'slot5',x:1389,y:355,w:151,h:198},
 ];
-const ENEMY_ARCHETYPES={slime:{id:'slime',category:'common',name:'SLIME',level:1,hp:200,
- basePhysicalAttack:0,baseMagicalAttack:10,basePhysicalDefense:2,baseMagicalDefense:4,speed:20,battleSprite:'slimeBattle',artwork:'slimeArtwork',
+const ENEMY_ARCHETYPES={slime:{id:'slime',category:'common',name:'SLIME',level:1,hp:100,
+ basePhysicalAttack:0,baseMagicalAttack:20,basePhysicalDefense:4,baseMagicalDefense:8,speed:20,battleSprite:'slimeBattle',artwork:'slimeArtwork',
  passive:{id:'slimy',every:3,damageBonus:.25},basicAttack:{damageType:'magical',multiplier:1.0}}};
 // Any encounter may supply its own finite number of waves, each with 1–15 enemies.
 // Presets are only review scenarios; they are NOT a global wave-count limit.
@@ -767,9 +767,9 @@ function drawBackground(){ctx.imageSmoothingEnabled=false;if(images.arena.comple
 
 const RUNE_STATS=['hp','physicalAttack','magicalAttack','physicalDefense','magicalDefense','speed'];
 const RUNE_STAT_INFO={
- hp:{label:'HP',main:200},physicalAttack:{label:'Physical Attack',main:20},
+ hp:{label:'HP',main:100},physicalAttack:{label:'Physical Attack',main:20},
  magicalAttack:{label:'Magical Attack',main:20},physicalDefense:{label:'Physical Defense',main:2},
- magicalDefense:{label:'Magical Defense',main:2},speed:{label:'Speed',main:20}
+ magicalDefense:{label:'Magical Defense',main:4},speed:{label:'Speed',main:20}
 };
 const CELESTIALS=[['passive','PASSIVE'],['basic','BASIC'],['skill','SKILL'],['ultimate','ULTIMATE']];
 function defaultLoadout(){return {characterDuplicates:0,weapon:{selected:'standard',standardPotential:1,premiumPotential:1,premiumOwned:false},runes:[null,null,null,null],celestials:{passive:1,basic:1,skill:1,ultimate:1}}}
@@ -797,7 +797,7 @@ function saveLoadouts(){try{localStorage.setItem(LOADOUT_KEY,JSON.stringify(char
 function weaponBonus(record){const w=record.weapon;return w.selected==='premium'&&w.premiumOwned?1+(w.premiumPotential-1)*.25:.8+(w.standardPotential-1)*.05}
 function loadoutStatModifiers(id,characterLevel=1){
  const record=loadoutFor(id),bonus=weaponBonus(record),totals=Object.fromEntries(RUNE_STATS.map(k=>[k,0]));
- for(const rune of record.runes){if(!rune)continue;totals[rune.main]+=RUNE_STAT_INFO[rune.main].main*rune.level;for(const sub of rune.subs)totals[sub]+=RUNE_STAT_INFO[sub].main*.5*rune.level}
+ for(const rune of record.runes){if(!rune)continue;totals[rune.main]+=RUNE_STAT_INFO[rune.main].main*rune.level;for(const sub of rune.subs)totals[sub]+=RUNE_STAT_INFO[sub].main*.25*rune.level}
  const pct={signatureWeapon:bonus};
  return {hpFlatModifiers:{},hpPercentModifiers:pct,hpEquipmentFlatModifiers:{runes:totals.hp},
  physicalAttackFlatModifiers:{},physicalAttackPercentModifiers:pct,physicalAttackEquipmentFlatModifiers:{runes:totals.physicalAttack},
@@ -861,7 +861,7 @@ function drawLoadout(){
   if(!rune)addButton(1060,y+8,174,38,'loadout:rune-equip:'+i,'ADD RUNE • PREVIEW','',true);
   else{text('Lv '+rune.level+'/5',1070,y+25,14,'#f1dfbf','750');addButton(1140,y+7,42,36,'loadout:rune-level:-1','−','',rune.level>1);addButton(1186,y+7,42,36,'loadout:rune-level:1','+','',rune.level<5);addButton(1240,y+7,96,36,'loadout:rune-remove','UNEQUIP','');
    text('MAIN '+RUNE_STAT_INFO[rune.main].label+' +'+RUNE_STAT_INFO[rune.main].main*rune.level,986,y+65,12,'#f3d69d','700');addButton(986,y+78,142,31,'loadout:rune-main','CHANGE MAIN','');
-   for(let j=0;j<3;j++){const sub=rune.subs[j],x=1137+j*106;addButton(x,y+72,100,37,'loadout:rune-sub:'+j,RUNE_STAT_INFO[sub].label,'+'+(RUNE_STAT_INFO[sub].main*.5*rune.level),true)}
+   for(let j=0;j<3;j++){const sub=rune.subs[j],x=1137+j*106;addButton(x,y+72,100,37,'loadout:rune-sub:'+j,RUNE_STAT_INFO[sub].label,'+'+(RUNE_STAT_INFO[sub].main*.25*rune.level),true)}
   }
  }
 }

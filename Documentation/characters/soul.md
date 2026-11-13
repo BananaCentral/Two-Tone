@@ -10,11 +10,11 @@
 
 | Stat | Base value |
 |---|---:|
-| HP | 200 |
+| HP | 100 |
 | Physical Attack | 20 |
 | Magical Attack | 20 |
-| Physical Defense | 2 |
-| Magical Defense | 2 |
+| Physical Defense | 4 |
+| Magical Defense | 4 |
 | Speed | 20 |
 
 Calculated stats scale with Level and use the matching stat standards.
@@ -59,7 +59,7 @@ Calculated stats scale with Level and use the matching stat standards.
 - His Premium signature weapon is a separate, character-locked option. It grants +100% at Potential 1 and +200% at Potential 5, with 25 percentage points per potential. Store ownership remains unavailable until the Store is implemented.
 - Premium Potential 2–5 correspond to weapon Duplicates 1–4. Duplicate 1 doubles Basic's base multiplier; Duplicate 2 restores one Follow Up proc when Soul kills an enemy; Duplicate 3 changes a 3-stack Enhanced Basic from Blast to AoE; Duplicate 4 restores one Follow Up proc for every two Follow Up activations.
 - Soul's four Celestials start at Level 1. Each level increases its corresponding ability multiplier by 10% of its base value. At Level 1, Follow Up is 0.55×, Basic is 1.1×, each Enhance stack adds 1.1×, and Ultimate is 2.2×.
-- Runes add flat stats: main-stat value × rune level; each of three distinct substats contributes half that value. Rune-set names and passive effects are not defined yet.
+- Runes add flat stats: main-stat value × rune level; each of three distinct substats contributes 25% of that value. Rune-set names and passive effects are not defined yet.
 
 ## Character Duplicates
 
