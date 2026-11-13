@@ -425,7 +425,7 @@ let wavePreset='stress',waveOverride=null,wavePlan=[],waveIndex=-1,waveQueue=[],
 // Fundamental 3 target rules and Fundamental 2 v1.1 post-attack reinforcement boundary.
 // Soul Enhanced Basic uses Blast unless Premium Weapon Duplicate 3 changes it to AoE; Ultimate is AoE. The pattern toolbar,
 // 5-hit and support actions remain development-only controls. Damage/cost values are provisional.
-let targetingMode='single',supportDemo=null,zeroSkillArmed=false,attackInProgress=false,attackSerial=0,
+let targetingMode='single',pendingTargetAction=null,supportDemo=null,zeroSkillArmed=false,attackInProgress=false,attackSerial=0,
      pendingVacancies=[],lastAttack=null,supportTestHistory=[],soulEnhanceStacks=0,soulFollowUpProcs=5,soulFollowUpSources=new Set(),soulEnhanceSpendingRemainder=0,soulFollowUpActivationCount=0;
 // Fundamental 4. Numerical energy costs and debug bonuses are inherited/provisional,
 // not character-balancing approvals. No gameplay source grants an SP-cap bonus by default.
@@ -529,7 +529,15 @@ function chooseAttackTargets(mode=targetingMode,primary=chosenEnemy()){
 function closestSurvivingEnemy(slot){return liveEnemies().slice().sort((a,b)=>Math.abs(a.slot-slot)-Math.abs(b.slot-slot)||a.slot-b.slot)[0]||null}
 // Soul's Basic becomes Blast at three Enhance stacks; the Ultimate is AoE.
 function actionTargetMode(actor,action){if(actor?.id==='zero'&&action==='ultimate')return 'aoe';if(actor?.id==='zero'&&action==='basic')return soulEnhancedBasicTargetMode(soulEnhanceStacks);return actor?.id==='zero'&&action==='skill'?'blast':targetingMode}
-function previewTargetMode(){if(phase==='player'&&activeId==='zero'){if(zeroSkillArmed)return premiumWeaponDuplicateRank()>=3?'aoe':'blast';if(soulEnhanceStacks>=3)return soulEnhancedBasicTargetMode(soulEnhanceStacks)}return targetingMode}
+function previewTargetMode(){if(pendingTargetAction){const actor=party.find(p=>p.id===pendingTargetAction.actorId);return actionTargetMode(actor,pendingTargetAction.action)}return targetingMode}
+function beginTargetSelection(action,actorId=activeId){
+ const actor=party.find(p=>p.id===actorId);if(!actor||actor.hp<=0)return false;
+ if(action==='ultimate'&&!canQueueUltimate(actor)){say(actor.hp<=0?'Defeated ally cannot use an Ultimate.':'Ultimate needs '+ULTIMATE_ENERGY_COST+' available Energy.');return false}
+ if(pendingTargetAction?.action===action&&pendingTargetAction.actorId===actorId){pendingTargetAction=null;cameraPreview=null;say('Target selection canceled.');return true}
+ pendingTargetAction={action,actorId};cameraPreview='target';supportDemo=null;selectedAllyId=null;
+ say(`Select an enemy for ${actor.name}'s ${action.toUpperCase()}. Tap the ability again to cancel.`);return true;
+}
+function cancelTargetSelection(){if(!pendingTargetAction)return false;pendingTargetAction=null;cameraPreview=null;say('Target selection canceled.');return true}
 function setTargetingMode(mode){if(!['single','blast','aoe','five-hit'].includes(mode)||phase!=='player'||paused)return false;targetingMode=mode;zeroSkillArmed=false;supportDemo=null;cameraPreview='target';return true}
 function zeroSkillControl(){return activateSoulEnhance();}
 function activateSoulEnhance(){
@@ -537,7 +545,7 @@ function activateSoulEnhance(){
  if(sp<1){say('Soul Enhance needs 1 Skill Point.');return false}
  sp--;soulEnhanceStacks++;let refunded=false;
  if(loadoutFor('zero').weapon.selected==='premium'&&loadoutFor('zero').weapon.premiumOwned){soulEnhanceSpendingRemainder++;if(soulEnhanceSpendingRemainder>=3){soulEnhanceSpendingRemainder-=3;gainSp(1);refunded=true}}
- zeroSkillArmed=false;cameraPreview=null;
+ zeroSkillArmed=false;pendingTargetAction=null;cameraPreview=null;
  log='SOUL ENHANCE: '+soulEnhanceStacks+' Skill Point(s) banked for the next Basic Attack.'+(refunded?' Standard signature weapon restored 1 Skill Point.':'');return true;
 }
 function startSupportDemo(kind){
@@ -671,7 +679,7 @@ function finishTrainingAttack(serial){
  if(lastAttack?.action==='ultimate'){ultimateHistory.push({event:'finished',actor:lastAttack.actor,seq:lastAttack.ultimateSeq,turn});ultimateExecuting=false;runNextUltimate()}
  else drainUltimateQueueBefore(()=>nextTurn());
 }
-function setEnemyTarget(id){if(phase!=='player'||paused)return false;const e=enemies.find(e=>e.id===id&&e.hp>0);if(!e)return false;selectedEnemyId=id;cameraPreview='target';selectedAllyId=null;log=`Camera test: targeting ${e.name} (wave ${e.wave}, slot ${e.slot+1}).`;return true;}
+function setEnemyTarget(id){if(phase!=='player'||paused)return false;const e=enemies.find(e=>e.id===id&&e.hp>0);if(!e)return false;selectedEnemyId=id;selectedAllyId=null;if(pendingTargetAction){const pending=pendingTargetAction;pendingTargetAction=null;cameraPreview=null;const actor=party.find(p=>p.id===pending.actorId);if(pending.action==='ultimate')return queueUltimate(pending.actorId);return executeCombatAction(actor,pending.action)}cameraPreview='target';log=`Target selected: ${e.name} (wave ${e.wave}, slot ${e.slot+1}).`;return true;}
 function setWavePlanForTest(sizes){if(phase!=='setup')return false;try{buildWavePlan(sizes)}catch(e){return false}waveOverride=[...sizes];return true;}
 function toggleWavePreset(){if(phase!=='setup')return;waveOverride=null;const choices=['stress','quick','sizes'];wavePreset=choices[(choices.indexOf(wavePreset)+1)%choices.length];}
 
@@ -685,11 +693,11 @@ function alive(){return party.filter(x=>x.hp>0)}
 function active(){return party.find(x=>x.id===activeId)}
 function say(message){hint=message;hintAt=performance.now()}
 function schedule(fn,ms){const token=battleToken;setTimeout(()=>{if(token===battleToken)fn()},ms)}
-function enterSelection(mandatory=false){saveVitals();cameraPreview=null;selectedAllyId=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;pendingVacancies=[];cancelAllQueuedUltimates('reset');battleToken++;summons=[];turnTimeline.reset();phase='setup';paused=false;forceSelect=mandatory;draft=[...loadTeam()];activeId=null;log='';say(mandatory?'This encounter requires team confirmation.':'Review the saved party and battle test options.');}
+function enterSelection(mandatory=false){saveVitals();cameraPreview=null;selectedAllyId=null;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;pendingVacancies=[];cancelAllQueuedUltimates('reset');battleToken++;summons=[];turnTimeline.reset();phase='setup';paused=false;forceSelect=mandatory;draft=[...loadTeam()];activeId=null;log='';say(mandatory?'This encounter requires team confirmation.':'Review the saved party and battle test options.');}
 function enterPartySetup(){
  saveVitals();battleToken++;cancelAllQueuedUltimates('party-setup');turnTimeline.reset();
  phase='partySetup';paused=false;forceSelect=false;draft=[...loadTeam()];activeId=null;actingEnemyId=null;
- cameraPreview=null;selectedAllyId=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;fx=null;hint='';
+ cameraPreview=null;selectedAllyId=null;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;fx=null;hint='';
 }
 function saveParty(){if(phase!=='partySetup'||!validTeam(draft))return false;saveTeam();phase='menu';hint='';return true}
 function enterMainMenu(){
@@ -704,7 +712,7 @@ function startBattle(){
  if(phase!=='setup'||!validTeam(draft)){say('Set a party of 1–4 unique characters in Party first.');return}
  cameraPreview=null;selectedAllyId=null;supportDemo=null;zeroSkillArmed=false;targetingMode='single';battleToken++;
  party=draft.map(id=>spawnProgressedUnit(id));
- turnTimeline.reset();speedModifiers=Object.create(null);summons=[];summonSerial=0;summonHistory=[];gauges={};for(const p of party)gauges[p.id]=0;
+ turnTimeline.reset();pendingTargetAction=null;speedModifiers=Object.create(null);summons=[];summonSerial=0;summonHistory=[];gauges={};for(const p of party)gauges[p.id]=0;
  resetEnemies();resetActionResources();enemyCount=0;turn=0;activeId=null;zeroSkillArmed=false;fx=null;paused=false;phase='intro';forceSelect=false;saveVitals();
  log=`Wave 1/${wavePlan.length}: ${wavePlan[0].length} training enemies (${enemies.length} on field).`;
  schedule(()=>{if(phase==='intro')nextTurn()},380);
@@ -713,7 +721,7 @@ function replay(){if(phase==='setup')return;draft=party.map(p=>p.id);startFromBa
 function startFromBattle(){
  cameraPreview=null;selectedAllyId=null;supportDemo=null;zeroSkillArmed=false;targetingMode='single';battleToken++;
  saveVitals();party=party.map(p=>spawnProgressedUnit(p.id));
- turnTimeline.reset();speedModifiers=Object.create(null);summons=[];summonSerial=0;summonHistory=[];gauges={};for(const p of party)gauges[p.id]=0;
+ turnTimeline.reset();pendingTargetAction=null;speedModifiers=Object.create(null);summons=[];summonSerial=0;summonHistory=[];gauges={};for(const p of party)gauges[p.id]=0;
  resetEnemies();resetActionResources();enemyCount=0;turn=0;activeId=null;zeroSkillArmed=false;fx=null;paused=false;phase='intro';saveVitals();
  log=`Wave test restarted: ${wavePlan.length} waves, ${wavePlan.reduce((n,w)=>n+w.length,0)} total enemies.`;
  schedule(()=>{if(phase==='intro')nextTurn()},380);
@@ -744,18 +752,17 @@ function nextTurn(){
  if(actingSummon){executeIndependentSummonTurn(actingSummon);return;}
  const attacking=enemies.find(e=>e.id===next&&e.hp>0);
  if(attacking&&attacking.brokenTurns>0){attacking.brokenTurns--;if(attacking.brokenTurns===0){attacking.barrier=attacking.maxBarrier;cleanseEnemy(attacking);addActionAdvance(attacking.id,100);}schedule(()=>nextTurn(),0);return;}
- if(attacking){activeId=null;zeroSkillArmed=false;actingEnemyId=next;cameraPreview=null;phase='enemy';log=`${attacking.name} prepares an attack.`;
+ if(attacking){activeId=null;zeroSkillArmed=false;pendingTargetAction=null;actingEnemyId=next;cameraPreview=null;phase='enemy';log=`${attacking.name} prepares an attack.`;
   schedule(()=>{if(phase!=='enemy'||paused)return;if(attacking.hp<=0){nextTurn();return}const candidates=alive();if(!candidates.length){cancelAllQueuedUltimates('defeat');phase='defeat';return}enemyCount++;const attack=resolveEnemyBasicAttack(attacking,candidates),firstHit=attack.hits[0];saveVitals();cancelQueuedUltimatesOfDefeated();fx={kind:'enemy',at:performance.now(),damage:firstHit.damage,target:firstHit.target,hits:attack.hits,actorEnemyId:attacking.id};log=attack.enhanced?`${attacking.name} uses Slimy against all allied characters.`:`${attacking.name} hits ${party.find(p=>p.id===firstHit.target)?.name||'an ally'} for ${firstHit.damage}.`;phase='resolve';schedule(()=>drainUltimateQueueBefore(()=>{if(!alive().length){phase='defeat';log='All allied characters were defeated.'}else nextTurn()}),1000)},780);
- }else{actingEnemyId=null;activeId=next;zeroSkillArmed=false;cameraPreview=null;turnCamera={fromId:previousActor,toId:next,start:performance.now(),duration:560};phase='player';log=`${active().name}'s turn — tap an enemy to select its target.`;}
+ }else{actingEnemyId=null;activeId=next;zeroSkillArmed=false;pendingTargetAction=null;cameraPreview=null;turnCamera={fromId:previousActor,toId:next,start:performance.now(),duration:560};phase='player';log=`${active().name}'s turn — select an ability, then choose an enemy.`;}
 }
 // Normal turns can use Basic or Skill. Ultimate is off-turn and never spends a turn.
 function play(action){
- if(action==='ultimate')return queueUltimate(activeId);
- if(phase!=='player'||paused||!['basic','skill'].includes(action))return false;
+ if(phase!=='player'||paused||!['basic','skill','ultimate'].includes(action))return false;
  const a=active();if(!a||a.hp<=0)return false;
  if(action==='skill'&&a.id==='zero')return activateSoulEnhance();
  if(action==='skill'&&sp<1){say('Not enough shared SP. Basic restores 1 SP.');return false;}
- return executeCombatAction(a,action,null);
+ return beginTargetSelection(action,a.id);
 }
 function soulDamageForTarget(actor,target,rate){return calculateTypedActionDamage('true',rate,actor,target)?.damageTaken??0}
 function executeCombatAction(a,action,ultimateSeq=null){
@@ -774,7 +781,7 @@ function executeCombatAction(a,action,ultimateSeq=null){
  else if(action==='skill'){damage=460;a.energy=Math.min(120,a.energy+35);sp--;addActionAdvance(a.id,25)}
  else damage=980;
  const serial=++attackSerial;
- attackInProgress=true;supportDemo=null;zeroSkillArmed=false;cameraPreview=null;selectedAllyId=null;
+ attackInProgress=true;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;cameraPreview=null;selectedAllyId=null;
  lastAttack={serial,actor:a.id,action,mode,ultimateSeq,controlledSummonId:controlledSummon?.id||null,initialTarget:victim.id,initialTargets:targets.map(e=>e.id),
   hits:[],defeats:[],finished:false,startedAt:performance.now(),finishedAt:null,energyBefore,energyAfter:a.energy,spBefore,spAfter:sp,spMaxBefore,spMaxAfter:effectiveSpMax(),enhanceSpent,soulRate};
  phase='resolve';fx={kind:action,at:performance.now(),damage,actor:a.id,targetEnemyId:victim.id,targetGeometry};
@@ -1271,9 +1278,9 @@ function drawUnit(p,pos,view,t,acting=false){
  }
 
 }
-function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&cameraPreview!=='party'&&previewTargetMode()==='aoe'&&all.length){ctx.save();ctx.strokeStyle='rgba(102,243,211,.82)';ctx.lineWidth=5;ctx.setLineDash([22,12]);ctx.beginPath();ctx.ellipse(1093+camera.currentX*.43,558,453,67,0,0,Math.PI*2);ctx.stroke();ctx.restore()}for(const e of all){
+function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&pendingTargetAction&&cameraPreview!=='party'&&previewTargetMode()==='aoe'&&all.length){ctx.save();ctx.strokeStyle='rgba(102,243,211,.82)';ctx.lineWidth=5;ctx.setLineDash([22,12]);ctx.beginPath();ctx.ellipse(1093+camera.currentX*.43,558,453,67,0,0,Math.PI*2);ctx.stroke();ctx.restore()}for(const e of all){
  const isFocus=phase==='player'&&chosenEnemy()?.id===e.id;
- const patternHit=phase==='player'&&cameraPreview!=='party'&&chooseAttackTargets(previewTargetMode()).some(x=>x.id===e.id);
+ const patternHit=phase==='player'&&!!pendingTargetAction&&cameraPreview!=='party'&&chooseAttackTargets(previewTargetMode()).some(x=>x.id===e.id);
  const isActor=(shot==='enemy-windup'&&actingEnemyId===e.id)||(fx?.kind==='enemy'&&fx?.actorEnemyId===e.id&&shot==='enemy-impact');
  const sh=isActor?1.09:shot==='attack-impact'&&fx?.targetEnemyId===e.id?1.045:1;
  const ww=e.w*sh,hh=e.h*sh,xx=e.x+camera.currentX*.43-(ww-e.w)/2,yy=e.y+(e.h-hh);
@@ -1302,7 +1309,8 @@ function drawActorsForShot(t,shot){
   for(const {p,pos} of ordered)drawUnit(p,pos,'party',t,p.id===selectedAllyId);
   return;
  }
- const chosen=shot==='enemy-impact'?(party.find(p=>p.id===fx?.target)||active()||alive()[0]):active()||alive()[0];
+ const ultimateActor=(pendingTargetAction?.action==='ultimate'&&party.find(p=>p.id===pendingTargetAction.actorId))||(ultimateExecuting&&lastAttack?.action==='ultimate'&&party.find(p=>p.id===lastAttack.actor));
+ const chosen=ultimateActor|| (shot==='enemy-impact'?(party.find(p=>p.id===fx?.target)||active()||alive()[0]):active()||alive()[0]);
  if(shot==='turn-transition'){
   const q=smooth01((t-turnCamera.start)/turnCamera.duration),old=party.find(p=>p.id===turnCamera.fromId);
   drawEnemy(t,shot);
@@ -1422,13 +1430,13 @@ function drawAllyStatuses(p,x,portraitY,sz){
 function drawAllyUltimate(p,x,y,sz){
  const radius=sz*.29;
  const cx=x+sz-radius-4,cy=y+sz-radius-4;
- const queued=isUltPending(p.id),ready=canQueueUltimate(p),ko=p.hp<=0;
+ const queued=isUltPending(p.id),ready=canQueueUltimate(p),ko=p.hp<=0,selected=pendingTargetAction?.action==='ultimate'&&pendingTargetAction.actorId===p.id;
  // Keep a 44+-CSS-pixel-equivalent hit area in the portrait itself at phone scale.
  const hit=Math.min(106,sz-4);
  choiceRects.push({x:x+sz-hit-1,y:y+sz-hit-1,w:hit,h:hit,action:'queue-ult:'+p.id,enabled:ready});
  ctx.save();ctx.beginPath();ctx.rect(x,y,sz,sz);ctx.clip();
  if(ready){ctx.shadowColor='#ffdd93';ctx.shadowBlur=18;}
- hudCircle(cx,cy,radius,'#11233b',ready?'#ffdfa0':queued?'#e9b77d':'#90a6bc',ready?4:2.5);
+ hudCircle(cx,cy,radius,'#11233b',selected?'#55aaff':ready?'#ffdfa0':queued?'#e9b77d':'#90a6bc',selected?4:ready?4:2.5);
  ctx.shadowBlur=0;
  // Interior fill is the sole energy meter: bottom-to-top and no numeric or ring indicator.
  const availableFrac=queued?0:Math.max(0,Math.min(1,availableEnergy(p)/ULTIMATE_ENERGY_COST));
@@ -1549,8 +1557,9 @@ function drawHud(t){
  // Contextual action cue; the main stage stays unobstructed.
  if(phase==='player'){
   const p=active();text(p?.name||'ALLY',1070,620,17,'#fae3b9','800');
-  const mode=previewTargetMode(),hits=chooseAttackTargets(mode);
-  text(zeroSkillArmed&&p?.id==='zero'?`SOUL ENHANCE • BLAST • ${hits.length} TARGETS`:mode==='blast'?`BLAST • ${hits.length} TARGETS`:mode==='aoe'?`AOE • ALL ${hits.length} ENEMIES`:'SELECT AN ENEMY',1190,620,15,'#d4e9f4','700');
+  const mode=previewTargetMode(),hits=pendingTargetAction?chooseAttackTargets(mode):[];
+  text(pendingTargetAction?`SELECT TARGET FOR ${pendingTargetAction.action.toUpperCase()} • ${hits.length} TARGETS`:'SELECT BASIC, SKILL OR ULTIMATE',1190,620,15,'#d4e9f4','700');
+  if(pendingTargetAction)addButton(1102,642,180,30,'cancel-target','CANCEL TARGET');
  }
  // Portrait-focused Ally HUD review layout, without altering combat resource logic.
  ctx.save();ctx.globalAlpha=cinematic?.88:1;
@@ -1573,10 +1582,10 @@ function drawHud(t){
   {key:'skill',cx:1508,cy:800,r:64,enabled:playerReady&&sp>0,icon:'✦',label:activeId==='zero'?'ENHANCE '+soulEnhanceStacks:'SKILL'},
  ];
  for(const a of actions){
-  const enabled=a.enabled;
+  const enabled=a.enabled,selected=pendingTargetAction?.action===a.key&&pendingTargetAction.actorId===activeId;
   choiceRects.push({x:a.cx-a.r-5,y:a.cy-a.r-5,w:(a.r+5)*2,h:(a.r+5)*2,action:a.key,enabled});
-  hudCircle(a.cx,a.cy,a.r,enabled?'rgba(29,48,70,.97)':'rgba(19,32,49,.87)',enabled?'#fff0c3':'#738092',4);
-  hudCircle(a.cx,a.cy,a.r-9,'rgba(13,25,45,.58)',enabled?'rgba(130,193,220,.54)':'rgba(82,100,121,.30)',2);
+  hudCircle(a.cx,a.cy,a.r,selected?'rgba(44,77,110,.98)':enabled?'rgba(29,48,70,.97)':'rgba(19,32,49,.87)',selected?'#55aaff':enabled?'#fff0c3':'#738092',4);
+  hudCircle(a.cx,a.cy,a.r-9,'rgba(13,25,45,.58)',selected?'rgba(134,204,255,.88)':enabled?'rgba(130,193,220,.54)':'rgba(82,100,121,.30)',2);
   text(a.icon,a.cx,a.cy-12,a.key==='skill'?43:41,enabled?'#f5f7ff':'#8897a9','850','center');
   text(a.label,a.cx,a.cy+31,a.key==='skill'?18:16,enabled?'#fff5dc':'#a0aebc','850','center');
  }
@@ -1622,16 +1631,16 @@ function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='menu'){drawMa
   const hit=zeroBasicStage(t);ctx.save();if(hit!==null&&hit>=645&&hit<=760){const q=1-(hit-645)/115;ctx.translate(Math.sin(hit*.42)*q*4,Math.cos(hit*.33)*q*2.5)}
   drawCameraStage(t);drawFx(t);ctx.restore();drawHud(t)
  }else{drawCameraStage(t);drawSetup()}drawHint(t);requestAnimationFrame(loop)}
-function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('loadout:')){handleLoadoutAction(cmd.slice(8));return}if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'){devPanelOpen=!devPanelOpen;return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(phase==='player'&&cameraPreview==='party'){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){queueUltimate(cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){chargeUltimateForTest(cmd.slice(11));return}
+function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('loadout:')){handleLoadoutAction(cmd.slice(8));return}if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'){devPanelOpen=!devPanelOpen;return}if(cmd==='cancel-target'){cancelTargetSelection();return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(phase==='player'&&cameraPreview==='party'){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){beginTargetSelection('ultimate',cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){chargeUltimateForTest(cmd.slice(11));return}
  switch(cmd){case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'support-heal':startSupportDemo('heal');break;case 'support-revive':startSupportDemo('revive');break;case 'confirm-support':confirmSupportDemo();break;case 'cancel-support':cancelSupportDemo();break;case 'camera-party':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':toggleWavePreset();break;case 'toggle-recovery':setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':testKO();break;case 'test-revive':testRevive();break;case 'skill':zeroSkillControl();break;case 'cap-test':cycleSpCapTest();break;case 'hud-status-test':toggleHudStatusDemo();break;case 'f05-advance':addActionAdvance(activeId,25);break;case 'f05-delay':addActionDelay(activeId,25);break;case 'f05-speed':setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':queueSummonForTest('independent');break;case 'f05-summon-controlled':queueSummonForTest('controlled');break;
  case 'progress-test-level':{const a=active(),p=a&&progressFor(a.id);if(a&&p){const cost=Math.max(1,requiredExp(a.level)-p.exp),result=testGrantExp(a.id,cost);say(result?`TEST ONLY: level ${result.level}, ${cost} EXP injected.`:'Ascension required or level cap reached.');}break}
  case 'progress-test-ascend':{const a=active();if(a)say(testAscend(a.id)?`TEST ONLY: level ${a.level} ascension unlocked (no materials).`:'Not at a locked ascension gate.');break}
  case 'hp-test-flat':{const a=active();if(a)setHpBonusForTest(a.id,'debug-flat','flat',(a.hpFlatModifiers['debug-flat']||0)+20);break}
  case 'hp-test-percent':{const a=active();if(a)setHpBonusForTest(a.id,'debug-percent','percent',(a.hpPercentModifiers['debug-percent']||0)+.2);break}default:zeroSkillArmed=false;play(cmd)}return}}
 canvas.addEventListener('pointerdown',e=>{e.preventDefault();const r=canvas.getBoundingClientRect();choose((e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height)},{passive:false});
-window.addEventListener('keydown',e=>{if(e.key==='1')play('basic');if(e.key==='2')zeroSkillControl();if(e.key==='3')play('ultimate');if(e.key.toLowerCase()==='m'&&phase==='player')cycleSpCapTest();if(['q','w','e','f'].includes(e.key.toLowerCase())&&phase==='player')setTargetingMode(({q:'single',w:'blast',e:'aoe',f:'five-hit'})[e.key.toLowerCase()]);if(e.key.toLowerCase()==='v'&&phase==='player'){cameraPreview=cameraPreview==='party'?null:'party';selectedAllyId=activeId}if(e.key.toLowerCase()==='t'&&phase==='player')cameraPreview=cameraPreview==='target'?null:'target';if(e.key.toLowerCase()==='r'&&phase!=='setup')replay()});window.addEventListener('contextmenu',e=>e.preventDefault());
+window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)cancelTargetSelection();if(e.key==='1')play('basic');if(e.key==='2')zeroSkillControl();if(e.key==='3')play('ultimate');if(e.key.toLowerCase()==='m'&&phase==='player')cycleSpCapTest();if(['q','w','e','f'].includes(e.key.toLowerCase())&&phase==='player')setTargetingMode(({q:'single',w:'blast',e:'aoe',f:'five-hit'})[e.key.toLowerCase()]);if(e.key.toLowerCase()==='v'&&phase==='player'){cameraPreview=cameraPreview==='party'?null:'party';selectedAllyId=activeId}if(e.key.toLowerCase()==='t'&&phase==='player')cameraPreview=cameraPreview==='target'?null:'target';if(e.key.toLowerCase()==='r'&&phase!=='setup')replay()});window.addEventListener('contextmenu',e=>e.preventDefault());
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
-window.twoToneStatus=()=>({phase,paused,turn,devPanelOpen,targetingMode,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,hp:e.hp,maxHp:e.maxHp,barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
+window.twoToneStatus=()=>({phase,paused,turn,devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,hp:e.hp,maxHp:e.maxHp,barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
 window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ULTIMATE_ENERGY_COST)),statusCount:hudStatusList(p).length})),version:'v0.0.17',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
  characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),

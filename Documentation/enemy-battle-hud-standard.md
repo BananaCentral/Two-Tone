@@ -22,3 +22,9 @@
 - Blast targets show circles around the primary target and enemies in adjacent formation slots, up to three enemies total. A primary target at the edge of a formation may therefore have only two targets.
 - AoE targets show a circle around every living enemy.
 - Do not draw a selection box or center dot around enemies to communicate ability targets. The circle is the target indicator.
+
+## Ability Targeting Flow
+
+- The player selects Basic, Skill, or an available Ultimate before selecting an enemy. Selecting an ability enters target mode; the circles show every enemy the selected ability will hit. Tapping a circled enemy confirms the action. Tapping the selected ability again or pressing Escape cancels target mode.
+- An Ultimate selected from a character's portrait keeps that character as the acting character. Show the Ultimate user while selecting a target and in the Ultimate camera cut-in.
+- Self-targeted skills do not require enemy selection. Soul's Enhance remains immediate because it adds a stack to Soul rather than attacking an enemy.
