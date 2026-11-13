@@ -654,7 +654,7 @@ function applyTrainingHit(enemy,damage,hitNumber){
  triggerRicochet(lastAttack,enemy,dealt.damage);
  if(lastAttack.actor==='lily'&&lastAttack.action==='ultimate')applyLilyUltimateDebuff(enemy);
  if(lastAttack.actor==='lily'&&lastAttack.action==='skill'){enemy.marks=enemy.marks||[];enemy.marks=enemy.marks.filter(m=>m.id!=='ricochet');enemy.marks.push({id:'ricochet',turns:2,sources:[]})}
- if(enemy.hp<=0){resolveEnemyDefeat(enemy);if(lastAttack.actor==='zero')onSoulEnemyKill()}else syncEnemyHp();
+ if(enemy.hp<=0)resolveEnemyDefeat(enemy);else syncEnemyHp();
  return true;
 }
 function applyLilyUltimateDebuff(enemy){if(characterDuplicateRank('lily')<1||!enemy)return;enemy.debuffs=enemy.debuffs||[];enemy.debuffs=enemy.debuffs.filter(d=>d.id!=='lily-weakened');enemy.debuffs.push({id:'lily-weakened',turns:2,damageMultiplier:.9})}
@@ -697,7 +697,7 @@ function resolveSoulFollowUp(sourceAttack){
  const affected=[...new Set(sourceAttack.hits.filter(h=>h.damage>0).map(h=>h.target))].map(id=>enemies.find(e=>e.id===id)).filter(e=>e&&e.hp>0);
  if(!affected.length)return false;soulFollowUpSources.add(sourceAttack.serial);soulFollowUpProcs--;
  const attack=calculateTrueAttack(soul),dupeBonus=characterDuplicateRank(soul.id)>=2?2:1,rawTotal=Number.isFinite(attack)?roundHp(attack*.5*dupeBonus*celestialMultiplier(soul.id,'passive')):0,base=Math.floor(rawTotal/affected.length),remainder=rawTotal%affected.length;let total=0;
- for(let i=0;i<affected.length;i++){const share=base+(i<remainder?1:0),rate=attack>0?share/attack:0,amount=soulDamageForTarget(soul,affected[i],rate);if(amount<=0)continue;const enemy=affected[i],dealt=applyEnemyDamage(enemy,amount,soul);total+=dealt.damage;sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,slot:enemy.slot,damage:dealt.damage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,barrierAfter:enemy.barrier,broken:dealt.broken,followUp:true,critical:dealt.critical});if(enemy.hp<=0){resolveEnemyDefeat(enemy);onSoulEnemyKill()}}
+ for(let i=0;i<affected.length;i++){const share=base+(i<remainder?1:0),rate=attack>0?share/attack:0,amount=soulDamageForTarget(soul,affected[i],rate);if(amount<=0)continue;const enemy=affected[i],dealt=applyEnemyDamage(enemy,amount,soul);total+=dealt.damage;sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,slot:enemy.slot,damage:dealt.damage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,barrierAfter:enemy.barrier,broken:dealt.broken,followUp:true,critical:dealt.critical});if(enemy.hp<=0)resolveEnemyDefeat(enemy)}
  soulFollowUpActivationCount++;
   if(premiumWeaponDuplicateRank(soul.id)>=4&&soulFollowUpActivationCount%2===0)soulFollowUpProcs=Math.min(soulFollowUpLimit(),soulFollowUpProcs+1);
   sourceAttack.followUp={sourceSerial:sourceAttack.serial,damage:total,targets:affected.map(e=>e.id),procsRemaining:soulFollowUpProcs};syncEnemyHp();return total>0;
@@ -900,7 +900,6 @@ function characterDuplicateRank(id='zero'){return loadoutFor(id).characterDuplic
 function premiumWeaponDuplicateRank(id='zero'){const w=loadoutFor(id).weapon;return w.selected==='premium'&&w.premiumOwned?Math.max(0,w.premiumPotential-1):0}
 function soulFollowUpLimit(){return characterDuplicateRank('zero')>=1?7:5}
 function soulEnhancedBasicTargetMode(stacks){if(stacks<3)return 'single';return premiumWeaponDuplicateRank()>=3?'aoe':'blast'}
-function onSoulEnemyKill(){if(premiumWeaponDuplicateRank()>=2)soulFollowUpProcs=Math.min(soulFollowUpLimit(),soulFollowUpProcs+1)}
 
 function loadoutStats(id){
  const model=ROSTER.find(x=>x.id===id),level=progressFor(id)?.level||1;if(!model)return null;

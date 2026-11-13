@@ -202,7 +202,6 @@ function applyRicochet(state,sourceActor,sourceId,hits){
   const repeats=lily.characterDuplicates>=4?2:1;
   for(let i=0;i<repeats&&enemy.hp>0;i++){const raw=base*(i===1?.5:1),trueAttack=attackValue(lily,'true'),uncrit=roundStat(raw*(trueAttack>0?damageFor(lily,enemy,'true',1)/trueAttack:0)),roll=rollCritical(state,lily,uncrit);
    const before=enemy.hp,damage=Math.min(before,roll.damage);enemy.hp=Math.max(0,enemy.hp-damage);enemy.damageTaken+=damage;lily.damageDealt+=damage;state.damageBySide.allies+=damage;
-   if(before>0&&enemy.hp===0)restoreSoulFollowUpOnKill(lily);
   }
  }
 }
@@ -249,7 +248,6 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
         broken = true;
       }
     }
-    if (hpBefore > 0 && target.hp <= 0) restoreSoulFollowUpOnKill(attacker);
     target.damageTaken += hpDamage + breakDamage;
     attacker.damageDealt += hpDamage + breakDamage;
     state.damageBySide[attacker.side] += hpDamage + breakDamage;
@@ -257,11 +255,6 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
   }
   if (targets.length > 1) attacker.aoeCount++;
   return hits;
-}
-function restoreSoulFollowUpOnKill(attacker) {
-  if (attacker.archetypeId !== 'soul' || attacker.premiumWeaponDuplicates < 2) return;
-  const passive = attacker.passives.find(p => p.type === 'followUp');
-  if (passive) passive.remaining = Math.min(passive.charges ?? 5, passive.remaining + 1);
 }
 function triggerFollowUps(state, sourceId, sourceActorId, affectedTargets) {
   const targets = [...new Set(affectedTargets.filter(target => target.hp > 0))];
@@ -285,9 +278,7 @@ function triggerFollowUps(state, sourceId, sourceActorId, affectedTargets) {
         const share = base + (index < remainder ? 1 : 0);
         const divisor = attackValue(soul, passive.damageType);
         const uncrit=damageFor(soul, target, passive.damageType, share / divisor),damage=Math.min(target.hp,rollCritical(state,soul,uncrit).damage);
-        const hpBefore = target.hp;
         target.hp = Math.max(0, target.hp - damage);
-        if (hpBefore > 0 && target.hp <= 0) restoreSoulFollowUpOnKill(soul);
         target.damageTaken += damage;
         soul.damageDealt += damage;
         state.damageBySide.allies += damage;
