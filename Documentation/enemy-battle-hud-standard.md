@@ -15,10 +15,10 @@
 - Both bars use the same width and have rounded ends. The current canvas sizes are 8 px for Barrier and 11 px for HP.
 - Barrier amount and recovery follow the Enemy Barrier and Broken State rules in the Turn Order Standard.
 
-## Target Dots
+## Target Circles
 
 - Show a blue outlined circle around every enemy that the currently previewed ability will hit. Center the circle on the visible sprite and make its radius large enough to surround the sprite. Preview the resolved target mode of the selected ability, including character-specific rules such as Soul’s 3-stack Basic becoming Blast or AoE.
-- Single targets show one dot on the selected primary target.
-- Blast targets show dots on the primary target and enemies in adjacent formation slots, up to three enemies total. A primary target at the edge of a formation may therefore have only two targets.
-- AoE targets show a dot on every living enemy.
+- Single targets show one circle around the selected primary target.
+- Blast targets show circles around the primary target and enemies in adjacent formation slots, up to three enemies total. A primary target at the edge of a formation may therefore have only two targets.
+- AoE targets show a circle around every living enemy.
 - Do not draw a selection box or center dot around enemies to communicate ability targets. The circle is the target indicator.
