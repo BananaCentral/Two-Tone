@@ -1,0 +1,40 @@
+name: Deploy to Vercel
+
+on:
+  push:
+    branches:
+      - prototype
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@65.14.0
+
+      - name: Pull Vercel project settings
+        run: vercel pull --yes --environment=production --scope casualrivera-8035
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: team_Q9COa9bok4fl5nD4tursFjsD
+          VERCEL_PROJECT_ID: prj_T8EVHva23cXZLYhh520icOTIcWgn
+
+      - name: Deploy current commit to production
+        run: vercel deploy --prod --yes --scope casualrivera-8035
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: team_Q9COa9bok4fl5nD4tursFjsD
+          VERCEL_PROJECT_ID: prj_T8EVHva23cXZLYhh520icOTIcWgn
