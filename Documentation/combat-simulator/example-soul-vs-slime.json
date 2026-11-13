@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "name": "Soul vs Slime",
+  "settings": {
+    "initialSkillPoints": 3,
+    "skillPointCap": 5,
+    "maxActions": 2000
+  },
+  "archetypes": {
+    "soul": {
+      "name": "Soul",
+      "level": 1,
+      "stats": {
+        "hp": 100,
+        "physicalAttack": 10,
+        "magicalAttack": 10,
+        "physicalDefense": 1,
+        "magicalDefense": 1,
+        "speed": 10
+      },
+      "basic": {
+        "damageType": "true",
+        "multiplier": 1,
+        "target": "single",
+        "energyGain": 10,
+        "skillPointGain": 1
+      },
+      "skill": {
+        "type": "enhanceBasic",
+        "damagePerStack": 1,
+        "energyPerStack": 10,
+        "aoeAtStacks": 3
+      },
+      "ultimate": {
+        "damageType": "true",
+        "multiplier": 2,
+        "target": "all",
+        "energyCost": 100,
+        "refillFollowUps": true
+      },
+      "passives": [
+        {
+          "type": "followUp",
+          "id": "followUp",
+          "damageType": "true",
+          "multiplier": 0.5,
+          "charges": 5
+        }
+      ]
+    },
+    "slime": {
+      "name": "Slime",
+      "level": 1,
+      "stats": {
+        "hp": 100,
+        "physicalAttack": 0,
+        "magicalAttack": 10,
+        "physicalDefense": 1,
+        "magicalDefense": 2,
+        "speed": 5
+      },
+      "basic": {
+        "damageType": "magical",
+        "multiplier": 1,
+        "target": "random"
+      },
+      "passives": [
+        {
+          "type": "everyNthBasic",
+          "id": "slimy",
+          "every": 3,
+          "damageBonus": 0.25,
+          "target": "all"
+        }
+      ]
+    }
+  },
+  "teams": {
+    "allies": [
+      { "id": "soul-1", "archetype": "soul" }
+    ],
+    "enemies": [
+      { "id": "slime-1", "archetype": "slime" }
+    ]
+  }
+}
