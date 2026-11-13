@@ -791,7 +791,7 @@ function normalizeLoadout(value){
  return base
 }
 function loadCharacterLoadouts(){let stored={};try{stored=JSON.parse(localStorage.getItem(LOADOUT_KEY)||'{}')||{}}catch(e){}return Object.fromEntries(ROSTER.map(model=>[model.id,normalizeLoadout(stored[model.id])]))}
-let characterLoadouts=loadCharacterLoadouts(),loadoutCharacterId='zero',selectedLoadoutRune=0,loadoutPage='characters';
+let characterLoadouts=loadCharacterLoadouts(),loadoutCharacterId='zero',selectedLoadoutRune=0,loadoutPage='characters',runeStatPicker=null;
 function loadoutFor(id=loadoutCharacterId){return characterLoadouts[id]||(characterLoadouts[id]=defaultLoadout())}
 function saveLoadouts(){try{localStorage.setItem(LOADOUT_KEY,JSON.stringify(characterLoadouts))}catch(e){}}
 function weaponBonus(record){const w=record.weapon;return w.selected==='premium'&&w.premiumOwned?1+(w.premiumPotential-1)*.25:.8+(w.standardPotential-1)*.05}
@@ -820,10 +820,10 @@ function loadoutStats(id){
  'Physical Attack':calculatePhysicalAttack(unit),'Magical Attack':calculateMagicalAttack(unit),
  'Physical Defense':calculatePhysicalDefense(unit),'Magical Defense':calculateMagicalDefense(unit),Speed:calculateSpeed(unit)}
 }
-function enterLoadout(){loadoutCharacterId='zero';selectedLoadoutRune=0;loadoutPage='characters';phase='loadout';hint=''}
+function enterLoadout(){loadoutCharacterId='zero';selectedLoadoutRune=0;loadoutPage='characters';runeStatPicker=null;phase='loadout';hint=''}
 function handleLoadoutAction(action){
  const [kind,arg]=action.split(':'),record=loadoutFor(),weapon=record.weapon,rune=record.runes[selectedLoadoutRune];
- if(kind==='back'){if(loadoutPage==='characters')phase='menu';else if(loadoutPage==='menu')loadoutPage='characters';else loadoutPage='menu';return}
+ if(kind==='back'){if(runeStatPicker){runeStatPicker=null;return}if(loadoutPage==='characters')phase='menu';else if(loadoutPage==='menu')loadoutPage='characters';else loadoutPage='menu';return}
  if(kind==='character'){if(ROSTER_IDS.has(arg)&&!roster(arg)?.test){loadoutCharacterId=arg;loadoutPage='menu'}return}
  if(kind==='page'){if(['weapons','runes','celestials','levels'].includes(arg))loadoutPage=arg;return}
  if(kind==='character-duplicate')record.characterDuplicates=Math.max(0,Math.min(4,record.characterDuplicates+Number(arg)));
@@ -834,8 +834,17 @@ function handleLoadoutAction(action){
  else if(kind==='rune-equip'){const index=Math.max(0,Math.min(3,Number(arg)||0));record.runes[index]={level:1,main:'hp',subs:['physicalAttack','magicalAttack','physicalDefense'],setId:null};selectedLoadoutRune=index}
  else if(kind==='rune-remove')record.runes[selectedLoadoutRune]=null;
  else if(kind==='rune-level'&&rune)rune.level=Math.max(1,Math.min(5,rune.level+Number(arg)));
- else if(kind==='rune-main'&&rune){const next=RUNE_STATS[(RUNE_STATS.indexOf(rune.main)+1)%RUNE_STATS.length];rune.main=next;rune.subs=RUNE_STATS.filter(x=>x!==next).slice(0,3)}
- else if(kind==='rune-sub'&&rune){const index=Number(arg),current=rune.subs[index];if(Number.isInteger(index)&&index>=0&&index<3){const choices=RUNE_STATS.filter(x=>x!==rune.main&&!rune.subs.some((v,i)=>i!==index&&v===x));rune.subs[index]=choices[(choices.indexOf(current)+1)%choices.length]}}
+ else if(kind==='rune-main'&&rune){runeStatPicker={slot:'main',subIndex:-1};return}
+ else if(kind==='rune-sub'&&rune){const index=Number(arg);if(Number.isInteger(index)&&index>=0&&index<3){runeStatPicker={slot:'sub',subIndex:index};return}}
+ else if(kind==='rune-picker-close'){runeStatPicker=null;return}
+ else if(kind==='rune-stat-choice'&&rune&&runeStatPicker){
+  const [slot,key]=arg.split(',');
+  if(slot===runeStatPicker.slot&&RUNE_STATS.includes(key)){
+   if(slot==='main'&&key!==rune.main){rune.main=key;rune.subs=RUNE_STATS.filter(x=>x!==key).slice(0,3)}
+   else{const index=runeStatPicker.subIndex,available=key!==rune.main&&!rune.subs.some((v,i)=>i!==index&&v===key);if(available)rune.subs[index]=key}
+  }
+  runeStatPicker=null;
+ }
  else if(kind==='celestial'){const [key,delta]=arg.split(',');if(Object.hasOwn(record.celestials,key))record.celestials[key]=Math.max(1,Math.min(10,record.celestials[key]+Number(delta)))}
  saveLoadouts()
 }
@@ -894,6 +903,24 @@ function drawLoadoutWeapons(){
  rect(145,705,1310,95,'rgba(25,37,58,.94)','#536983',12);
  text('PREMIUM EFFECT • Spend 3 Enhance points to restore 1 Skill Point. Costs and acquisition are not configured.',175,755,16,'#d6e2ef','650');
 }
+function drawRuneStatPicker(rune){
+ if(!runeStatPicker)return;
+ rect(0,0,W,H,'rgba(4,8,18,.80)');
+ choiceRects.push({x:0,y:0,w:W,h:H,action:'loadout:rune-picker-close',enabled:true});
+ rect(135,170,1330,590,'rgba(13,20,39,.99)','#ccb88e',18);
+ const isMain=runeStatPicker.slot==='main',heading=isMain?'CHOOSE MAIN STAT':'CHOOSE SUBSTAT '+(runeStatPicker.subIndex+1);
+ text(heading,185,220,30,'#ffedd1','850');
+ text(isMain?'All six stats are available. Changing the main stat refreshes the three unique substats.':'All six stats are shown. Options already used by another slot are disabled.',185,254,16,'#c4d6e5','550');
+ addButton(1285,190,140,52,'loadout:rune-picker-close','CLOSE');
+ for(let i=0;i<RUNE_STATS.length;i++){
+  const key=RUNE_STATS[i],info=RUNE_STAT_INFO[key],col=i%3,row=Math.floor(i/3),x=190+col*410,y=280+row*190;
+  const subIndex=runeStatPicker.subIndex,usedAsMain=key===rune.main,usedByOtherSub=!isMain&&rune.subs.some((v,j)=>j!==subIndex&&v===key);
+  const enabled=isMain||(!usedAsMain&&!usedByOtherSub),selected=isMain?usedAsMain:rune.subs[subIndex]===key;
+  const value=info.main*rune.level*(isMain?1:.25),note=selected?(isMain?'CURRENT MAIN':'CURRENT SUBSTAT'):usedAsMain?'USED BY MAIN STAT':usedByOtherSub?'USED BY ANOTHER SUBSTAT':(isMain?'MAIN STAT':'SUBSTAT')+' • LEVEL '+rune.level;
+  addButton(x,y,390,155,'loadout:rune-stat-choice:'+runeStatPicker.slot+','+key,info.label,note+'  •  +'+value,enabled);
+  if(selected)rect(x-3,y-3,396,161,'rgba(0,0,0,0)','#edcf98',12);
+ }
+}
 function drawLoadoutRunes(){
  const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId);
  loadoutPanel(model.name+' • RUNES','Equip up to four runes. Main and substats are flat bonuses; each rune is level 1–5.');
@@ -913,12 +940,13 @@ function drawLoadoutRunes(){
   addButton(x+540,y+12,92,42,'loadout:rune-remove','UNEQUIP');
   const main=RUNE_STAT_INFO[rune.main];
   text('MAIN  '+main.label+'  +'+main.main*rune.level,x+28,y+83,15,'#f3d69d','750');
-  addButton(x+430,y+57,190,42,'loadout:rune-main','CHANGE MAIN');
+  addButton(x+430,y+57,190,42,'loadout:rune-main','CHOOSE MAIN STAT');
   for(let j=0;j<3;j++){
    const sub=rune.subs[j],sx=x+24+j*204,info=RUNE_STAT_INFO[sub];
    addButton(sx,y+135,194,82,'loadout:rune-sub:'+j,info.label,'+'+(info.main*.25*rune.level));
   }
  }
+ const rune=record.runes[selectedLoadoutRune];if(rune)drawRuneStatPicker(rune);
 }
 function drawLoadoutCelestials(){
  const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId);
@@ -1355,7 +1383,7 @@ function drawAllyStatuses(p,x,portraitY,sz){
  }
 }
 function drawAllyUltimate(p,x,y,sz){
- const radius=sz*.20;
+ const radius=sz*.29;
  const cx=x+sz-radius-4,cy=y+sz-radius-4;
  const queued=isUltPending(p.id),ready=canQueueUltimate(p),ko=p.hp<=0;
  // Keep a 44+-CSS-pixel-equivalent hit area in the portrait itself at phone scale.
@@ -1384,24 +1412,20 @@ function drawAllyPortraitHud(){
  let x=Math.max(18,Math.round((780-total)/2));
  for(const p of party){
   const activeAlly=phase==='player'&&activeId===p.id&&p.hp>0,ko=p.hp<=0;
-  const portraitX=x+10,portraitY=top+10,portraitSize=72;
+  const portraitX=x+10,portraitY=top+10,portraitSize=98;
   ctx.save();ctx.globalAlpha=ko?.57:activeAlly?1:.84;
   rect(x,top,cardW,cardH,'rgba(14,23,42,.96)',activeAlly?'#f3d79e':'rgba(129,164,191,.82)',12);
   hudPortrait(p.id==='zero'?images.zeroFront:null,portraitX,portraitY,portraitSize,portraitSize,true);
   if(ko)rect(portraitX,portraitY,portraitSize,portraitSize,'rgba(30,17,23,.62)',null,10);
-  drawAllyUltimate(p,x+76,top+1,88);
+  drawAllyUltimate(p,x+72,top+1,100);
   drawAllyStatuses(p,portraitX,portraitY,portraitSize);
   text(ko?'0 / '+p.maxHp:`${p.hp} / ${p.maxHp}`,x+cardW-10,top+105,13,ko?'#f0afb7':'#e4f3ef','750','right');
   line(x+10,top+119,cardW-20,ko?0:p.hp/p.maxHp,ko?'#b16b76':'#67e3b4','#23374d',10);
   if(p.id==='zero'){
    const maximum=soulFollowUpLimit(),current=Math.max(0,Math.min(maximum,soulFollowUpProcs));
-   text('FOLLOW UP',x+12,top+155,13,'#d6e2ef','800');
-   text(current+'/'+maximum,x+cardW-12,top+155,13,'#f4d99c','800','right');
+   text(current+' / '+maximum,x+cardW/2,top+155,14,'#f4d99c','800','center');
    const dotSize=9,pitch=18,rowWidth=(maximum-1)*pitch+dotSize,startX=x+(cardW-rowWidth)/2;
    for(let i=0;i<maximum;i++)hudCircle(startX+i*pitch+dotSize/2,top+181,dotSize/2,i<current?'#72d8f5':'rgba(65,84,108,.9)',i<current?'#d7f6ff':'#8295a9',1.5);
-  }else{
-   text('PASSIVE',x+12,top+155,13,'#d6e2ef','800');
-   text(p.test?'PLACEHOLDER':'—',x+cardW-12,top+155,12,'#aebfd0','600','right');
   }
   ctx.restore();
   x+=cardW+gap;
