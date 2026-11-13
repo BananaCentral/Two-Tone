@@ -96,7 +96,7 @@ const images={};for(const [k,src] of Object.entries(sources)){const img=new Imag
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:false});
 const W=1600,H=900, TEAM_KEY='two-tone-demo-team-fundamental-1-v1';
 const PROGRESSION_KEY='two-tone-character-progress-v1',VITALS_KEY='two-tone-character-vitals-v1';
-const CHARACTER_MAX_LEVEL=50,ASCENSION_GATES=[10,20,30,40];
+const CHARACTER_MAX_LEVEL=50,ASCENSION_GATES=[10,20,30,40],MAX_PARTY_SIZE=4;
 // Rank progression is not implemented yet; this value is the account Rank hook.
 let playerRank=1;
 // Numerical Base HP values are inherited/development-only combat fixtures, NOT
@@ -105,6 +105,7 @@ const ROSTER=[
  {id:'zero',name:'SOUL',label:'Character',hp:100,basePhysicalAttack:10,baseMagicalAttack:10,basePhysicalDefense:1,baseMagicalDefense:1,speed:10,art:'zero',test:false},
  {id:'test2',name:'TEST SLOT 2',label:'Placeholder • no approved identity',hp:2300,basePhysicalAttack:null,baseMagicalAttack:null,basePhysicalDefense:null,baseMagicalDefense:null,speed:115,art:null,test:true},
  {id:'test3',name:'TEST SLOT 3',label:'Placeholder • no approved identity',hp:2600,basePhysicalAttack:null,baseMagicalAttack:null,basePhysicalDefense:null,baseMagicalDefense:null,speed:115,art:null,test:true},
+ {id:'test4',name:'TEST SLOT 4',label:'Placeholder • no approved identity',hp:2600,basePhysicalAttack:null,baseMagicalAttack:null,basePhysicalDefense:null,baseMagicalDefense:null,speed:115,art:null,test:true},
 ];
 const ROSTER_IDS=new Set(ROSTER.map(u=>u.id));
 function roundHp(value){return Math.floor(value+0.5)}
@@ -386,7 +387,7 @@ const color={ink:'#0a101f',panel:'rgba(13,17,35,.94)',gold:'#eacb87',white:'#f7f
 let phase='menu',paused=false,turn=0,enemyHp=0,maxEnemyHp=0,sp=3,
     gauges={},party=[],activeId=null,fx=null,log='',hint='',hintAt=0,
     choiceRects=[],battleToken=0,enemyCount=0,forceSelect=false;
-// Five authored formation positions. Enemy identities and wave queues are independent of these slots.
+// Four authored party formation positions. Enemy identities and wave queues are independent of these slots.
 // Encounter presets and enemy stats below are DEMO DATA; Approved Fundamental 2 defines the rules.
 const ENEMY_CATEGORIES=Object.freeze(['common','elite','boss']);
 function validateEnemyCategory(category){
@@ -638,8 +639,8 @@ function toggleWavePreset(){if(phase!=='setup')return;waveOverride=null;const ch
 
 const savedTeam=loadTeam();
 let draft=[...savedTeam];
-function validTeam(ids){return Array.isArray(ids)&&ids.length>=1&&ids.length<=5&&ids.every(id=>ROSTER_IDS.has(id))&&new Set(ids).size===ids.length}
-function loadTeam(){try{const a=JSON.parse(localStorage.getItem(TEAM_KEY)||'null');if(validTeam(a))return a}catch(e){}return ['zero','test2','test3']}
+function validTeam(ids){return Array.isArray(ids)&&ids.length>=1&&ids.length<=MAX_PARTY_SIZE&&ids.every(id=>ROSTER_IDS.has(id))&&new Set(ids).size===ids.length}
+function loadTeam(){try{const a=JSON.parse(localStorage.getItem(TEAM_KEY)||'null');if(Array.isArray(a)&&a.every(id=>ROSTER_IDS.has(id))&&new Set(a).size===a.length){const team=a.slice(0,MAX_PARTY_SIZE);if(team.join(',')==='zero,test2,test3')team.push('test4');return team}}catch(e){}return ['zero','test2','test3','test4']}
 function saveTeam(){try{localStorage.setItem(TEAM_KEY,JSON.stringify(draft))}catch(e){}}
 function roster(id){return ROSTER.find(x=>x.id===id)}
 function alive(){return party.filter(x=>x.hp>0)}
@@ -659,10 +660,10 @@ function enterMainMenu(){
  phase='menu';paused=false;activeId=null;actingEnemyId=null;cameraPreview=null;
  selectedAllyId=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;fx=null;hint='';
 }
-function addUnit(id){if(phase!=='partySetup')return;if(draft.includes(id)){say('Already in the party.');return}if(draft.length>=5){say('A party can contain no more than five characters.');return}draft.push(id);}
+function addUnit(id){if(phase!=='partySetup')return;if(draft.includes(id)){say('Already in the party.');return}if(draft.length>=MAX_PARTY_SIZE){say('A party can contain no more than four characters.');return}draft.push(id);}
 function removeUnit(index){if(phase!=='partySetup')return;if(draft.length<=1){say('A party must contain at least one character.');return}draft.splice(index,1);}
 function startBattle(){
- if(phase!=='setup'||!validTeam(draft)){say('Set a party of 1–5 unique characters in Party first.');return}
+ if(phase!=='setup'||!validTeam(draft)){say('Set a party of 1–4 unique characters in Party first.');return}
  cameraPreview=null;selectedAllyId=null;supportDemo=null;zeroSkillArmed=false;targetingMode='single';battleToken++;
  party=draft.map(id=>spawnProgressedUnit(id));
  turnTimeline.reset();speedModifiers=Object.create(null);summons=[];summonSerial=0;summonHistory=[];gauges={};for(const p of party)gauges[p.id]=0;
@@ -788,10 +789,10 @@ function drawPartySetup(){
  rect(145,58,1310,780,'rgba(13,20,39,.98)','#ccb88e',20);
  text('PARTY',205,111,43,'#ffedd1','850');
  addButton(1226,82,190,54,'main-menu','MAIN MENU','');
- text(`CURRENT PARTY  •  ${draft.length}/5`,208,177,21,'#bad4e9','800');
- text('Choose 1–5 unique characters. Party order has no special meaning.',208,207,16,'#c4d6e5','550');
- for(let i=0;i<5;i++){
-  const x=212+i*236,y=238,w=220,h=215,id=draft[i],p=id?roster(id):null;
+ text(`CURRENT PARTY  •  ${draft.length}/${MAX_PARTY_SIZE}`,208,177,21,'#bad4e9','800');
+ text('Choose 1–4 unique characters. Party order has no special meaning.',208,207,16,'#c4d6e5','550');
+ for(let i=0;i<MAX_PARTY_SIZE;i++){
+  const x=212+i*295,y=238,w=275,h=215,id=draft[i],p=id?roster(id):null;
   rect(x,y,w,h,p?'rgba(38,54,79,.94)':'rgba(21,33,56,.88)',p?'#9eb8d3':'#4c607a',13);
   if(p){
    text(p.name,x+w/2,y+55,23,'#f6eefa','800','center');
@@ -804,11 +805,11 @@ function drawPartySetup(){
  }
  text('AVAILABLE CHARACTERS',208,493,20,'#bad4e9','800');
  for(let i=0;i<ROSTER.length;i++){
-  const p=ROSTER[i],x=212+i*397,y=520,w=370,h=132,selected=draft.includes(p.id);
+  const p=ROSTER[i],x=212+i*295,y=520,w=275,h=132,selected=draft.includes(p.id);
   rect(x,y,w,h,selected?'rgba(35,59,76,.92)':'rgba(29,41,67,.94)',selected?'#8fbcad':'#7e97b0',11);
   text(p.name,x+18,y+33,23,'#f5e9dc','800');
   text(p.test?'TEST PLACEHOLDER • NO CHARACTER ASSET':'CHARACTER',x+18,y+65,14,'#bdccdd','600');
-  addButton(x+w-140,y+83,122,34,`add:${p.id}`,selected?'IN PARTY':'ADD','',!selected&&draft.length<5);
+  addButton(x+w-140,y+83,122,34,`add:${p.id}`,selected?'IN PARTY':'ADD','',!selected&&draft.length<MAX_PARTY_SIZE);
  }
  addButton(212,711,250,62,'main-menu','CANCEL','Discard changes');
  addButton(1126,711,250,62,'save-party','SAVE PARTY','',validTeam(draft));
@@ -959,7 +960,8 @@ function petals(t){ctx.save();ctx.fillStyle='rgba(248,181,200,.72)';for(let i=0;
 const PARTY_STAGE={
  1:[{x:719,baseY:676,w:192,h:384}],
  2:[{x:572,baseY:674,w:182,h:364},{x:876,baseY:626,w:165,h:330}],
- 3:[{x:418,baseY:671,w:174,h:348},{x:716,baseY:613,w:166,h:332},{x:1046,baseY:672,w:174,h:348}]
+ 3:[{x:418,baseY:671,w:174,h:348},{x:716,baseY:613,w:166,h:332},{x:1046,baseY:672,w:174,h:348}],
+ 4:[{x:280,baseY:674,w:170,h:340},{x:600,baseY:620,w:166,h:332},{x:930,baseY:620,w:166,h:332},{x:1230,baseY:674,w:170,h:340}]
 };
 function cameraAllyPosition(id,view){
  if(view==='party'){const i=party.findIndex(p=>p.id===id);return PARTY_STAGE[party.length]?.[i]||null}
@@ -1218,7 +1220,7 @@ function drawDeveloperPanel(){
  if(!supportDemo)hudButton(x+416,y+243,191,49,'hud-status-test','STATUS ICONS',phase==='player'&&!paused,party.some(p=>hudStatusList(p).length));
  if(supportDemo){hudButton(x+416,y+243,191,49,'confirm-support','CONFIRM',!!party.find(p=>p.id===selectedAllyId&&eligibleAllyTarget(p,supportDemo)));hudButton(x+416,y+299,191,38,'cancel-support','CANCEL');}
  text('CHARGE ULTIMATE ENERGY — TEST ONLY',x+23,y+323,14,'#b9c8d8','800');
- for(let i=0;i<party.length;i++)hudButton(x+23+i*198,y+345,187,45,'charge-ult:'+party[i].id,'+ ENERGY '+(i+1),party[i].hp>0&&!paused&&!['intro','victory','defeat'].includes(phase));
+ for(let i=0;i<party.length;i++)hudButton(x+23+i*146,y+345,139,45,'charge-ult:'+party[i].id,'+ ENERGY '+(i+1),party[i].hp>0&&!paused&&!['intro','victory','defeat'].includes(phase));
  text('FUNDAMENTAL 05 — TURN TIMING TESTS',x+23,y+412,14,'#b9c8d8','800');
  hudButton(x+23,y+429,183,40,'f05-advance','ADVANCE +25%',phase==='player'&&!paused);
  hudButton(x+222,y+429,183,40,'f05-delay','DELAY 25%',phase==='player'&&!paused);
@@ -1317,7 +1319,7 @@ function drawResult(){
  rect(310,215,980,460,'rgba(13,21,38,.98)',color.gold,20);
  text(phase==='victory'?'VICTORY':'DEFEAT',800,317,58,phase==='victory'?'#f7dd9f':'#f29ba4','900','center');
  text(phase==='victory'?'All '+totalEnemyDefeats+' enemies defeated across '+wavePlan.length+' waves.':'All allies have fallen in training.',800,397,27,'#edf2f7','600','center');
- text('Turns processed: '+turn+'    Party: '+party.length+'/5',800,447,20,'#a9bcce','500','center');
+ text('Turns processed: '+turn+'    Party: '+party.length+'/'+MAX_PARTY_SIZE,800,447,20,'#a9bcce','500','center');
  addButton(430,532,220,90,'restart','REPLAY','Same party');
  addButton(690,532,220,90,'change-team','PARTY','Manage members');
  addButton(950,532,220,90,'main-menu','MAIN MENU','');
@@ -1329,8 +1331,8 @@ function drawSetup(){
  addButton(1234,96,160,52,'main-menu','MAIN MENU','');
  text('Party membership is managed from Party on the main menu.',231,180,18,'#c4d6e5','550');
  text('CURRENT PARTY  '+draft.length+'/5',240,231,20,'#bad4e9','800');
- for(let i=0;i<5;i++){
-  const x=218+i*232,y=256,w=214,h=142,p=roster(draft[i]);
+ for(let i=0;i<MAX_PARTY_SIZE;i++){
+  const x=218+i*285,y=256,w=260,h=142,p=roster(draft[i]);
   rect(x,y,w,h,p?'rgba(38,54,79,.94)':'rgba(21,33,56,.88)',p?'#9eb8d3':'#4c607a',12);
   text(p?p.name:'EMPTY',x+w/2,y+58,20,p?'#f6eefa':'#8494a9','800','center');
   if(p)text(p.test?'TEST PLACEHOLDER':'LEVEL '+progressFor(p.id).level,x+w/2,y+96,14,p.test?'#e5ca99':'#c4d6e5','600','center');
