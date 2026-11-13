@@ -84,12 +84,16 @@ function instantiate(config, side) {
     const weaponMultiplier = 1 + signatureWeaponBonus(weapon);
     const runeTotals = runeStatTotals(instance.runes ?? archetype.runes ?? []);
     const stats = Object.fromEntries(Object.entries(archetype.stats).map(([name, value]) => [name, roundStat((statAtLevel(value, level) + (runeTotals[name] || 0)) * weaponMultiplier)]));
+    const characterDuplicates = instance.characterDuplicates ?? archetype.characterDuplicates ?? 0;
+    assert(Number.isInteger(characterDuplicates) && characterDuplicates >= 0 && characterDuplicates <= 4, 'Character duplicates must be from 0 to 4.');
+    const premiumWeaponDuplicates = weapon?.type === 'premium' ? weapon.potential - 1 : 0;
     assert(stats.physicalAttack !== undefined && stats.magicalAttack !== undefined && stats.physicalDefense !== undefined && stats.magicalDefense !== undefined, 'Archetype ' + instance.archetype + ' needs all six standard stats.');
     const maxEnergy = archetype.energy?.max ?? 120;
     const passives = (archetype.passives || []).map((passive, index) => ({
       ...passive,
       key: passive.id || passive.type + '-' + index,
-      remaining: passive.charges ?? Infinity,
+      remaining: passive.type === 'followUp' && instance.archetype === 'soul' && characterDuplicates >= 1 ? 7 : passive.charges ?? Infinity,
+      charges: passive.type === 'followUp' && instance.archetype === 'soul' && characterDuplicates >= 1 ? 7 : passive.charges,
       seenSources: new Set(),
       attackCount: 0
     }));
@@ -106,6 +110,11 @@ function instantiate(config, side) {
       energy: Math.max(0, Math.min(maxEnergy, instance.energy ?? archetype.energy?.start ?? 0)),
       maxEnergy,
       celestials: instance.celestials ?? archetype.celestials ?? {},
+      weapon,
+      characterDuplicates,
+      premiumWeaponDuplicates,
+      enhanceSpentRemainder: 0,
+      followUpActivations: 0,
       basic: archetype.basic,
       skill: archetype.skill || null,
       ultimate: archetype.ultimate || null,
@@ -161,8 +170,10 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
   if (!targets.length) return [];
   const hits = [];
   for (const target of targets) {
+    const hpBefore = target.hp;
     const damage = damageFor(attacker, target, spec.damageType, options.multiplier ?? spec.multiplier);
     target.hp = Math.max(0, target.hp - damage);
+    if (hpBefore > 0 && target.hp <= 0) restoreSoulFollowUpOnKill(attacker);
     target.damageTaken += damage;
     attacker.damageDealt += damage;
     state.damageBySide[attacker.side] += damage;
@@ -170,6 +181,11 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
   }
   if (targets.length > 1) attacker.aoeCount++;
   return hits;
+}
+function restoreSoulFollowUpOnKill(attacker) {
+  if (attacker.archetypeId !== 'soul' || attacker.premiumWeaponDuplicates < 2) return;
+  const passive = attacker.passives.find(p => p.type === 'followUp');
+  if (passive) passive.remaining = Math.min(passive.charges ?? 5, passive.remaining + 1);
 }
 function triggerFollowUps(state, sourceId, sourceActorId, affectedTargets) {
   const targets = [...new Set(affectedTargets.filter(target => target.hp > 0))];
@@ -180,18 +196,22 @@ function triggerFollowUps(state, sourceId, sourceActorId, affectedTargets) {
       if (passive.remaining <= 0 || passive.seenSources.has(sourceId)) continue;
       const activeTargets = targets.filter(target => target.hp > 0);
       if (!activeTargets.length) break;
-      const rawTotal = roundStat(attackValue(soul, passive.damageType) * passive.multiplier * celestialFactor(soul, 'passive'));
+      const rawTotal = roundStat(attackValue(soul, passive.damageType) * passive.multiplier * (soul.archetypeId === 'soul' && soul.characterDuplicates >= 2 ? 2 : 1) * celestialFactor(soul, 'passive'));
       if (rawTotal <= 0) continue;
       passive.seenSources.add(sourceId);
       passive.remaining--;
       soul.followUpCount++;
+      soul.followUpActivations++;
+      if (soul.archetypeId === 'soul' && soul.premiumWeaponDuplicates >= 4 && soul.followUpActivations % 2 === 0) passive.remaining = Math.min(passive.charges ?? 5, passive.remaining + 1);
       const base = Math.floor(rawTotal / activeTargets.length);
       const remainder = rawTotal % activeTargets.length;
       activeTargets.forEach((target, index) => {
         const share = base + (index < remainder ? 1 : 0);
         const divisor = attackValue(soul, passive.damageType);
         const damage = damageFor(soul, target, passive.damageType, share / divisor);
+        const hpBefore = target.hp;
         target.hp = Math.max(0, target.hp - damage);
+        if (hpBefore > 0 && target.hp <= 0) restoreSoulFollowUpOnKill(soul);
         target.damageTaken += damage;
         soul.damageDealt += damage;
         state.damageBySide.allies += damage;
@@ -214,7 +234,7 @@ function resolveAllyAction(state, actor) {
   if (ultimate && actor.energy >= (ultimate.energyCost ?? 100)) {
     actor.energy -= ultimate.energyCost ?? 100;
     actor.ultimateCount++;
-    const hits = runAttack(state, actor, foes, ultimate, { multiplier: ultimate.multiplier * celestialFactor(actor, 'ultimate') });
+    const hits = runAttack(state, actor, foes, ultimate, { multiplier: ultimate.multiplier * (actor.archetypeId === 'soul' && actor.characterDuplicates >= 3 ? 2 : 1) * celestialFactor(actor, 'ultimate') });
     triggerFollowUps(state, ++state.sourceSerial, actor.id, hits.map(hit => hit.target));
     if (ultimate.refillFollowUps) refillPassives(actor);
     foes = state.enemies.filter(unit => unit.hp > 0);
@@ -226,12 +246,21 @@ function resolveAllyAction(state, actor) {
       state.skillPoints--;
       actor.enhanceStacks++;
       state.skillUses++;
+      if (actor.archetypeId === 'soul' && actor.weapon?.type === 'standard') {
+        actor.enhanceSpentRemainder++;
+        if (actor.enhanceSpentRemainder >= 3) {
+          actor.enhanceSpentRemainder -= 3;
+          state.skillPoints = Math.min(state.skillPointCap, state.skillPoints + 1);
+        }
+      }
     }
   }
   const basic = actor.basic;
   const stacks = actor.enhanceStacks;
-  const multiplier = basic.multiplier * celestialFactor(actor, 'basic') + stacks * (skill?.damagePerStack ?? 0) * celestialFactor(actor, 'skill');
-  const targetMode = skill && stacks >= (skill.blastAtStacks ?? Infinity) ? 'blast' : basic.target;
+  const baseBasicMultiplier = basic.multiplier * (actor.archetypeId === 'soul' && actor.premiumWeaponDuplicates >= 1 ? 2 : 1);
+  const skillPerStack = (skill?.damagePerStack ?? 0) * (actor.archetypeId === 'soul' && actor.characterDuplicates >= 4 ? 2 : 1);
+  const multiplier = baseBasicMultiplier * celestialFactor(actor, 'basic') + stacks * skillPerStack * celestialFactor(actor, 'skill');
+  const targetMode = skill && stacks >= (skill.blastAtStacks ?? Infinity) ? (actor.archetypeId === 'soul' && actor.premiumWeaponDuplicates >= 3 ? 'aoe' : 'blast') : basic.target;
   const hits = runAttack(state, actor, foes, basic, { multiplier, targetMode });
   actor.basicAttackCount++;
   actor.energy = Math.min(actor.maxEnergy, actor.energy + (basic.energyGain ?? 0) + stacks * (skill?.energyPerStack ?? 0));

@@ -25,7 +25,7 @@ Calculated stats scale with Level and use the matching stat standards.
 - Soul's own Basic and Ultimate do not trigger Follow Up.
 - Follow Up deals True damage at a 0.5× multiplier.
 - Each allied action instance is one unique source. A multi-hit or multi-target action can trigger at most one Follow Up.
-- Follow Up has 5 procs at battle start. The Ultimate refills it to 5 after its damage resolves.
+- Follow Up has 5 procs by default, or 7 with Character Duplicate 1. The Ultimate refills it to the current proc limit after its damage resolves.
 - If the triggering action damaged multiple enemies, the Follow Up's total damage is distributed as evenly as possible across the surviving enemies it hit. Any remainder is assigned in target order.
 - A Follow Up attack cannot trigger another Follow Up.
 
@@ -44,7 +44,7 @@ Calculated stats scale with Level and use the matching stat standards.
 - Each activation spends 1 party Skill Point and adds one Enhanced Basic stack.
 - Soul may activate Enhance repeatedly while Skill Points remain.
 - Each stack adds 1.0× Basic damage and 10 Energy to the next Basic Attack.
-- At 3 or more stacks, that Basic becomes a Blast targeting up to three adjacent enemies.
+- At 3 or more stacks, that Basic becomes a Blast targeting up to three adjacent enemies. With Premium Weapon Duplicate 3, it instead becomes AoE.
 
 ## Ultimate
 

@@ -57,7 +57,8 @@
         "skill": 1,
         "ultimate": 1
       },
-      "runes": []
+      "runes": [],
+      "characterDuplicates": 0
     },
     "slime": {
       "name": "Slime",

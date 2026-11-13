@@ -411,7 +411,7 @@ const WAVE_PRESETS={stress:[15,12,6],quick:[1,5,6],sizes:[1,5,6,12,15]};
 let wavePreset='stress',waveOverride=null,wavePlan=[],waveIndex=-1,waveQueue=[],waveKills=0,
     totalEnemyDefeats=0,encounterCleared=false,spawnHistory=[],enemies=[],selectedEnemyId=null,actingEnemyId=null;
 // Fundamental 3 target rules and Fundamental 2 v1.1 post-attack reinforcement boundary.
-// Soul Enhanced Basic uses Blast; the Ultimate targets all enemies with AoE. The pattern toolbar,
+// Soul Enhanced Basic uses Blast (Premium Weapon Duplicate 3 changes it to AoE); the Ultimate is AoE. The pattern toolbar,
 // 5-hit and support actions remain development-only controls. Damage/cost values are provisional.
 let targetingMode='single',supportDemo=null,zeroSkillArmed=false,attackInProgress=false,attackSerial=0,
      pendingVacancies=[],lastAttack=null,supportTestHistory=[],soulEnhanceStacks=0,soulFollowUpProcs=5,soulFollowUpSources=new Set();

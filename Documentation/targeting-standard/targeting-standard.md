@@ -15,5 +15,5 @@ Target selection policy is separate from target shape. For example, an automated
 ## Soul targeting
 
 - Basic is `single` by default.
-- After spending at least three Skill Points on Enhance, the next Basic is `blast`. Each target receives the full damage.
+- After spending at least three Skill Points on Enhance, the next Basic is `blast`. Each target receives the full damage. Premium Weapon Duplicate 3 changes it to `aoe`.
 - Ultimate is `aoe` and hits every living enemy.
