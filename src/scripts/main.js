@@ -1379,28 +1379,32 @@ function drawAllyUltimate(p,x,y,sz){
  ctx.restore();
 }
 function drawAllyPortraitHud(){
- // Portrait cards retain a shared baseline. Only the active ally is full scale.
- // No names, no standalone EP bars, and no extra stat/name panel.
- const bottom=883,reference=136,spacing=22;
- let x=165;
+ // Compact battle cards keep the portrait, ultimate, HP, health bar, and passive in one stack.
+ const cardW=176,cardH=214,gap=10,top=650,total=party.length*cardW+Math.max(0,party.length-1)*gap;
+ let x=Math.max(18,Math.round((780-total)/2));
  for(const p of party){
-  const activeAlly=phase==='player'&&activeId===p.id&&p.hp>0;
-  const ko=p.hp<=0,scale=activeAlly?1:.9,sz=reference*scale;
-  const numberY=bottom-1,barY=bottom-28,barH=9,gap=7,portraitY=barY-gap-sz;
+  const activeAlly=phase==='player'&&activeId===p.id&&p.hp>0,ko=p.hp<=0;
+  const portraitX=x+10,portraitY=top+10,portraitSize=72;
   ctx.save();ctx.globalAlpha=ko?.57:activeAlly?1:.84;
-  // Premium but compact framing: full color for active/inactive distinctions,
-  // only the border brightens for the active ally (no lift or card glow).
-  rect(x-3,portraitY-3,sz+6,sz+6,'rgba(14,23,42,.96)',activeAlly?'#f3d79e':'rgba(129,164,191,.82)',12);
-  hudPortrait(p.id==='zero'?images.zeroFront:null,x,portraitY,sz,sz,true);
-  if(ko)rect(x,portraitY,sz,sz,'rgba(30,17,23,.62)',null,10);
-  drawAllyUltimate(p,x,portraitY,sz);
-  // All effects are shown in application order. Additional rows grow upward.
-  drawAllyStatuses(p,x,portraitY,sz);
-  // Small visible gap, full-width health bar, then centered numeric health.
-  line(x,barY,sz,ko?0:p.hp/p.maxHp,ko?'#b16b76':'#67e3b4','#23374d',barH);
-  text(ko?'0 / '+p.maxHp:`${p.hp} / ${p.maxHp}`,x+sz/2,numberY,14*scale,ko?'#f0afb7':'#e4f3ef','750','center');
+  rect(x,top,cardW,cardH,'rgba(14,23,42,.96)',activeAlly?'#f3d79e':'rgba(129,164,191,.82)',12);
+  hudPortrait(p.id==='zero'?images.zeroFront:null,portraitX,portraitY,portraitSize,portraitSize,true);
+  if(ko)rect(portraitX,portraitY,portraitSize,portraitSize,'rgba(30,17,23,.62)',null,10);
+  drawAllyUltimate(p,x+76,top+1,88);
+  drawAllyStatuses(p,portraitX,portraitY,portraitSize);
+  text(ko?'0 / '+p.maxHp:`${p.hp} / ${p.maxHp}`,x+cardW-10,top+105,13,ko?'#f0afb7':'#e4f3ef','750','right');
+  line(x+10,top+119,cardW-20,ko?0:p.hp/p.maxHp,ko?'#b16b76':'#67e3b4','#23374d',10);
+  if(p.id==='zero'){
+   const maximum=soulFollowUpLimit(),current=Math.max(0,Math.min(maximum,soulFollowUpProcs));
+   text('FOLLOW UP',x+12,top+155,13,'#d6e2ef','800');
+   text(current+'/'+maximum,x+cardW-12,top+155,13,'#f4d99c','800','right');
+   const dotSize=9,pitch=18,rowWidth=(maximum-1)*pitch+dotSize,startX=x+(cardW-rowWidth)/2;
+   for(let i=0;i<maximum;i++)hudCircle(startX+i*pitch+dotSize/2,top+181,dotSize/2,i<current?'#72d8f5':'rgba(65,84,108,.9)',i<current?'#d7f6ff':'#8295a9',1.5);
+  }else{
+   text('PASSIVE',x+12,top+155,13,'#d6e2ef','800');
+   text(p.test?'PLACEHOLDER':'—',x+cardW-12,top+155,12,'#aebfd0','600','right');
+  }
   ctx.restore();
-  x+=sz+spacing;
+  x+=cardW+gap;
  }
 }
 function toggleHudStatusDemo(){
@@ -1484,9 +1488,9 @@ function drawHud(t){
  choiceRects.push({x:1463,y:7,w:106,h:100,action:'pause',enabled:phase==='player'||paused});
  // Contextual action cue; the main stage stays unobstructed.
  if(phase==='player'){
-  const p=active();text(p?.name||'ALLY',730,712,17,'#fae3b9','800');
+  const p=active();text(p?.name||'ALLY',830,712,17,'#fae3b9','800');
   const mode=previewTargetMode(),hits=chooseAttackTargets(mode);
-  text(zeroSkillArmed&&p?.id==='zero'?`SOUL ENHANCE • BLAST • ${hits.length} TARGETS`:mode==='blast'?`BLAST • ${hits.length} TARGETS`:mode==='aoe'?`AOE • ALL ${hits.length} ENEMIES`:'SELECT AN ENEMY',842,712,15,'#d4e9f4','700');
+  text(zeroSkillArmed&&p?.id==='zero'?`SOUL ENHANCE • BLAST • ${hits.length} TARGETS`:mode==='blast'?`BLAST • ${hits.length} TARGETS`:mode==='aoe'?`AOE • ALL ${hits.length} ENEMIES`:'SELECT AN ENEMY',940,712,15,'#d4e9f4','700');
  }
  // Portrait-focused Ally HUD review layout, without altering combat resource logic.
  ctx.save();ctx.globalAlpha=cinematic?.88:1;
