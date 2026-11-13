@@ -44,10 +44,11 @@ function validateConfig(config) {
       const barrierPercent = instance.barrierPercent ?? archetype.barrierPercent ?? 0.2;
       assert(Number.isFinite(barrierPercent) && barrierPercent >= 0 && barrierPercent <= 1, 'Enemy barrierPercent must be from 0 to 1.');
       assert(archetype.basic && Number.isFinite(archetype.basic.multiplier) && ['physical', 'magical', 'true'].includes(archetype.basic.damageType), 'Archetype ' + instance.archetype + ' needs a typed Basic Attack.');
-      assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
+      assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
       for (const passive of archetype.passives || []) {
         if (passive.type === 'everyNthBasic') assert(Number.isInteger(passive.every) && passive.every > 0, 'everyNthBasic needs a positive integer interval.');
         if (passive.type === 'followUp') assert(Number.isFinite(passive.multiplier) && passive.multiplier >= 0, 'followUp needs a non-negative multiplier.');
+        if (passive.type === 'rampage') assert(Number.isFinite(passive.damageBonus) && passive.damageBonus >= 0 && Number.isInteger(passive.maxStacks) && passive.maxStacks >= 0, 'rampage needs a non-negative damageBonus and a non-negative integer maxStacks.');
       }
       assert(!archetype.skill || archetype.skill.type === 'enhanceBasic', 'Unsupported skill type in ' + instance.archetype + '.');
       assert(!archetype.ultimate || ['physical', 'magical', 'true'].includes(archetype.ultimate.damageType), 'Ultimate needs a supported damage type.');
@@ -305,6 +306,8 @@ function resolveEnemyAction(state, actor) {
   actor.basicAttackCount++;
   let targetMode = basic.target;
   let multiplier = basic.multiplier;
+  const rampage = actor.passives.find(passive => passive.type === 'rampage');
+  if (rampage) multiplier *= 1 + rampage.damageBonus * (rampage.stacks || 0);
   for (const passive of actor.passives) {
     if (passive.type !== 'everyNthBasic') continue;
     passive.attackCount++;
@@ -313,7 +316,8 @@ function resolveEnemyAction(state, actor) {
       multiplier *= 1 + passive.damageBonus;
     }
   }
-  runAttack(state, actor, targets, basic, { targetMode, multiplier });
+  const hits = runAttack(state, actor, targets, basic, { targetMode, multiplier });
+  if (rampage && hits.some(hit => hit.damage > 0)) rampage.stacks = Math.min(rampage.maxStacks, (rampage.stacks || 0) + 1);
 }
 function simulateBattle(config, seed = 1, maxActionsOverride = null) {
   validateConfig(config);

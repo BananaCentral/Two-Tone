@@ -1,5 +1,5 @@
 'use strict';
-const sources={arena:'/assets/embedded-image-01.png',zero:'/assets/soul-battle.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',zeroFront:'/assets/soul-portrait.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png'};
+const sources={arena:'/assets/embedded-image-01.png',zero:'/assets/soul-battle.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',wolfBattle:'/assets/wolf.png',wolfArtwork:'/assets/wolf-artwork.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',zeroFront:'/assets/soul-portrait.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png'};
 
 /* Two-Tone Fundamental 05 preview scheduling engine.
    Baseline event allocation follows approved deterministic fractional cycles and
@@ -99,7 +99,7 @@ function spriteAlphaBounds(img){
  const canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
  const c=canvas.getContext('2d',{willReadFrequently:true});let bounds={x:0,y:0,w:img.naturalWidth,h:img.naturalHeight};
  try{c.drawImage(img,0,0);const pixels=c.getImageData(0,0,canvas.width,canvas.height).data;let left=canvas.width,top=canvas.height,right=-1,bottom=-1;
-  for(let y=0;y<canvas.height;y++)for(let x=0;x<canvas.width;x++)if(pixels[(y*canvas.width+x)*4+3]>0){if(x<left)left=x;if(x>right)right=x;if(y<top)top=y;if(y>bottom)bottom=y}
+  for(let y=0;y<canvas.height;y++)for(let x=0;x<canvas.width;x++)if(pixels[(y*canvas.width+x)*4+3]>16){if(x<left)left=x;if(x>right)right=x;if(y<top)top=y;if(y>bottom)bottom=y}
   if(right>=left&&bottom>=top)bounds={x:left,y:top,w:right-left+1,h:bottom-top+1};
  }catch(e){}
  visibleSpriteBounds.set(img,bounds);return bounds;
@@ -414,13 +414,14 @@ const ENEMY_FORMATIONS=[
  {id:'slot4',x:1201,y:312,w:156,h:205},
  {id:'slot5',x:1389,y:355,w:151,h:198},
 ];
-const ENEMY_ARCHETYPES={slime:{id:'slime',category:'common',name:'SLIME',level:1,hp:100,
- basePhysicalAttack:0,baseMagicalAttack:20,basePhysicalDefense:4,baseMagicalDefense:8,speed:20,battleSprite:'slimeBattle',battleAspectRatio:'1:1',artwork:'slimeArtwork',
- passive:{id:'slimy',every:3,damageBonus:.25},basicAttack:{damageType:'magical',multiplier:1.0}}};
+const ENEMY_ARCHETYPES={
+ slime:{id:'slime',category:'common',name:'SLIME',level:1,hp:100,basePhysicalAttack:0,baseMagicalAttack:20,basePhysicalDefense:4,baseMagicalDefense:8,speed:20,battleSprite:'slimeBattle',battleAspectRatio:'1:1',artwork:'slimeArtwork',passive:{id:'slimy',every:3,damageBonus:.25},basicAttack:{damageType:'magical',multiplier:1.0}},
+ wolf:{id:'wolf',category:'common',name:'WOLF',level:1,hp:100,basePhysicalAttack:40,baseMagicalAttack:0,basePhysicalDefense:2,baseMagicalDefense:2,speed:40,battleSprite:'wolfBattle',battleAspectRatio:'1:1',artwork:'wolfArtwork',passive:{id:'rampage',damageBonus:.25,maxStacks:4},basicAttack:{damageType:'physical',multiplier:1.0}}
+};
 // Any encounter may supply its own finite number of waves, each with 1–15 enemies.
 // Presets are only review scenarios; they are NOT a global wave-count limit.
 const WAVE_PRESETS={stress:[15,12,6],quick:[1,5,6],sizes:[1,5,6,12,15]};
-let wavePreset='stress',waveOverride=null,wavePlan=[],waveIndex=-1,waveQueue=[],waveKills=0,
+let wavePreset='stress',waveOverride=null,enemyRosterMode='slime',wavePlan=[],waveIndex=-1,waveQueue=[],waveKills=0,
     totalEnemyDefeats=0,encounterCleared=false,spawnHistory=[],enemies=[],selectedEnemyId=null,actingEnemyId=null;
 // Fundamental 3 target rules and Fundamental 2 v1.1 post-attack reinforcement boundary.
 // Soul Enhanced Basic uses Blast unless Premium Weapon Duplicate 3 changes it to AoE; Ultimate is AoE. The pattern toolbar,
@@ -577,11 +578,11 @@ function chosenEnemy(){return liveEnemies().find(e=>e.id===selectedEnemyId)||liv
 function buildWavePlan(sizes){
  if(!Array.isArray(sizes)||!sizes.length||!sizes.every(n=>Number.isInteger(n)&&n>=1&&n<=15))throw Error('Wave sizes must each be 1–15');
  return sizes.map((size,wi)=>Array.from({length:size},(_,i)=>{
-  const model=ENEMY_ARCHETYPES.slime;return {id:`wave${wi+1}-enemy${i+1}`,archetypeId:model.id,name:model.name,
+  const species=enemyRosterMode==='wolf'?'wolf':enemyRosterMode==='mixed'&&((wi+i)%2===1)?'wolf':'slime';const model=ENEMY_ARCHETYPES[species];return {id:`wave${wi+1}-enemy${i+1}`,archetypeId:model.id,name:model.name,
    wave:wi+1,order:i+1,category:validateEnemyCategory(model.category),level:model.level,maxHp:model.hp,speed:model.speed,
    basePhysicalAttack:model.basePhysicalAttack,baseMagicalAttack:model.baseMagicalAttack,
    basePhysicalDefense:model.basePhysicalDefense,baseMagicalDefense:model.baseMagicalDefense,
-   battleSprite:model.battleSprite,battleAspectRatio:model.battleAspectRatio,artwork:model.artwork,barrierPercent:model.barrierPercent??.2,passive:{...model.passive},basicAttack:{...model.basicAttack},basicAttackCount:0};
+   battleSprite:model.battleSprite,battleAspectRatio:model.battleAspectRatio,artwork:model.artwork,barrierPercent:model.barrierPercent??.2,passive:{...model.passive},basicAttack:{...model.basicAttack},basicAttackCount:0,rampageStacks:0};
  }));
 }
 function initialSlots(count){return ({1:[2],2:[1,3],3:[1,2,3],4:[0,1,3,4],5:[0,1,2,3,4]})[count].slice()}
@@ -682,7 +683,8 @@ function finishTrainingAttack(serial){
 }
 function setEnemyTarget(id){if(phase!=='player'||paused)return false;const e=enemies.find(e=>e.id===id&&e.hp>0);if(!e)return false;selectedEnemyId=id;selectedAllyId=null;if(pendingTargetAction){const pending=pendingTargetAction;pendingTargetAction=null;cameraPreview=null;const actor=party.find(p=>p.id===pending.actorId);if(pending.action==='ultimate')return queueUltimate(pending.actorId);return executeCombatAction(actor,pending.action)}cameraPreview='target';log=`Target selected: ${e.name} (wave ${e.wave}, slot ${e.slot+1}).`;return true;}
 function setWavePlanForTest(sizes){if(phase!=='setup')return false;try{buildWavePlan(sizes)}catch(e){return false}waveOverride=[...sizes];return true;}
-function toggleWavePreset(){if(phase!=='setup')return;waveOverride=null;const choices=['stress','quick','sizes'];wavePreset=choices[(choices.indexOf(wavePreset)+1)%choices.length];}
+function toggleWavePreset(){if(phase!=='setup')return;waveOverride=null;const choices=['stress','quick','sizes'];wavePreset=choices[(choices.indexOf(wavePreset)+1)%choices.length]}
+function toggleEnemyRoster(){if(phase!=='setup')return;const choices=['slime','wolf','mixed'];enemyRosterMode=choices[(choices.indexOf(enemyRosterMode)+1)%choices.length];}
 
 const savedTeam=loadTeam();
 let draft=[...savedTeam];
@@ -728,17 +730,18 @@ function startFromBattle(){
  schedule(()=>{if(phase==='intro')nextTurn()},380);
 }
 function resolveEnemyBasicAttack(attacker,candidates){
- const basic=attacker.basicAttack||{},passive=attacker.passive?.id==='slimy'?attacker.passive:null;
+ const basic=attacker.basicAttack||{},passive=attacker.passive?.id==='slimy'?attacker.passive:null,rampage=attacker.passive?.id==='rampage';
  if(passive)attacker.basicAttackCount=(attacker.basicAttackCount||0)+1;
  const enhanced=!!passive&&attacker.basicAttackCount%passive.every===0;
  const targets=enhanced?[...candidates]:[candidates[Math.floor(Math.random()*candidates.length)]];
- const multiplier=(basic.multiplier??1)*(enhanced?1+passive.damageBonus:1);
+ const multiplier=(basic.multiplier??1)*(enhanced?1+passive.damageBonus:1)*(rampage?1+(attacker.passive.damageBonus??.25)*(attacker.rampageStacks||0):1);
  const hits=targets.map(target=>{
   const calculated=basic.damageType?calculateTypedActionDamage(basic.damageType,multiplier,attacker,target):null;
   const damage=calculated?.damageTaken??(basic.damageType?0:92+((turn*37)%51));
   const dealt=applyEnemyDamage(target,damage);target.energy=Math.min(120,target.energy+10);
   return {target:target.id,damage:dealt.damage+dealt.breakDamage,barrierDamage:dealt.barrierDamage,breakDamage:dealt.breakDamage,barrierAfter:target.barrier,broken:dealt.broken};
  });
+ if(rampage&&hits.some(hit=>hit.damage>0))attacker.rampageStacks=Math.min(attacker.passive.maxStacks??4,(attacker.rampageStacks||0)+1);
  return {hits,enhanced};
 }
 function nextTurn(){
@@ -1623,6 +1626,8 @@ function drawSetup(){
  text('BATTLE TEST OPTIONS',240,467,19,'#bad4e9','800');
  text('TEST WAVES: '+(waveOverride||WAVE_PRESETS[wavePreset]).join(' + ')+'  UP TO 5 ACTIVE',240,510,17,'#d2ddec','650');
  addButton(240,542,250,58,'toggle-waves','CHANGE WAVES','');
+ text('ENEMY ROSTER: '+enemyRosterMode.toUpperCase(),240,626,17,'#d2ddec','650');
+ addButton(240,655,250,52,'toggle-enemies','CHANGE ENEMIES','Slime / Wolf / Mixed');
  text('TRAINING RECOVERY: '+(trainingRecoveryMode==='restore'?'RESTORE FULL HP':'PRESERVE HP')+'  TEST ONLY',538,510,16,'#d2ddec','650');
  addButton(538,542,470,58,'toggle-recovery','TOGGLE HP RECOVERY MODE',trainingRecoveryMode==='restore'?'CURRENT: RESTORE':'CURRENT: PRESERVE');
  addButton(1039,733,313,79,'start','START BATTLE','Current party',validTeam(draft));
@@ -1633,7 +1638,7 @@ function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='menu'){drawMa
   drawCameraStage(t);drawFx(t);ctx.restore();drawHud(t)
  }else{drawCameraStage(t);drawSetup()}drawHint(t);requestAnimationFrame(loop)}
 function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('loadout:')){handleLoadoutAction(cmd.slice(8));return}if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'){devPanelOpen=!devPanelOpen;return}if(cmd==='cancel-target'){cancelTargetSelection();return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(phase==='player'&&cameraPreview==='party'){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){beginTargetSelection('ultimate',cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){chargeUltimateForTest(cmd.slice(11));return}
- switch(cmd){case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'support-heal':startSupportDemo('heal');break;case 'support-revive':startSupportDemo('revive');break;case 'confirm-support':confirmSupportDemo();break;case 'cancel-support':cancelSupportDemo();break;case 'camera-party':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':toggleWavePreset();break;case 'toggle-recovery':setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':testKO();break;case 'test-revive':testRevive();break;case 'skill':zeroSkillControl();break;case 'cap-test':cycleSpCapTest();break;case 'hud-status-test':toggleHudStatusDemo();break;case 'f05-advance':addActionAdvance(activeId,25);break;case 'f05-delay':addActionDelay(activeId,25);break;case 'f05-speed':setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':queueSummonForTest('independent');break;case 'f05-summon-controlled':queueSummonForTest('controlled');break;
+ switch(cmd){case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'support-heal':startSupportDemo('heal');break;case 'support-revive':startSupportDemo('revive');break;case 'confirm-support':confirmSupportDemo();break;case 'cancel-support':cancelSupportDemo();break;case 'camera-party':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':toggleWavePreset();break;case 'toggle-enemies':toggleEnemyRoster();break;case 'toggle-recovery':setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':testKO();break;case 'test-revive':testRevive();break;case 'skill':zeroSkillControl();break;case 'cap-test':cycleSpCapTest();break;case 'hud-status-test':toggleHudStatusDemo();break;case 'f05-advance':addActionAdvance(activeId,25);break;case 'f05-delay':addActionDelay(activeId,25);break;case 'f05-speed':setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':queueSummonForTest('independent');break;case 'f05-summon-controlled':queueSummonForTest('controlled');break;
  case 'progress-test-level':{const a=active(),p=a&&progressFor(a.id);if(a&&p){const cost=Math.max(1,requiredExp(a.level)-p.exp),result=testGrantExp(a.id,cost);say(result?`TEST ONLY: level ${result.level}, ${cost} EXP injected.`:'Ascension required or level cap reached.');}break}
  case 'progress-test-ascend':{const a=active();if(a)say(testAscend(a.id)?`TEST ONLY: level ${a.level} ascension unlocked (no materials).`:'Not at a locked ascension gate.');break}
  case 'hp-test-flat':{const a=active();if(a)setHpBonusForTest(a.id,'debug-flat','flat',(a.hpFlatModifiers['debug-flat']||0)+20);break}

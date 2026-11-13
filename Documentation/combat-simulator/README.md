@@ -37,6 +37,7 @@ Supported Skill and Passive effect types:
 - `enhanceBasic`: consumes available shared Skill Points before that unit's Basic. Configure added multiplier, Energy per stack, and the stack threshold that changes Basic to Blast (Premium Soul Weapon Duplicate 3 changes it to AoE).
 - `followUp`: triggers once for each unique damaging action from another ally while charges remain. The source actor cannot trigger its own Follow Up. Each follow-up uses its own unit's stats; damage is shared evenly among surviving targets hit by the source action.
 - `everyNthBasic`: on each Nth Basic by that unit, changes its target mode and applies its damage bonus. The counter is per unit.
+- `rampage`: each successful Basic Attack increases later Basic Attack damage by `damageBonus`, up to `maxStacks`. A successful attack adds one stack after resolving, so the first Basic uses base damage; a stack cap of 4 with a 25% bonus reaches +100% damage.
 
 Additional ability effects require adding a handler to the simulator before configs can use them.
 
@@ -52,5 +53,7 @@ Blast includes the primary target and enemies in adjacent formation slots, up to
 ## Enemy Barriers
 
 Enemy archetypes and instances may define `barrierPercent` from 0 to 1. The default is `0.2` (20% of max HP). Every hit deals its normal HP damage and an additional Barrier amount equal to 25% of the damage. Barrier does not mitigate HP damage. Breaking Barrier also deals one extra hit equal to 10% of enemy max HP and starts Broken state. Excess damage does not carry over to Barrier after recovery.
+
+The example also defines the Common Wolf archetype with its live stats and capped Rampage passive. The default example encounter remains Soul vs Slime; change the enemy instance's `archetype` to `wolf` to simulate Soul vs Wolf.
 
 Broken enemies take 50% more damage and skip their scheduled turns. Duration is `max(1, round(enemyBaseTurns × clamp(2 − Speed / 100, 0.5, 1.5)))`; base turns use `max(1, enemy team average Speed / slower team average Speed)`; the individual enemy Speed adjusts its Broken duration. On recovery, the enemy fully cleanses debuffs and marks and restores Barrier to maximum. The simulator reports remaining Barrier and Broken turns for survivors, plus the total number of Barrier breaks.

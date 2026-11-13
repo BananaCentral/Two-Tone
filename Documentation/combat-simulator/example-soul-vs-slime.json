@@ -86,6 +86,32 @@
           "target": "aoe"
         }
       ]
+    },
+    "wolf": {
+      "name": "Wolf",
+      "level": 1,
+      "barrierPercent": 0.2,
+      "stats": {
+        "hp": 100,
+        "physicalAttack": 40,
+        "magicalAttack": 0,
+        "physicalDefense": 2,
+        "magicalDefense": 2,
+        "speed": 40
+      },
+      "basic": {
+        "damageType": "physical",
+        "multiplier": 1,
+        "target": "random"
+      },
+      "passives": [
+        {
+          "type": "rampage",
+          "id": "rampage",
+          "damageBonus": 0.25,
+          "maxStacks": 4
+        }
+      ]
     }
   },
   "teams": {
