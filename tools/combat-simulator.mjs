@@ -246,7 +246,7 @@ function resolveAllyAction(state, actor) {
       state.skillPoints--;
       actor.enhanceStacks++;
       state.skillUses++;
-      if (actor.archetypeId === 'soul' && actor.weapon?.type === 'standard') {
+      if (actor.archetypeId === 'soul' && actor.weapon?.type === 'premium') {
         actor.enhanceSpentRemainder++;
         if (actor.enhanceSpentRemainder >= 3) {
           actor.enhanceSpentRemainder -= 3;

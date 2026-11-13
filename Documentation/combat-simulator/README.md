@@ -37,7 +37,7 @@ Supported Skill and Passive effect types:
 Additional ability effects require adding a handler to the simulator before configs can use them.
 
 
-Soul's `characterDuplicates` field (0–4) enables his four character Duplicate effects. With a Premium weapon, potential levels 2–5 correspond to weapon duplicates 1–4. The Standard Soul weapon refunds one shared Skill Point per three Enhance points spent. The simulator models these Soul-specific effects and the default Level 1 Celestials.
+Soul's `characterDuplicates` field (0–4) enables his four character Duplicate effects. With a Premium weapon, potential levels 2–5 correspond to weapon duplicates 1–4. Soul's Premium weapon refunds one shared Skill Point per three Enhance points spent. The simulator models these Soul-specific effects and the default Level 1 Celestials.
 
 ## Output
 

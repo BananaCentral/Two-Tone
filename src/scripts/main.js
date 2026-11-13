@@ -524,7 +524,7 @@ function activateSoulEnhance(){
  const a=active();if(phase!=='player'||paused||!a||a.id!=='zero'){say('Enhance is available on Soul’s turn.');return false}
  if(sp<1){say('Soul Enhance needs 1 Skill Point.');return false}
  sp--;soulEnhanceStacks++;let refunded=false;
- if(loadoutFor('zero').weapon.selected==='standard'){soulEnhanceSpendingRemainder++;if(soulEnhanceSpendingRemainder>=3){soulEnhanceSpendingRemainder-=3;gainSp(1);refunded=true}}
+ if(loadoutFor('zero').weapon.selected==='premium'&&loadoutFor('zero').weapon.premiumOwned){soulEnhanceSpendingRemainder++;if(soulEnhanceSpendingRemainder>=3){soulEnhanceSpendingRemainder-=3;gainSp(1);refunded=true}}
  zeroSkillArmed=false;cameraPreview=null;
  log='SOUL ENHANCE: '+soulEnhanceStacks+' Skill Point(s) banked for the next Basic Attack.'+(refunded?' Standard signature weapon restored 1 Skill Point.':'');return true;
 }
@@ -849,7 +849,7 @@ function drawLoadout(){
  addButton(650,214,242,52,'loadout:weapon-premium',w.premiumOwned?'PREMIUM • '+w.premiumPotential+'/5':'PREMIUM • STORE LOCKED',w.premiumOwned?'+'+Math.round((1+(w.premiumPotential-1)*.25)*100)+'% • DUPLICATES '+(w.premiumPotential-1):'Acquired in Store',w.premiumOwned);
  text('Potential',416,294,15,'#c4d6e5','700');addButton(505,274,54,40,'loadout:potential:standard,-1','−','',w.standardPotential>1);addButton(563,274,54,40,'loadout:potential:standard,1','+','',w.standardPotential<5);
  if(w.premiumOwned){addButton(670,274,54,40,'loadout:potential:premium,-1','−','',w.premiumPotential>1);addButton(728,274,54,40,'loadout:potential:premium,1','+','',w.premiumPotential<5)}
- text('Standard effect: spend 3 Enhance points to restore 1 SP. Costs are not configured.',416,337,13,'#aebfd0','550');
+ text('Premium effect: spend 3 Enhance points to restore 1 SP. Costs are not configured.',416,337,13,'#aebfd0','550');
  rect(390,376,530,434,'rgba(25,37,58,.94)','#718ba4',12);text('COMBAT STATS • LEVEL '+progressFor(loadoutCharacterId).level,416,405,18,'#d6e2ef','850');
  const statsList=Object.entries(stats||{});for(let i=0;i<statsList.length;i++){const [name,value]=statsList[i],yy=443+i*37;text(name,420,yy,15,'#d6dceb','600');text(value===null?'—':Math.round(value),875,yy,17,'#fff1d5','800','right')}
  text('Weapon bonus: +'+Math.round(weaponBonus(record)*100)+'% to all six stats',416,680,15,'#f4d99c','750');
