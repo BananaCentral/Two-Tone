@@ -1269,13 +1269,14 @@ function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&camera
  const shimmer=isFocus?Math.sin(t*.004)*2:0;
  const zbHit=fx?.kind==='basic'&&fx?.actor==='zero'&&fx.targetEnemyId===e.id?t-fx.at:null;
   const hitKick=zbHit!==null&&zbHit>=645&&zbHit<745?Math.sin((zbHit-645)*.18)*(1-(zbHit-645)/100)*4:0;
-  ctx.save();ctx.globalAlpha=e.hp>0?1:Math.max(.02,.8-(t-fx.at)/1050);ctx.translate(shimmer+hitKick,Math.sin(t*.0026+e.x)*2.2);
+ let spriteCenterY=yy+hh/2;
+ ctx.save();ctx.globalAlpha=e.hp>0?1:Math.max(.02,.8-(t-fx.at)/1050);ctx.translate(shimmer+hitKick,Math.sin(t*.0026+e.x)*2.2);
  ctx.beginPath();ctx.ellipse(xx+ww/2,yy+hh-4,ww*.48,13,0,0,Math.PI*2);ctx.fillStyle='#1b213c70';ctx.fill();
- if(images[e.battleSprite]?.complete&&images[e.battleSprite].naturalWidth){const img=images[e.battleSprite];ctx.imageSmoothingEnabled=e.battleSprite==='slimeBattle';if(e.battleSprite==='slimeBattle'){const scale=Math.min(ww/img.naturalWidth,hh/img.naturalHeight),iw=img.naturalWidth*scale,ih=img.naturalHeight*scale;ctx.drawImage(img,xx+(ww-iw)/2,yy+(hh-ih)/2,iw,ih)}else ctx.drawImage(img,xx,yy,ww,hh)}
+ if(images[e.battleSprite]?.complete&&images[e.battleSprite].naturalWidth){const img=images[e.battleSprite];ctx.imageSmoothingEnabled=e.battleSprite==='slimeBattle';if(e.battleSprite==='slimeBattle'){const scale=Math.min(ww/img.naturalWidth,hh/img.naturalHeight),iw=img.naturalWidth*scale,ih=img.naturalHeight*scale,drawX=xx+(ww-iw)/2,drawY=yy+hh-ih;spriteCenterY=drawY+ih/2;ctx.drawImage(img,drawX,drawY,iw,ih)}else ctx.drawImage(img,xx,yy,ww,hh)}
  ctx.restore();
  if(e.hp<=0)continue;
  if(isActor){ctx.strokeStyle='#b7e6ff';ctx.lineWidth=4;ctx.strokeRect(xx-8,yy-6,ww+16,hh+13)}
- if(patternHit){ctx.beginPath();ctx.arc(xx+ww/2,yy-67,7,0,Math.PI*2);ctx.fillStyle='#55aaff';ctx.fill();ctx.strokeStyle='#eaf6ff';ctx.lineWidth=2;ctx.stroke()}
+ if(patternHit){ctx.beginPath();ctx.arc(xx+ww/2,spriteCenterY,7,0,Math.PI*2);ctx.fillStyle='#55aaff';ctx.fill();ctx.strokeStyle='#eaf6ff';ctx.lineWidth=2;ctx.stroke()}
  rect(xx-3,yy-58,ww+6,30,'#1c2843e8','#8d96a9',6);
  text(e.name,xx+ww/2,yy-43,14,'#fff4e8','800','center');
  line(xx+2,yy-25,ww-4,e.maxBarrier?e.barrier/e.maxBarrier:0,'#55aaff','#263b59',8);
