@@ -791,7 +791,7 @@ function normalizeLoadout(value){
  return base
 }
 function loadCharacterLoadouts(){let stored={};try{stored=JSON.parse(localStorage.getItem(LOADOUT_KEY)||'{}')||{}}catch(e){}return Object.fromEntries(ROSTER.map(model=>[model.id,normalizeLoadout(stored[model.id])]))}
-let characterLoadouts=loadCharacterLoadouts(),loadoutCharacterId='zero',selectedLoadoutRune=0;
+let characterLoadouts=loadCharacterLoadouts(),loadoutCharacterId='zero',selectedLoadoutRune=0,loadoutPage='characters';
 function loadoutFor(id=loadoutCharacterId){return characterLoadouts[id]||(characterLoadouts[id]=defaultLoadout())}
 function saveLoadouts(){try{localStorage.setItem(LOADOUT_KEY,JSON.stringify(characterLoadouts))}catch(e){}}
 function weaponBonus(record){const w=record.weapon;return w.selected==='premium'&&w.premiumOwned?1+(w.premiumPotential-1)*.25:.8+(w.standardPotential-1)*.05}
@@ -820,11 +820,12 @@ function loadoutStats(id){
  'Physical Attack':calculatePhysicalAttack(unit),'Magical Attack':calculateMagicalAttack(unit),
  'Physical Defense':calculatePhysicalDefense(unit),'Magical Defense':calculateMagicalDefense(unit),Speed:calculateSpeed(unit)}
 }
-function enterLoadout(){loadoutCharacterId='zero';selectedLoadoutRune=0;phase='loadout';hint=''}
+function enterLoadout(){loadoutCharacterId='zero';selectedLoadoutRune=0;loadoutPage='characters';phase='loadout';hint=''}
 function handleLoadoutAction(action){
  const [kind,arg]=action.split(':'),record=loadoutFor(),weapon=record.weapon,rune=record.runes[selectedLoadoutRune];
- if(kind==='back'){phase='menu';return}
- if(kind==='character'){if(ROSTER_IDS.has(arg)&&!roster(arg)?.test)loadoutCharacterId=arg;return}
+ if(kind==='back'){if(loadoutPage==='characters')phase='menu';else if(loadoutPage==='menu')loadoutPage='characters';else loadoutPage='menu';return}
+ if(kind==='character'){if(ROSTER_IDS.has(arg)&&!roster(arg)?.test){loadoutCharacterId=arg;loadoutPage='menu'}return}
+ if(kind==='page'){if(['weapons','runes','celestials','levels'].includes(arg))loadoutPage=arg;return}
  if(kind==='character-duplicate')record.characterDuplicates=Math.max(0,Math.min(4,record.characterDuplicates+Number(arg)));
  else if(kind==='weapon-standard')weapon.selected='standard';
  else if(kind==='weapon-premium'){if(weapon.premiumOwned)weapon.selected='premium'}
@@ -838,34 +839,135 @@ function handleLoadoutAction(action){
  else if(kind==='celestial'){const [key,delta]=arg.split(',');if(Object.hasOwn(record.celestials,key))record.celestials[key]=Math.max(1,Math.min(10,record.celestials[key]+Number(delta)))}
  saveLoadouts()
 }
-function drawLoadout(){
+function loadoutPanel(title,subtitle,backLabel='BACK'){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.76)');rect(74,40,1452,820,'rgba(13,20,39,.98)','#ccb88e',20);
- text('LOADOUT',120,95,42,'#ffedd1','850');text('Configure weapons, runes, and celestials.',120,135,17,'#c4d6e5','550');addButton(1300,66,180,54,'loadout:back','MAIN MENU');
- for(let i=0;i<ROSTER.length;i++){const p=ROSTER[i],y=192+i*116,active=loadoutCharacterId===p.id;addButton(112,y,240,90,'loadout:character:'+p.id,p.name,p.test?'PLACEHOLDER • NO LOADOUT':'LEVEL '+progressFor(p.id).level,!p.test);if(active)rect(108,y-4,248,98,'rgba(0,0,0,0)','#f2d39c',12)}
- const model=roster(loadoutCharacterId),record=loadoutFor(loadoutCharacterId),w=record.weapon,stats=loadoutStats(loadoutCharacterId);
- text(model.name+' • SIGNATURE LOADOUT',405,94,24,'#f3dfb9','850');text('CHARACTER DUPLICATES '+record.characterDuplicates+'/4',405,135,14,'#d6e2ef','750');addButton(700,117,48,36,'loadout:character-duplicate:-1','−','',record.characterDuplicates>0);addButton(754,117,48,36,'loadout:character-duplicate:1','+','',record.characterDuplicates<4);
- rect(390,165,530,192,'rgba(25,37,58,.94)','#718ba4',12);text('SIGNATURE WEAPON',416,190,17,'#d6e2ef','850');
- addButton(414,214,220,52,'loadout:weapon-standard','STANDARD • '+w.standardPotential+'/5','+'+Math.round((.8+(w.standardPotential-1)*.05)*100)+'% ALL STATS',w.selected==='standard');
- addButton(650,214,242,52,'loadout:weapon-premium',w.premiumOwned?'PREMIUM • '+w.premiumPotential+'/5':'PREMIUM • STORE LOCKED',w.premiumOwned?'+'+Math.round((1+(w.premiumPotential-1)*.25)*100)+'% • DUPLICATES '+(w.premiumPotential-1):'Acquired in Store',w.premiumOwned);
- text('Potential',416,294,15,'#c4d6e5','700');addButton(505,274,54,40,'loadout:potential:standard,-1','−','',w.standardPotential>1);addButton(563,274,54,40,'loadout:potential:standard,1','+','',w.standardPotential<5);
- if(w.premiumOwned){addButton(670,274,54,40,'loadout:potential:premium,-1','−','',w.premiumPotential>1);addButton(728,274,54,40,'loadout:potential:premium,1','+','',w.premiumPotential<5)}
- text('Premium effect: spend 3 Enhance points to restore 1 SP. Costs are not configured.',416,337,13,'#aebfd0','550');
- rect(390,376,530,434,'rgba(25,37,58,.94)','#718ba4',12);text('COMBAT STATS • LEVEL '+progressFor(loadoutCharacterId).level,416,405,18,'#d6e2ef','850');
- const statsList=Object.entries(stats||{});for(let i=0;i<statsList.length;i++){const [name,value]=statsList[i],yy=443+i*37;text(name,420,yy,15,'#d6dceb','600');text(value===null?'—':Math.round(value),875,yy,17,'#fff1d5','800','right')}
- text('Weapon bonus: +'+Math.round(weaponBonus(record)*100)+'% to all six stats',416,680,15,'#f4d99c','750');
- text('Rune stats are flat. Substats contribute 50% of main-stat value.',416,706,12,'#aebfd0','550');
- text('CELESTIALS • +10% MULTIPLIER PER LEVEL • MAX 10',416,739,13,'#d6e2ef','800');
- for(let i=0;i<CELESTIALS.length;i++){const [key,label]=CELESTIALS[i],x=410+i*124,level=record.celestials[key];text(label+' '+level, x+54,766,12,'#f1dfbf','750','center');addButton(x,784,50,34,'loadout:celestial:'+key+',-1','−','',level>1);addButton(x+57,784,50,34,'loadout:celestial:'+key+',1','+','',level<10)}
- rect(948,165,540,645,'rgba(25,37,58,.94)','#718ba4',12);text('RUNES • UP TO FOUR • ONE SET',974,192,18,'#d6e2ef','850');text('Rune-set names/passives and rune inventory are pending definition.',974,219,13,'#aebfd0','550');
- for(let i=0;i<4;i++){const y=246+i*126,rune=record.runes[i],selected=i===selectedLoadoutRune;rect(970,y,494,116,'rgba(17,27,45,.9)',selected?'#edcf98':'#536983',9);addButton(978,y+8,72,38,'loadout:rune-select:'+i,'RUNE '+(i+1),'',selected);
-  if(!rune)addButton(1060,y+8,174,38,'loadout:rune-equip:'+i,'ADD RUNE • PREVIEW','',true);
-  else{text('Lv '+rune.level+'/5',1070,y+25,14,'#f1dfbf','750');addButton(1140,y+7,42,36,'loadout:rune-level:-1','−','',rune.level>1);addButton(1186,y+7,42,36,'loadout:rune-level:1','+','',rune.level<5);addButton(1240,y+7,96,36,'loadout:rune-remove','UNEQUIP','');
-   text('MAIN '+RUNE_STAT_INFO[rune.main].label+' +'+RUNE_STAT_INFO[rune.main].main*rune.level,986,y+65,12,'#f3d69d','700');addButton(986,y+78,142,31,'loadout:rune-main','CHANGE MAIN','');
-   for(let j=0;j<3;j++){const sub=rune.subs[j],x=1137+j*106;addButton(x,y+72,100,37,'loadout:rune-sub:'+j,RUNE_STAT_INFO[sub].label,'+'+(RUNE_STAT_INFO[sub].main*.25*rune.level),true)}
+ text(title,120,100,40,'#ffedd1','850');text(subtitle,120,139,17,'#c4d6e5','550');
+ addButton(1300,66,180,54,'loadout:back',backLabel);
+}
+function loadoutCharacter(){return roster(loadoutCharacterId)}
+function drawLoadoutCharacters(){
+ loadoutPanel('LOADOUT','Choose a character to open their equipment and progression menus.','MAIN MENU');
+ for(let i=0;i<ROSTER.length;i++){
+  const p=ROSTER[i],y=190+i*145,active=loadoutCharacterId===p.id;
+  rect(150,y,1300,118,'rgba(25,37,58,.94)',active?'#edcf98':'#718ba4',14);
+  addButton(174,y+20,1252,78,'loadout:character:'+p.id,p.name,p.test?'PLACEHOLDER • NO LOADOUT':'LEVEL '+(progressFor(p.id)?.level||1),!p.test);
+ }
+}
+function drawLoadoutMenu(){
+ const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId),progress=progressFor(loadoutCharacterId);
+ loadoutPanel(model.name+' • LOADOUT','Choose what you want to configure. Current character level: '+(progress?.level||1)+'.');
+ const cards=[
+  ['weapons','WEAPONS','Standard and premium signature weapon'],
+  ['runes','RUNES','Four rune slots and stat customization'],
+  ['celestials','CELESTIALS','Ability multipliers • four upgrades'],
+  ['levels','LEVELS','Character progression and combat stats']
+ ];
+ for(let i=0;i<cards.length;i++){
+  const [key,label,sub]=cards[i],x=190+(i%2)*620,y=210+Math.floor(i/2)*275;
+  rect(x,y,570,230,'rgba(25,37,58,.94)','#718ba4',14);
+  addButton(x+28,y+28,514,174,'loadout:page:'+key,label,sub);
+ }
+ text('WEAPON • '+record.weapon.selected.toUpperCase()+'     RUNES • '+record.runes.filter(Boolean).length+'/4     CELESTIALS • '+Object.values(record.celestials).map(v=>v+'/10').join('  '),800,790,14,'#c4d6e5','650','center');
+}
+function drawLoadoutWeapons(){
+ const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId),w=record.weapon;
+ loadoutPanel(model.name+' • WEAPONS','Each character can use only their own Standard or Premium signature weapon.');
+ const standardBonus=Math.round((.8+(w.standardPotential-1)*.05)*100),premiumBonus=Math.round((1+(w.premiumPotential-1)*.25)*100);
+ const cards=[{x:145,label:'STANDARD SIGNATURE',selected:w.selected==='standard',bonus:standardBonus,potential:w.standardPotential,type:'standard'},
+              {x:825,label:'PREMIUM SIGNATURE',selected:w.selected==='premium',bonus:premiumBonus,potential:w.premiumPotential,type:'premium'}];
+ for(const c of cards){
+  rect(c.x,205,630,470,'rgba(25,37,58,.94)',c.selected?'#edcf98':'#718ba4',14);
+  text(c.label,c.x+30,245,22,'#f3dfb9','850');
+  text(c.type==='standard'?'Included with '+model.name:'Acquired in the Store',c.x+30,278,15,'#c4d6e5','550');
+  text('+'+c.bonus+'% to all six stats',c.x+30,350,28,'#f4d99c','800');
+  text('POTENTIAL '+c.potential+' / 5',c.x+30,405,18,'#d6e2ef','750');
+  const usable=c.type==='standard'||w.premiumOwned;
+  addButton(c.x+30,438,570,64,c.type==='standard'?'loadout:weapon-standard':'loadout:weapon-premium',
+    usable?(c.selected?'EQUIPPED':'EQUIP'): 'PREMIUM • STORE LOCKED',
+    usable?'Signature weapon • character locked':'Premium weapon is not owned',usable);
+  if(c.type==='standard'||w.premiumOwned){
+   addButton(c.x+180,528,90,54,'loadout:potential:'+c.type+',-1','−','',c.potential>1);
+   addButton(c.x+360,528,90,54,'loadout:potential:'+c.type+',1','+','',c.potential<5);
+   text('Each potential changes the stat bonus.',c.x+315,613,14,'#aebfd0','550','center');
+  }
+ }
+ rect(145,705,1310,95,'rgba(25,37,58,.94)','#536983',12);
+ text('PREMIUM EFFECT • Spend 3 Enhance points to restore 1 Skill Point. Costs and acquisition are not configured.',175,755,16,'#d6e2ef','650');
+}
+function drawLoadoutRunes(){
+ const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId);
+ loadoutPanel(model.name+' • RUNES','Equip up to four runes. Main and substats are flat bonuses; each rune is level 1–5.');
+ for(let i=0;i<4;i++){
+  const x=125+(i%2)*690,y=190+Math.floor(i/2)*300,rune=record.runes[i],selected=i===selectedLoadoutRune;
+  rect(x,y,650,276,'rgba(25,37,58,.94)',selected?'#edcf98':'#718ba4',13);
+  text('RUNE SLOT '+(i+1),x+24,y+32,18,'#d6e2ef','850');
+  addButton(x+450,y+12,82,42,'loadout:rune-select:'+i,'SELECT','',selected);
+  if(!rune){
+   text('Empty slot',x+30,y+104,18,'#aebfd0','550');
+   addButton(x+30,y+150,590,64,'loadout:rune-equip:'+i,'ADD RUNE • PREVIEW','Rune inventory and set bonuses are not configured');
+   continue;
+  }
+  text('LEVEL '+rune.level+' / 5',x+250,y+32,15,'#f1dfbf','750','center');
+  addButton(x+306,y+12,44,42,'loadout:rune-level:-1','−','',rune.level>1);
+  addButton(x+356,y+12,44,42,'loadout:rune-level:1','+','',rune.level<5);
+  addButton(x+540,y+12,92,42,'loadout:rune-remove','UNEQUIP');
+  const main=RUNE_STAT_INFO[rune.main];
+  text('MAIN  '+main.label+'  +'+main.main*rune.level,x+28,y+83,15,'#f3d69d','750');
+  addButton(x+430,y+57,190,42,'loadout:rune-main','CHANGE MAIN');
+  for(let j=0;j<3;j++){
+   const sub=rune.subs[j],sx=x+24+j*204,info=RUNE_STAT_INFO[sub];
+   addButton(sx,y+135,194,82,'loadout:rune-sub:'+j,info.label,'+'+(info.main*.25*rune.level));
   }
  }
 }
-
+function drawLoadoutCelestials(){
+ const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId);
+ loadoutPanel(model.name+' • CELESTIALS','Four ability-specific upgrades. Each level adds 10% to that ability’s base multiplier.');
+ for(let i=0;i<CELESTIALS.length;i++){
+  const [key,label]=CELESTIALS[i],x=165+(i%2)*650,y=195+Math.floor(i/2)*292,level=record.celestials[key];
+  rect(x,y,600,258,'rgba(25,37,58,.94)','#718ba4',14);
+  text(label.toUpperCase(),x+30,y+48,22,'#f3dfb9','850');
+  text('LEVEL '+level+' / 10',x+30,y+100,20,'#d6e2ef','700');
+  text('+'+(level*10)+'% base multiplier',x+30,y+145,17,'#f4d99c','750');
+  addButton(x+330,y+75,92,70,'loadout:celestial:'+key+',-1','−','',level>1);
+  addButton(x+445,y+75,92,70,'loadout:celestial:'+key+',1','+','',level<10);
+ }
+}
+function drawLoadoutLevels(){
+ const model=loadoutCharacter(),progress=progressFor(loadoutCharacterId),record=loadoutFor(loadoutCharacterId),cap=characterLevelCap(),stats=loadoutStats(loadoutCharacterId);
+ loadoutPanel(model.name+' • LEVELS','Review character level, level cap, and current combat stats.');
+ rect(130,190,610,650,'rgba(25,37,58,.94)','#718ba4',14);
+ text('CHARACTER LEVEL',165,235,20,'#f3dfb9','850');
+ text('LEVEL '+progress.level+' / '+cap,165,290,30,'#fff1d5','850');
+ const expNeeded=requiredExp(progress.level),atGate=ASCENSION_GATES.includes(progress.level)&&!progress.ascended.includes(progress.level);
+ text(progress.level>=cap?'Current level cap reached':atGate?'Ascension required at this level':'EXP  '+progress.exp+' / '+expNeeded,165,345,18,'#d6e2ef','700');
+ text('Account rank '+playerRank+' sets the current level cap.',165,398,15,'#aebfd0','550');
+ text('Ascensions completed: '+(progress.ascended.length?progress.ascended.join(', '):'none'),165,434,14,'#aebfd0','550');
+ text('Level scaling multiplies base stats by character level.',165,490,14,'#c4d6e5','550');
+ text('EXP sources and ascension materials are not configured.',165,520,14,'#c4d6e5','550');
+ text('CURRENT COMBAT STATS',165,580,17,'#f3dfb9','800');
+ const statList=Object.entries(stats||{});
+ for(let i=0;i<statList.length;i++){
+  const [name,value]=statList[i],x=165+(i%2)*275,y=610+Math.floor(i/2)*28;
+  text(name+'  '+(value===null?'—':Math.round(value)),x,y,14,'#d6dceb','650');
+ }
+ rect(790,190,680,450,'rgba(25,37,58,.94)','#718ba4',14);
+ text('CHARACTER DUPLICATES',830,240,21,'#f3dfb9','850');
+ text('Duplicate preview: '+record.characterDuplicates+' / 4',830,295,19,'#d6e2ef','700');
+ addButton(830,335,95,58,'loadout:character-duplicate:-1','−','',record.characterDuplicates>0);
+ addButton(940,335,95,58,'loadout:character-duplicate:1','+','',record.characterDuplicates<4);
+ text('Duplicate effects currently preview without resource costs.',830,430,14,'#aebfd0','550');
+ text('Levels affect all six base combat stats.',830,490,16,'#d6e2ef','650');
+ text('Current loadout bonuses are included in the stat values.',830,525,14,'#aebfd0','550');
+}
+function drawLoadout(){
+ if(loadoutPage==='characters')return drawLoadoutCharacters();
+ if(loadoutPage==='menu')return drawLoadoutMenu();
+ if(loadoutPage==='weapons')return drawLoadoutWeapons();
+ if(loadoutPage==='runes')return drawLoadoutRunes();
+ if(loadoutPage==='celestials')return drawLoadoutCelestials();
+ return drawLoadoutLevels();
+}
 function drawMainMenu(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.68)');
  text('TWO-TONE',800,112,58,'#f8f4ea','900','center');
