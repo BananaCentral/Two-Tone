@@ -49,7 +49,7 @@ Calculated stats scale with Level and use the matching stat standards.
 ## Ultimate
 
 - Costs 100 Energy.
-- Deals True damage to all enemies at a 2.0× multiplier.
+- Deals True damage as a Blast at a 2.0× multiplier, hitting the selected enemy and up to two adjacent enemies. Each target receives full damage.
 - After its damage resolves, refills Follow Up to 5 procs.
 
 ## Implementation Notes
