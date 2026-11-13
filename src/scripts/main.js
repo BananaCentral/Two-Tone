@@ -534,6 +534,7 @@ function beginTargetSelection(action,actorId=activeId){
  const actor=party.find(p=>p.id===actorId);if(!actor||actor.hp<=0)return false;
  if(action==='ultimate'&&!canQueueUltimate(actor)){say(actor.hp<=0?'Defeated ally cannot use an Ultimate.':'Ultimate needs '+ULTIMATE_ENERGY_COST+' available Energy.');return false}
  if(pendingTargetAction?.action===action&&pendingTargetAction.actorId===actorId){pendingTargetAction=null;cameraPreview=null;say('Target selection canceled.');return true}
+ if(action==='ultimate'&&actionTargetMode(actor,action)==='aoe'){pendingTargetAction=null;cameraPreview=null;return queueUltimate(actorId)}
  pendingTargetAction={action,actorId};cameraPreview='target';supportDemo=null;selectedAllyId=null;
  say(`Select an enemy for ${actor.name}'s ${action.toUpperCase()}. Tap the ability again to cancel.`);return true;
 }

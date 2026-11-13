@@ -36,7 +36,7 @@ This standard defines how combat turns are scheduled and how actions affect turn
 
 ## Ultimates
 
-- An Ultimate is an off-turn action and does not consume a scheduled turn. In the battle interface, select the Ultimate first, then select an enemy to confirm it; the Ultimate user is shown during targeting and its camera cut-in.
+- An Ultimate is an off-turn action and does not consume a scheduled turn. In the battle interface, select the Ultimate first. An Ultimate with a target pattern that requires a primary target then waits for an enemy selection; an AoE Ultimate that hits every enemy activates immediately. Show the Ultimate user in its camera cut-in.
 - If no attack is underway, it begins immediately. Otherwise, it waits until that attack resolves, then executes before the next scheduled turn.
 - After an Ultimate used before the character's normal action, that character keeps their scheduled turn and may still use Basic or Skill.
 - Multiple queued Ultimates resolve in request order.
