@@ -939,11 +939,10 @@ function drawLoadoutRunes(){
   addButton(x+356,y+12,44,42,'loadout:rune-level:1','+','',rune.level<5);
   addButton(x+540,y+12,92,42,'loadout:rune-remove','UNEQUIP');
   const main=RUNE_STAT_INFO[rune.main];
-  text('MAIN  '+main.label+'  +'+main.main*rune.level,x+28,y+83,15,'#f3d69d','750');
-  addButton(x+430,y+57,190,42,'loadout:rune-main','CHOOSE MAIN STAT');
+  addButton(x+24,y+58,602,64,'loadout:rune-main','MAIN STAT • '+main.label,'+'+(main.main*rune.level)+' • SELECT TO CHANGE');
   for(let j=0;j<3;j++){
    const sub=rune.subs[j],sx=x+24+j*204,info=RUNE_STAT_INFO[sub];
-   addButton(sx,y+135,194,82,'loadout:rune-sub:'+j,info.label,'+'+(info.main*.25*rune.level));
+   addButton(sx,y+140,194,92,'loadout:rune-sub:'+j,info.label,'+'+(info.main*.25*rune.level));
   }
  }
  const rune=record.runes[selectedLoadoutRune];if(rune)drawRuneStatPicker(rune);
@@ -1417,7 +1416,7 @@ function drawAllyPortraitHud(){
   rect(x,top,cardW,cardH,'rgba(14,23,42,.96)',activeAlly?'#f3d79e':'rgba(129,164,191,.82)',12);
   hudPortrait(p.id==='zero'?images.zeroFront:null,portraitX,portraitY,portraitSize,portraitSize,true);
   if(ko)rect(portraitX,portraitY,portraitSize,portraitSize,'rgba(30,17,23,.62)',null,10);
-  drawAllyUltimate(p,x+100,top-1,128);
+  drawAllyUltimate(p,x+95,top-11,136);
   drawAllyStatuses(p,portraitX,portraitY,portraitSize);
   text(ko?'0 / '+p.maxHp:`${p.hp} / ${p.maxHp}`,x+cardW-12,top+136,14,ko?'#f0afb7':'#e4f3ef','750','right');
   line(x+12,top+146,cardW-24,ko?0:p.hp/p.maxHp,ko?'#b16b76':'#67e3b4','#23374d',14);
