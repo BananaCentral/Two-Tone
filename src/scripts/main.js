@@ -1994,7 +1994,6 @@ function drawHud(t){
  }
  ctx.restore();
  if(ultimateQueue.length){const names=ultimateQueue.map(q=>party.find(p=>p.id===q.actorId)?.name||q.actorId).join(' → ');rect(965,769,287,38,'rgba(28,35,49,.82)','rgba(219,195,130,.53)',10);text(`ULT QUEUE ${names.slice(0,23)}`,978,788,14,'#f3e3bc','750')}
- if(phase==='player'&&log){text(log.length>84?log.slice(0,83)+'…':log,730,742,14,'#d7e1ed','550')}
  if(phase==='resolve'&&log){rect(420,615,760,44,'rgba(9,17,31,.92)','rgba(177,203,226,.62)',11);text(log.length>76?log.slice(0,75)+'…':log,800,637,17,'#eff6ff','750','center')}
  if(devPanelOpen&&!['victory','defeat'].includes(phase))drawDeveloperPanel();
  if(paused)drawPause();if(phase==='victory'||phase==='defeat')drawResult();
@@ -2032,7 +2031,10 @@ function drawSetup(){
  addButton(538,542,470,58,'toggle-recovery','TOGGLE HP RECOVERY MODE',trainingRecoveryMode==='restore'?'CURRENT: RESTORE':'CURRENT: PRESERVE');
  addButton(1039,733,313,79,'start','START BATTLE','Current party',validTeam(draft));
 }
-function drawHint(t){if(hint&&t-hintAt<2300){rect(474,393,652,76,'rgba(15,21,39,.98)','#e6b98a',12);text(hint,800,431,20,'#fff4e8','700','center')}}
+// Transient hint popovers belong to menus and setup screens. Combat has
+// dedicated turn, targeting, and action-resolution cues; overlaying another
+// message on the battlefield obscures character cards and action effects.
+function drawHint(t){if(hint&&t-hintAt<2300&&['startup','menu','partySetup','loadout','setup'].includes(phase)){rect(474,393,652,76,'rgba(15,21,39,.98)','#e6b98a',12);text(hint,800,431,20,'#fff4e8','700','center')}}
 function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='startup'){drawStartupMenu()}else if(phase==='menu'){drawMainMenu()}else if(phase==='partySetup'){drawPartySetup()}else if(phase==='loadout'){drawLoadout()}else if(phase!=='setup'){
   const hit=zeroBasicStage(t);ctx.save();if(hit!==null&&hit>=645&&hit<=760){const q=1-(hit-645)/115;ctx.translate(Math.sin(hit*.42)*q*4,Math.cos(hit*.33)*q*2.5)}
   drawCameraStage(t);drawFx(t);ctx.restore();drawHud(t)
