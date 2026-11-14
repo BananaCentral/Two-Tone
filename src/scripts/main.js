@@ -215,6 +215,18 @@ function applyLifesteal(attacker,healthDamage){
  const hpBefore=attacker.hp;healCharacterHp(attacker,roundHp(healthDamage*rate));const healing=Math.max(0,attacker.hp-hpBefore);
  if(healing>0)emitCombatVisual('lifesteal-heal',[attacker.id],850,{healing});return healing;
 }
+function tauntRateOf(unit){return Math.min(1,Math.max(0,...(unit?.tauntEffects||[]).filter(effect=>Number.isInteger(effect.turns)&&effect.turns>0).map(effect=>effect.rate)))}
+function applyTaunt(target,source,rate,turns){
+ if(!target||!source||!Number.isFinite(rate)||rate<0||rate>1||!Number.isInteger(turns)||turns<1)return false;
+ target.tauntEffects=Array.isArray(target.tauntEffects)?target.tauntEffects:[];target.tauntEffects=target.tauntEffects.filter(effect=>effect.sourceId!==source.id);target.tauntEffects.push({sourceId:source.id,rate,turns});
+ emitCombatVisual('taunt-applied',[target.id],900,{rate,turns});return true;
+}
+function resolveTauntTarget(candidates,originalTarget,random=Math.random){
+ const contenders=[...new Set(candidates)].map(unit=>({unit,rate:tauntRateOf(unit)})).filter(entry=>entry.rate>0).sort((a,b)=>b.rate-a.rate||String(a.unit.id).localeCompare(String(b.unit.id)));
+ for(const {unit,rate} of contenders)if(random()<rate)return {target:unit,taunted:true};
+ return {target:originalTarget,taunted:false};
+}
+function ageTaunt(unit){if(!unit?.tauntEffects)return false;unit.tauntEffects=unit.tauntEffects.map(effect=>({...effect,turns:effect.turns-1})).filter(effect=>effect.turns>0);return true}
 function characterLevelCap(rank=playerRank){return Number.isInteger(rank)&&rank>=1&&rank<=50?Math.ceil(rank/10)*10:0}
 function requiredExp(level){return Number.isInteger(level)&&level>=1&&level<CHARACTER_MAX_LEVEL?level*(10*(1+Math.floor(level/5))):0}
 function defaultProgress(){return {level:1,exp:0,ascended:[]}}
@@ -338,7 +350,7 @@ function spawnProgressedUnit(id){
  const savedMax=Number.isFinite(saved?.maxHp)&&saved.maxHp>0?saved.maxHp:maxHp;
  const savedHp=Number.isFinite(saved?.hp)?saved.hp:maxHp;
  const hp=restore?maxHp:savedHp<=0?0:Math.max(0,roundHp(maxHp*(savedHp/savedMax)));
- return {...model,baseHp:model.hp,level:progress.level,hp,maxHp,...modifiers,energy:20,energyReserved:0};
+ return {...model,baseHp:model.hp,level:progress.level,hp,maxHp,...modifiers,tauntEffects:[],energy:20,energyReserved:0};
 }
 
 const turnTimeline=new TwoToneTurnTimeline();
@@ -680,7 +692,7 @@ function enterEnemy(slot){
  const queueIndex=waveQueue.findIndex(canDeployEnemy);if(queueIndex<0)return null;
  const [incoming]=waveQueue.splice(queueIndex,1),formation=ENEMY_FORMATIONS[slot];
  const barrier=roundHp(incoming.maxHp*incoming.barrierPercent);
- const e={...incoming,slot,x:formation.x,y:formation.y,w:formation.w,h:formation.h,hp:incoming.maxHp,maxBarrier:barrier,barrier,brokenTurns:0,debuffs:[],marks:[]};
+ const e={...incoming,slot,x:formation.x,y:formation.y,w:formation.w,h:formation.h,hp:incoming.maxHp,maxBarrier:barrier,barrier,brokenTurns:0,debuffs:[],marks:[],tauntEffects:[]};
  if(premiumWeaponDuplicateRank('lily')>=1&&party.some(p=>p.id==='lily'))e.marks.push({id:'soul-mark',turns:2},{id:'ricochet',turns:2,sources:[]});
  enemies.push(e);enemies.sort((a,b)=>a.slot-b.slot);gauges[e.id]=0;
  spawnHistory.push({wave:e.wave,id:e.id,slot,initial:waveKills===0,duringAttack:attackInProgress});
@@ -758,7 +770,7 @@ function triggerRicochet(sourceAttack,hitEnemy,sourceDamage){
  }
  emitCombatVisual('lily-ricochet-trigger',triggered.map(e=>e.id),900,{damageByTarget});sourceAttack.ricochetFollowUp=false;syncEnemyHp();return triggered.length;
 }
-function cleanseEnemy(enemy,full=true){if(full){enemy.debuffs=[];enemy.marks=[];enemy.bleedStacks=[];return}enemy.debuffs.shift();enemy.marks.shift()}
+function cleanseEnemy(enemy,full=true){if(full){enemy.debuffs=[];enemy.marks=[];enemy.bleedStacks=[];enemy.tauntEffects=[];return}enemy.debuffs.shift();enemy.marks.shift()}
 function teamBaseTurns(faction){
  const allyAverage=TwoToneTurnTimeline.mean(party.map(p=>speedOf(p)));
  const enemyMembers=timelineEnemyMembers(),enemyAverage=TwoToneTurnTimeline.mean(enemyMembers.map(e=>speedOf(e)));
@@ -893,7 +905,8 @@ function resolveEnemyBasicAttack(attacker,candidates){
  const basic=attacker.basicAttack||{},passive=attacker.passive?.id==='slimy'?attacker.passive:null,rampage=attacker.passive?.id==='rampage';
  if(passive)attacker.basicAttackCount=(attacker.basicAttackCount||0)+1;
  const enhanced=!!passive&&attacker.basicAttackCount%passive.every===0,mode=enhanced?'aoe':basic.targetMode||'single';
- const primary=candidates[Math.floor(Math.random()*candidates.length)];
+ const originalPrimary=candidates[Math.floor(Math.random()*candidates.length)],tauntSelection=mode==='aoe'?{target:originalPrimary,taunted:false}:resolveTauntTarget(candidates,originalPrimary),primary=tauntSelection.target||originalPrimary;
+ if(tauntSelection.taunted)emitCombatVisual('taunt-redirect',[primary.id],850,{rate:tauntRateOf(primary)});
  const targets=mode==='aoe'?[...candidates]:mode==='blast'?candidates.filter(target=>Math.abs(party.indexOf(target)-party.indexOf(primary))<=1):[primary];
  const multiplier=(basic.multiplier??1)*(enhanced?1+(passive?.damageBonus||0):1)*(rampage?1+(attacker.passive.damageBonus??.25)*(attacker.rampageStacks||0):1)*(attacker.debuffs||[]).reduce((v,d)=>v*(d.damageMultiplier??1),1);
  const hits=targets.map(target=>{
@@ -917,12 +930,13 @@ function nextTurn(){
  if(actingSummon){executeIndependentSummonTurn(actingSummon);return;}
  const attacking=enemies.find(e=>e.id===next&&e.hp>0);
  if(attacking&&attacking.bleedStacks?.length){resolveBleedTick(attacking);if(attacking.hp<=0){resolveEnemyDefeat(attacking);schedule(()=>nextTurn(),COMBAT_ACTION_PHASE_GAP_MS);return}}
+ ageTaunt(attacking);
  if(attacking&&attacking.brokenTurns>0){attacking.brokenTurns--;if(attacking.brokenTurns===0){attacking.barrier=attacking.maxBarrier;cleanseEnemy(attacking);addActionAdvance(attacking.id,100);}schedule(()=>nextTurn(),0);return;}
  if(attacking?.marks)attacking.marks=attacking.marks.map(m=>({...m,turns:m.turns-1})).filter(m=>m.turns>0);
  if(attacking?.debuffs)attacking.debuffs=attacking.debuffs.map(d=>({...d,turns:d.turns-1})).filter(d=>d.turns>0);
  if(attacking){activeId=null;zeroSkillArmed=false;pendingTargetAction=null;actingEnemyId=next;cameraPreview=null;phase='enemy';log=`${attacking.name} prepares an attack.`;
   schedule(()=>{if(phase!=='enemy'||paused)return;if(attacking.hp<=0){nextTurn();return}const candidates=alive();if(!candidates.length){cancelAllQueuedUltimates('defeat');phase='defeat';return}enemyCount++;const attack=resolveEnemyBasicAttack(attacking,candidates),firstHit=attack.hits[0];saveVitals();cancelQueuedUltimatesOfDefeated();const visual=ENEMY_ACTION_VISUALS[attacking.archetypeId]?.basic||ENEMY_ACTION_VISUALS.slime.basic;fx={kind:'enemy',visual,at:performance.now(),damage:firstHit.damage,target:firstHit.target,hits:attack.hits,actorEnemyId:attacking.id};log=attack.enhanced?`${attacking.name} uses Slimy against all allied characters.`:attack.mode==='aoe'?`${attacking.name} attacks all allied characters for ${firstHit.damage} damage each.`:attack.mode==='blast'?`${attacking.name} blasts ${attack.hits.length} allied characters.`:`${attacking.name} hits ${party.find(p=>p.id===firstHit.target)?.name||'an ally'} for ${firstHit.damage}.`;phase='resolve';schedule(()=>drainUltimateQueueBefore(()=>{if(!alive().length){phase='defeat';log='All allied characters were defeated.'}else nextTurn()}),1000)},780);
- }else{actingEnemyId=null;activeId=next;zeroSkillArmed=false;pendingTargetAction=null;cameraPreview=null;turnCamera={fromId:previousActor,toId:next,start:performance.now(),duration:560};phase='player';log=`${active().name}'s turn — select an ability, then choose an enemy.`;}
+ }else{actingEnemyId=null;activeId=next;ageTaunt(party.find(unit=>unit.id===next));zeroSkillArmed=false;pendingTargetAction=null;cameraPreview=null;turnCamera={fromId:previousActor,toId:next,start:performance.now(),duration:560};phase='player';log=`${active().name}'s turn — select an ability, then choose an enemy.`;}
 }
 // Normal turns can use Basic or Skill. Ultimate is off-turn and never spends a turn.
 function play(action){
@@ -1687,6 +1701,11 @@ function drawCombatVisualEvents(t,shot){
    for(const id of event.targetIds){const pos=enemyVisualPosition(id);if(!pos)continue;drawCombatSigil(pos.x,pos.y,32+q*24,'#e85b77',fade,'ring');const label=event.type==='bleed-tick'?`BLEED -${event.damage??0} • ${event.stacks??0} LEFT`:`BLEED ${event.stacks??0}/${enemies.find(enemy=>enemy.id===id)?.bleedMaxStacks||5}`;text(label,pos.x,pos.y-64,14,`rgba(255,197,208,${fade})`,'900','center')}
    continue;
   }
+  if(event.type==='taunt-applied'||event.type==='taunt-redirect'){
+   const view=shotWorld(shot)==='reverse'?'party':'command',pan=view==='party'?.32:.52;
+   for(const id of event.targetIds){const ally=party.find(unit=>unit.id===id),allyPosition=ally&&cameraAllyPosition(id,view),enemyPosition=!ally&&enemyVisualPosition(id);const x=allyPosition?allyPosition.x+allyPosition.w/2+camera.currentX*pan:enemyPosition?.x,y=allyPosition?allyPosition.baseY-allyPosition.h*.62:enemyPosition?.y;if(!Number.isFinite(x)||!Number.isFinite(y))continue;drawCombatSigil(x,y,34+q*23,'#83dcff',fade,'ring');const rate=Math.round((event.rate??tauntRateOf(ally||enemies.find(unit=>unit.id===id)))*100);text(event.type==='taunt-redirect'?`TAUNT REDIRECT • ${rate}%`:`TAUNT ${rate}% • ${event.turns} TURN${event.turns===1?'':'S'}`,x,y-62,14,`rgba(203,243,255,${fade})`,'900','center')}
+   continue;
+  }
   if(event.type==='slime-residue'){
    const view=shotWorld(shot)==='reverse'?'party':'command',pan=view==='party'?.32:.52;
    for(const id of event.targetIds){const ally=party.find(p=>p.id===id),pos=ally&&cameraAllyPosition(id,view);if(!pos)continue;const x=pos.x+pos.w/2+camera.currentX*pan,y=pos.baseY-pos.h*.58;drawCombatSigil(x,y,32+q*22,'#a5ed43',fade,'ring');text(`RESIDUE ${ally.residueStacks}/${RESIDUE_RULES.maxStacks}`,x,y-62,14,`rgba(222,255,173,${fade})`,'900','center')}
@@ -2011,4 +2030,6 @@ window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLeve
  unitTrueDamageBasis:party.map(p=>({id:p.id,trueAttack:calculateTrueAttack(p),trueDefense:calculateTrueDefense(p),selfTrueDamageReduction:calculateTrueDamageReduction(p,p)}))});
 window.twoToneTest={testGrantExp,testAscend,setPlayerRankForTest,setHpBonusForTest,calculateMaxHp,calculateLevelScaledStat,calculatePhysicalAttack,calculateMagicalAttack,calculatePhysicalDefense,calculateMagicalDefense,calculateTrueAttack,calculateTrueDefense,calculateTrueDamageReduction,calculateDamageAfterDefense,calculatePhysicalDamageAfterDefense,calculateMagicalDamageAfterDefense,calculateTrueDamageAfterDefense,calculateTypedActionDamage,requiredExp,setTrainingRecoveryMode,roundHp,addActionAdvance,addActionDelay,setSpeedMultiplierForTest,queueSummonForTest,turnTimelineSnapshot:()=>turnTimeline.snapshot(),queueUltimate,chargeUltimateForTest,toggleHudStatusDemo,setHudStatusesForTest:(id,items)=>{const p=party.find(p=>p.id===id);if(!p||!Array.isArray(items)||items.length>80)return false;p.hudStatuses=items.map(e=>({kind:e.kind==='debuff'?'debuff':'buff',icon:String(e.icon||'✦').slice(0,2),turns:e.turns===null?null:(Number.isInteger(e.turns)&&e.turns>=0?e.turns:null)}));return true;},setSpCapTestSource,cycleSpCapTest,canQueueUltimate,debugKOForTest:(id)=>{if(['setup','intro','victory','defeat'].includes(phase))return false;const p=party.find(p=>p.id===id);if(!p||p.hp<=0)return false;p.hp=0;gauges[p.id]=0;saveVitals();cancelQueuedUltimatesOfDefeated();return true},startBattle,addUnit,removeUnit,enterSelection,enterPartySetup,saveParty,testKO,testRevive,play,replay,zeroSkillControl,setTargetingMode,startSupportDemo,confirmSupportDemo,cancelSupportDemo,eligibleAllyTarget:(id,kind)=>eligibleAllyTarget(party.find(p=>p.id===id),kind),setEnemyHpForTest:(id,hp)=>{if(phase!=='player'||attackInProgress)return false;const e=liveEnemies().find(e=>e.id===id);if(!e||!Number.isFinite(hp)||hp<1||hp>e.maxHp)return false;e.hp=hp;syncEnemyHp();return true},applyBleedForTest:(enemyId,sourceId,stacks=1,maxStacks=5)=>{const enemy=liveEnemies().find(unit=>unit.id===enemyId),source=party.find(unit=>unit.id===sourceId);return enemy&&source?applyBleed(enemy,source,stacks,maxStacks):false},setEnemyTarget,setWavePlanForTest,toggleWavePreset,setEnemyRoster,debugDefeatEnemy:(id)=>{const e=liveEnemies().find(e=>e.id===id);if(!e||phase==='setup'||phase==='victory'||phase==='defeat')return false;e.hp=0;resolveEnemyDefeat(e);return true;},selectEnemy:(id)=>setEnemyTarget(id),setCameraPreview:(view)=>{if(phase==='player'){cameraPreview=view;selectedAllyId=activeId}},cameraStatus:()=>cameraShot()};
 window.zeroBasicAnimationDebug=()=>({durationMs:SOUL_BASIC_MS,elapsed:fx?.kind==='basic'&&fx.actor==='zero'?Math.max(0,performance.now()-fx.at):null,active:zeroBasicStage(performance.now())!==null,assets:['zero','zeroBasicWindup','zeroBasicSlash'].map(id=>({id,loaded:!!images[id]?.complete&&!!images[id]?.naturalWidth}))});
+window.twoToneTest.applyTauntForTest=(targetId,sourceId,rate,turns)=>{const target=party.find(unit=>unit.id===targetId)||enemies.find(unit=>unit.id===targetId),source=party.find(unit=>unit.id===sourceId)||enemies.find(unit=>unit.id===sourceId);return target&&source?applyTaunt(target,source,rate,turns):false};
+window.twoToneTauntStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,activeRate:tauntRateOf(unit),effects:(unit.tauntEffects||[]).map(effect=>({...effect}))}));
 requestAnimationFrame(loop);

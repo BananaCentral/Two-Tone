@@ -38,6 +38,8 @@ All simulated units default to 10% Critical Rate and 50% Critical Damage. These 
 
 Lifesteal is another hidden stat and defaults to 0 for all units. Set `lifesteal` to a decimal rate (for example, `0.1` for 10%); `lifestealBonus` adds a rate bonus. Healing is based on actual HP damage after all damage modifiers and HP caps, including Barrier shatter HP damage but excluding Barrier damage. Healing is capped at the source's missing HP. Battle and batch output report Lifesteal healing by side, and ally `averageUnitStats` include healing per archetype.
 
+Taunt uses an optional `taunt: { "rate": 0.5, "turns": 2 }` field on a unit archetype or instance. It is checked for automatic primary-target selection in descending rate order, then falls back to the normal target if all rolls fail. Duration is measured in the bearer’s turns. Explicit player-selected targets and AoE target sets are not changed by Taunt.
+
 Supported Skill and Passive effect types:
 
 - `enhanceBasic`: consumes available shared Skill Points before that unit's Basic. Configure added multiplier, Energy per stack, and the stack threshold that changes Basic to Blast (Premium Soul Weapon Duplicate 3 changes it to AoE).
@@ -52,6 +54,7 @@ Supported Skill and Passive effect types:
 - `lethalImpact`: the Slime Monster ignores 25% of both defenses on its AoE magical attack.
 - `lifesteal`: heals the damage source for its configured fraction of final actual HP damage. It applies to allies and enemies, including simulated direct and follow-up damage.
 - `bleed`: an optional ally passive that applies a Bleed stack when its attacks hit living enemies. The enemy ticks all stacks for 2% of its Max HP per stack at the start of its scheduled turn, then loses one stack. Five stacks is the default cap; `maxStacks` and `stacksPerHit` can be configured. Bleed is true damage, bypasses Barrier and defense, cannot crit, and is attributed to its applier (including Lifesteal).
+- `taunt`: redirects automatic targeting toward the unit holding the effect according to its configured chance and duration. When several bearers have Taunt, the simulator checks them from highest chance down.
 
 Lily's Ultimate creates an independent Hauntling after its initial AoE. It acts immediately, then takes two more scheduled turns, dealing AoE True damage with Lily's stats. Duplicate 1 applies a one-turn 10% enemy damage reduction; Duplicate 3 doubles initial Ultimate damage and adds a Hauntling turn. Lily's Premium weapon effects are not modeled.
 

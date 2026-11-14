@@ -48,6 +48,8 @@ function validateConfig(config) {
       assert([instance.criticalRateBonus,archetype.criticalRateBonus,instance.criticalDamageBonus,archetype.criticalDamageBonus].every(value=>value===undefined||(Number.isFinite(value)&&value>=0)),'Critical bonuses must be finite non-negative values.');
       assert([instance.lifesteal,archetype.lifesteal].every(value=>value===undefined||(Number.isFinite(value)&&value>=0)),'Lifesteal rates must be finite non-negative values.');
       assert([instance.lifestealBonus,archetype.lifestealBonus].every(value=>value===undefined||(Number.isFinite(value)&&value>=0)),'Lifesteal bonuses must be finite non-negative values.');
+      const taunt=instance.taunt??archetype.taunt;
+      assert(taunt===undefined||(taunt&&Number.isFinite(taunt.rate)&&taunt.rate>=0&&taunt.rate<=1&&Number.isInteger(taunt.turns)&&taunt.turns>0),'Taunt needs a rate from 0 to 1 and a positive integer duration.');
       assert(archetype.basic && Number.isFinite(archetype.basic.multiplier) && ['physical', 'magical', 'true'].includes(archetype.basic.damageType), 'Archetype ' + instance.archetype + ' needs a typed Basic Attack.');
       assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage', 'exposed', 'resourceful', 'residue', 'lethalImpact', 'bleed'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
       for (const passive of archetype.passives || []) {
@@ -137,6 +139,7 @@ function instantiate(config, side) {
       marks: [],
       bleedStacks:[],
       bleedMaxStacks:archetype.passives?.find(passive=>passive.type==='bleed')?.maxStacks??5,
+      tauntEffects:(instance.taunt??archetype.taunt)?[{sourceId:instance.id,rate:(instance.taunt??archetype.taunt).rate,turns:(instance.taunt??archetype.taunt).turns}]:[],
       barriersBroken: 0,
       energy: Math.max(0, Math.min(maxEnergy, instance.energy ?? archetype.energy?.start ?? 0)),
       maxEnergy,
@@ -191,6 +194,8 @@ function resolveBleedTick(state,target){
  for(const [source,rawDamage] of bySource){const damage=roundStat(rawDamage*(1-(target.tune?.damageReduction||0))*(target.brokenTurns>0?1.5:1)),actual=Math.min(target.hp,damage);target.hp=Math.max(0,target.hp-damage);target.damageTaken+=actual;source.damageDealt+=actual;state.damageBySide.allies+=actual;healFromLifesteal(state,source,actual);total+=actual;if(target.hp<=0)break}
  target.bleedStacks.shift();return total;
 }
+function tauntRateOf(unit){return Math.max(0,...(unit.tauntEffects||[]).filter(effect=>effect.turns>0).map(effect=>effect.rate))}
+function ageTaunt(unit){unit.tauntEffects=(unit.tauntEffects||[]).map(effect=>({...effect,turns:effect.turns-1})).filter(effect=>effect.turns>0)}
 function defenseValue(unit, type) {
   if (type === 'physical') return unit.stats.physicalDefense;
   if (type === 'magical') return unit.stats.magicalDefense;
@@ -256,9 +261,11 @@ function brokenDuration(speed, baseTurns) {
 function chooseTarget(actor, candidates, mode, random) {
   if (!candidates.length) return [];
   if (mode === 'aoe') return [...candidates];
-  const primary = mode === 'lowestHp' || (actor.side !== 'enemies' && mode !== 'random')
+  let primary = mode === 'lowestHp' || (actor.side !== 'enemies' && mode !== 'random')
     ? candidates.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp || a.id.localeCompare(b.id))[0]
     : candidates[Math.floor(random() * candidates.length)];
+  const taunts=candidates.map(unit=>({unit,rate:tauntRateOf(unit)})).filter(entry=>entry.rate>0).sort((a,b)=>b.rate-a.rate||a.unit.id.localeCompare(b.unit.id));
+  for(const entry of taunts)if(random()<entry.rate){primary=entry.unit;break;}
   if (mode === 'blast') return candidates.filter(unit => Math.abs(unit.slot - primary.slot) <= 1).sort((a, b) => a.slot - b.slot);
   return [primary];
 }
@@ -485,6 +492,7 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
     actor.timeToNextTurn += 1 / actor.turnRate;
     state.actions++;
     actor.turns++;
+    ageTaunt(actor);
     if (actor.side === 'allies') {
       state.allyTurns++;
       resolveAllyAction(state, actor);

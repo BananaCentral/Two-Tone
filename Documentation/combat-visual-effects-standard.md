@@ -36,6 +36,9 @@ This standard defines how combat actions and passive effects receive readable, c
 | Slime Leader | Basic / blast | Bright green globules and an expanding target ring on each ally in the blast |
 | Slime Monster | Basic / AoE | Wide green shockwave with slime motes across the allied formation |
 | Wolf | Basic | Three red claw strokes on affected allies |
+| Combat system | Lifesteal | Green recovery ring and `LIFESTEAL +N` on the source |
+| Combat system | Bleed | Red stack ring on application and a damage / remaining-stack cue on each tick |
+| Combat system | Taunt | Cyan ring and chance label when applied; `TAUNT REDIRECT` when it changes a target |
 
 The character and enemy visual registries are implemented in `src/scripts/main.js` as `ACTION_VISUALS` and `ENEMY_ACTION_VISUALS`, with the combat visual drawing helpers. Keep the registries, rendering behavior, and this table aligned when adding or changing an action.
 
