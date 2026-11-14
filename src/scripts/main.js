@@ -547,7 +547,7 @@ function beginDawnAllyTargetSelection(action,actorId){
  if(action==='ultimate'&&!canQueueUltimate(actor)){say(actor.hp<=0?'Defeated ally cannot use an Ultimate.':'Ultimate needs '+ULTIMATE_ENERGY_COST+' available Energy.');return false}
  if(action==='skill'&&sp<1){say('Tune needs 1 Skill Point.');return false}
  pendingTargetAction={action,actorId,targetSide:'ally'};cameraPreview='party';supportDemo=null;selectedAllyId=party.find(p=>p.hp>0&&p.id!==actorId)?.id||actorId;
- say(`Select a living ally for Dawn's ${action==='skill'?'Tune':'Ultimate'}.`);return true;
+ say(`Select a living ally for Dawn's ${action==='skill'?'Tune':'Ultimate'} on the field or in their portrait card.`);return true;
 }
 function beginTargetSelection(action,actorId=activeId){
  const actor=party.find(p=>p.id===actorId);if(!actor||actor.hp<=0)return false;
@@ -837,7 +837,7 @@ function executeCombatAction(a,action,ultimateSeq=null,allyTargetId=null){
  if(!a||a.hp<=0||!['basic','skill','ultimate'].includes(action))return false;
  const dawnSupport=a.id==='dawn'&&(action==='skill'||action==='ultimate'),allyTarget=dawnSupport?party.find(p=>p.id===allyTargetId&&p.hp>0):null;
  if(dawnSupport&&!allyTarget){say('Dawn’s ability needs a living ally target.');return false}
- const victim=dawnSupport?null:chosenEnemy();if(!victim){say('No available enemy target.');return false;}
+ const victim=dawnSupport?null:chosenEnemy();if(!dawnSupport&&!victim){say('No available enemy target.');return false;}
  const targetGeometry=victim?{x:victim.x,y:victim.y,w:victim.w,h:victim.h,slot:victim.slot}:null;
  const mode=dawnSupport?'ally':actionTargetMode(a,action),targets=dawnSupport?[]:chooseAttackTargets(mode,victim);
  const controlledSummon=action==='skill'&&a.test?summons.find(s=>s.mode==='controlled'&&!s.pendingCreation&&s.ownerId===a.id):null;
@@ -1332,7 +1332,7 @@ function drawUnit(p,pos,view,t,acting=false){
  ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.44,16,0,0,Math.PI*2);ctx.fillStyle='rgba(12,12,40,.45)';ctx.fill();
  if(acting||select){ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.51,22,0,0,Math.PI*2);ctx.lineWidth=4;ctx.strokeStyle=select?'#eaca94':'#8be3fb';ctx.stroke()}
  if(p.hp<=0)ctx.globalAlpha=.37;
- const art=p.id==='zero'?(view==='party'?'zeroFront':'zero'):p.id==='lily'?(view==='party'?'lilyFront':'lilyBack'):p.id==='dawn'?(view==='party'?'dawnFront':'dawnBattle'):null;
+ const art=p.id==='zero'?'zero':p.id==='lily'?'lilyBack':p.id==='dawn'?'dawnBattle':null;
  const zb=view==='command'&&p.id==='zero'?zeroBasicStage(t):null;
   if(zb!==null)zeroBasicPaint(x,baseY,w,h,zb);
   else if(art&&images[art]?.complete&&images[art].naturalWidth){
@@ -1542,9 +1542,10 @@ function drawAllyPortraitHud(){
  let x=Math.max(16,Math.round((1060-total)/2));
  for(const p of party){
   const activeAlly=phase==='player'&&activeId===p.id&&p.hp>0,ko=p.hp<=0;
+  const selectingAlly=pendingTargetAction?.targetSide==='ally'&&phase==='player',targetSelected=selectingAlly&&selectedAllyId===p.id;
   const portraitX=x+12,portraitY=top+10,portraitSize=112;
   ctx.save();ctx.globalAlpha=ko?.57:activeAlly?1:.84;
-  rect(x,top,cardW,cardH,'rgba(14,23,42,.96)',activeAlly?'#f3d79e':'rgba(129,164,191,.82)',12);
+  rect(x,top,cardW,cardH,'rgba(14,23,42,.96)',targetSelected?'#eaca94':activeAlly?'#f3d79e':'rgba(129,164,191,.82)',12);
   hudPortrait(p.id==='zero'?images.zeroFront:p.id==='lily'?images.lilyFront:p.id==='dawn'?images.dawnFront:null,portraitX,portraitY,portraitSize,portraitSize,true);
   if(ko)rect(portraitX,portraitY,portraitSize,portraitSize,'rgba(30,17,23,.62)',null,10);
   drawAllyUltimate(p,x+95,top-11,136);
@@ -1557,6 +1558,7 @@ function drawAllyPortraitHud(){
    for(let i=0;i<maximum;i++)hudCircle(startX+i*pitch+dotSize/2,top+174,dotSize/2,i<current?'#72d8f5':'rgba(65,84,108,.9)',i<current?'#d7f6ff':'#8295a9',1.8);
   }
   ctx.restore();
+  if(selectingAlly)choiceRects.push({x,y:top,w:cardW,h:cardH,action:'camera-select:'+p.id,enabled:p.hp>0});
   x+=cardW+gap;
  }
 }

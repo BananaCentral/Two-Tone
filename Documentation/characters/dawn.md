@@ -16,7 +16,7 @@ Deal Magical damage at a 2.0× multiplier and restore 10 Energy. A Basic Attack 
 
 ## Skill: Tune
 
-Costs 1 party Skill Point, restores 20 Energy, and targets one living ally (Dawn may target herself). The target's next Basic Attack deals 40% more damage and restores 1 additional Skill Point when used. Tune lasts through the target's next scheduled turn, then expires. The enhanced-Basic effect is consumed by the first Basic during the duration; if the target does not use a Basic, that enhancement expires with Tune.
+Costs 1 party Skill Point, restores 20 Energy, and targets one living ally (Dawn may target herself). Choose the target by tapping their battlefield sprite or HUD portrait card. The target's next Basic Attack deals 40% more damage and restores 1 additional Skill Point when used. Tune lasts through the target's next scheduled turn, then expires. The enhanced-Basic effect is consumed by the first Basic during the duration; if the target does not use a Basic, that enhancement expires with Tune.
 
 Dawn Duplicate 3 adds 20% Physical and Magical Attack and extends Tune to two target turns. Duplicate 4 adds a further 40% to the enhanced Basic's damage bonus, for +80% total.
 
