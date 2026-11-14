@@ -17,6 +17,7 @@ For each damage instance, heal its source by `round(actual HP damage × effectiv
 
 - Calculate healing after critical hits, defense, resistance, damage increases or reductions, and all other final damage modifiers.
 - Actual HP damage is capped by the target's remaining HP, so overkill cannot produce extra healing.
+- Damage absorbed by a Shield is not HP damage and does not produce Lifesteal. See the [Shield Standard](shield-standard.md).
 - Include HP damage from effects such as Barrier shatter damage. Barrier damage itself does not count because it does not reduce HP.
 - Heal the source, up to its Max HP. Lifesteal cannot revive a defeated unit, and a damage instance that deals no HP damage does not heal.
 - Resolve Lifesteal separately for each hit, including each AoE target and each follow-up, ricochet, or summon damage instance. Use the unit that owns the damage instance as its source.

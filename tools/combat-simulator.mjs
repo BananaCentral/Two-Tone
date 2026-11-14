@@ -58,7 +58,7 @@ function validateConfig(config) {
         if (passive.type === 'rampage') assert(Number.isFinite(passive.damageBonus) && passive.damageBonus >= 0 && Number.isInteger(passive.maxStacks) && passive.maxStacks >= 0, 'rampage needs a non-negative damageBonus and a non-negative integer maxStacks.');
         if (passive.type === 'bleed') assert(Number.isInteger(passive.stacksPerHit??1)&&(passive.stacksPerHit??1)>0&&Number.isInteger(passive.maxStacks??5)&&(passive.maxStacks??5)>0,'bleed needs positive integer stacksPerHit and maxStacks.');
       }
-      assert(!archetype.skill || ['enhanceBasic', 'ricochet', 'tune'].includes(archetype.skill.type), 'Unsupported skill type in ' + instance.archetype + '.');
+      assert(!archetype.skill || ['enhanceBasic', 'ricochet', 'tune', 'bloodShield'].includes(archetype.skill.type), 'Unsupported skill type in ' + instance.archetype + '.');
       assert(!archetype.ultimate || archetype.ultimate.type==='dawnSupport'||['physical', 'magical', 'true'].includes(archetype.ultimate.damageType), 'Ultimate needs a supported damage type or support handler.');
     }
   }
@@ -118,6 +118,7 @@ function instantiate(config, side) {
       stats,
       hp: stats.hp,
       maxHp: stats.hp,
+      shield: Math.max(0,instance.shield??archetype.shield??0),
       criticalRate:instance.critical?.rate??archetype.critical?.rate??.1,
       criticalDamage:instance.critical?.damage??archetype.critical?.damage??.5,
       criticalRateBonus:(archetype.criticalRateBonus||0)+(instance.criticalRateBonus||0)+(instance.archetype==='soul'&&premiumWeaponDuplicates>=2?.1:0),
@@ -139,7 +140,7 @@ function instantiate(config, side) {
       marks: [],
       bleedStacks:[],
       bleedMaxStacks:archetype.passives?.find(passive=>passive.type==='bleed')?.maxStacks??5,
-      tauntEffects:(instance.taunt??archetype.taunt)?[{sourceId:instance.id,rate:(instance.taunt??archetype.taunt).rate,turns:(instance.taunt??archetype.taunt).turns}]:[],
+      tauntEffects:instance.tauntEffects??[],
       barriersBroken: 0,
       energy: Math.max(0, Math.min(maxEnergy, instance.energy ?? archetype.energy?.start ?? 0)),
       maxEnergy,
@@ -167,17 +168,18 @@ function instantiate(config, side) {
   });
 }
 function attackValue(unit, type) {
-  const multiplier=1+(unit.tune?.attackBonus||0),physical=roundStat(unit.stats.physicalAttack*multiplier),magical=roundStat(unit.stats.magicalAttack*multiplier);
+  const multiplier=1+(unit.tune?.attackBonus||0)+(unit.shield>0&&unit.archetypeId==='logan'&&unit.premiumWeaponDuplicates>=4?.2:0),physical=roundStat(unit.stats.physicalAttack*multiplier),magical=roundStat(unit.stats.magicalAttack*multiplier);
   if (type === 'physical') return physical;
   if (type === 'magical') return magical;
   return (physical + magical) / 2;
 }
 function healFromLifesteal(state,attacker,damageDealt){
- const rate=Math.max(0,attacker.lifestealRate||0);
+ const logan=state.allies.find(unit=>unit.archetypeId==='logan'&&unit.hp>0),rate=Math.max(0,(attacker.lifestealRate||0)+(attacker.side==='allies'&&logan?.hp>0?(logan.characterDuplicates>=4?.2:.1):0));
  if(rate<=0||damageDealt<=0||attacker.hp<=0)return 0;
  const healing=Math.min(Math.max(0,attacker.maxHp-attacker.hp),roundStat(damageDealt*rate));
  attacker.hp+=healing;attacker.lifestealHealing=(attacker.lifestealHealing||0)+healing;
  state.lifestealHealingBySide[attacker.side]+=healing;
+ const equipped=logan?.weapon?.type==='premium';if(logan&&attacker!==logan&&attacker.side==='allies'&&equipped){const echo=Math.min(healing,logan.maxHp-logan.hp);logan.hp+=echo;logan.lifestealHealing+=echo;state.lifestealHealingBySide.allies+=echo}
  return healing;
 }
 function applyBleed(target,source,stacks=1,maxStacks=target.bleedMaxStacks??5){
@@ -191,10 +193,10 @@ function resolveBleedTick(state,target){
  const perStack=roundStat(target.maxHp*.02),bySource=new Map();
  for(const stack of target.bleedStacks){const source=state.allies.find(unit=>unit.id===stack.sourceId);if(source)bySource.set(source,(bySource.get(source)||0)+perStack)}
  let total=0;
- for(const [source,rawDamage] of bySource){const damage=roundStat(rawDamage*(1-(target.tune?.damageReduction||0))*(target.brokenTurns>0?1.5:1)),actual=Math.min(target.hp,damage);target.hp=Math.max(0,target.hp-damage);target.damageTaken+=actual;source.damageDealt+=actual;state.damageBySide.allies+=actual;healFromLifesteal(state,source,actual);total+=actual;if(target.hp<=0)break}
+ for(const [source,rawDamage] of bySource){const damage=roundStat(rawDamage*(1-(target.tune?.damageReduction||0))*(target.brokenTurns>0?1.5:1)),absorbed=Math.min(target.shield||0,damage);target.shield=Math.max(0,(target.shield||0)-absorbed);const actual=Math.min(target.hp,damage-absorbed);target.hp=Math.max(0,target.hp-(damage-absorbed));target.damageTaken+=actual;source.damageDealt+=actual;state.damageBySide.allies+=actual;healFromLifesteal(state,source,actual);total+=actual;if(target.hp<=0)break}
  target.bleedStacks.shift();return total;
 }
-function tauntRateOf(unit){return Math.max(0,...(unit.tauntEffects||[]).filter(effect=>effect.turns>0).map(effect=>effect.rate))}
+function tauntRateOf(attacker,target){return Math.max(0,...(attacker.tauntEffects||[]).filter(effect=>effect.turns>0&&effect.targetId===target.id).map(effect=>effect.rate))}
 function ageTaunt(unit){unit.tauntEffects=(unit.tauntEffects||[]).map(effect=>({...effect,turns:effect.turns-1})).filter(effect=>effect.turns>0)}
 function defenseValue(unit, type) {
   if (type === 'physical') return unit.stats.physicalDefense;
@@ -264,7 +266,7 @@ function chooseTarget(actor, candidates, mode, random) {
   let primary = mode === 'lowestHp' || (actor.side !== 'enemies' && mode !== 'random')
     ? candidates.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp || a.id.localeCompare(b.id))[0]
     : candidates[Math.floor(random() * candidates.length)];
-  const taunts=candidates.map(unit=>({unit,rate:tauntRateOf(unit)})).filter(entry=>entry.rate>0).sort((a,b)=>b.rate-a.rate||a.unit.id.localeCompare(b.unit.id));
+  const taunts=candidates.map(unit=>({unit,rate:tauntRateOf(actor,unit)})).filter(entry=>entry.rate>0).sort((a,b)=>b.rate-a.rate||a.unit.id.localeCompare(b.unit.id));
   for(const entry of taunts)if(random()<entry.rate){primary=entry.unit;break;}
   if (mode === 'blast') return candidates.filter(unit => Math.abs(unit.slot - primary.slot) <= 1).sort((a, b) => a.slot - b.slot);
   return [primary];
@@ -278,8 +280,9 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
     const hpBefore = target.hp;
     const baseDamage = damageFor(attacker, target, spec.damageType, (options.multiplier ?? spec.multiplier)*(1-(attacker.residueStacks||0)*(attacker.residueDamageReductionPerStack??.05)));
     const roll=rollCritical(state,attacker,baseDamage),damage = roundStat(roll.damage*(1-(target.tune?.damageReduction||0)) * (target.side === 'enemies' && target.brokenTurns > 0 ? 1.5 : 1));
-    target.hp = Math.max(0, target.hp - damage);
-    const hpDamage=Math.min(hpBefore,damage);
+    const shieldAbsorbed=Math.min(target.shield||0,damage);target.shield=Math.max(0,(target.shield||0)-shieldAbsorbed);
+    target.hp = Math.max(0, target.hp - (damage-shieldAbsorbed));
+    const hpDamage=Math.max(0,hpBefore-target.hp);
     let barrierDamage = 0, breakDamage = 0, broken = false;
     if (target.side === 'enemies' && target.barrier > 0) {
       barrierDamage = damage * 0.25*(1+(attacker.tune?.barrierDamageBonus||0));
@@ -287,8 +290,9 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
       if (target.barrier === 0) {
         target.brokenTurns = brokenDuration(target.stats.speed, Math.max(1, state.enemyAverage / state.slowerAverage));
         breakDamage = roundStat(target.maxHp * 0.1);
-        const appliedBreakDamage=Math.min(target.hp,breakDamage);
-        target.hp = Math.max(0, target.hp - breakDamage);
+        const breakAbsorbed=Math.min(target.shield||0,breakDamage);target.shield=Math.max(0,(target.shield||0)-breakAbsorbed);
+        const appliedBreakDamage=Math.min(target.hp,breakDamage-breakAbsorbed);
+        target.hp = Math.max(0, target.hp - (breakDamage-breakAbsorbed));
         breakDamage=appliedBreakDamage;
         target.barriersBroken++;
         broken = true;
@@ -301,7 +305,7 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
     healFromLifesteal(state,attacker,finalHpDamage);
     const bleedPassive=attacker.passives.find(passive=>passive.type==='bleed');
     if(bleedPassive&&target.side==='enemies'&&target.hp>0)applyBleed(target,attacker,bleedPassive.stacksPerHit??1,bleedPassive.maxStacks??5);
-    hits.push({ target, damage: finalHpDamage, barrierDamage, breakDamage, barrierRemaining: target.barrier, broken,critical:roll.critical });
+    hits.push({ target, damage: finalHpDamage, shieldDamage:shieldAbsorbed, barrierDamage, breakDamage, barrierRemaining: target.barrier, broken,critical:roll.critical });
   }
   if (targets.length > 1) attacker.aoeCount++;
   return hits;
@@ -382,11 +386,14 @@ function resolveAllyAction(state, actor) {
       state.skillPoints=Math.min(state.skillPointCap,state.skillPoints+(actor.characterDuplicates>=2?3:1));advanceTurn(state,target,100);
     }else{
     const duplicate=actor.archetypeId==='soul'&&actor.characterDuplicates>=3?2:actor.archetypeId==='lily'&&actor.characterDuplicates>=3?2:1;
-    const hits = runAttack(state, actor, foes, ultimate, { multiplier: ultimate.multiplier * duplicate * celestialFactor(actor, 'ultimate') });
+    const loganMultiplier=actor.archetypeId==='logan'&&actor.premiumWeaponDuplicates>=3?2:1;
+    const hits = runAttack(state, actor, foes, ultimate, { multiplier: ultimate.multiplier * duplicate * loganMultiplier * celestialFactor(actor, 'ultimate') });
+    if(actor.archetypeId==='logan')for(const hit of hits)if(hit.target.hp>0)applyBleed(hit.target,actor,actor.characterDuplicates>=3?2:1);
     const sourceId=++state.sourceSerial;
     if(actor.archetypeId==='lily')applyExposed(actor,hits.map(hit=>hit.target));
     if(actor.archetypeId==='lily')applyLilyWeakened(actor,hits.map(hit=>hit.target));
     applyRicochet(state,actor,sourceId,hits);triggerFollowUps(state, sourceId, actor.id, hits.map(hit => hit.target));
+    if(actor.archetypeId==='logan'&&actor.characterDuplicates>=3)state.skillPoints=Math.min(state.skillPointCap,state.skillPoints+1);
     if (ultimate.refillFollowUps) refillPassives(actor);
     if(actor.archetypeId==='lily'&&state.enemies.some(unit=>unit.hp>0)){
       const summon={...actor,id:'hauntling-'+sourceId,name:'Hauntling',isHauntling:true,turnsRemaining:actor.characterDuplicates>=3?4:3,hp:1,maxHp:1,energy:0,ultimate:null,skill:null,basic:{damageType:'true',multiplier:1,target:'aoe'},passives:[],timeToNextTurn:state.currentTime,turnRate:actor.turnRate,turns:0,damageDealt:0,damageTaken:0,followUpCount:0,ultimateCount:0,aoeCount:0};
@@ -397,6 +404,15 @@ function resolveAllyAction(state, actor) {
     if (!foes.length) return;
   }
   const skill = actor.skill;
+  if(skill?.type==='bloodShield'&&actor.archetypeId==='logan'&&state.skillPoints>0){
+    state.skillPoints--;state.skillUses++;actor.energy=Math.min(actor.maxEnergy,actor.energy+(skill.energyGain??20));
+    const cost=Math.min(Math.max(0,actor.hp-1),Math.max(1,roundStat(actor.hp*.25))),pool=cost*(actor.characterDuplicates>=2?2:1),recipients=state.allies.filter(unit=>unit.hp>0),share=Math.floor(pool/recipients.length),remainder=pool-share*recipients.length;
+    actor.hp=Math.max(1,actor.hp-cost);
+    recipients.forEach((unit,index)=>{unit.shield=(unit.shield||0)+share+(index<remainder?1:0)});
+    const rate=actor.premiumWeaponDuplicates>=2?.5:.25,turns=actor.premiumWeaponDuplicates>=2?3:2;
+    for(const enemy of state.enemies)if(enemy.hp>0)enemy.tauntEffects.push({sourceId:actor.id,targetId:actor.id,rate,turns});
+    ageTune(actor);return;
+  }
   if(skill?.type==='tune'&&actor.archetypeId==='dawn'&&state.skillPoints>0){
     state.skillPoints--;state.skillUses++;actor.energy=Math.min(actor.maxEnergy,actor.energy+(skill.energyGain??20));
     applyDawnTune(state,actor,chooseDawnTarget(state,actor));ageTune(actor);return;
@@ -424,7 +440,7 @@ function resolveAllyAction(state, actor) {
   }
   const basic = actor.basic;
   const stacks = actor.enhanceStacks;
-  const baseBasicMultiplier = basic.multiplier * (actor.archetypeId === 'soul' && actor.premiumWeaponDuplicates >= 1 ? 2 : 1);
+  const baseBasicMultiplier = basic.multiplier * (actor.archetypeId === 'soul' && actor.premiumWeaponDuplicates >= 1 ? 2 : 1) * (actor.archetypeId==='logan'&&actor.premiumWeaponDuplicates>=1?2:1);
   const skillPerStack = (skill?.damagePerStack ?? 0) * (actor.archetypeId === 'soul' && actor.characterDuplicates >= 4 ? 2 : 1);
   const multiplier = (baseBasicMultiplier * celestialFactor(actor, 'basic') + stacks * skillPerStack * celestialFactor(actor, 'skill'))*(actor.tune?.basicEnhanced?1+actor.tune.damageBonus:1);
   const targetMode = skill && stacks >= (skill.blastAtStacks ?? Infinity) ? (actor.archetypeId === 'soul' && actor.premiumWeaponDuplicates >= 3 ? 'aoe' : 'blast') : basic.target;
@@ -492,7 +508,6 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
     actor.timeToNextTurn += 1 / actor.turnRate;
     state.actions++;
     actor.turns++;
-    ageTaunt(actor);
     if (actor.side === 'allies') {
       state.allyTurns++;
       resolveAllyAction(state, actor);
@@ -511,6 +526,7 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
         }
       } else {resolveEnemyAction(state, actor);ageMarks(actor)}
     }
+    ageTaunt(actor);
   }
   const winner = !allies.some(unit => unit.hp > 0) ? 'enemies' : !enemies.some(unit => unit.hp > 0) ? 'allies' : 'draw';
   return {
@@ -524,8 +540,8 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
     aoeAttacks: [...allies, ...enemies].reduce((sum, unit) => sum + unit.aoeCount, 0),
     barriersBroken: enemies.reduce((sum, unit) => sum + unit.barriersBroken, 0),
     survivors: {
-      allies: allies.filter(unit => unit.hp > 0).map(unit => ({ id: unit.id, hp: unit.hp, maxHp: unit.maxHp })),
-      enemies: enemies.filter(unit => unit.hp > 0).map(unit => ({ id: unit.id, hp: unit.hp, maxHp: unit.maxHp, barrier: unit.barrier, maxBarrier: unit.maxBarrier, brokenTurns: unit.brokenTurns,bleedStacks:unit.bleedStacks.length }))
+      allies: allies.filter(unit => unit.hp > 0).map(unit => ({ id: unit.id, hp: unit.hp, maxHp: unit.maxHp, shield:unit.shield||0 })),
+      enemies: enemies.filter(unit => unit.hp > 0).map(unit => ({ id: unit.id, hp: unit.hp, maxHp: unit.maxHp, shield:unit.shield||0, barrier: unit.barrier, maxBarrier: unit.maxBarrier, brokenTurns: unit.brokenTurns,bleedStacks:unit.bleedStacks.length }))
     }
   };
 }

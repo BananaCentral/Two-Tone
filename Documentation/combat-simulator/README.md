@@ -16,7 +16,7 @@ The default runs 100 battles with a reproducible seed using the Soul vs Slime ex
 node tools/combat-simulator.mjs --config path/to/scenario.json --runs 1000 --seed 42
 ```
 
-`Documentation/combat-simulator/example-soul-lily-vs-slimes.json` is a Level 1 Soul and Lily team scenario against five Slimes. To compare either character solo under the same conditions, remove the other ally from `teams.allies`.
+`Documentation/combat-simulator/example-soul-lily-vs-slimes.json` is a Level 1 Soul and Lily team scenario against five Slimes. `Documentation/combat-simulator/example-logan-party-vs-slime-boss.json` includes Soul, Lily, Dawn, and Logan against the Slime Monster boss.
 
 Use `--json` for machine-readable output, `--max-actions 2000` to set a battle limit, or `--help` for options. Re-running with the same config and seed produces the same batch.
 
@@ -36,9 +36,11 @@ Supported attack damage types are `physical`, `magical`, and `true`. Basic and U
 
 All simulated units default to 10% Critical Rate and 50% Critical Damage. These are hidden stats. An archetype or instance may override them with `critical: { "rate": 0.25, "damage": 0.75 }`; `criticalRateBonus` and `criticalDamageBonus` add temporary or other source bonuses. Soul's Premium Weapon Duplicate 2 adds 10 percentage points of Critical Rate and 25 percentage points of Critical Damage. Each damage instance rolls independently, including AoE targets and multi-hit actions. Use `--seed` to reproduce crit rolls. Batch output includes average Critical Hits.
 
-Lifesteal is another hidden stat and defaults to 0 for all units. Set `lifesteal` to a decimal rate (for example, `0.1` for 10%); `lifestealBonus` adds a rate bonus. Healing is based on actual HP damage after all damage modifiers and HP caps, including Barrier shatter HP damage but excluding Barrier damage. Healing is capped at the source's missing HP. Battle and batch output report Lifesteal healing by side, and ally `averageUnitStats` include healing per archetype.
+Lifesteal is another hidden stat and defaults to 0 for all units. Set `lifesteal` to a decimal rate (for example, `0.1` for 10%); `lifestealBonus` adds a rate bonus. Healing is based on actual HP damage after all damage modifiers, Shield absorption, and HP caps, including Barrier shatter HP damage but excluding Barrier damage. Healing is capped at the source's missing HP. Battle and batch output report Lifesteal healing by side, and ally `averageUnitStats` include healing per archetype. Logan's Taste for Blood adds his party Lifesteal aura; his Premium weapon echoes allied healing back to him.
 
-Taunt uses an optional `taunt: { "rate": 0.5, "turns": 2 }` field on a unit archetype or instance. It is checked for automatic primary-target selection in descending rate order, then falls back to the normal target if all rolls fail. Duration is measured in the bearer’s turns. Explicit player-selected targets and AoE target sets are not changed by Taunt.
+Taunt effects are stored on the affected attacker as `{ "sourceId": "logan-1", "targetId": "logan-1", "rate": 0.5, "turns": 2 }`. Automatic primary-target selection checks candidate targets in descending Taunt rate order and falls back to the normal target if all rolls fail. Duration is measured in the affected attacker's turns. Explicit player-selected targets and AoE target sets are not changed by Taunt.
+
+Shields are tracked as a separate per-unit total. New Shields add to the existing value and persist until combat ends or damage depletes them. Final damage is absorbed by Shield before HP; Barrier remains a separate enemy gauge. Lifesteal uses HP actually lost after Shield absorption. The sample Logan scenario demonstrates his team Shield, Taunt, Bleed, and Lifesteal support.
 
 Supported Skill and Passive effect types:
 
@@ -52,9 +54,10 @@ Supported Skill and Passive effect types:
 - `tune`: models Dawn's single-ally Skill, enhanced next Basic, Skill Point recovery, stat and defense effects, Premium weapon duplicates, and her support Ultimate. The simulator targets Soul with Tune when present; otherwise it targets the living ally with the strongest Basic. It advances only that selected ally for Tune and Ultimate.
 - `residue`: the Slime Leader's blast applies a two-turn stack to each ally it damages. Each stack lowers that ally's defenses and damage dealt by 5%, to a maximum of five stacks.
 - `lethalImpact`: the Slime Monster ignores 25% of both defenses on its AoE magical attack.
-- `lifesteal`: heals the damage source for its configured fraction of final actual HP damage. It applies to allies and enemies, including simulated direct and follow-up damage.
-- `bleed`: an optional ally passive that applies a Bleed stack when its attacks hit living enemies. The enemy ticks all stacks for 2% of its Max HP per stack at the start of its scheduled turn, then loses one stack. Five stacks is the default cap; `maxStacks` and `stacksPerHit` can be configured. Bleed is true damage, bypasses Barrier and defense, cannot crit, and is attributed to its applier (including Lifesteal).
-- `taunt`: redirects automatic targeting toward the unit holding the effect according to its configured chance and duration. When several bearers have Taunt, the simulator checks them from highest chance down.
+- `lifesteal`: heals the damage source for its configured fraction of final actual HP damage. It applies to allies and enemies, including simulated direct and follow-up damage. Shields absorb damage before Lifesteal is calculated.
+- `bleed`: an optional ally passive that applies a Bleed stack when its attacks hit living enemies. The enemy ticks all stacks for 2% of its Max HP per stack at the start of its scheduled turn, then loses one stack. Five stacks is the default cap; `maxStacks` and `stacksPerHit` can be configured. Bleed is true damage, bypasses Barrier and defense, cannot crit, and is attributed to its applier (including Lifesteal). Shields absorb Bleed before HP.
+- `taunt`: redirects automatic targeting toward the taunter according to the active chance and duration recorded on the attacker.
+- `bloodShield`: models Logan's Skill Point-consuming Blood Shield, even team Shield distribution, current-HP cost, and single-target Taunt effect.
 
 Lily's Ultimate creates an independent Hauntling after its initial AoE. It acts immediately, then takes two more scheduled turns, dealing AoE True damage with Lily's stats. Duplicate 1 applies a one-turn 10% enemy damage reduction; Duplicate 3 doubles initial Ultimate damage and adds a Hauntling turn. Lily's Premium weapon effects are not modeled.
 

@@ -1,0 +1,25 @@
+# Shield Standard
+
+## Purpose
+
+Shields are a per-unit damage buffer. They are separate from HP and enemy Barriers.
+
+## Rules
+
+- A unit starts a battle with zero Shield unless an effect grants one.
+- Shield amounts from every source add to that unit's existing Shield. A new Shield never replaces another source's Shield, and there is no default cap.
+- Shield does not expire with turns or when its source leaves the field. It remains until damage depletes it or the battle ends.
+- Resolve the final damage instance after attack, defense, critical, and other damage modifiers. Shield absorbs that damage first; any remainder reduces HP.
+- This applies to physical, magical, and true damage, including Bleed. Shields do not prevent status effects from being applied.
+- Lifesteal uses actual HP lost after Shield absorption. Damage absorbed by Shield does not heal the attacker.
+- Enemy Barrier remains a separate mechanic. It tracks Barrier damage and breaking; it does not absorb the damage that is applied to HP. A unit's Shield absorbs incoming HP damage, including Barrier shatter damage.
+- Each unit owns an independent Shield total. Excess Shield on one unit cannot protect another.
+- Shields are cleared when combat ends. Between-battle persistence is not defined.
+
+## Display
+
+Show current Shield separately from HP and Barrier in battle HUDs. When Shield absorbs damage, display the absorbed amount and remaining Shield so the player can follow the damage sequence.
+
+## Runtime
+
+Units store remaining Shield in `shield`, defaulting to `0`. Add Shield through the shared additive helper and route every incoming damage instance through the shared absorption rule.

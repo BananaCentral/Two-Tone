@@ -26,6 +26,8 @@ This standard defines Base HP, Max HP, current HP, and the default rules for HP 
 - Ordinary healing cannot raise HP above Max HP. It has no effect on a character already above Max HP unless its source specifies otherwise.
 - Healing and Revive amounts are determined by their source.
 
+Shields are separate from HP and absorb final incoming damage before HP is reduced. See the [Shield Standard](../shield-standard.md).
+
 ## Between Battles
 
 - HP recovery is determined by the game mode.

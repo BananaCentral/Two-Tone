@@ -14,7 +14,7 @@ Bleed is a stackable damage-over-time debuff applied to enemies.
 
 ## Damage Resolution
 
-- Bleed deals true damage: it ignores defense and Barrier and cannot critically strike.
+- Bleed deals true damage: it ignores defense and Barrier, cannot critically strike, and is absorbed by Shield before reducing HP. See the [Shield Standard](shield-standard.md).
 - Apply applicable incoming damage modifiers after calculating the stack damage. Broken's damage increase applies while the enemy is Broken.
 - Cap damage at the enemy's remaining HP. A defeated enemy does not take further Bleed ticks.
 - Bleed ticks are attributed to their applier. Lifesteal, if any, uses the final HP actually lost and follows the [Lifesteal Standard](lifesteal-standard.md).
