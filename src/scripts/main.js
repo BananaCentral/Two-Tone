@@ -1429,7 +1429,7 @@ function cameraShot(t=performance.now()){
  if(phase==='player')return cameraPreview==='party'?'party':cameraPreview==='target'?'target':'command';
  if(phase==='enemy')return 'enemy-windup';
  if(phase==='resolve'&&fx){const dt=t-fx.at;
-  if(fx.kind==='support')return 'party';
+  if(fx.kind==='support')return fx.targetAllyId?'ally-impact':'command';
   if(fx.kind==='enemy')return dt<420?'enemy-windup':fx.hits?.length>1?'party':'enemy-impact';
   if(fx.kind==='ultimate')return dt<350?'ultimate-intro':dt<610?'attack-track':'attack-impact';
   return dt<(fx.kind==='basic'&&fx.actor==='zero'?460:350)?'attack-track':'attack-impact';
@@ -1530,6 +1530,7 @@ const PARTY_STAGE={
 };
 function cameraAllyPosition(id,view){
  if(view==='party'){const i=party.findIndex(p=>p.id===id);return PARTY_STAGE[party.length]?.[i]||null}
+ if(view==='ally-impact')return {x:211,baseY:908,w:288,h:576};
  // Foreground cinematic framing: the ally stands close to camera, not inside a reserved
  // 'safe' slot above the party HUD. The HUD pass paints OVER the actor's lower body.
  // This is a presentation-only change. No world-space targeting mechanics depend on it.
@@ -1538,12 +1539,12 @@ function cameraAllyPosition(id,view){
 function drawUnit(p,pos,view,t,acting=false){
  if(!p||!pos)return;const {x,baseY,w,h}=pos,top=baseY-h;
  const bob=Math.sin(t*.0024+(p.id==='zero'?0:1))*(p.hp>0?3:0);
- const select=view==='party'&&selectedAllyId===p.id;const allyTargeting=view==='party'&&pendingTargetAction?.targetSide==='ally',allTeamTargeting=allyTargeting&&pendingTargetAction?.targetScope==='all',supportAnimating=view==='party'&&phase==='resolve'&&fx?.kind==='support'&&fx.targetAllyId===p.id,eligible=view==='party'&&supportDemo?eligibleAllyTarget(p,supportDemo):allyTargeting?p.hp>0:true;
+ const select=view==='party'&&selectedAllyId===p.id;const allyTargeting=view==='party'&&pendingTargetAction?.targetSide==='ally',allTeamTargeting=allyTargeting&&pendingTargetAction?.targetScope==='all',supportAnimating=view==='ally-impact'&&phase==='resolve'&&fx?.kind==='support'&&fx.targetAllyId===p.id,eligible=view==='party'&&supportDemo?eligibleAllyTarget(p,supportDemo):allyTargeting?p.hp>0:true;
  ctx.save();ctx.translate(camera.currentX*(view==='party'?.32:.52),bob);
  ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.44,16,0,0,Math.PI*2);ctx.fillStyle='rgba(12,12,40,.45)';ctx.fill();
  if(acting||select){ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.51,22,0,0,Math.PI*2);ctx.lineWidth=4;ctx.strokeStyle=select?(allyTargeting||supportAnimating?'#55aaff':'#eaca94'):'#8be3fb';ctx.stroke()}
  if(p.hp<=0)ctx.globalAlpha=.37;
- const art=p.id==='zero'?(view==='party'?'zeroFront':'zero'):p.id==='lily'?(view==='party'?'lilyFront':'lilyBack'):p.id==='dawn'?(view==='party'?'dawnFront':'dawnBattle'):p.id==='logan'?(view==='party'?'loganFront':'loganBattle'):null;
+ const art=p.id==='zero'?(view==='party'||view==='ally-impact'?'zeroFront':'zero'):p.id==='lily'?(view==='party'||view==='ally-impact'?'lilyFront':'lilyBack'):p.id==='dawn'?(view==='party'||view==='ally-impact'?'dawnFront':'dawnBattle'):p.id==='logan'?(view==='party'||view==='ally-impact'?'loganFront':'loganBattle'):null;
  const zb=view==='command'&&p.id==='zero'?zeroBasicStage(t):null;
   if(zb!==null)zeroBasicPaint(x,baseY,w,h,zb);
   else if(art&&images[art]?.complete&&images[art].naturalWidth){
@@ -1605,6 +1606,11 @@ function drawActorsForShot(t,shot){
  if(view==='party'){
   const ordered=party.map(p=>({p,pos:cameraAllyPosition(p.id,'party')})).sort((a,b)=>a.pos.baseY-b.pos.baseY);
   for(const {p,pos} of ordered)drawUnit(p,pos,'party',t,p.id===selectedAllyId);
+  return;
+ }
+ if(shot==='ally-impact'){
+  const target=party.find(p=>p.id===fx?.targetAllyId&&p.hp>0);
+  if(target)drawUnit(target,cameraAllyPosition(target.id,'ally-impact'),'ally-impact',t,true);
   return;
  }
  const ultimateActor=(pendingTargetAction?.action==='ultimate'&&party.find(p=>p.id===pendingTargetAction.actorId))||(ultimateExecuting&&lastAttack?.action==='ultimate'&&party.find(p=>p.id===lastAttack.actor));
@@ -1669,11 +1675,11 @@ function drawFx(t){
  if(fx.kind==='self'){const pos=cameraAllyPosition(fx.actor,'command');if(pos){const x=pos.x+pos.w/2+camera.currentX*.52,y=pos.baseY-pos.h*.58;drawCombatSigil(x,y,35+q*80,'#75cfff',fade,'ring');drawCombatSigil(x,y,22+q*45,'#e2f7ff',fade*.8,'star')}return}
  if(fx.kind==='support'){
   if(visual==='logan-blood-shield'){
-   for(const id of fx.targetAllyIds||[]){const pos=cameraAllyPosition(id,'party');if(!pos)continue;const x=pos.x+pos.w/2+camera.currentX*.32,y=pos.baseY-pos.h*.58;drawCombatSigil(x,y,32+q*66,'#83dcff',fade,'ring');drawCombatSigil(x,y,18+q*42,'#ffe0ed',fade*.75,'star')}
+   const pos=cameraAllyPosition(fx.actor,'command');if(pos){const x=pos.x+pos.w/2+camera.currentX*.52,y=pos.baseY-pos.h*.58;drawCombatSigil(x,y,32+q*66,'#83dcff',fade,'ring');drawCombatSigil(x,y,18+q*42,'#ffe0ed',fade*.75,'star')}
    text('BLOOD SHIELD',1050,432,20,`rgba(215,244,255,${fade})`,'900','center');return;
   }
-  const p=party.find(x=>x.id===fx.targetAllyId),pos=p&&cameraAllyPosition(p.id,'party');if(!pos)return;
-  const x=pos.x+pos.w/2+camera.currentX*.32,y=pos.baseY-pos.h*.58,progress=clamp01(dt/950);
+  const p=party.find(x=>x.id===fx.targetAllyId),view='ally-impact',pos=p&&cameraAllyPosition(p.id,view);if(!pos)return;
+  const x=pos.x+pos.w/2+camera.currentX*.52,y=pos.baseY-pos.h*.58,progress=clamp01(dt/950);
   if(visual==='dawn-tune'){
    drawCombatSigil(x,y,45+progress*85,'#6dfff1',fade,'ring');drawCombatSigil(x-36,y-85-progress*22,25,'#e9ffe9',fade,'note');drawCombatSigil(x+43,y-40-progress*12,19,'#a1d8ff',fade*.9,'note');
    text('TUNE',x,y-145,20,`rgba(226,255,250,${fade})`,'900','center');
