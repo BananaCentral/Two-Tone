@@ -1647,10 +1647,10 @@ function drawCameraStage(t){prepareCamera(t);
  // view cut without double-rendering actors, targets, or combat effects.
  const p=camera.progress,worldChanged=shotWorld(camera.from)!==shotWorld(camera.shot);
  if(worldChanged&&p<1){
-  drawBattleShot(p<.5?camera.from:camera.shot);
+  drawBattleShot(t,p<.5?camera.from:camera.shot);
   const veil=(p<.5?smooth01(p*2):smooth01((1-p)*2))*.28;
   if(veil>0){ctx.save();ctx.fillStyle=`rgba(5,9,20,${veil})`;ctx.fillRect(0,0,W,H);ctx.restore()}
- }else drawBattleShot(camera.shot);
+ }else drawBattleShot(t,camera.shot);
  // Camera test labels are shown in the HUD; no obscured scene banners.
 }
 
