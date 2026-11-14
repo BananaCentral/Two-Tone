@@ -974,12 +974,12 @@ function ageDawnTune(ally){if(!ally?.tune)return false;if(ally.tune.skipFirstTic
 function ageResidue(ally){if(!ally||!ally.residueStacks)return false;ally.residueTurns=Math.max(0,(ally.residueTurns||RESIDUE_RULES.durationTurns)-1);if(ally.residueTurns===0){ally.residueStacks=0;ally.residueMaxStacks=null;ally.residueDamageReductionPerStack=null;ally.residueResistanceReductionPerStack=null}return true}
 function applyLoganBloodShield(logan){
  if(!logan||logan.hp<=0)return false;
- const healthCost=Math.min(Math.max(0,logan.hp-1),Math.max(1,roundHp(logan.hp*.25))),shieldPool=healthCost*(characterDuplicateRank('logan')>=2?2:1),recipients=party.filter(ally=>ally.hp>0),share=Math.floor(shieldPool/Math.max(1,recipients.length)),remainder=shieldPool-share*recipients.length;
+ const healthCost=Math.min(Math.max(0,logan.hp-1),Math.max(1,roundHp(logan.hp*.25))),shieldPerAlly=healthCost*(characterDuplicateRank('logan')>=2?2:1),recipients=party.filter(ally=>ally.hp>0);
  logan.hp=Math.max(1,logan.hp-healthCost);saveVitals();
- for(let i=0;i<recipients.length;i++){const amount=share+(i<remainder?1:0);if(amount>0){addShield(recipients[i],amount);emitCombatVisual('shield-applied',[recipients[i].id],1000,{shield:amount,totalShield:recipients[i].shield})}}
+ for(const ally of recipients){if(shieldPerAlly>0){addShield(ally,shieldPerAlly);emitCombatVisual('shield-applied',[ally.id],1000,{shield:shieldPerAlly,totalShield:ally.shield})}}
  const weaponDuplicates=premiumWeaponDuplicateRank('logan'),tauntRate=weaponDuplicates>=2?.5:.25,tauntTurns=weaponDuplicates>=2?3:2;
  for(const enemy of liveEnemies())applyTaunt(enemy,logan,tauntRate,tauntTurns);
- emitCombatVisual('logan-blood-shield',recipients.map(ally=>ally.id),1050,{healthCost,shieldPool});return {healthCost,shieldPool,tauntRate,tauntTurns};
+ emitCombatVisual('logan-blood-shield',recipients.map(ally=>ally.id),1050,{healthCost,shieldPerAlly});return {healthCost,shieldPerAlly,tauntRate,tauntTurns};
 }
 function executeCombatAction(a,action,ultimateSeq=null,allyTargetId=null){
  if(!a||a.hp<=0||!['basic','skill','ultimate'].includes(action))return false;

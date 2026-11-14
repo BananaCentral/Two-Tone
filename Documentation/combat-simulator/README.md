@@ -57,7 +57,7 @@ Supported Skill and Passive effect types:
 - `lifesteal`: heals the damage source for its configured fraction of final actual HP damage. It applies to allies and enemies, including simulated direct and follow-up damage. Shields absorb damage before Lifesteal is calculated.
 - `bleed`: an optional ally passive that applies a Bleed stack when its attacks hit living enemies. The enemy ticks all stacks for 2% of its Max HP per stack at the start of its scheduled turn, then loses one stack. Five stacks is the default cap; `maxStacks` and `stacksPerHit` can be configured. Bleed is true damage, bypasses Barrier and defense, cannot crit, and is attributed to its applier (including Lifesteal). Shields absorb Bleed before HP.
 - `taunt`: redirects automatic targeting toward the taunter according to the active chance and duration recorded on the attacker.
-- `bloodShield`: models Logan's Skill Point-consuming Blood Shield, even team Shield distribution, current-HP cost, and single-target Taunt effect.
+- `bloodShield`: models Logan's Skill Point-consuming Blood Shield, which applies a Shield equal to the HP cost to each living ally, plus the current-HP cost and Taunt effect.
 
 Lily's Ultimate creates an independent Hauntling after its initial AoE. It acts immediately, then takes two more scheduled turns, dealing AoE True damage with Lily's stats. Duplicate 1 applies a one-turn 10% enemy damage reduction; Duplicate 3 doubles initial Ultimate damage and adds a Hauntling turn. Lily's Premium weapon effects are not modeled.
 

@@ -406,9 +406,9 @@ function resolveAllyAction(state, actor) {
   const skill = actor.skill;
   if(skill?.type==='bloodShield'&&actor.archetypeId==='logan'&&state.skillPoints>0){
     state.skillPoints--;state.skillUses++;actor.energy=Math.min(actor.maxEnergy,actor.energy+(skill.energyGain??20));
-    const cost=Math.min(Math.max(0,actor.hp-1),Math.max(1,roundStat(actor.hp*.25))),pool=cost*(actor.characterDuplicates>=2?2:1),recipients=state.allies.filter(unit=>unit.hp>0),share=Math.floor(pool/recipients.length),remainder=pool-share*recipients.length;
+    const cost=Math.min(Math.max(0,actor.hp-1),Math.max(1,roundStat(actor.hp*.25))),shieldPerAlly=cost*(actor.characterDuplicates>=2?2:1),recipients=state.allies.filter(unit=>unit.hp>0);
     actor.hp=Math.max(1,actor.hp-cost);
-    recipients.forEach((unit,index)=>{unit.shield=(unit.shield||0)+share+(index<remainder?1:0)});
+    recipients.forEach(unit=>{unit.shield=(unit.shield||0)+shieldPerAlly});
     const rate=actor.premiumWeaponDuplicates>=2?.5:.25,turns=actor.premiumWeaponDuplicates>=2?3:2;
     for(const enemy of state.enemies)if(enemy.hp>0)enemy.tauntEffects.push({sourceId:actor.id,targetId:actor.id,rate,turns});
     ageTune(actor);return;

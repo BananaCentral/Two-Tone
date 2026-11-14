@@ -14,6 +14,7 @@ Shields are a per-unit damage buffer. They are separate from HP and enemy Barrie
 - Lifesteal uses actual HP lost after Shield absorption. Damage absorbed by Shield does not heal the attacker.
 - Enemy Barrier remains a separate mechanic. It tracks Barrier damage and breaking; it does not absorb the damage that is applied to HP. A unit's Shield absorbs incoming HP damage, including Barrier shatter damage.
 - Each unit owns an independent Shield total. Excess Shield on one unit cannot protect another.
+- A multi-target Shield effect may apply its full stated amount to every target. Do not divide the amount among targets unless the effect explicitly says to distribute a shared pool.
 - Shields are cleared when combat ends. Between-battle persistence is not defined.
 
 ## Display
