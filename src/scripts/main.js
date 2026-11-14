@@ -5,8 +5,9 @@ const BATTLE_AREAS=Object.freeze({
 });
 const DEFAULT_BATTLE_AREA_ID='area-1';
 const COMBAT_ACTION_PHASE_GAP_MS=500;
-const ULTIMATE_PRESENTATION_MS=1800;
-const ENEMY_DEATH_BEAT_MS=700;
+const ULTIMATE_PRESENTATION_MS=1500;
+const ENEMY_DEATH_BEAT_MS=500;
+const ENEMY_REINFORCEMENT_ENTRY_MS=500;
 const ULTIMATE_CAMERA_INTRO_MS=550;
 const ACTION_VISUALS=Object.freeze({
  zero:Object.freeze({basic:'soul-sword',skill:'soul-enhance',ultimate:'soul-storm'}),
@@ -716,7 +717,7 @@ function enterEnemy(slot){
  const queueIndex=waveQueue.findIndex(canDeployEnemy);if(queueIndex<0)return null;
  const [incoming]=waveQueue.splice(queueIndex,1),formation=ENEMY_FORMATIONS[slot];
  const barrier=roundHp(incoming.maxHp*incoming.barrierPercent);
- const e={...incoming,slot,x:formation.x,y:formation.y,w:formation.w,h:formation.h,hp:incoming.maxHp,shield:incoming.shield||0,maxBarrier:barrier,barrier,brokenTurns:0,debuffs:[],marks:[],tauntEffects:[]};
+ const e={...incoming,slot,x:formation.x,y:formation.y,w:formation.w,h:formation.h,hp:incoming.maxHp,shield:incoming.shield||0,maxBarrier:barrier,barrier,brokenTurns:0,debuffs:[],marks:[],tauntEffects:[],reinforcement:waveKills>0,entryPending:waveKills>0,enteredAt:waveKills>0?performance.now():null};
  if(premiumWeaponDuplicateRank('lily')>=1&&party.some(p=>p.id==='lily'))e.marks.push({id:'soul-mark',turns:2},{id:'ricochet',turns:2,sources:[]});
  enemies.push(e);enemies.sort((a,b)=>a.slot-b.slot);gauges[e.id]=0;
  spawnHistory.push({wave:e.wave,id:e.id,slot,initial:waveKills===0,duringAttack:attackInProgress});
@@ -875,9 +876,10 @@ function finishTrainingAttack(serial){
  if(pendingVacancies.length){schedule(()=>completeTrainingAttack(serial),ENEMY_DEATH_BEAT_MS);return}
  completeTrainingAttack(serial);
 }
-function completeTrainingAttack(serial){
+function completeTrainingAttack(serial,entryFinished=false){
  if(!lastAttack||lastAttack.serial!==serial||phase!=='resolve')return;
  settleAfterAttack();
+ if(!entryFinished&&enemies.some(e=>e.entryPending)){schedule(()=>{for(const enemy of enemies)if(enemy.entryPending)enemy.entryPending=false;completeTrainingAttack(serial,true)},ENEMY_REINFORCEMENT_ENTRY_MS);return}
  if(!encounterCleared&&lastAttack?.action!=='ultimate')finishSummonCreationForTest(lastAttack?.actor);
  if(phase!=='resolve')return;
  if(encounterCleared){cancelAllQueuedUltimates('victory');phase='victory';log='All enemies in every wave defeated.';return}
@@ -1599,20 +1601,21 @@ function drawUnit(p,pos,view,t,acting=false){
 
 }
 function drawEnemy(t,shot){const all=enemies;if(phase==='player'&&pendingTargetAction&&cameraPreview!=='party'&&previewTargetMode()==='aoe'&&combatEnemies().length){ctx.save();ctx.strokeStyle='rgba(102,243,211,.82)';ctx.lineWidth=5;ctx.setLineDash([22,12]);ctx.beginPath();ctx.ellipse(1093+camera.currentX*.43,558,453,67,0,0,Math.PI*2);ctx.stroke();ctx.restore()}for(const e of all){
- const defeated=e.hp<=0,deathElapsed=defeated?Math.max(0,t-(e.deathAt||t)):0,deathProgress=Math.min(1,deathElapsed/ENEMY_DEATH_BEAT_MS);
+ const defeated=e.hp<=0,deathElapsed=defeated?Math.max(0,t-(e.deathAt||t)):0,deathProgress=Math.min(1,deathElapsed/ENEMY_DEATH_BEAT_MS),entering=!defeated&&e.reinforcement&&e.enteredAt&&t-e.enteredAt<ENEMY_REINFORCEMENT_ENTRY_MS,entryProgress=entering?Math.max(0,Math.min(1,(t-e.enteredAt)/ENEMY_REINFORCEMENT_ENTRY_MS)):1,opacity=defeated?Math.max(0,1-deathProgress):entryProgress;
+ ctx.save();ctx.globalAlpha=opacity;
  const isFocus=phase==='player'&&chosenEnemy()?.id===e.id;
  const patternHit=phase==='player'&&!!pendingTargetAction&&cameraPreview!=='party'&&chooseAttackTargets(previewTargetMode()).some(x=>x.id===e.id);
  const isActor=(shot==='enemy-windup'&&actingEnemyId===e.id)||(fx?.kind==='enemy'&&fx?.actorEnemyId===e.id&&shot==='enemy-impact');
- const sh=(isActor?1.09:shot==='attack-impact'&&fx?.targetEnemyId===e.id?1.045:1)*(e.category==='boss'?1.55:1);
- const ww=e.w*sh,hh=e.h*sh,xx=e.x+camera.currentX*.43-(ww-e.w)/2,yy=e.y+(e.h-hh);
+ const sh=(isActor?1.09:shot==='attack-impact'&&fx?.targetEnemyId===e.id?1.045:1)*(e.category==='boss'?1.55:1)*((e.reinforcement&&e.enteredAt)?0.92+entryProgress*.08:1);
+ const ww=e.w*sh,hh=e.h*sh,xx=e.x+camera.currentX*.43-(ww-e.w)/2,yy=e.y+(e.h-hh)+(entering?(1-entryProgress)*27:0)+(defeated?Math.pow(deathProgress,1.4)*26:0);
  const zbHit=fx?.kind==='basic'&&fx?.actor==='zero'&&fx.targetEnemyId===e.id?t-fx.at:null;
-  const hitKick=zbHit!==null&&zbHit>=645&&zbHit<745?Math.sin((zbHit-645)*.06)*(1-(zbHit-645)/100)*2:0;
- let spriteCenterY=yy+hh/2,spriteVisibleW=ww,spriteVisibleH=hh;const spriteOffsetX=defeated?0:hitKick,spriteOffsetY=defeated?Math.pow(deathProgress,1.4)*26:Math.sin(t*.0026+e.x)*2.2;
- ctx.save();ctx.globalAlpha=defeated?Math.max(0,1-deathProgress):1;if(defeated)ctx.filter='grayscale(1)';ctx.translate(spriteOffsetX,spriteOffsetY);
+ const hitKick=zbHit!==null&&zbHit>=645&&zbHit<745?Math.sin((zbHit-645)*.06)*(1-(zbHit-645)/100)*2:0;
+ let spriteCenterY=yy+hh/2,spriteVisibleW=ww,spriteVisibleH=hh;const spriteOffsetX=defeated?0:hitKick,spriteOffsetY=defeated||entering?0:Math.sin(t*.0026+e.x)*2.2;
+ ctx.save();ctx.globalAlpha=opacity;if(defeated)ctx.filter='grayscale(1)';ctx.translate(spriteOffsetX,spriteOffsetY);
  ctx.beginPath();ctx.ellipse(xx+ww/2,yy+hh-4,ww*.48,13,0,0,Math.PI*2);ctx.fillStyle='#1b213c70';ctx.fill();
  const spriteId=enemyBattleSprite(e);if(images[spriteId]?.complete&&images[spriteId].naturalWidth){const img=images[spriteId];ctx.imageSmoothingEnabled=spriteId==='slimeBattle';const ratioParts=String(e.battleAspectRatio||'').split(':').map(Number),aspect=ratioParts.length===2&&ratioParts.every(Number.isFinite)&&ratioParts[0]>0&&ratioParts[1]>0?ratioParts[0]/ratioParts[1]:img.naturalWidth/img.naturalHeight,canvasW=Math.min(ww,hh*aspect),canvasH=canvasW/aspect,scaleX=canvasW/img.naturalWidth,scaleY=canvasH/img.naturalHeight,bounds=spriteAlphaBounds(img),drawW=bounds.w*scaleX,drawH=bounds.h*scaleY,drawX=xx+(ww-drawW)/2,drawY=yy+hh-drawH;spriteVisibleW=drawW;spriteVisibleH=drawH;spriteCenterY=drawY+drawH/2;ctx.drawImage(img,bounds.x,bounds.y,bounds.w,bounds.h,drawX,drawY,drawW,drawH)}
  ctx.restore();
- if(e.hp<=0)continue;
+ if(defeated){ctx.restore();continue}
  if(isActor){ctx.strokeStyle='#b7e6ff';ctx.lineWidth=4;ctx.strokeRect(xx-8,yy-6,ww+16,hh+13)}
  if(patternHit){const ringRadius=Math.max(spriteVisibleW,spriteVisibleH)/2+8;ctx.beginPath();ctx.arc(xx+ww/2+spriteOffsetX,spriteCenterY+spriteOffsetY,ringRadius,0,Math.PI*2);ctx.strokeStyle='#55aaff';ctx.lineWidth=4;ctx.stroke()}
  if(e.category!=='boss'){
@@ -1622,8 +1625,9 @@ function drawEnemy(t,shot){const all=enemies;if(phase==='player'&&pendingTargetA
   shieldedHealthBar(xx+2,yy-19,ww-14,10,e.hp,e.maxHp,e.shield,isFocus?'#ffd88e':'#ff8276','#4b2637');
  }
  if(e.brokenTurns>0)text('BROKEN '+e.brokenTurns,xx+ww/2,yy+9,12,'#9cecff','800','center');
- if(phase==='player'&&!paused&&cameraPreview!=='party')choiceRects.push({x:xx-13,y:yy-64,w:ww+26,h:hh+74,action:'enemy-target:'+e.id,enabled:true});
- }}
+ if(!entering&&phase==='player'&&!paused&&cameraPreview!=='party')choiceRects.push({x:xx-13,y:yy-64,w:ww+26,h:hh+74,action:'enemy-target:'+e.id,enabled:true});
+ ctx.restore();
+}}
 function drawActorsForShot(t,shot){
  const view=shotWorld(shot)==='reverse'?'party':'command';
  if(view==='party'){
