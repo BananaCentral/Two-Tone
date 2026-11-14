@@ -624,8 +624,9 @@ function validateWaveComposition(wave){
 function initialSlots(count){return ({1:[2],2:[1,3],3:[1,2,3],4:[0,1,3,4],5:[0,1,2,3,4]})[count].slice()}
 function canDeployEnemy(enemy){
  if(!enemy||enemies.length>=ENCOUNTER_LIMITS.enemiesOnField)return false;
- const bossWave=wavePlan[waveIndex]?.some(e=>e.category==='boss');
- if(bossWave&&enemy.category==='elite'&&enemies.filter(e=>e.category==='elite'&&e.hp>0).length>=ENCOUNTER_LIMITS.elitesOnFieldInBossWave)return false;
+ const eliteCount=enemies.filter(e=>e.category==='elite'&&e.hp>0).length,bossOnField=enemies.some(e=>e.category==='boss'&&e.hp>0);
+ if(enemy.category==='boss'&&eliteCount>ENCOUNTER_LIMITS.elitesOnFieldInBossWave)return false;
+ if(bossOnField&&enemy.category==='elite'&&eliteCount>=ENCOUNTER_LIMITS.elitesOnFieldInBossWave)return false;
  return true;
 }
 function enterEnemy(slot){
