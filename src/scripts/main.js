@@ -4,11 +4,17 @@ const BATTLE_AREAS=Object.freeze({
  'area-1':Object.freeze({name:'Area 1',background:'area1Background'})
 });
 const DEFAULT_BATTLE_AREA_ID='area-1';
-const COMBAT_ACTION_PHASE_GAP_MS=500;
-const ULTIMATE_PRESENTATION_MS=1500;
-const ENEMY_DEATH_BEAT_MS=500;
-const ENEMY_REINFORCEMENT_ENTRY_MS=500;
-const ULTIMATE_CAMERA_INTRO_MS=550;
+const ANIMATION_STEP_MS=250;
+const CAMERA_TRANSITION_SAME_VIEW_MS=ANIMATION_STEP_MS;
+const CAMERA_TRANSITION_BETWEEN_SIDES_MS=ANIMATION_STEP_MS*2;
+const ENEMY_WINDUP_MS=ANIMATION_STEP_MS*3;
+const COMBAT_ACTION_EFFECT_MS=ANIMATION_STEP_MS*4;
+const ENEMY_ATTACK_EFFECT_MS=ANIMATION_STEP_MS*4;
+const COMBAT_ACTION_PHASE_GAP_MS=ANIMATION_STEP_MS*2;
+const ULTIMATE_PRESENTATION_MS=ANIMATION_STEP_MS*6;
+const ENEMY_DEATH_BEAT_MS=ANIMATION_STEP_MS*2;
+const ENEMY_REINFORCEMENT_ENTRY_MS=ANIMATION_STEP_MS*2;
+const ULTIMATE_CAMERA_INTRO_MS=ANIMATION_STEP_MS*2;
 const ACTION_VISUALS=Object.freeze({
  zero:Object.freeze({basic:'soul-sword',skill:'soul-enhance',ultimate:'soul-storm'}),
  lily:Object.freeze({basic:'lily-petal',skill:'lily-ricochet',ultimate:'lily-haunting'}),
@@ -219,19 +225,19 @@ function criticalRateOf(unit){return Math.min(1,Math.max(0,(Number.isFinite(unit
 function criticalDamageOf(unit){return Math.max(0,(Number.isFinite(unit?.criticalDamage)?unit.criticalDamage:.5)+(Number.isFinite(unit?.criticalDamageBonus)?unit.criticalDamageBonus:0)+(unit?.tune?.criticalDamageBonus||0)+Object.values(unit?.criticalDamageModifiers||{}).reduce((sum,value)=>sum+(Number.isFinite(value)?value:0),0))}
 function lifestealRateOf(unit){const base=(Number.isFinite(unit?.lifesteal)?unit.lifesteal:0)+(Number.isFinite(unit?.lifestealBonus)?unit.lifestealBonus:0)+Object.values(unit?.lifestealModifiers||{}).reduce((sum,value)=>sum+(Number.isFinite(value)?value:0),0),tasteForBlood=party.includes(unit)&&party.some(member=>member.id==='logan'&&member.hp>0)?(characterDuplicateRank('logan')>=4?.2:.1):0;return Math.max(0,base+tasteForBlood)}
 function shieldOf(unit){return Math.max(0,Number.isFinite(unit?.shield)?unit.shield:0)}
-function absorbShield(unit,damage){const absorbed=Math.min(shieldOf(unit),Math.max(0,damage));if(absorbed>0){unit.shield=Math.max(0,shieldOf(unit)-absorbed);emitCombatVisual('shield-absorbed',[unit.id],850,{damage:absorbed,remaining:unit.shield})}return absorbed}
+function absorbShield(unit,damage){const absorbed=Math.min(shieldOf(unit),Math.max(0,damage));if(absorbed>0){unit.shield=Math.max(0,shieldOf(unit)-absorbed);emitCombatVisual('shield-absorbed',[unit.id],COMBAT_ACTION_EFFECT_MS,{damage:absorbed,remaining:unit.shield})}return absorbed}
 function addShield(unit,amount){if(!unit||!Number.isFinite(amount)||amount<=0)return 0;unit.shield=shieldOf(unit)+roundHp(amount);return unit.shield}
 function applyLifesteal(attacker,healthDamage){
  const rate=lifestealRateOf(attacker);if(healthDamage<=0||rate<=0||!attacker||attacker.hp<=0||!Number.isFinite(attacker.maxHp))return 0;
  const hpBefore=attacker.hp;healCharacterHp(attacker,roundHp(healthDamage*rate));const healing=Math.max(0,attacker.hp-hpBefore);
- if(healing>0){emitCombatVisual('lifesteal-heal',[attacker.id],850,{healing});const logan=party.find(unit=>unit.id==='logan'),weapon=logan&&loadoutFor('logan').weapon,signatureEquipped=weapon?.selected==='premium'&&weapon?.premiumOwned;if(attacker.id!=='logan'&&logan&&party.includes(attacker)&&signatureEquipped){const before=logan.hp;healCharacterHp(logan,healing);const copied=Math.max(0,logan.hp-before);if(copied>0)emitCombatVisual('logan-signature-heal',[logan.id],850,{healing:copied})}}
+ if(healing>0){emitCombatVisual('lifesteal-heal',[attacker.id],COMBAT_ACTION_EFFECT_MS,{healing});const logan=party.find(unit=>unit.id==='logan'),weapon=logan&&loadoutFor('logan').weapon,signatureEquipped=weapon?.selected==='premium'&&weapon?.premiumOwned;if(attacker.id!=='logan'&&logan&&party.includes(attacker)&&signatureEquipped){const before=logan.hp;healCharacterHp(logan,healing);const copied=Math.max(0,logan.hp-before);if(copied>0)emitCombatVisual('logan-signature-heal',[logan.id],COMBAT_ACTION_EFFECT_MS,{healing:copied})}}
  return healing;
 }
 function tauntRateOf(attacker,target=null){return Math.min(1,Math.max(0,...(attacker?.tauntEffects||[]).filter(effect=>Number.isInteger(effect.turns)&&effect.turns>0&&(!target||effect.targetId===target.id)).map(effect=>effect.rate)))}
 function applyTaunt(attacker,taunter,rate,turns){
  if(!attacker||!taunter||!Number.isFinite(rate)||rate<0||rate>1||!Number.isInteger(turns)||turns<1)return false;
  attacker.tauntEffects=Array.isArray(attacker.tauntEffects)?attacker.tauntEffects:[];attacker.tauntEffects=attacker.tauntEffects.filter(effect=>effect.targetId!==taunter.id||effect.sourceId!==taunter.id);attacker.tauntEffects.push({sourceId:taunter.id,targetId:taunter.id,rate,turns});
- emitCombatVisual('taunt-applied',[attacker.id],900,{rate,turns,taunterId:taunter.id});return true;
+ emitCombatVisual('taunt-applied',[attacker.id],COMBAT_ACTION_EFFECT_MS,{rate,turns,taunterId:taunter.id});return true;
 }
 function resolveTauntTarget(attacker,candidates,originalTarget,random=Math.random){
  const contenders=[...new Set(candidates)].map(unit=>({unit,rate:tauntRateOf(attacker,unit)})).filter(entry=>entry.rate>0).sort((a,b)=>b.rate-a.rate||String(a.unit.id).localeCompare(String(b.unit.id)));
@@ -456,12 +462,12 @@ function executeIndependentSummonTurn(s){
   const lily=party.find(p=>p.id==='lily'),raw=calculateTypedActionDamage('true',1,lily,enemy),dealt=applyEnemyDamage(enemy,raw?.damageTaken||0,lily);
   source.hits.push({target:enemy.id,damage:dealt.damage,summon:true});if(enemy.hp<=0)resolveEnemyDefeat(enemy);
   else{
-   enemy.marks=enemy.marks||[];emitCombatVisual('lily-exposed',[enemy.id],850);const dup=characterDuplicateRank('lily'),existing=enemy.marks.filter(m=>m.id==='exposed').length;enemy.marks=enemy.marks.filter(m=>m.id!=='exposed');for(let i=0;i<(dup>=2?Math.min(2,existing+1):1);i++)enemy.marks.push({id:'exposed',turns:dup>=2?3:2});emitCombatVisual('lily-ricochet-mark',[enemy.id],850);applyLilyUltimateDebuff(enemy);if(!source.pendingRicochet&&dealt.damage>0)source.pendingRicochet={enemyId:enemy.id,damage:dealt.damage};if(lily&&loadoutFor('lily').weapon.selected==='premium'&&loadoutFor('lily').weapon.premiumOwned)lily.energy=Math.min(120,lily.energy+5);
+   enemy.marks=enemy.marks||[];emitCombatVisual('lily-exposed',[enemy.id],COMBAT_ACTION_EFFECT_MS);const dup=characterDuplicateRank('lily'),existing=enemy.marks.filter(m=>m.id==='exposed').length;enemy.marks=enemy.marks.filter(m=>m.id!=='exposed');for(let i=0;i<(dup>=2?Math.min(2,existing+1):1);i++)enemy.marks.push({id:'exposed',turns:dup>=2?3:2});emitCombatVisual('lily-ricochet-mark',[enemy.id],COMBAT_ACTION_EFFECT_MS);applyLilyUltimateDebuff(enemy);if(!source.pendingRicochet&&dealt.damage>0)source.pendingRicochet={enemyId:enemy.id,damage:dealt.damage};if(lily&&loadoutFor('lily').weapon.selected==='premium'&&loadoutFor('lily').weapon.premiumOwned)lily.energy=Math.min(120,lily.energy+5);
   }
  }
  log=`${s.name} • INITIAL AOE • TRUE DAMAGE`;
  const finishTurn=()=>{attackInProgress=false;settleAfterAttack();if(s.remaining<=0){summons=summons.filter(x=>x.id!==s.id);turnTimeline.states.delete(s.id);summonHistory.push({event:'expired',id:s.id})}drainUltimateQueueBefore(()=>nextTurn())};
- schedule(()=>{const pending=source.pendingRicochet,ricochetCount=pending?triggerRicochet(source,enemies.find(e=>e.id===pending.enemyId),pending.damage):0;if(ricochetCount)log=`Hauntling triggers Lily's Ricochet • ${ricochetCount} marked ${ricochetCount===1?'enemy':'enemies'}.`;schedule(finishTurn,COMBAT_ACTION_PHASE_GAP_MS)},950);
+ schedule(()=>{const pending=source.pendingRicochet,ricochetCount=pending?triggerRicochet(source,enemies.find(e=>e.id===pending.enemyId),pending.damage):0;if(ricochetCount)log=`Hauntling triggers Lily's Ricochet • ${ricochetCount} marked ${ricochetCount===1?'enemy':'enemies'}.`;schedule(finishTurn,COMBAT_ACTION_PHASE_GAP_MS)},COMBAT_ACTION_EFFECT_MS);
 }
 
 const color={ink:'#0a101f',panel:'rgba(13,17,35,.94)',gold:'#eacb87',white:'#f7f3f8',sub:'#bfc8d9',blue:'#85d9ff',red:'#f47679',green:'#5bebac'};
@@ -530,7 +536,7 @@ function availableEnergy(p){return p?Math.max(0,p.energy-(p.energyReserved||0)):
 function isUltPending(id){return ultimateQueue.some(q=>q.actorId===id)||(ultimateExecuting&&lastAttack?.action==='ultimate'&&lastAttack.actor===id)}
 function canQueueUltimate(p){return !!p&&p.hp>0&&!paused&&['player','enemy','resolve'].includes(phase)
   &&availableEnergy(p)>=ULTIMATE_ENERGY_COST&&!isUltPending(p.id)}
-function emitCombatVisual(type,targetIds=[],duration=1000,details={}){combatVisualEvents.push({type,targetIds:[...targetIds],at:performance.now(),duration,...details})}
+function emitCombatVisual(type,targetIds=[],duration=COMBAT_ACTION_EFFECT_MS,details={}){combatVisualEvents.push({type,targetIds:[...targetIds],at:performance.now(),duration,...details})}
 function resetActionResources(){const resourceful=party.some(p=>p.id==='dawn');combatVisualEvents=[];sp=resourceful?5:3;soulEnhanceStacks=0;soulFollowUpProcs=soulFollowUpLimit();soulFollowUpSources=new Set();soulEnhanceSpendingRemainder=0;soulFollowUpActivationCount=0;spCapModifiers=Object.create(null);if(resourceful){setSpCapModifier('dawn-resourceful',2);emitCombatVisual('dawn-resourceful',party.map(p=>p.id),1250)}ultimateQueue=[];ultimateSequence=0;ultimateHistory=[];ultimateResume=null;ultimateExecuting=false;
   for(const p of party)p.energyReserved=0;}
 function setSpCapTestSource(source,bonus){
@@ -772,7 +778,7 @@ function applyTrainingHit(enemy,damage,hitNumber,deferRicochet=false){
  if((lastAttack.actor!=='lily'||lastAttack.action==='summon')&&enemy.marks?.some(m=>m.id==='exposed')&&premiumWeaponDuplicateRank('lily')>=0){const lily=party.find(p=>p.id==='lily');if(lily&&loadoutFor('lily').weapon.selected==='premium'&&loadoutFor('lily').weapon.premiumOwned)lily.energy=Math.min(120,lily.energy+5)}
  lastAttack.hits.push({index:hitNumber,target:enemy.id,slot:enemy.slot,damage:dealt.damage+dealt.breakDamage,healthDamage:dealt.healthDamage,shieldDamage:dealt.shieldDamage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,breakDamage:dealt.breakDamage,barrierAfter:enemy.barrier,broken:dealt.broken,critical:dealt.critical,criticalMultiplier:dealt.criticalMultiplier,phase:'initial'});
  if(lastAttack.actor==='lily'&&(lastAttack.action==='skill'||lastAttack.action==='ultimate')){
-  emitCombatVisual('lily-exposed',[enemy.id],850);
+  emitCombatVisual('lily-exposed',[enemy.id],COMBAT_ACTION_EFFECT_MS);
   enemy.marks=enemy.marks||[];const dup=characterDuplicateRank('lily');
   if(dup>=2){const stacks=Math.min(2,(enemy.marks.filter(m=>m.id==='exposed').length||0)+1);enemy.marks=enemy.marks.filter(m=>m.id!=='exposed');for(let i=0;i<stacks;i++)enemy.marks.push({id:'exposed',turns:3})}
   else{enemy.marks=enemy.marks.filter(m=>m.id!=='exposed');enemy.marks.push({id:'exposed',turns:2})}
@@ -797,7 +803,7 @@ function triggerRicochet(sourceAttack,hitEnemy,sourceDamage){
  for(const enemy of triggered){const mark=enemy.marks.find(m=>m.id==='ricochet');mark.sources=[...(mark.sources||[]),sourceAttack.serial];
   for(let n=0;n<repetitions&&enemy.hp>0;n++){const reduction=calculateTrueDamageReduction(lily,enemy),amount=roundHp(sourceDamage*.1*(n===1?.5:1)*(1-(Number.isFinite(reduction)?reduction:0))),dealt=applyEnemyDamage(enemy,amount,lily);damageByTarget[enemy.id]=(damageByTarget[enemy.id]||0)+dealt.damage;sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,damage:dealt.damage,barrierDamage:dealt.barrierDamage,ricochet:true,ricochetSource:sourceAttack.serial,critical:dealt.critical,phase:'ricochet'});if(enemy.hp<=0)resolveEnemyDefeat(enemy)}
  }
- emitCombatVisual('lily-ricochet-trigger',triggered.map(e=>e.id),900,{damageByTarget});sourceAttack.ricochetFollowUp=false;syncEnemyHp();return triggered.length;
+ emitCombatVisual('lily-ricochet-trigger',triggered.map(e=>e.id),COMBAT_ACTION_EFFECT_MS,{damageByTarget});sourceAttack.ricochetFollowUp=false;syncEnemyHp();return triggered.length;
 }
 function cleanseEnemy(enemy,full=true){if(full){enemy.debuffs=[];enemy.marks=[];enemy.bleedStacks=[];enemy.tauntEffects=[];return}enemy.debuffs.shift();enemy.marks.shift()}
 function teamBaseTurns(faction){
@@ -828,7 +834,7 @@ function applyBleed(target,source,stacks=1,maxStacks=target?.bleedMaxStacks??5){
  if(!target||target.hp<=0||!source||!Number.isInteger(stacks)||stacks<1||!Number.isInteger(maxStacks)||maxStacks<1)return false;
  target.bleedStacks=Array.isArray(target.bleedStacks)?target.bleedStacks:[];target.bleedMaxStacks=maxStacks;
  const added=Math.min(stacks,Math.max(0,maxStacks-target.bleedStacks.length));if(!added)return false;
- for(let i=0;i<added;i++)target.bleedStacks.push({sourceId:source.id});emitCombatVisual('bleed-applied',[target.id],900,{stacks:target.bleedStacks.length});return added;
+ for(let i=0;i<added;i++)target.bleedStacks.push({sourceId:source.id});emitCombatVisual('bleed-applied',[target.id],COMBAT_ACTION_EFFECT_MS,{stacks:target.bleedStacks.length});return added;
 }
 function resolveBleedTick(target){
  if(!target||target.hp<=0||!target.bleedStacks?.length)return 0;
@@ -846,7 +852,7 @@ function resolveSoulFollowUp(sourceAttack){
  for(let i=0;i<affected.length;i++){const share=base+(i<remainder?1:0),rate=attack>0?share/attack:0,amount=soulDamageForTarget(soul,affected[i],rate);if(amount<=0)continue;const enemy=affected[i],dealt=applyEnemyDamage(enemy,amount,soul);total+=dealt.damage;sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,slot:enemy.slot,damage:dealt.damage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,barrierAfter:enemy.barrier,broken:dealt.broken,followUp:true,critical:dealt.critical,phase:'follow-up'});if(enemy.hp<=0)resolveEnemyDefeat(enemy)}
  soulFollowUpActivationCount++;
   if(premiumWeaponDuplicateRank(soul.id)>=4&&soulFollowUpActivationCount%2===0)soulFollowUpProcs=Math.min(soulFollowUpLimit(),soulFollowUpProcs+1);
- sourceAttack.followUp={sourceSerial:sourceAttack.serial,damage:total,targets:affected.map(e=>e.id),procsRemaining:soulFollowUpProcs};emitCombatVisual('soul-follow-up',affected.map(e=>e.id),1150,{damageByTarget:Object.fromEntries(sourceAttack.hits.filter(hit=>hit.followUp).map(hit=>[hit.target,hit.damage])),targetGeometry:Object.fromEntries(affected.map(e=>[e.id,{x:e.x,y:e.y,w:e.w,h:e.h}]))});syncEnemyHp();return total>0;
+ sourceAttack.followUp={sourceSerial:sourceAttack.serial,damage:total,targets:affected.map(e=>e.id),procsRemaining:soulFollowUpProcs};emitCombatVisual('soul-follow-up',affected.map(e=>e.id),ANIMATION_STEP_MS*5,{damageByTarget:Object.fromEntries(sourceAttack.hits.filter(hit=>hit.followUp).map(hit=>[hit.target,hit.damage])),targetGeometry:Object.fromEntries(affected.map(e=>[e.id,{x:e.x,y:e.y,w:e.w,h:e.h}]))});syncEnemyHp();return total>0;
 }
 function finishTrainingAttack(serial){
  if(!attackInProgress||!lastAttack||lastAttack.serial!==serial)return;
@@ -925,7 +931,7 @@ function startBattle(areaId=DEFAULT_BATTLE_AREA_ID){
  turnTimeline.reset();pendingTargetAction=null;speedModifiers=Object.create(null);summons=[];summonSerial=0;summonHistory=[];gauges={};for(const p of party)gauges[p.id]=0;
  resetEnemies();resetActionResources();enemyCount=0;turn=0;activeId=null;actingEnemyId=null;prepareBattleIntro();zeroSkillArmed=false;fx=null;paused=false;phase='intro';forceSelect=false;saveVitals();
  log=`Wave 1/${wavePlan.length}: ${wavePlan[0].length} training enemies (${enemies.length} on field).`;
- schedule(()=>{if(phase==='intro')nextTurn()},380);
+ schedule(()=>{if(phase==='intro')nextTurn()},CAMERA_TRANSITION_BETWEEN_SIDES_MS);
 }
 function replay(){if(phase==='setup')return;draft=party.map(p=>p.id);startFromBattle();}
 function startFromBattle(){
@@ -934,7 +940,7 @@ function startFromBattle(){
  turnTimeline.reset();pendingTargetAction=null;speedModifiers=Object.create(null);summons=[];summonSerial=0;summonHistory=[];gauges={};for(const p of party)gauges[p.id]=0;
  resetEnemies();resetActionResources();enemyCount=0;turn=0;activeId=null;actingEnemyId=null;prepareBattleIntro();zeroSkillArmed=false;fx=null;paused=false;phase='intro';saveVitals();
  log=`Wave test restarted: ${wavePlan.length} waves, ${wavePlan.reduce((n,w)=>n+w.length,0)} total enemies.`;
- schedule(()=>{if(phase==='intro')nextTurn()},380);
+ schedule(()=>{if(phase==='intro')nextTurn()},CAMERA_TRANSITION_BETWEEN_SIDES_MS);
 }
 function applyResidue(target,passive={}){if(!target||target.hp<=0)return false;target.residueMaxStacks=passive.maxStacks??RESIDUE_RULES.maxStacks;target.residueDamageReductionPerStack=passive.damageReductionPerStack??RESIDUE_RULES.damageReductionPerStack;target.residueResistanceReductionPerStack=passive.resistanceReductionPerStack??RESIDUE_RULES.resistanceReductionPerStack;target.residueStacks=Math.min(target.residueMaxStacks,(target.residueStacks||0)+1);target.residueTurns=RESIDUE_RULES.durationTurns;emitCombatVisual('slime-residue',[target.id],1000);return true}
 function resolveEnemyBasicAttack(attacker,candidates){
@@ -942,7 +948,7 @@ function resolveEnemyBasicAttack(attacker,candidates){
  if(passive)attacker.basicAttackCount=(attacker.basicAttackCount||0)+1;
  const enhanced=!!passive&&attacker.basicAttackCount%passive.every===0,mode=enhanced?'aoe':basic.targetMode||'single';
  const originalPrimary=candidates[Math.floor(Math.random()*candidates.length)],tauntSelection=mode==='aoe'?{target:originalPrimary,taunted:false}:resolveTauntTarget(attacker,candidates,originalPrimary),primary=tauntSelection.target||originalPrimary;
- if(tauntSelection.taunted)emitCombatVisual('taunt-redirect',[attacker.id],850,{rate:tauntRateOf(attacker,primary),taunterId:primary.id});
+ if(tauntSelection.taunted)emitCombatVisual('taunt-redirect',[attacker.id],COMBAT_ACTION_EFFECT_MS,{rate:tauntRateOf(attacker,primary),taunterId:primary.id});
  const targets=mode==='aoe'?[...candidates]:mode==='blast'?candidates.filter(target=>Math.abs(party.indexOf(target)-party.indexOf(primary))<=1):[primary];
  const multiplier=(basic.multiplier??1)*(enhanced?1+(passive?.damageBonus||0):1)*(rampage?1+(attacker.passive.damageBonus??.25)*(attacker.rampageStacks||0):1)*(attacker.debuffs||[]).reduce((v,d)=>v*(d.damageMultiplier??1),1);
  const hits=targets.map(target=>{
@@ -969,7 +975,7 @@ function nextTurn(){
  if(attacking?.marks)attacking.marks=attacking.marks.map(m=>({...m,turns:m.turns-1})).filter(m=>m.turns>0);
  if(attacking?.debuffs)attacking.debuffs=attacking.debuffs.map(d=>({...d,turns:d.turns-1})).filter(d=>d.turns>0);
  if(attacking){activeId=null;zeroSkillArmed=false;pendingTargetAction=null;actingEnemyId=next;cameraPreview=null;phase='enemy';log=`${attacking.name} prepares an attack.`;
-  schedule(()=>{if(phase!=='enemy'||paused)return;if(attacking.hp<=0){nextTurn();return}const candidates=alive();if(!candidates.length){cancelAllQueuedUltimates('defeat');phase='defeat';return}enemyCount++;const attack=resolveEnemyBasicAttack(attacking,candidates),firstHit=attack.hits[0];ageTaunt(attacking);saveVitals();cancelQueuedUltimatesOfDefeated();const visual=ENEMY_ACTION_VISUALS[attacking.archetypeId]?.basic||ENEMY_ACTION_VISUALS.slime.basic;fx={kind:'enemy',visual,at:performance.now(),damage:firstHit.damage,target:firstHit.target,hits:attack.hits,actorEnemyId:attacking.id};log=attack.enhanced?`${attacking.name} uses Slimy against all allied characters.`:attack.mode==='aoe'?`${attacking.name} attacks all allied characters for ${firstHit.damage} damage each.`:attack.mode==='blast'?`${attacking.name} blasts ${attack.hits.length} allied characters.`:`${attacking.name} hits ${party.find(p=>p.id===firstHit.target)?.name||'an ally'} for ${firstHit.damage}.`;phase='resolve';schedule(()=>drainUltimateQueueBefore(()=>{if(!alive().length){phase='defeat';log='All allied characters were defeated.'}else nextTurn()}),1000)},780);
+  schedule(()=>{if(phase!=='enemy'||paused)return;if(attacking.hp<=0){nextTurn();return}const candidates=alive();if(!candidates.length){cancelAllQueuedUltimates('defeat');phase='defeat';return}enemyCount++;const attack=resolveEnemyBasicAttack(attacking,candidates),firstHit=attack.hits[0];ageTaunt(attacking);saveVitals();cancelQueuedUltimatesOfDefeated();const visual=ENEMY_ACTION_VISUALS[attacking.archetypeId]?.basic||ENEMY_ACTION_VISUALS.slime.basic;fx={kind:'enemy',visual,at:performance.now(),damage:firstHit.damage,target:firstHit.target,hits:attack.hits,actorEnemyId:attacking.id};log=attack.enhanced?`${attacking.name} uses Slimy against all allied characters.`:attack.mode==='aoe'?`${attacking.name} attacks all allied characters for ${firstHit.damage} damage each.`:attack.mode==='blast'?`${attacking.name} blasts ${attack.hits.length} allied characters.`:`${attacking.name} hits ${party.find(p=>p.id===firstHit.target)?.name||'an ally'} for ${firstHit.damage}.`;phase='resolve';schedule(()=>drainUltimateQueueBefore(()=>{if(!alive().length){phase='defeat';log='All allied characters were defeated.'}else nextTurn()}),ENEMY_ATTACK_EFFECT_MS)},ENEMY_WINDUP_MS);
  }else{actingEnemyId=null;activeId=next;zeroSkillArmed=false;pendingTargetAction=null;cameraPreview=null;phase='player';log=`${active().name}'s turn — select an ability, then choose an enemy.`;}
 }
 // Normal turns can use Basic or Skill. Ultimate is off-turn and never spends a turn.
@@ -997,7 +1003,7 @@ function applyLoganBloodShield(logan){
  for(const ally of recipients){if(shieldPerAlly>0){addShield(ally,shieldPerAlly);emitCombatVisual('shield-applied',[ally.id],1000,{shield:shieldPerAlly,totalShield:ally.shield})}}
  const weaponDuplicates=premiumWeaponDuplicateRank('logan'),tauntRate=weaponDuplicates>=2?.5:.25,tauntTurns=weaponDuplicates>=2?3:2;
  for(const enemy of liveEnemies())applyTaunt(enemy,logan,tauntRate,tauntTurns);
- emitCombatVisual('logan-blood-shield',recipients.map(ally=>ally.id),1050,{healthCost,shieldPerAlly});return {healthCost,shieldPerAlly,tauntRate,tauntTurns};
+ emitCombatVisual('logan-blood-shield',recipients.map(ally=>ally.id),COMBAT_ACTION_EFFECT_MS,{healthCost,shieldPerAlly});return {healthCost,shieldPerAlly,tauntRate,tauntTurns};
 }
 function executeCombatAction(a,action,ultimateSeq=null,allyTargetId=null){
  if(!a||a.hp<=0||!['basic','skill','ultimate'].includes(action))return false;
@@ -1036,12 +1042,12 @@ function executeCombatAction(a,action,ultimateSeq=null,allyTargetId=null){
  if(controlledSummon)summonHistory.push({event:'controlled-activation',id:controlledSummon.id,ownerId:a.id,clock:turnTimeline.clock});
  if(mode==='five-hit'){
   let focused=victim,lastSlot=victim.slot;
-  for(let n=0;n<5;n++)schedule(()=>{if(phase!=='resolve'||!attackInProgress||lastAttack?.serial!==serial)return;if(!focused||focused.hp<=0)focused=closestSurvivingEnemy(lastSlot);if(!focused)return;lastSlot=focused.slot;const part=Math.floor(damage/5)+(n<damage%5?1:0);applyTrainingHit(focused,part,n+1,true)},160+n*135);
+  for(let n=0;n<5;n++)schedule(()=>{if(phase!=='resolve'||!attackInProgress||lastAttack?.serial!==serial)return;if(!focused||focused.hp<=0)focused=closestSurvivingEnemy(lastSlot);if(!focused)return;lastSlot=focused.slot;const part=Math.floor(damage/5)+(n<damage%5?1:0);applyTrainingHit(focused,part,n+1,true)},ANIMATION_STEP_MS*(n+1));
  }else schedule(()=>{
   if(phase!=='resolve'||!attackInProgress||lastAttack?.serial!==serial)return;
   for(let n=0;n<targets.length;n++)if(targets[n].hp>0){let hitDamage=damage;if(a.id==='zero'&&(action==='basic'||action==='ultimate'))hitDamage=soulDamageForTarget(a,targets[n],soulRate);else if(a.id==='lily')hitDamage=calculateTypedActionDamage('magical',(action==='skill' ? 0.5 : 1)*celestialMultiplier(a.id,action)*(action==='ultimate'&&characterDuplicateRank(a.id)>=3?2:1)*(tuneBasicUsed?1+a.tune.damageBonus:1),a,targets[n])?.damageTaken??0;else if(a.id==='dawn'&&action==='basic')hitDamage=calculateTypedActionDamage('magical',2*celestialMultiplier(a.id,'basic')*(tuneBasicUsed?1+a.tune.damageBonus:1),a,targets[n])?.damageTaken??0;applyTrainingHit(targets[n],hitDamage,n+1,true)}
- },a.id==='zero'&&action==='basic'?645:340);
- schedule(()=>finishTrainingAttack(serial),a.id==='zero'&&action==='basic'?SOUL_BASIC_MS:action==='ultimate'?ULTIMATE_PRESENTATION_MS:dawnSupport?950:990);
+ },a.id==='zero'&&action==='basic'?ANIMATION_STEP_MS*3:ANIMATION_STEP_MS);
+ schedule(()=>finishTrainingAttack(serial),mode==='five-hit'?ULTIMATE_PRESENTATION_MS:a.id==='zero'&&action==='basic'?SOUL_BASIC_MS:action==='ultimate'?ULTIMATE_PRESENTATION_MS:COMBAT_ACTION_EFFECT_MS);
  return true;
 }
 // Developer-only test helpers. They do not define the game's revival resource, cost, or eligibility rules.
@@ -1399,13 +1405,13 @@ function combatEnemies(){return liveEnemies()}
 // New reverse-view arena geometry and test-slot silhouettes are development placeholders.
 let cameraPreview=null,selectedAllyId=null,devPanelOpen=false;
 // Review-only HUD arrangement. Developer controls are hidden until explicitly opened.
-const camera={shot:'command',from:'command',start:performance.now(),duration:250,lastX:0,mode:'command',parallax:{},focus:null};
+const camera={shot:'command',from:'command',start:performance.now(),duration:CAMERA_TRANSITION_SAME_VIEW_MS,lastX:0,mode:'command',parallax:{},focus:null};
 function smooth01(x){x=Math.max(0,Math.min(1,x));return x*x*(3-2*x)}
 function clamp01(x){return Math.min(1,Math.max(0,x))}
 // Zero's user-approved basic-attack assembly: 256×512 neutral + wind-up + slash.
 // The motion is presentation-only; all damage, targeting and turn logic stays in combat actions.
-// 1250 ms: dash 0–260, wind-up 260–460, strike 460–650, impact 650–760, return 760–1250.
-const SOUL_BASIC_MS=1250;
+// 1250 ms: approach 0–250, hold 250–750, strike 750–1000, return 1000–1250.
+const SOUL_BASIC_MS=ANIMATION_STEP_MS*5;
 function zeroBasicStage(t){
  if(phase!=='resolve'||fx?.kind!=='basic'||fx.actor!=='zero')return null;
  const dt=Math.max(0,t-fx.at);return dt<=SOUL_BASIC_MS?dt:null;
@@ -1416,7 +1422,7 @@ function zeroBasicTravel(t,pos){
  const dt=zeroBasicStage(t),target=fx?.targetGeometry;
  if(dt===null||!target)return pos;
  // Parallax-safe destination: camera remains independent from the actor's world motion.
- let approach=dt<260?easeOutCubic(dt/260):dt<760?1:1-smooth01((dt-760)/490);
+ let approach=dt<ANIMATION_STEP_MS?easeOutCubic(dt/ANIMATION_STEP_MS):dt<ANIMATION_STEP_MS*3?1:1-smooth01((dt-ANIMATION_STEP_MS*3)/(ANIMATION_STEP_MS*2));
  const scale=lerp(1,.50,approach);
  const targetWidth=pos.w*.50;
  const targetLeft=target.x-targetWidth*.80 + camera.currentX*(.43-.52);
@@ -1432,12 +1438,11 @@ function zeroBasicPaint(x,baseY,w,h,dt){
   ctx.drawImage(img,x+(w-sw)/2+dxFor(m.dx,w),baseY-sh*m.foot/512,sw,sh);ctx.restore();
  };
  const mix=(before,after,a)=>{draw(before,1-a);draw(after,a)};
- if(dt<220)draw('zero');
- else if(dt<300)mix('zero','zeroBasicWindup',smooth01((dt-220)/80));
- else if(dt<450)draw('zeroBasicWindup');
- else if(dt<520)mix('zeroBasicWindup','zeroBasicSlash',smooth01((dt-450)/70));
- else if(dt<810)draw('zeroBasicSlash');
- else if(dt<930)mix('zeroBasicSlash','zero',smooth01((dt-810)/120));
+ if(dt<ANIMATION_STEP_MS)draw('zero');
+ else if(dt<ANIMATION_STEP_MS*2)mix('zero','zeroBasicWindup',(dt-ANIMATION_STEP_MS)/ANIMATION_STEP_MS);
+ else if(dt<ANIMATION_STEP_MS*3)draw('zeroBasicWindup');
+ else if(dt<ANIMATION_STEP_MS*4)draw('zeroBasicSlash');
+ else if(dt<ANIMATION_STEP_MS*5)mix('zeroBasicSlash','zero',(dt-ANIMATION_STEP_MS*4)/ANIMATION_STEP_MS);
  else draw('zero');
 }
 function dxFor(relative,width){return relative*width}
@@ -1449,9 +1454,9 @@ function cameraShot(t=performance.now()){
  if(phase==='enemy')return 'enemy-windup';
  if(phase==='resolve'&&fx){const dt=t-fx.at;
   if(fx.kind==='support')return fx.targetAllyId?(fx.action==='ultimate'?'party':'ally-impact'):'command';
-  if(fx.kind==='enemy')return dt<420?'enemy-windup':'enemy-impact';
+  if(fx.kind==='enemy')return dt<COMBAT_ACTION_PHASE_GAP_MS?'enemy-windup':'enemy-impact';
   if(fx.kind==='ultimate')return dt<ULTIMATE_CAMERA_INTRO_MS?'ultimate-intro':'attack-impact';
-  return dt<(fx.kind==='basic'&&fx.actor==='zero'?460:350)?'attack-track':'attack-impact';
+ return dt<(fx.kind==='basic'&&fx.actor==='zero'?ANIMATION_STEP_MS*2:ANIMATION_STEP_MS)?'attack-track':'attack-impact';
  }
  // Animation lifetimes can end a frame before their resolution timers. Keep
  // the impact framing, but do not retain a stale party-selection shot after
@@ -1467,7 +1472,7 @@ function shotPan(s){
  return ({command:0,party:34,'enemy-impact':28,'ultimate-intro':-86})[s]||0
 }
 function shotWorld(s){return s==='party'?'reverse':'forward'}
-function prepareCamera(t){const s=cameraShot(t);const focus=phase==='resolve'&&!fx?camera.focus:s==='target'?chosenEnemy()?.id:s==='enemy-windup'?actingEnemyId:s==='attack-impact'||s==='attack-track'?fx?.targetEnemyId:null;if(s!==camera.shot||focus!==camera.focus){camera.from=camera.shot;camera.shot=s;camera.focus=focus;camera.start=t;camera.duration=(shotWorld(s)!==shotWorld(camera.from)?300:250);camera.lastX=camera.currentX??shotPan(camera.from)}
+function prepareCamera(t){const s=cameraShot(t);const focus=phase==='resolve'&&!fx?camera.focus:s==='target'?chosenEnemy()?.id:s==='enemy-windup'?actingEnemyId:s==='attack-impact'||s==='attack-track'?fx?.targetEnemyId:null;if(s!==camera.shot||focus!==camera.focus){camera.from=camera.shot;camera.shot=s;camera.focus=focus;camera.start=t;camera.duration=shotWorld(s)!==shotWorld(camera.from)?CAMERA_TRANSITION_BETWEEN_SIDES_MS:CAMERA_TRANSITION_SAME_VIEW_MS;camera.lastX=camera.currentX??shotPan(camera.from)}
  camera.mode=shotWorld(camera.shot);
  camera.progress=smooth01((t-camera.start)/camera.duration);
  camera.currentX=camera.lastX+(shotPan(camera.shot)-camera.lastX)*camera.progress;
@@ -1609,7 +1614,7 @@ function drawEnemy(t,shot){const all=enemies;if(phase==='player'&&pendingTargetA
  const sh=(isActor?1.09:shot==='attack-impact'&&fx?.targetEnemyId===e.id?1.045:1)*(e.category==='boss'?1.55:1)*((e.reinforcement&&e.enteredAt)?0.92+entryProgress*.08:1);
  const ww=e.w*sh,hh=e.h*sh,xx=e.x+camera.currentX*.43-(ww-e.w)/2,yy=e.y+(e.h-hh)+(entering?(1-entryProgress)*27:0)+(defeated?Math.pow(deathProgress,1.4)*26:0);
  const zbHit=fx?.kind==='basic'&&fx?.actor==='zero'&&fx.targetEnemyId===e.id?t-fx.at:null;
- const hitKick=zbHit!==null&&zbHit>=645&&zbHit<745?Math.sin((zbHit-645)*.06)*(1-(zbHit-645)/100)*2:0;
+ const hitKick=zbHit!==null&&zbHit>=ANIMATION_STEP_MS*3&&zbHit<ANIMATION_STEP_MS*4?Math.sin((zbHit-ANIMATION_STEP_MS*3)*.025)*(1-(zbHit-ANIMATION_STEP_MS*3)/ANIMATION_STEP_MS)*2:0;
  let spriteCenterY=yy+hh/2,spriteVisibleW=ww,spriteVisibleH=hh;const spriteOffsetX=defeated?0:hitKick,spriteOffsetY=defeated||entering?0:Math.sin(t*.0026+e.x)*2.2;
  ctx.save();ctx.globalAlpha=opacity;if(defeated)ctx.filter='grayscale(1)';ctx.translate(spriteOffsetX,spriteOffsetY);
  ctx.beginPath();ctx.ellipse(xx+ww/2,yy+hh-4,ww*.48,13,0,0,Math.PI*2);ctx.fillStyle='#1b213c70';ctx.fill();
@@ -1646,7 +1651,7 @@ function drawActorsForShot(t,shot){
  if(chosen&&pos){
   // True tracked character travel is independent of the background-layer camera offsets.
   const dt=fx?.actor===chosen.id?t-fx.at:9999;
-  const basicLunge=fx?.kind==='basic'&&fx.actor===chosen.id?74*smooth01(dt/300)*(1-smooth01((dt-420)/350)):0;
+  const basicLunge=fx?.kind==='basic'&&fx.actor===chosen.id?74*smooth01(dt/ANIMATION_STEP_MS)*(1-smooth01((dt-ANIMATION_STEP_MS)/(ANIMATION_STEP_MS*2))):0;
   // Enemies are in the midground; render them first, then the close foreground ally.
   drawEnemy(t,shot);
   drawUnit(chosen,(chosen.id==='zero'&&zeroBasicStage(t)!==null)?zeroBasicTravel(t,pos):{...pos,x:pos.x+basicLunge},'command',t,phase==='player'&&cameraPreview!=='target');
@@ -1697,7 +1702,7 @@ function drawCombatSigil(x,y,r,colorName,alpha,style='ring'){
 }
 function enemyVisualPosition(id,geometry=null){const e=enemies.find(x=>x.id===id)||geometry;return e?{x:e.x+e.w/2+camera.currentX*.43,y:e.y+e.h*.55}:null}
 function drawFx(t){
- if(!fx)return;const dt=t-fx.at,duration=fx.kind==='basic'&&fx.actor==='zero'?SOUL_BASIC_MS:fx.action==='ultimate'?ULTIMATE_PRESENTATION_MS:950;if(dt>duration){fx=null;return}
+ if(!fx)return;const dt=t-fx.at,duration=fx.kind==='basic'&&fx.actor==='zero'?SOUL_BASIC_MS:fx.action==='ultimate'?ULTIMATE_PRESENTATION_MS:fx.kind==='enemy'?ENEMY_ATTACK_EFFECT_MS:lastAttack?.mode==='five-hit'?ULTIMATE_PRESENTATION_MS:COMBAT_ACTION_EFFECT_MS;if(dt>duration){fx=null;return}
  const q=clamp01(dt/duration),fade=1-q,visual=fx.visual||`${fx.actor}-${fx.kind}`;
  if(fx.kind==='self'){const pos=cameraAllyPosition(fx.actor,'command');if(pos){const x=pos.x+pos.w/2+camera.currentX*.52,y=pos.baseY-pos.h*.58;drawCombatSigil(x,y,35+q*80,'#75cfff',fade,'ring');drawCombatSigil(x,y,22+q*45,'#e2f7ff',fade*.8,'star')}return}
  if(fx.kind==='support'){
@@ -1723,14 +1728,14 @@ function drawFx(t){
    else if(fx.visual==='slime-leader-blast'){drawCombatSigil(x,y,33+q*48,'#a9ff54',fade,'ring');for(let i=0;i<5;i++){ctx.fillStyle=i%2?'#caff78':'#82e62d';const a=i*Math.PI*2/5+q*2;ctx.beginPath();ctx.arc(x+Math.cos(a)*(35+q*15),y+Math.sin(a)*(34+q*14),8,0,Math.PI*2);ctx.fill()}}
    else if(fx.visual==='slime-monster-wave'){drawCombatSigil(x,y,65+q*100,'#8fe328',fade,'ring');ctx.fillStyle='#b7ff4c';for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(x-26+i*26,y-34-Math.sin(i+q*5)*18,10,0,Math.PI*2);ctx.fill()}}
    else{ctx.strokeStyle='#ff8997';ctx.lineWidth=11;ctx.lineCap='round';for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(x-54+i*15,y-66);ctx.lineTo(x+45+i*15,y+55);ctx.stroke()}}
-   ctx.restore();if(dt>100){const labelY=hudHit?y+34:y-65,damage=hit.healthDamage??hit.damage??fx.damage;if(damage>0)text('-'+damage,x,labelY,26,hit.critical?'#ffd66e':'#ff9d9e','900','center');else if(hit.shieldDamage>0)text('BLOCKED',x,labelY,17,'#b6efff','900','center');if(hit.critical)text('CRITICAL',x,hudHit?y+12:y-96,12,'#ffe9a9','900','center')}}return;
+   ctx.restore();if(dt>ANIMATION_STEP_MS){const labelY=hudHit?y+34:y-65,damage=hit.healthDamage??hit.damage??fx.damage;if(damage>0)text('-'+damage,x,labelY,26,hit.critical?'#ffd66e':'#ff9d9e','900','center');else if(hit.shieldDamage>0)text('BLOCKED',x,labelY,17,'#b6efff','900','center');if(hit.critical)text('CRITICAL',x,hudHit?y+12:y-96,12,'#ffe9a9','900','center')}}return;
  }
  const targetIds=fx.targetEnemyIds?.length?fx.targetEnemyIds:[fx.targetEnemyId],targets=targetIds.map(id=>enemyVisualPosition(id,fx.targetGeometry)).filter(Boolean);
  if(!targets.length){const p=enemyVisualPosition(fx.targetEnemyId,fx.targetGeometry);if(p)targets.push(p)}
  for(let i=0;i<targets.length;i++){
   const {x,y}=targets[i],offset=i*85;
   if(visual==='soul-sword'){
-   const a=fade*(dt>620?clamp01((duration-dt)/250):1);ctx.save();ctx.translate(x,y);ctx.rotate(-.4);ctx.globalAlpha=a;ctx.lineCap='round';ctx.strokeStyle='#eff8ff';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(-108,-90);ctx.quadraticCurveTo(80,-40,100,92);ctx.stroke();ctx.strokeStyle='#80dcff';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-118,-104);ctx.quadraticCurveTo(70,-55,116,85);ctx.stroke();ctx.restore();
+   const a=fade*(dt>ANIMATION_STEP_MS*3?clamp01((duration-dt)/ANIMATION_STEP_MS):1);ctx.save();ctx.translate(x,y);ctx.rotate(-.4);ctx.globalAlpha=a;ctx.lineCap='round';ctx.strokeStyle='#eff8ff';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(-108,-90);ctx.quadraticCurveTo(80,-40,100,92);ctx.stroke();ctx.strokeStyle='#80dcff';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-118,-104);ctx.quadraticCurveTo(70,-55,116,85);ctx.stroke();ctx.restore();
   }else if(visual==='soul-enhance'){
    drawCombatSigil(x,y,44+q*70,'#75cfff',fade,'ring');drawCombatSigil(x,y,25+q*36,'#e2f7ff',fade*.8,'star');
   }else if(visual==='soul-storm'){
@@ -1752,7 +1757,7 @@ function drawFx(t){
    ctx.save();ctx.translate(x,y);ctx.rotate(-.35);ctx.strokeStyle=`rgba(255,247,238,${fade})`;ctx.lineWidth=12;ctx.beginPath();ctx.ellipse(0,0,90+80*q,32+80*q,0,0,Math.PI*1.65);ctx.stroke();ctx.restore();
   }
  }
- if(dt>100){const hits=(lastAttack?.hits||[]).filter(h=>h.phase==='initial'),ids=[...new Set(hits.filter(h=>h.damage>0).map(h=>h.target))];for(const id of ids){const p=enemyVisualPosition(id);if(!p)continue;const amount=hits.filter(h=>h.target===id).reduce((sum,h)=>sum+(h.healthDamage??h.damage??0),0),shielded=hits.some(h=>h.target===id&&(h.shieldDamage||0)>0);if(amount>0)text('-'+amount,p.x,p.y-50,33,'#fff0ba','900','center');else if(shielded)text('BLOCKED',p.x,p.y-50,17,'#b6efff','900','center');if(hits.some(h=>h.target===id&&h.critical))text('CRITICAL',p.x,p.y-80,14,'#ffe9a9','900','center')}}
+ if(dt>ANIMATION_STEP_MS){const hits=(lastAttack?.hits||[]).filter(h=>h.phase==='initial'),ids=[...new Set(hits.filter(h=>h.damage>0).map(h=>h.target))];for(const id of ids){const p=enemyVisualPosition(id);if(!p)continue;const amount=hits.filter(h=>h.target===id).reduce((sum,h)=>sum+(h.healthDamage??h.damage??0),0),shielded=hits.some(h=>h.target===id&&(h.shieldDamage||0)>0);if(amount>0)text('-'+amount,p.x,p.y-50,33,'#fff0ba','900','center');else if(shielded)text('BLOCKED',p.x,p.y-50,17,'#b6efff','900','center');if(hits.some(h=>h.target===id&&h.critical))text('CRITICAL',p.x,p.y-80,14,'#ffe9a9','900','center')}}
 }
 function drawCombatVisualEvents(t,shot){
  combatVisualEvents=combatVisualEvents.filter(e=>t-e.at<e.duration);

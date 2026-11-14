@@ -11,6 +11,20 @@ Resolve battle actions in visible phases so players can follow the acting charac
 
 ## Timing and feedback
 
+- Use 250 ms (0.25 s) as the animation timing unit. Animation phase durations, transition durations, and waits between phases must be whole multiples of 250 ms; avoid arbitrary timings between these steps. Interpolate smoothly between timing marks rather than snapping at each mark.
+
+| Animation phase | Duration |
+| --- | ---: |
+| Camera movement within one view | 250 ms |
+| Switch between ally and enemy views | 500 ms |
+| Enemy wind-up before damage | 750 ms |
+| Basic attack, Skill, and enemy attack effect | 1,000 ms |
+| Ultimate presentation | 1,500 ms |
+| Enemy death fade and sink | 500 ms |
+| Reinforcement entrance | 500 ms |
+| Gap between distinct chained effects | 500 ms |
+
+Character-specific composite actions may run longer (Soul's Basic is 1,250 ms; the five-hit pattern is 1,500 ms), but each animation phase boundary still falls on a 250 ms mark.
 - Leave at least 500 ms between distinct damage phases. A follow-up must not resolve in the same frame as the hit that caused it.
 - Begin the battle intro on the first actor in the scheduled turn order. Do not show the first roster ally as a temporary fallback before turn order is initialized.
 - Keep the action in resolution until its chained effects have been applied, so another turn cannot interrupt the sequence.
@@ -21,12 +35,13 @@ Resolve battle actions in visible phases so players can follow the acting charac
 ## Camera and scene transitions
 
 - Keep the camera on the current combat shot until the action and its queued effects finish. An animation ending a frame before combat resolution must not reveal the command view or another screen.
-- Ease camera changes within the same view over 250 ms. Complete ally movement before returning the character to their resting position; never snap them home when the action ends.
+- Ease camera changes within the same view over 250 ms and changes between ally and enemy views over 500 ms. Complete ally movement before returning the character to their resting position; never snap them home when the action ends.
 - Keep actors stationary through camera cuts. Basic attacks may use their designated movement; Skills and Ultimates do not inherit a generic lunge. Keep idle movement subtle and avoid continuous screen shake.
 - Keep Ultimate presentation active for 1.5 seconds. An ally-targeted Ultimate stays on the party view through the recipient's effect so the camera does not cut away immediately.
 - When changing between forward and reverse battlefield views, show one scene at a time and ease into the destination without a flash or dark veil. Do not cross-render both scenes, since this duplicates characters, targets, and effects.
 - A new turn must not run an additional ally entrance animation while the previous action is still resolving.
 - Keep the selected target and action focus stable through resolution. Change camera focus only when the next actual action or target selection begins.
+- Give enemies a 750 ms wind-up before damage resolves. Present the attack effect for 1,000 ms, then continue the turn sequence.
 - When an enemy reaches zero HP, keep its defeated sprite on stage for a 500 ms grayscale fade and sink. Treat it as defeated immediately for targeting and turn order, but keep its formation slot unavailable until the fade completes.
 - Deploy reinforcements only after the defeating action and its chained effects have finished, followed by the enemy defeat presentation beat. Animate each reinforcement over 500 ms with a fade and rise into its formation slot, then allow the next combat action. Apply the same timing to Bleed defeats and independent summon attacks.
 
