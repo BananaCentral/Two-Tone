@@ -422,6 +422,7 @@ let phase='menu',paused=false,turn=0,enemyHp=0,maxEnemyHp=0,sp=3,
 // Four authored party formation positions. Enemy identities and wave queues are independent of these slots.
 // Encounter presets and enemy stats below are DEMO DATA; Approved Fundamental 2 defines the rules.
 const ENEMY_CATEGORIES=Object.freeze(['common','elite','boss']);
+const ENCOUNTER_LIMITS=Object.freeze({enemiesOnField:5,bossesPerWave:1,elitesPerWave:5,elitesOnFieldInBossWave:2});
 function validateEnemyCategory(category){
  if(!ENEMY_CATEGORIES.includes(category))throw Error(`Enemy category must be one of: ${ENEMY_CATEGORIES.join(', ')}`);
  return category;
@@ -606,18 +607,31 @@ function syncEnemyHp(){enemyHp=totalEnemyHp();maxEnemyHp=liveEnemies().reduce((n
 function chosenEnemy(){return liveEnemies().find(e=>e.id===selectedEnemyId)||liveEnemies()[0]||null}
 function buildWavePlan(sizes){
  if(!Array.isArray(sizes)||!sizes.length||!sizes.every(n=>Number.isInteger(n)&&n>=1&&n<=15))throw Error('Wave sizes must each be 1–15');
- return sizes.map((size,wi)=>Array.from({length:size},(_,i)=>{
+ return sizes.map((size,wi)=>validateWaveComposition(Array.from({length:size},(_,i)=>{
   const isWolf=enemyRosterMode==='wolf'||(enemyRosterMode==='mixed'&&(wi+i)%2===0);const model=ENEMY_ARCHETYPES[isWolf?'wolf':'slime'];return {id:`wave${wi+1}-enemy${i+1}`,archetypeId:model.id,name:model.name,
    wave:wi+1,order:i+1,category:validateEnemyCategory(model.category),level:model.level,maxHp:model.hp,speed:model.speed,
    basePhysicalAttack:model.basePhysicalAttack,baseMagicalAttack:model.baseMagicalAttack,
    basePhysicalDefense:model.basePhysicalDefense,baseMagicalDefense:model.baseMagicalDefense,
    battleSprite:model.battleSprite,battleAspectRatio:model.battleAspectRatio,artwork:model.artwork,barrierPercent:model.barrierPercent??.2,passive:{...model.passive},basicAttack:{...model.basicAttack},basicAttackCount:0,rampageStacks:0};
- }));
+ })));
+}
+function validateWaveComposition(wave){
+ const bosses=wave.filter(e=>validateEnemyCategory(e.category)==='boss').length,elites=wave.filter(e=>e.category==='elite').length;
+ if(bosses>ENCOUNTER_LIMITS.bossesPerWave)throw Error(`A wave can contain at most ${ENCOUNTER_LIMITS.bossesPerWave} Boss.`);
+ if(elites>ENCOUNTER_LIMITS.elitesPerWave)throw Error(`A wave can contain at most ${ENCOUNTER_LIMITS.elitesPerWave} Elite enemies.`);
+ return wave;
 }
 function initialSlots(count){return ({1:[2],2:[1,3],3:[1,2,3],4:[0,1,3,4],5:[0,1,2,3,4]})[count].slice()}
+function canDeployEnemy(enemy){
+ if(!enemy||enemies.length>=ENCOUNTER_LIMITS.enemiesOnField)return false;
+ const bossWave=wavePlan[waveIndex]?.some(e=>e.category==='boss');
+ if(bossWave&&enemy.category==='elite'&&enemies.filter(e=>e.category==='elite'&&e.hp>0).length>=ENCOUNTER_LIMITS.elitesOnFieldInBossWave)return false;
+ return true;
+}
 function enterEnemy(slot){
- if(!waveQueue.length||enemies.some(e=>e.slot===slot)||enemies.length>=5)return null;
- const incoming=waveQueue.shift(),formation=ENEMY_FORMATIONS[slot];
+ if(!waveQueue.length||enemies.some(e=>e.slot===slot))return null;
+ const queueIndex=waveQueue.findIndex(canDeployEnemy);if(queueIndex<0)return null;
+ const [incoming]=waveQueue.splice(queueIndex,1),formation=ENEMY_FORMATIONS[slot];
  const barrier=roundHp(incoming.maxHp*incoming.barrierPercent);
  const e={...incoming,slot,x:formation.x,y:formation.y,w:formation.w,h:formation.h,hp:incoming.maxHp,maxBarrier:barrier,barrier,brokenTurns:0,debuffs:[],marks:[]};
  if(premiumWeaponDuplicateRank('lily')>=1&&party.some(p=>p.id==='lily'))e.marks.push({id:'soul-mark',turns:2},{id:'ricochet',turns:2,sources:[]});
@@ -628,8 +642,9 @@ function enterEnemy(slot){
 function beginWave(index){saveVitals();
  if(index>=wavePlan.length){encounterCleared=true;enemies=[];selectedEnemyId=null;syncEnemyHp();return;}
  waveIndex=index;waveQueue=[...wavePlan[index]];waveKills=0;enemies=[];actingEnemyId=null;pendingVacancies=[];
- const count=Math.min(5,waveQueue.length);
- for(const slot of initialSlots(count))enterEnemy(slot);
+ const initialCount=Math.min(ENCOUNTER_LIMITS.enemiesOnField,waveQueue.length);
+ for(const slot of initialSlots(initialCount))enterEnemy(slot);
+ const count=enemies.length;
  selectedEnemyId=enemies[Math.floor(enemies.length/2)]?.id||null;
  syncEnemyHp();
  log=`Wave ${index+1}/${wavePlan.length}: ${wavePlan[index].length} enemies • ${count} deployed.`;
