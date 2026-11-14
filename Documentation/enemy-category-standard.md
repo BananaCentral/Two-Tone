@@ -16,6 +16,7 @@ Runtime data must validate the value against these three categories before the e
 
 - A wave may contain at most one Boss.
 - A wave may contain at most five Elite enemies in total. This includes Elite enemies deployed on the field and held in the reinforcement queue.
+- Bosses have one health bar by default. A Boss archetype may set `healthBars` to two or three; other enemy categories use one health bar.
 - While a Boss is on the field, at most two Elite enemies may be on the field at the same time. Additional Elite enemies stay queued until an Elite leaves the field; queued reinforcements do not bypass the limit.
 - A Boss cannot enter the field while more than two Elite enemies are already there. If a Boss is still queued, the field may contain more than two Elites until the Boss can enter.
 - The one-Boss and five-Elite limits are counted independently for each wave. Common enemies do not count toward either category limit. The existing five-enemy formation limit still applies to total field size.

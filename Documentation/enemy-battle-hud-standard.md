@@ -12,10 +12,17 @@ Enemy Critical Rate and Critical Damage are hidden combat values governed by the
 
 ## Enemy Bars
 
-- Show the Barrier bar above the HP bar.
+- For Common and Elite enemies, show the Barrier bar above the HP bar.
 - The Barrier bar is grey; the HP bar is red, with the selected target's HP fill highlighted gold.
 - Both bars use the same width and have rounded ends. The current canvas sizes are 8 px for Barrier and 11 px for HP.
 - Barrier amount and recovery follow the Enemy Barrier and Broken State rules in the Turn Order Standard.
+
+## Boss Health Bars
+
+- A Boss uses a dedicated screen-space health display at the top of the screen while it is on the field. Do not show a duplicate HP bar above its battlefield sprite; its Barrier bar remains above the sprite.
+- Each Boss has one health bar by default and may define up to three with the `healthBars` field. Non-Boss enemies use one health bar.
+- Stack the Boss's health bars in rows. Put one dot immediately to the left of each row; the total dot count shows the Boss's total number of health bars. Dim a dot after its corresponding bar is depleted.
+- Divide the Boss's existing Max HP evenly across its bars. Damage drains the bars in order and carries across boundaries. The bars do not multiply Max HP or restore HP when a segment is depleted; the Boss is defeated when total HP reaches zero.
 
 ## Target Circles
 

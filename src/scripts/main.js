@@ -427,6 +427,11 @@ function validateEnemyCategory(category){
  if(!ENEMY_CATEGORIES.includes(category))throw Error(`Enemy category must be one of: ${ENEMY_CATEGORIES.join(', ')}`);
  return category;
 }
+function validateEnemyHealthBars(category,bars=1){
+ if(!Number.isInteger(bars)||bars<1||bars>3)throw Error('Enemy health bars must be an integer from 1 to 3.');
+ if(category!=='boss'&&bars!==1)throw Error('Only Boss enemies can have multiple health bars.');
+ return bars;
+}
 const ENEMY_FORMATIONS=[
  {id:'slot1',x:646,y:359,w:151,h:198},
  {id:'slot2',x:822,y:314,w:156,h:205},
@@ -608,8 +613,8 @@ function chosenEnemy(){return liveEnemies().find(e=>e.id===selectedEnemyId)||liv
 function buildWavePlan(sizes){
  if(!Array.isArray(sizes)||!sizes.length||!sizes.every(n=>Number.isInteger(n)&&n>=1&&n<=15))throw Error('Wave sizes must each be 1–15');
  return sizes.map((size,wi)=>validateWaveComposition(Array.from({length:size},(_,i)=>{
-  const isWolf=enemyRosterMode==='wolf'||(enemyRosterMode==='mixed'&&(wi+i)%2===0);const model=ENEMY_ARCHETYPES[isWolf?'wolf':'slime'];return {id:`wave${wi+1}-enemy${i+1}`,archetypeId:model.id,name:model.name,
-   wave:wi+1,order:i+1,category:validateEnemyCategory(model.category),level:model.level,maxHp:model.hp,speed:model.speed,
+  const isWolf=enemyRosterMode==='wolf'||(enemyRosterMode==='mixed'&&(wi+i)%2===0);const model=ENEMY_ARCHETYPES[isWolf?'wolf':'slime'],category=validateEnemyCategory(model.category);return {id:`wave${wi+1}-enemy${i+1}`,archetypeId:model.id,name:model.name,
+   wave:wi+1,order:i+1,category,healthBars:validateEnemyHealthBars(category,model.healthBars??1),level:model.level,maxHp:model.hp,speed:model.speed,
    basePhysicalAttack:model.basePhysicalAttack,baseMagicalAttack:model.baseMagicalAttack,
    basePhysicalDefense:model.basePhysicalDefense,baseMagicalDefense:model.baseMagicalDefense,
    battleSprite:model.battleSprite,battleAspectRatio:model.battleAspectRatio,artwork:model.artwork,barrierPercent:model.barrierPercent??.2,passive:{...model.passive},basicAttack:{...model.basicAttack},basicAttackCount:0,rampageStacks:0};
@@ -910,6 +915,10 @@ function testRevive(){if(!paused||phase!=='player')return;const p=party.find(p=>
 function rect(x,y,w,h,fill,stroke=null,r=0){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke()}}
 function text(s,x,y,size=24,fill=color.white,weight='600',align='left'){ctx.textAlign=align;ctx.textBaseline='middle';ctx.fillStyle=fill;ctx.font=`${weight} ${size}px system-ui,-apple-system,Segoe UI,sans-serif`;ctx.fillText(String(s),x,y)}
 function line(x,y,w,f=1,c='#72e3ae',bg='#303649',h=13){rect(x,y,w,h,bg,null,6);rect(x,y,Math.max(0,w*Math.min(1,Math.max(0,f))),h,c,null,6)}
+function segmentedHealthBar(x,y,w,h,hp,maxHp,bars=1,fill='#ff8276',background='#4b2637'){
+ const count=Math.max(1,Math.min(3,Number.isInteger(bars)?bars:1)),gap=count>1?3:0,segmentWidth=(w-gap*(count-1))/count,segmentMax=maxHp/count;
+ for(let i=0;i<count;i++){const amount=Math.max(0,Math.min(segmentMax,hp-i*segmentMax));line(x+i*(segmentWidth+gap),y,segmentWidth,segmentMax?amount/segmentMax:0,fill,background,h)}
+}
 function addButton(x,y,w,h,action,label,sub='',enabled=true){choiceRects.push({x,y,w,h,action,enabled});rect(x,y,w,h,enabled?'#263754':'#1d2538',enabled?'#a5c9dc':'#526176',11);text(label,x+w/2,y+h/2-(sub?10:0),19,enabled?'#fff4e6':'#9eafc1','750','center');if(sub)text(sub,x+w/2,y+h/2+16,13,'#bacadb','500','center')}
 function drawBackground(){ctx.imageSmoothingEnabled=false;if(images.arena.complete&&images.arena.naturalWidth)ctx.drawImage(images.arena,0,0,W,H);else{rect(0,0,W,H,'#596f83');rect(0,480,W,420,'#a38f9e')}rect(0,0,W,165,'rgba(8,10,22,.24)');const shade=ctx.createLinearGradient(0,580,0,900);shade.addColorStop(0,'#17122500');shade.addColorStop(1,'#090d23dc');rect(0,560,W,340,shade)}
 
@@ -1414,7 +1423,7 @@ function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&pendin
  rect(xx-3,yy-58,ww+6,30,'#1c2843e8','#8d96a9',6);
  text(e.name,xx+ww/2,yy-43,14,'#fff4e8','800','center');
  line(xx+2,yy-25,ww-4,e.maxBarrier?e.barrier/e.maxBarrier:0,'#c4c9d2','#626a75',8);
- line(xx+2,yy-13,ww-4,e.hp/e.maxHp,isFocus?'#ffd88e':'#ff8276','#4b2637',11);
+ if(e.category!=='boss')segmentedHealthBar(xx+2,yy-13,ww-4,11,e.hp,e.maxHp,e.healthBars,isFocus?'#ffd88e':'#ff8276','#4b2637');
  if(e.brokenTurns>0)text('BROKEN '+e.brokenTurns,xx+ww/2,yy+9,12,'#9cecff','800','center');
  if(phase==='player'&&!paused&&cameraPreview!=='party')choiceRects.push({x:xx-13,y:yy-64,w:ww+26,h:hh+74,action:'enemy-target:'+e.id,enabled:true});
  }}
@@ -1708,14 +1717,28 @@ function drawHud(t){
   text(now?'NOW':String(i+1),xx+54,yy+48,10,now?'#fff2cb':'#bacbdf','850','right');
  }
  ctx.restore();
+ // Boss HP is a screen-space display. Each dot corresponds to one equal share
+ // of the boss's total HP and sits immediately left of its health bar.
+ const bossOnField=liveEnemies().find(e=>e.category==='boss');
+ if(bossOnField){
+  const bx=342,by=12,bw=970,bars=bossOnField.healthBars||1,bh=42+bars*14,segmentMax=bossOnField.maxHp/bars;
+  rect(bx,by,bw,bh,'rgba(10,16,31,.86)','rgba(244,202,139,.62)',12);
+  text(`BOSS  •  ${bossOnField.name}`,bx+18,by+18,17,'#fff0d4','850');
+  text(`HP ${bossOnField.hp} / ${bossOnField.maxHp}`,bx+bw-18,by+18,15,'#f0e7eb','750','right');
+  for(let i=0;i<bars;i++){
+   const segmentHp=Math.max(0,Math.min(segmentMax,bossOnField.hp-i*segmentMax)),ratio=segmentMax?segmentHp/segmentMax:0,rowY=by+36+i*14;
+   const remaining=segmentHp>0;hudCircle(bx+19,rowY+4,5,remaining?'#f3c778':'#43485a',remaining?'#fff0c5':'#72798a',2);
+   line(bx+34,rowY,bw-52,ratio,ratio<1&&ratio>0?'#ffd57c':'#ee7882','#3e2938',8);
+  }
+ }
  // Compact expanded selected enemy information.
  const focus=chosenEnemy();
- if(phase==='player'&&cameraPreview!=='party'&&focus){
+ if(phase==='player'&&cameraPreview!=='party'&&focus&&focus.category!=='boss'){
   rect(938,22,399,72,'rgba(10,16,31,.78)','rgba(210,213,220,.40)',14);
   text(focus.name,961,44,19,'#fff3db','750');
   text(`HP ${focus.hp} / ${focus.maxHp}`,1315,44,15,'#f0e7eb','700','right');
   line(961,65,348,focus.hp/focus.maxHp,'#f38382','#343d51',9);
- }else if(cameraPreview==='party'){
+ }else if(cameraPreview==='party'&&!bossOnField){
   rect(1010,24,386,62,'rgba(10,16,31,.76)','rgba(200,207,225,.38)',14);
   text('SELECT AN ALLY',1035,55,20,'#f7e7ca','800');
  }
@@ -1813,7 +1836,7 @@ function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRect
 canvas.addEventListener('pointerdown',e=>{e.preventDefault();const r=canvas.getBoundingClientRect();choose((e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height)},{passive:false});
 window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)cancelTargetSelection();if(e.key==='1')play('basic');if(e.key==='2')play('skill');if(e.key==='3')play('ultimate');if(e.key.toLowerCase()==='m'&&phase==='player')cycleSpCapTest();if(['q','w','e','f'].includes(e.key.toLowerCase())&&phase==='player')setTargetingMode(({q:'single',w:'blast',e:'aoe',f:'five-hit'})[e.key.toLowerCase()]);if(e.key.toLowerCase()==='v'&&phase==='player'){cameraPreview=cameraPreview==='party'?null:'party';selectedAllyId=activeId}if(e.key.toLowerCase()==='t'&&phase==='player')cameraPreview=cameraPreview==='target'?null:'target';if(e.key.toLowerCase()==='r'&&phase!=='setup')replay()});window.addEventListener('contextmenu',e=>e.preventDefault());
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
-window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,hp:e.hp,maxHp:e.maxHp,barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
+window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
 window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ULTIMATE_ENERGY_COST)),statusCount:hudStatusList(p).length})),version:'v0.0.17',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
  characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
