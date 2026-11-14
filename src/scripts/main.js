@@ -4,7 +4,7 @@ const BATTLE_AREAS=Object.freeze({
  'area-1':Object.freeze({name:'Area 1',background:'area1Background'})
 });
 const DEFAULT_BATTLE_AREA_ID='area-1';
-const COMBAT_ACTION_PHASE_GAP_MS=250;
+const COMBAT_ACTION_PHASE_GAP_MS=500;
 const ACTION_VISUALS=Object.freeze({
  zero:Object.freeze({basic:'soul-sword',skill:'soul-enhance',ultimate:'soul-storm'}),
  lily:Object.freeze({basic:'lily-petal',skill:'lily-ricochet',ultimate:'lily-haunting'}),
