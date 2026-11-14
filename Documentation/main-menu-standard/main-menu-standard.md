@@ -17,6 +17,20 @@ Show these sections in this order:
 
 The main menu displays the player's Rank, as defined in the Rank Standard.
 
+## Startup Menu
+
+- On launch, show a startup menu with **Start** and **Load** options.
+- Start opens the main menu.
+- Load opens the device's file picker for a Two-Tone save file. A valid import restores progress and opens the main menu.
+- Reject unsupported or invalid files without changing current progress. Confirm before replacing existing local progress.
+
+## Save Files
+
+- The main menu has a **Save** option that downloads a portable JSON save file.
+- Save files include the party, account Rank, character levels and EXP, ascensions, saved HP, and character loadouts.
+- Save files have an explicit format name and version. Loading must validate the entire file before replacing local progress.
+- Local browser storage remains the active device's automatic save; file export lets the player carry or back up progress.
+
 ## Placeholder Sections
 
 - Sections may appear before they are implemented.
