@@ -742,7 +742,7 @@ function setEnemyRoster(mode){if(phase!=='setup'||!['slime','wolf','mixed'].incl
 const savedTeam=loadTeam();
 let draft=[...savedTeam];
 function validTeam(ids){return Array.isArray(ids)&&ids.length>=1&&ids.length<=MAX_PARTY_SIZE&&ids.every(id=>ROSTER_IDS.has(id))&&new Set(ids).size===ids.length}
-function loadTeam(){try{const a=JSON.parse(localStorage.getItem(TEAM_KEY)||'null');if(Array.isArray(a)&&a.every(id=>ROSTER_IDS.has(id))&&new Set(a).size===a.length)return a.slice(0,MAX_PARTY_SIZE)}catch(e){}return ['zero','lily']}
+function loadTeam(){try{const a=JSON.parse(localStorage.getItem(TEAM_KEY)||'null');if(Array.isArray(a)&&a.every(id=>ROSTER_IDS.has(id))&&new Set(a).size===a.length){const saved=a.slice(0,MAX_PARTY_SIZE);if(saved.length===2&&saved[0]==='zero'&&saved[1]==='lily')return [...saved,'dawn'];return saved}}catch(e){}return ['zero','lily','dawn']}
 function saveTeam(){try{localStorage.setItem(TEAM_KEY,JSON.stringify(draft))}catch(e){}}
 function roster(id){return ROSTER.find(x=>x.id===id)}
 function alive(){return party.filter(x=>x.hp>0)}
