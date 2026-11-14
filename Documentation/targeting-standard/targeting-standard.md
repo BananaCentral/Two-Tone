@@ -15,7 +15,7 @@ Target selection policy is separate from target shape. For example, an automated
 ## Ally support targeting
 
 - A targeted support action enters selection after the ability is chosen, matching the enemy-target flow.
-- Select a living ally by tapping their battlefield sprite or HUD portrait card. The selected ally is highlighted before the action resolves.
+- Select a living ally by tapping their battlefield sprite or HUD portrait card. The selected ally receives a visible circular outline, matching the enemy target indicator, and remains highlighted through resolution.
 - Self-targeting abilities keep the acting ally selectable. Defeated allies are not valid targets unless the ability explicitly supports revival.
 
 ## Soul targeting

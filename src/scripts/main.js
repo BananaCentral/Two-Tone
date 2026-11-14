@@ -4,6 +4,11 @@ const BATTLE_AREAS=Object.freeze({
  'area-1':Object.freeze({name:'Area 1',background:'area1Background'})
 });
 const DEFAULT_BATTLE_AREA_ID='area-1';
+const ACTION_VISUALS=Object.freeze({
+ zero:Object.freeze({basic:'soul-sword',skill:'soul-enhance',ultimate:'soul-storm'}),
+ lily:Object.freeze({basic:'lily-petal',skill:'lily-ricochet',ultimate:'lily-haunting'}),
+ dawn:Object.freeze({basic:'dawn-star',skill:'dawn-tune',ultimate:'dawn-advance'})
+});
 
 /* Two-Tone Fundamental 05 preview scheduling engine.
    Baseline event allocation follows approved deterministic fractional cycles and
@@ -398,12 +403,12 @@ function executeIndependentSummonTurn(s){
  activeId=null;actingEnemyId=null;phase='resolve';
  const owner=party.find(p=>p.id===s.ownerId);
  const foe=chosenEnemy();
- fx={kind:'basic',at:performance.now(),actor:owner?.id||s.ownerId,targetEnemyId:foe?.id,targetGeometry:foe?{x:foe.x,y:foe.y,w:foe.w,h:foe.h}:null};
+ fx={kind:'basic',visual:'lily-hauntling',at:performance.now(),actor:owner?.id||s.ownerId,targetEnemyId:foe?.id,targetEnemyIds:liveEnemies().map(e=>e.id),targetGeometry:foe?{x:foe.x,y:foe.y,w:foe.w,h:foe.h}:null};
  const source={serial:++attackSerial,actor:'lily',action:'summon',hits:[]};
  for(const enemy of liveEnemies().slice()){
   const lily=party.find(p=>p.id==='lily'),raw=calculateTypedActionDamage('true',1,lily,enemy),dealt=applyEnemyDamage(enemy,raw?.damageTaken||0,lily);
   source.hits.push({target:enemy.id,damage:dealt.damage,summon:true});if(enemy.hp<=0)resolveEnemyDefeat(enemy);
-  else{enemy.marks=enemy.marks||[];const dup=characterDuplicateRank('lily'),existing=enemy.marks.filter(m=>m.id==='exposed').length;enemy.marks=enemy.marks.filter(m=>m.id!=='exposed');for(let i=0;i<(dup>=2?Math.min(2,existing+1):1);i++)enemy.marks.push({id:'exposed',turns:dup>=2?3:2});applyLilyUltimateDebuff(enemy);triggerRicochet(source,enemy,dealt.damage);if(lily&&loadoutFor('lily').weapon.selected==='premium'&&loadoutFor('lily').weapon.premiumOwned)lily.energy=Math.min(120,lily.energy+5)}
+  else{enemy.marks=enemy.marks||[];emitCombatVisual('lily-exposed',[enemy.id],850);const dup=characterDuplicateRank('lily'),existing=enemy.marks.filter(m=>m.id==='exposed').length;enemy.marks=enemy.marks.filter(m=>m.id!=='exposed');for(let i=0;i<(dup>=2?Math.min(2,existing+1):1);i++)enemy.marks.push({id:'exposed',turns:dup>=2?3:2});emitCombatVisual('lily-ricochet-mark',[enemy.id],850);applyLilyUltimateDebuff(enemy);triggerRicochet(source,enemy,dealt.damage);if(lily&&loadoutFor('lily').weapon.selected==='premium'&&loadoutFor('lily').weapon.premiumOwned)lily.energy=Math.min(120,lily.energy+5)}
  }
  log=`${s.name} haunts all enemies with True damage.`;
  schedule(()=>{if(s.remaining<=0){summons=summons.filter(x=>x.id!==s.id);turnTimeline.states.delete(s.id);summonHistory.push({event:'expired',id:s.id})}
@@ -412,7 +417,7 @@ function executeIndependentSummonTurn(s){
 
 const color={ink:'#0a101f',panel:'rgba(13,17,35,.94)',gold:'#eacb87',white:'#f7f3f8',sub:'#bfc8d9',blue:'#85d9ff',red:'#f47679',green:'#5bebac'};
 let phase='menu',paused=false,turn=0,enemyHp=0,maxEnemyHp=0,sp=3,
-    gauges={},party=[],activeId=null,fx=null,log='',hint='',hintAt=0,
+    gauges={},party=[],activeId=null,fx=null,combatVisualEvents=[],log='',hint='',hintAt=0,
     choiceRects=[],battleToken=0,enemyCount=0,forceSelect=false;
 // Four authored party formation positions. Enemy identities and wave queues are independent of these slots.
 // Encounter presets and enemy stats below are DEMO DATA; Approved Fundamental 2 defines the rules.
@@ -468,7 +473,8 @@ function availableEnergy(p){return p?Math.max(0,p.energy-(p.energyReserved||0)):
 function isUltPending(id){return ultimateQueue.some(q=>q.actorId===id)||(ultimateExecuting&&lastAttack?.action==='ultimate'&&lastAttack.actor===id)}
 function canQueueUltimate(p){return !!p&&p.hp>0&&!paused&&['player','enemy','resolve'].includes(phase)
   &&availableEnergy(p)>=ULTIMATE_ENERGY_COST&&!isUltPending(p.id)}
-function resetActionResources(){const resourceful=party.some(p=>p.id==='dawn');sp=resourceful?5:3;soulEnhanceStacks=0;soulFollowUpProcs=soulFollowUpLimit();soulFollowUpSources=new Set();soulEnhanceSpendingRemainder=0;soulFollowUpActivationCount=0;spCapModifiers=Object.create(null);if(resourceful)setSpCapModifier('dawn-resourceful',2);ultimateQueue=[];ultimateSequence=0;ultimateHistory=[];ultimateResume=null;ultimateExecuting=false;
+function emitCombatVisual(type,targetIds=[],duration=1000){combatVisualEvents.push({type,targetIds:[...targetIds],at:performance.now(),duration})}
+function resetActionResources(){const resourceful=party.some(p=>p.id==='dawn');sp=resourceful?5:3;soulEnhanceStacks=0;soulFollowUpProcs=soulFollowUpLimit();soulFollowUpSources=new Set();soulEnhanceSpendingRemainder=0;soulFollowUpActivationCount=0;spCapModifiers=Object.create(null);if(resourceful){setSpCapModifier('dawn-resourceful',2);emitCombatVisual('dawn-resourceful',party.map(p=>p.id),1250)}ultimateQueue=[];ultimateSequence=0;ultimateHistory=[];ultimateResume=null;ultimateExecuting=false;
   for(const p of party)p.energyReserved=0;}
 function setSpCapTestSource(source,bonus){
  if(!SP_CAP_SOURCES.has(source)||!Number.isInteger(bonus)||bonus<0||bonus>20)return false;
@@ -570,7 +576,7 @@ function activateSoulEnhance(){
  if(sp<1){say('Soul Enhance needs 1 Skill Point.');return false}
  sp--;soulEnhanceStacks++;let refunded=false;
  if(loadoutFor('zero').weapon.selected==='premium'&&loadoutFor('zero').weapon.premiumOwned){soulEnhanceSpendingRemainder++;if(soulEnhanceSpendingRemainder>=3){soulEnhanceSpendingRemainder-=3;gainSp(1);refunded=true}}
- zeroSkillArmed=false;pendingTargetAction=null;cameraPreview=null;
+ zeroSkillArmed=false;pendingTargetAction=null;cameraPreview=null;fx={kind:'self',visual:'soul-enhance',at:performance.now(),actor:a.id};
  log='SOUL ENHANCE: '+soulEnhanceStacks+' Skill Point(s) banked for the next Basic Attack.'+(refunded?' Standard signature weapon restored 1 Skill Point.':'');return true;
 }
 function startSupportDemo(kind){
@@ -663,13 +669,14 @@ function applyTrainingHit(enemy,damage,hitNumber){
  if((lastAttack.actor!=='lily'||lastAttack.action==='summon')&&enemy.marks?.some(m=>m.id==='exposed')&&premiumWeaponDuplicateRank('lily')>=0){const lily=party.find(p=>p.id==='lily');if(lily&&loadoutFor('lily').weapon.selected==='premium'&&loadoutFor('lily').weapon.premiumOwned)lily.energy=Math.min(120,lily.energy+5)}
  lastAttack.hits.push({index:hitNumber,target:enemy.id,slot:enemy.slot,damage:dealt.damage+dealt.breakDamage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,breakDamage:dealt.breakDamage,barrierAfter:enemy.barrier,broken:dealt.broken,critical:dealt.critical,criticalMultiplier:dealt.criticalMultiplier});
  if(lastAttack.actor==='lily'&&(lastAttack.action==='skill'||lastAttack.action==='ultimate')){
+  emitCombatVisual('lily-exposed',[enemy.id],850);
   enemy.marks=enemy.marks||[];const dup=characterDuplicateRank('lily');
   if(dup>=2){const stacks=Math.min(2,(enemy.marks.filter(m=>m.id==='exposed').length||0)+1);enemy.marks=enemy.marks.filter(m=>m.id!=='exposed');for(let i=0;i<stacks;i++)enemy.marks.push({id:'exposed',turns:3})}
   else{enemy.marks=enemy.marks.filter(m=>m.id!=='exposed');enemy.marks.push({id:'exposed',turns:2})}
  }
  triggerRicochet(lastAttack,enemy,dealt.damage);
  if(lastAttack.actor==='lily'&&lastAttack.action==='ultimate')applyLilyUltimateDebuff(enemy);
- if(lastAttack.actor==='lily'&&lastAttack.action==='skill'){enemy.marks=enemy.marks||[];enemy.marks=enemy.marks.filter(m=>m.id!=='ricochet');enemy.marks.push({id:'ricochet',turns:2,sources:[]})}
+ if(lastAttack.actor==='lily'&&lastAttack.action==='skill'){enemy.marks=enemy.marks||[];enemy.marks=enemy.marks.filter(m=>m.id!=='ricochet');enemy.marks.push({id:'ricochet',turns:2,sources:[]});emitCombatVisual('lily-ricochet-mark',[enemy.id],1000)}
  if(enemy.hp<=0)resolveEnemyDefeat(enemy);else syncEnemyHp();
  return true;
 }
@@ -681,6 +688,7 @@ function triggerRicochet(sourceAttack,hitEnemy,sourceDamage){
  if(!triggered.length)return;
  const lily=party.find(p=>p.id==='lily');if(!lily)return;
  sourceAttack.ricochetFollowUp=true;const repetitions=characterDuplicateRank('lily')>=4?2:1;
+ emitCombatVisual('lily-ricochet-trigger',triggered.map(e=>e.id),900);
  for(const enemy of triggered){const mark=enemy.marks.find(m=>m.id==='ricochet');mark.sources=[...(mark.sources||[]),sourceAttack.serial];
   for(let n=0;n<repetitions&&enemy.hp>0;n++){const reduction=calculateTrueDamageReduction(lily,enemy),amount=roundHp(sourceDamage*.1*(n===1?.5:1)*(1-(Number.isFinite(reduction)?reduction:0))),dealt=applyEnemyDamage(enemy,amount,lily);sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,damage:dealt.damage,barrierDamage:dealt.barrierDamage,ricochet:true,ricochetSource:sourceAttack.serial,critical:dealt.critical});if(enemy.hp<=0)resolveEnemyDefeat(enemy)}
  }
@@ -717,7 +725,7 @@ function resolveSoulFollowUp(sourceAttack){
  for(let i=0;i<affected.length;i++){const share=base+(i<remainder?1:0),rate=attack>0?share/attack:0,amount=soulDamageForTarget(soul,affected[i],rate);if(amount<=0)continue;const enemy=affected[i],dealt=applyEnemyDamage(enemy,amount,soul);total+=dealt.damage;sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,slot:enemy.slot,damage:dealt.damage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,barrierAfter:enemy.barrier,broken:dealt.broken,followUp:true,critical:dealt.critical});if(enemy.hp<=0)resolveEnemyDefeat(enemy)}
  soulFollowUpActivationCount++;
   if(premiumWeaponDuplicateRank(soul.id)>=4&&soulFollowUpActivationCount%2===0)soulFollowUpProcs=Math.min(soulFollowUpLimit(),soulFollowUpProcs+1);
-  sourceAttack.followUp={sourceSerial:sourceAttack.serial,damage:total,targets:affected.map(e=>e.id),procsRemaining:soulFollowUpProcs};syncEnemyHp();return total>0;
+ sourceAttack.followUp={sourceSerial:sourceAttack.serial,damage:total,targets:affected.map(e=>e.id),procsRemaining:soulFollowUpProcs};emitCombatVisual('soul-follow-up',affected.map(e=>e.id),800);syncEnemyHp();return total>0;
 }
 function finishTrainingAttack(serial){
  if(!attackInProgress||!lastAttack||lastAttack.serial!==serial)return;
@@ -818,7 +826,7 @@ function nextTurn(){
  if(attacking?.marks)attacking.marks=attacking.marks.map(m=>({...m,turns:m.turns-1})).filter(m=>m.turns>0);
  if(attacking?.debuffs)attacking.debuffs=attacking.debuffs.map(d=>({...d,turns:d.turns-1})).filter(d=>d.turns>0);
  if(attacking){activeId=null;zeroSkillArmed=false;pendingTargetAction=null;actingEnemyId=next;cameraPreview=null;phase='enemy';log=`${attacking.name} prepares an attack.`;
-  schedule(()=>{if(phase!=='enemy'||paused)return;if(attacking.hp<=0){nextTurn();return}const candidates=alive();if(!candidates.length){cancelAllQueuedUltimates('defeat');phase='defeat';return}enemyCount++;const attack=resolveEnemyBasicAttack(attacking,candidates),firstHit=attack.hits[0];saveVitals();cancelQueuedUltimatesOfDefeated();fx={kind:'enemy',at:performance.now(),damage:firstHit.damage,target:firstHit.target,hits:attack.hits,actorEnemyId:attacking.id};log=attack.enhanced?`${attacking.name} uses Slimy against all allied characters.`:`${attacking.name} hits ${party.find(p=>p.id===firstHit.target)?.name||'an ally'} for ${firstHit.damage}.`;phase='resolve';schedule(()=>drainUltimateQueueBefore(()=>{if(!alive().length){phase='defeat';log='All allied characters were defeated.'}else nextTurn()}),1000)},780);
+  schedule(()=>{if(phase!=='enemy'||paused)return;if(attacking.hp<=0){nextTurn();return}const candidates=alive();if(!candidates.length){cancelAllQueuedUltimates('defeat');phase='defeat';return}enemyCount++;const attack=resolveEnemyBasicAttack(attacking,candidates),firstHit=attack.hits[0];saveVitals();cancelQueuedUltimatesOfDefeated();fx={kind:'enemy',visual:attacking.archetypeId==='wolf'?'enemy-wolf-claw':'enemy-slime-acid',at:performance.now(),damage:firstHit.damage,target:firstHit.target,hits:attack.hits,actorEnemyId:attacking.id};log=attack.enhanced?`${attacking.name} uses Slimy against all allied characters.`:`${attacking.name} hits ${party.find(p=>p.id===firstHit.target)?.name||'an ally'} for ${firstHit.damage}.`;phase='resolve';schedule(()=>drainUltimateQueueBefore(()=>{if(!alive().length){phase='defeat';log='All allied characters were defeated.'}else nextTurn()}),1000)},780);
  }else{actingEnemyId=null;activeId=next;zeroSkillArmed=false;pendingTargetAction=null;cameraPreview=null;turnCamera={fromId:previousActor,toId:next,start:performance.now(),duration:560};phase='player';log=`${active().name}'s turn — select an ability, then choose an enemy.`;}
 }
 // Normal turns can use Basic or Skill. Ultimate is off-turn and never spends a turn.
@@ -867,7 +875,7 @@ function executeCombatAction(a,action,ultimateSeq=null,allyTargetId=null){
  attackInProgress=true;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;cameraPreview=null;selectedAllyId=null;
  lastAttack={serial,actor:a.id,action,mode,ultimateSeq,allyTargetId:allyTarget?.id||null,tuneBasicUsed,controlledSummonId:controlledSummon?.id||null,initialTarget:victim?.id||allyTarget?.id||null,initialTargets:targets.map(e=>e.id),
   hits:[],defeats:[],finished:false,startedAt:performance.now(),finishedAt:null,energyBefore,energyAfter:a.energy,spBefore,spAfter:sp,spMaxBefore,spMaxAfter:effectiveSpMax(),enhanceSpent,soulRate};
- phase='resolve';fx=dawnSupport?null:{kind:action,at:performance.now(),damage,actor:a.id,targetEnemyId:victim.id,targetGeometry};
+ phase='resolve';if(dawnSupport)selectedAllyId=allyTarget.id;const actionVisual=ACTION_VISUALS[a.id]?.[action]||`${a.id}-${action}`;fx=dawnSupport?{kind:'support',visual:actionVisual,at:performance.now(),damage:0,actor:a.id,targetAllyId:allyTarget.id,action}:{kind:action,visual:actionVisual,at:performance.now(),damage,actor:a.id,targetEnemyId:victim.id,targetEnemyIds:targets.map(e=>e.id),targetGeometry};
  log=a.id==='zero'?(action==='ultimate'?'SOUL ULTIMATE • TRUE AOE':action==='basic'?'SOUL BASIC • TRUE DAMAGE':'SOUL '+action.toUpperCase()):a.id==='dawn'?(action==='skill'?'DAWN TUNE • '+allyTarget.name:action==='ultimate'?'DAWN ULTIMATE • '+allyTarget.name:'DAWN BASIC • MAGICAL'):a.id==='lily'?'LILY '+action.toUpperCase():'TEST '+mode.toUpperCase()+': '+a.name+' uses '+action+' • '+targets.length+' initial target(s).';
  if(controlledSummon)summonHistory.push({event:'controlled-activation',id:controlledSummon.id,ownerId:a.id,clock:turnTimeline.clock});
  if(mode==='five-hit'){
@@ -877,7 +885,7 @@ function executeCombatAction(a,action,ultimateSeq=null,allyTargetId=null){
   if(phase!=='resolve'||!attackInProgress||lastAttack?.serial!==serial)return;
   for(let n=0;n<targets.length;n++)if(targets[n].hp>0){let hitDamage=damage;if(a.id==='zero'&&(action==='basic'||action==='ultimate'))hitDamage=soulDamageForTarget(a,targets[n],soulRate);else if(a.id==='lily')hitDamage=calculateTypedActionDamage('magical',celestialMultiplier(a.id,action)*(action==='ultimate'&&characterDuplicateRank(a.id)>=3?2:1)*(tuneBasicUsed?1+a.tune.damageBonus:1),a,targets[n])?.damageTaken??0;else if(a.id==='dawn'&&action==='basic')hitDamage=calculateTypedActionDamage('magical',2*celestialMultiplier(a.id,'basic')*(tuneBasicUsed?1+a.tune.damageBonus:1),a,targets[n])?.damageTaken??0;applyTrainingHit(targets[n],hitDamage,n+1)}
  },a.id==='zero'&&action==='basic'?645:340);
- schedule(()=>finishTrainingAttack(serial),a.id==='zero'&&action==='basic'?SOUL_BASIC_MS:dawnSupport?420:990);
+ schedule(()=>finishTrainingAttack(serial),a.id==='zero'&&action==='basic'?SOUL_BASIC_MS:dawnSupport?950:990);
  return true;
 }
 // Developer-only test helpers. They do not define the game's revival resource, cost, or eligibility rules.
@@ -1229,6 +1237,7 @@ function cameraShot(t=performance.now()){
  if(phase==='player')return cameraPreview==='party'?'party':cameraPreview==='target'?'target':(t-turnCamera.start<turnCamera.duration?'turn-transition':'command');
  if(phase==='enemy')return 'enemy-windup';
  if(phase==='resolve'&&fx){const dt=t-fx.at;
+  if(fx.kind==='support')return 'party';
   if(fx.kind==='enemy')return dt<420?'enemy-windup':'enemy-impact';
   if(fx.kind==='ultimate')return dt<350?'ultimate-intro':dt<610?'attack-track':'attack-impact';
   return dt<(fx.kind==='basic'&&fx.actor==='zero'?460:350)?'attack-track':'attack-impact';
@@ -1333,10 +1342,10 @@ function cameraAllyPosition(id,view){
 function drawUnit(p,pos,view,t,acting=false){
  if(!p||!pos)return;const {x,baseY,w,h}=pos,top=baseY-h;
  const bob=Math.sin(t*.0024+(p.id==='zero'?0:1))*(p.hp>0?3:0);
- const select=view==='party'&&selectedAllyId===p.id;const allyTargeting=view==='party'&&pendingTargetAction?.targetSide==='ally',eligible=view==='party'&&supportDemo?eligibleAllyTarget(p,supportDemo):allyTargeting?p.hp>0:true;
+ const select=view==='party'&&selectedAllyId===p.id;const allyTargeting=view==='party'&&pendingTargetAction?.targetSide==='ally',supportAnimating=view==='party'&&phase==='resolve'&&fx?.kind==='support'&&fx.targetAllyId===p.id,eligible=view==='party'&&supportDemo?eligibleAllyTarget(p,supportDemo):allyTargeting?p.hp>0:true;
  ctx.save();ctx.translate(camera.currentX*(view==='party'?.32:.52),bob);
  ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.44,16,0,0,Math.PI*2);ctx.fillStyle='rgba(12,12,40,.45)';ctx.fill();
- if(acting||select){ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.51,22,0,0,Math.PI*2);ctx.lineWidth=4;ctx.strokeStyle=select?'#eaca94':'#8be3fb';ctx.stroke()}
+ if(acting||select){ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.51,22,0,0,Math.PI*2);ctx.lineWidth=4;ctx.strokeStyle=select?(allyTargeting||supportAnimating?'#55aaff':'#eaca94'):'#8be3fb';ctx.stroke()}
  if(p.hp<=0)ctx.globalAlpha=.37;
  const art=p.id==='zero'?(view==='party'?'zeroFront':'zero'):p.id==='lily'?(view==='party'?'lilyFront':'lilyBack'):p.id==='dawn'?(view==='party'?'dawnFront':'dawnBattle'):null;
  const zb=view==='command'&&p.id==='zero'?zeroBasicStage(t):null;
@@ -1358,6 +1367,7 @@ function drawUnit(p,pos,view,t,acting=false){
  }else silhouette(x,top,w,h,p.name);
  ctx.restore();
  const xx=x+camera.currentX*(view==='party'?.32:.52);
+ if((allyTargeting||supportAnimating)&&eligible&&selectedAllyId===p.id){ctx.save();ctx.beginPath();ctx.arc(xx+w/2,top+h/2,Math.max(w,h)/2+8,0,Math.PI*2);ctx.strokeStyle='#55aaff';ctx.lineWidth=4;ctx.stroke();ctx.restore()}
  if(view==='party'){
   rect(xx-16,top-60,w+32,40,select?'#3f3845ef':!eligible?'#24212fe7':'#1e2945df',select?'#ffe2a8':eligible?'#869ab0':'#655d6a',8);
   text(p.name,xx+w/2,top-41,p.test?16:19,p.hp<=0?'#c6acb0':'#f4edf8','800','center');
@@ -1439,7 +1449,7 @@ function drawBattleAreaBackground(areaId,reverse=false){
 function drawBattleShot(t,shot){const reverse=shotWorld(shot)==='reverse',area=BATTLE_AREAS[currentBattleAreaId]||BATTLE_AREAS[DEFAULT_BATTLE_AREA_ID];
  const areaBackground=drawBattleAreaBackground(currentBattleAreaId,reverse);
  if(!areaBackground){if(reverse)reverseScene(t);else forwardScene(t)}
- drawActorsForShot(t,shot);if(!areaBackground||area.foregroundEffect==='petals')petals(t);
+ drawActorsForShot(t,shot);drawCombatVisualEvents(t);if(!areaBackground||area.foregroundEffect==='petals')petals(t);
  const shade=ctx.createLinearGradient(0,565,0,900);shade.addColorStop(0,'rgba(12,12,26,0)');shade.addColorStop(1,'rgba(5,10,25,.52)');rect(0,555,W,345,shade);
 }
 function drawCameraStage(t){prepareCamera(t);
@@ -1451,38 +1461,79 @@ function drawCameraStage(t){prepareCamera(t);
  // Camera test labels are shown in the HUD; no obscured scene banners.
 }
 
-function drawFx(t){
- if(!fx)return;const dt=t-fx.at;const fxDuration=fx.kind==='basic'&&fx.actor==='zero'?SOUL_BASIC_MS:950;if(dt>fxDuration){fx=null;return}
- const q=dt/fxDuration;
- ctx.save();
- if(fx.kind==='basic'&&fx.actor==='zero'){
-  const foe=enemies.find(e=>e.id===fx.targetEnemyId)||fx.targetGeometry;
-  if(foe){const x=foe.x+foe.w*.48+camera.currentX*.43,y=foe.y+foe.h*.52;
-   if(dt>=450&&dt<=720){const a=clamp01((dt-450)/80)*(1-clamp01((dt-650)/70));
-    ctx.save();ctx.translate(x,y);ctx.rotate(-.34);ctx.lineWidth=6;ctx.lineCap='round';ctx.strokeStyle=`rgba(232,242,253,${.82*a})`;
-    ctx.beginPath();ctx.moveTo(-92,-117);ctx.quadraticCurveTo(130,-76,124,107);ctx.stroke();
-    ctx.lineWidth=2;ctx.strokeStyle=`rgba(255,255,255,${.65*a})`;ctx.beginPath();ctx.moveTo(-83,-132);ctx.quadraticCurveTo(151,-66,133,106);ctx.stroke();ctx.restore();
-   }
-   if(dt>=645&&dt<=760){const a=1-clamp01((dt-645)/115);ctx.save();ctx.translate(x,y);ctx.globalAlpha=a;
-    ctx.strokeStyle='#fff8eb';ctx.lineWidth=3;for(let i=0;i<8;i++){const angle=i*Math.PI/4;ctx.beginPath();ctx.moveTo(Math.cos(angle)*13,Math.sin(angle)*13);ctx.lineTo(Math.cos(angle)*(33+(i%2)*9),Math.sin(angle)*(33+(i%2)*9));ctx.stroke();}
-    ctx.fillStyle='#eef7ff';ctx.beginPath();ctx.arc(0,0,11*a+2,0,Math.PI*2);ctx.fill();ctx.restore();
-   }
-   if(dt>=645){ctx.save();ctx.globalAlpha=1-clamp01((dt-645)/605);text('-'+fx.damage,x,y-52-(dt-645)*.08,38,'#fff4dc','900','center');ctx.restore();}
-  }
- }else if(fx.kind!=='enemy'){
-  const impact=enemies.find(e=>e.id===fx.targetEnemyId)||fx.targetGeometry;ctx.translate(impact?impact.x+impact.w/2+camera.currentX*.43:1126,impact?impact.y+impact.h*.58:438);ctx.rotate(-.4);
-  ctx.strokeStyle=fx.kind==='ultimate'?`rgba(255,220,132,${1-q})`:fx.kind==='skill'?`rgba(145,225,255,${1-q})`:`rgba(255,247,238,${1-q})`;
-  ctx.lineWidth=fx.kind==='ultimate'?28:14;ctx.beginPath();ctx.ellipse(0,0,120+80*q,30+150*q,0,0,Math.PI*1.5);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(-140,-50);ctx.lineTo(140,75);ctx.stroke();
+function drawCombatSigil(x,y,r,colorName,alpha,style='ring'){
+ ctx.save();ctx.globalAlpha=alpha;ctx.translate(x,y);ctx.strokeStyle=colorName;ctx.fillStyle=colorName;ctx.lineWidth=4;
+ if(style==='star'){
+  ctx.beginPath();for(let i=0;i<8;i++){const a=-Math.PI/2+i*Math.PI/4,rr=i%2?r*.48:r;const px=Math.cos(a)*rr,py=Math.sin(a)*rr;if(!i)ctx.moveTo(px,py);else ctx.lineTo(px,py)}ctx.closePath();ctx.fill();
+ }else if(style==='note'){
+  ctx.beginPath();ctx.arc(-r*.25,-r*.15,r*.19,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.moveTo(-r*.08,-r*.15);ctx.lineTo(-r*.08,-r*.85);ctx.lineTo(r*.55,-r*.68);ctx.lineTo(r*.55,-r*.05);ctx.stroke();ctx.beginPath();ctx.arc(r*.39,-r*.07,r*.17,0,Math.PI*2);ctx.fill();
  }else{
-  const hits=fx.hits?.length?fx.hits:[{target:fx.target}];
-  for(const hit of hits){const pos=cameraAllyPosition(hit.target,"command");if(!pos)continue;const xx=pos.x+pos.w/2,yy=pos.baseY-pos.h*.58;
-   ctx.strokeStyle=`rgba(255,98,121,${1-q})`;ctx.lineWidth=18;ctx.beginPath();ctx.moveTo(xx-65,yy-85);ctx.lineTo(xx+65,yy+70);ctx.stroke();}
+  ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(0,0,r*.68,0,Math.PI*2);ctx.stroke();
+  for(let i=0;i<4;i++){const a=i*Math.PI/2;ctx.beginPath();ctx.moveTo(Math.cos(a)*r*.78,Math.sin(a)*r*.78);ctx.lineTo(Math.cos(a)*r*1.12,Math.sin(a)*r*1.12);ctx.stroke()}
  }
  ctx.restore();
- if(dt>100&&!(fx.kind==='basic'&&fx.actor==='zero')){if(fx.kind==='enemy'){
-  const hits=fx.hits?.length?fx.hits:[{target:fx.target,damage:fx.damage}];for(const hit of hits){const pos=cameraAllyPosition(hit.target,"command");if(pos){text('-'+hit.damage,pos.x+pos.w/2,pos.baseY-pos.h*.73-70*q,42,hit.critical?'#ffd66e':'#ff9d9e','900','center');if(hit.critical)text('CRITICAL',pos.x+pos.w/2,pos.baseY-pos.h*.73-106*q,15,'#ffe9a9','900','center')}}
- }else{const foe=enemies.find(e=>e.id===fx.targetEnemyId)||fx.targetGeometry;const x=foe?foe.x+foe.w/2+camera.currentX*.43:1142,y=foe?foe.y+foe.h*.12:355;text('-'+fx.damage,x,y-70*q,42,'#fff0ba','900','center');for(const hit of lastAttack?.hits||[]){if(!hit.critical)continue;const target=enemies.find(e=>e.id===hit.target);if(target)text('CRITICAL',target.x+target.w/2+camera.currentX*.43,target.y+target.h*.05,15,'#ffe9a9','900','center')}}}
+}
+function enemyVisualPosition(id,geometry=null){const e=enemies.find(x=>x.id===id)||geometry;return e?{x:e.x+e.w/2+camera.currentX*.43,y:e.y+e.h*.55}:null}
+function drawFx(t){
+ if(!fx)return;const dt=t-fx.at,duration=fx.kind==='basic'&&fx.actor==='zero'?SOUL_BASIC_MS:fx.kind==='support'?950:950;if(dt>duration){fx=null;return}
+ const q=clamp01(dt/duration),fade=1-q,visual=fx.visual||`${fx.actor}-${fx.kind}`;
+ if(fx.kind==='self'){const pos=cameraAllyPosition(fx.actor,'command');if(pos){const x=pos.x+pos.w/2+camera.currentX*.52,y=pos.baseY-pos.h*.58;drawCombatSigil(x,y,35+q*80,'#75cfff',fade,'ring');drawCombatSigil(x,y,22+q*45,'#e2f7ff',fade*.8,'star')}return}
+ if(fx.kind==='support'){
+  const p=party.find(x=>x.id===fx.targetAllyId),pos=p&&cameraAllyPosition(p.id,'party');if(!pos)return;
+  const x=pos.x+pos.w/2+camera.currentX*.32,y=pos.baseY-pos.h*.58,progress=clamp01(dt/950);
+  if(visual==='dawn-tune'){
+   drawCombatSigil(x,y,45+progress*85,'#6dfff1',fade,'ring');drawCombatSigil(x-36,y-85-progress*22,25,'#e9ffe9',fade,'note');drawCombatSigil(x+43,y-40-progress*12,19,'#a1d8ff',fade*.9,'note');
+   text('TUNE',x,y-145,20,`rgba(226,255,250,${fade})`,'900','center');
+  }else{
+   drawCombatSigil(x,y,55+progress*80,'#ffd989',fade,'ring');drawCombatSigil(x,y,25+progress*44,'#fff4c1',fade*.8,'star');
+   ctx.save();ctx.globalAlpha=fade;ctx.strokeStyle='#ffe9ad';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x-100,y+80);ctx.quadraticCurveTo(x,y-120,x+100,y-190);ctx.stroke();ctx.restore();text('ADVANCE',x,y-155,18,`rgba(255,239,194,${fade})`,'900','center');
+  }
+  return;
+ }
+ if(fx.kind==='enemy'){
+  const hits=fx.hits?.length?fx.hits:[{target:fx.target}];for(const hit of hits){const pos=cameraAllyPosition(hit.target,'command');if(!pos)continue;const x=pos.x+pos.w/2,y=pos.baseY-pos.h*.58;ctx.save();ctx.globalAlpha=fade;
+   if(fx.visual==='enemy-slime-acid'){ctx.fillStyle='#a8ff9d';ctx.strokeStyle='#ecffbc';for(let i=0;i<4;i++){ctx.beginPath();ctx.arc(x-30+i*20,y-5-Math.sin(i+q*6)*18,10+i%2*3,0,Math.PI*2);ctx.fill();ctx.lineWidth=2;ctx.stroke()}}
+   else{ctx.strokeStyle='#ff8997';ctx.lineWidth=11;ctx.lineCap='round';for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(x-54+i*15,y-66);ctx.lineTo(x+45+i*15,y+55);ctx.stroke()}}
+   ctx.restore();if(dt>100){const damage=hit.damage??fx.damage;text('-'+damage,x,y-65,34,hit.critical?'#ffd66e':'#ff9d9e','900','center');if(hit.critical)text('CRITICAL',x,y-96,14,'#ffe9a9','900','center')}}return;
+ }
+ const targetIds=fx.targetEnemyIds?.length?fx.targetEnemyIds:[fx.targetEnemyId],targets=targetIds.map(id=>enemyVisualPosition(id,fx.targetGeometry)).filter(Boolean);
+ if(!targets.length){const p=enemyVisualPosition(fx.targetEnemyId,fx.targetGeometry);if(p)targets.push(p)}
+ for(let i=0;i<targets.length;i++){
+  const {x,y}=targets[i],offset=i*85;
+  if(visual==='soul-sword'){
+   const a=fade*(dt>620?clamp01((duration-dt)/250):1);ctx.save();ctx.translate(x,y);ctx.rotate(-.4);ctx.globalAlpha=a;ctx.lineCap='round';ctx.strokeStyle='#eff8ff';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(-108,-90);ctx.quadraticCurveTo(80,-40,100,92);ctx.stroke();ctx.strokeStyle='#80dcff';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-118,-104);ctx.quadraticCurveTo(70,-55,116,85);ctx.stroke();ctx.restore();
+  }else if(visual==='soul-enhance'){
+   drawCombatSigil(x,y,44+q*70,'#75cfff',fade,'ring');drawCombatSigil(x,y,25+q*36,'#e2f7ff',fade*.8,'star');
+  }else if(visual==='soul-storm'){
+   drawCombatSigil(x,y,56+q*120,'#9bd8ff',fade,'ring');drawCombatSigil(x,y,31+q*69,'#ffe3a5',fade*.85,'star');
+  }else if(visual==='lily-petal'){
+   ctx.save();ctx.globalAlpha=fade;ctx.translate(x,y);for(let k=0;k<6;k++){const a=k*Math.PI/3+q*3;ctx.save();ctx.rotate(a);ctx.fillStyle=k%2?'#ffb5d4':'#fff0f6';ctx.beginPath();ctx.ellipse(0,-35-q*35,12,29,0,0,Math.PI*2);ctx.fill();ctx.restore()}ctx.restore();
+  }else if(visual==='lily-ricochet'||visual==='lily-ricochet-mark'||visual==='lily-ricochet-trigger'){
+   drawCombatSigil(x,y,36+q*95,'#cf91ff',fade,'ring');if(visual!=='lily-ricochet')drawCombatSigil(x,y,26+q*45,'#ffb6eb',fade*.9,'star');
+   if(visual==='lily-ricochet-trigger'){ctx.save();ctx.globalAlpha=fade;ctx.strokeStyle='#f0bcff';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x-50,y-45);ctx.lineTo(x+50,y+45);ctx.moveTo(x+50,y-45);ctx.lineTo(x-50,y+45);ctx.stroke();ctx.restore()}
+  }else if(visual==='lily-haunting'||visual==='lily-hauntling'){
+   drawCombatSigil(x,y,45+q*105,'#9d6bdf',fade,'ring');drawCombatSigil(x-35,y-26,17+q*12,'#d9b6ff',fade*.85,'star');drawCombatSigil(x+38,y+24,12+q*14,'#c78cff',fade*.75,'star');
+  }else if(visual==='dawn-star'){
+   drawCombatSigil(x,y,34+q*78,'#7cf8ed',fade,'star');drawCombatSigil(x,y,22+q*42,'#fff1bd',fade*.85,'ring');
+  }else{
+   ctx.save();ctx.translate(x,y);ctx.rotate(-.35);ctx.strokeStyle=`rgba(255,247,238,${fade})`;ctx.lineWidth=12;ctx.beginPath();ctx.ellipse(0,0,90+80*q,32+80*q,0,0,Math.PI*1.65);ctx.stroke();ctx.restore();
+  }
+ }
+ if(dt>100){const hits=lastAttack?.hits||[],ids=[...new Set(hits.filter(h=>h.damage>0).map(h=>h.target))];for(const id of ids){const p=enemyVisualPosition(id);if(!p)continue;const amount=hits.filter(h=>h.target===id).reduce((sum,h)=>sum+(h.damage||0),0);text('-'+amount,p.x,p.y-50,33,'#fff0ba','900','center');if(hits.some(h=>h.target===id&&h.critical))text('CRITICAL',p.x,p.y-82,14,'#ffe9a9','900','center')}}
+}
+function drawCombatVisualEvents(t){
+ combatVisualEvents=combatVisualEvents.filter(e=>t-e.at<e.duration);
+ for(const event of combatVisualEvents){const q=clamp01((t-event.at)/event.duration),fade=1-q;
+  if(event.type==='dawn-resourceful'){
+   const x=W/2,y=435;drawCombatSigil(x,y,58+q*100,'#80f2ed',fade,'ring');text('RESOURCEFUL  •  +2 SP',x,y-125,24,`rgba(224,255,247,${fade})`,'900','center');continue;
+  }
+  for(const id of event.targetIds){const p=enemyVisualPosition(id);if(!p)continue;
+   if(event.type==='lily-exposed'){drawCombatSigil(p.x,p.y,36+q*12,'#a978e8',fade,'ring');text('EXPOSED',p.x,p.y-64,14,`rgba(226,207,255,${fade})`,'900','center')}
+   else if(event.type==='lily-ricochet-mark'){drawCombatSigil(p.x,p.y,28+q*8,'#d18cff',fade,'star')}
+   else if(event.type==='lily-ricochet-trigger'){drawCombatSigil(p.x,p.y,38+q*45,'#f0b2ff',fade,'ring')}
+   else if(event.type==='soul-follow-up'){ctx.save();ctx.globalAlpha=fade;ctx.strokeStyle='#c8edff';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(p.x-36,p.y-40);ctx.lineTo(p.x+36,p.y+40);ctx.moveTo(p.x+36,p.y-40);ctx.lineTo(p.x-36,p.y+40);ctx.stroke();ctx.restore()}
+  }
+ }
 }
 function getOrder(n){
  const predicted=turnTimeline.preview(n).map(x=>x.id);
