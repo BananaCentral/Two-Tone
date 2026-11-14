@@ -6,6 +6,7 @@ This standard defines how combat actions and passive effects receive readable, c
 
 ## Required effect coverage
 
+- Resolve primary attacks, mark triggers, and follow-up attacks in the order and timing defined by the [Combat Action Resolution Standard](combat-action-resolution-standard.md).
 - Each playable character's Passive, Basic Attack, Skill, and Ultimate must have a distinct visual treatment. A passive may use a triggered effect rather than an always-on animation.
 - Triggered effects such as Soul's follow-up, Lily's Exposed and Ricochet marks, and Ricochet damage must have separate cues so players can distinguish the base action from the passive or mark trigger.
 - Targeted ally skills show the normal ally selection circle on the selected living ally. The cue stays visible during the action's resolution.
