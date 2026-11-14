@@ -597,7 +597,7 @@ function chooseAttackTargets(mode=targetingMode,primary=chosenEnemy()){
 }
 function closestSurvivingEnemy(slot){return liveEnemies().slice().sort((a,b)=>Math.abs(a.slot-slot)-Math.abs(b.slot-slot)||a.slot-b.slot)[0]||null}
 // Soul's Basic becomes Blast at three Enhance stacks; the Ultimate is AoE.
-function actionTargetMode(actor,action){if((actor?.id==='zero'&&action==='ultimate')||(actor?.id==='lily'&&(action==='skill'||action==='ultimate'))||(actor?.id==='logan'&&action==='ultimate'))return 'aoe';if(actor?.id==='zero'&&action==='basic')return soulEnhancedBasicTargetMode(soulEnhanceStacks);if(actor?.id==='logan'&&action==='basic')return 'single';return actor?.id==='zero'&&action==='skill'?'blast':targetingMode}
+function actionTargetMode(actor,action){if(actor?.id==='logan'&&action==='skill')return 'allAllies';if((actor?.id==='zero'&&action==='ultimate')||(actor?.id==='lily'&&(action==='skill'||action==='ultimate'))||(actor?.id==='logan'&&action==='ultimate'))return 'aoe';if(actor?.id==='zero'&&action==='basic')return soulEnhancedBasicTargetMode(soulEnhanceStacks);if(actor?.id==='logan'&&action==='basic')return 'single';return actor?.id==='zero'&&action==='skill'?'blast':targetingMode}
 function previewTargetMode(){if(pendingTargetAction){const actor=party.find(p=>p.id===pendingTargetAction.actorId);return actionTargetMode(actor,pendingTargetAction.action)}return targetingMode}
 function beginDawnAllyTargetSelection(action,actorId){
  const actor=party.find(p=>p.id===actorId);if(!actor||actor.id!=='dawn')return false;
@@ -615,7 +615,9 @@ function beginDawnAllyTargetSelection(action,actorId){
 function beginTargetSelection(action,actorId=activeId){
  const actor=party.find(p=>p.id===actorId);if(!actor||actor.hp<=0)return false;
  if(actor.id==='dawn'&&(action==='skill'||action==='ultimate'))return beginDawnAllyTargetSelection(action,actorId);
+ if(action==='skill'&&actor.id!=='zero'&&sp<1){say('Not enough shared SP. Basic restores 1 SP.');return false}
  if(action==='ultimate'&&!canQueueUltimate(actor)){say(actor.hp<=0?'Defeated ally cannot use an Ultimate.':'Ultimate needs '+ULTIMATE_ENERGY_COST+' available Energy.');return false}
+ if(actionTargetMode(actor,action)==='allAllies'){pendingTargetAction=null;cameraPreview=null;return executeCombatAction(actor,action)}
  if(pendingTargetAction?.action===action&&pendingTargetAction.actorId===actorId){pendingTargetAction=null;cameraPreview=null;if(action==='ultimate')return queueUltimate(actorId);return executeCombatAction(actor,action)}
  if(action==='ultimate'&&actionTargetMode(actor,action)==='aoe'){pendingTargetAction=null;cameraPreview=null;return queueUltimate(actorId)}
  pendingTargetAction={action,actorId};cameraPreview='target';supportDemo=null;selectedAllyId=null;
@@ -952,8 +954,6 @@ function play(action){
  const a=active();if(!a||a.hp<=0)return false;
  if(action==='skill'&&a.id==='zero'){pendingTargetAction=null;cameraPreview=null;return activateSoulEnhance()}
  if(action==='skill'&&a.id==='dawn')return beginDawnAllyTargetSelection('skill',a.id);
- if(action==='skill'&&a.id==='logan')return executeCombatAction(a,'skill');
- if(action==='skill'&&sp<1){say('Not enough shared SP. Basic restores 1 SP.');return false;}
  return beginTargetSelection(action,a.id);
 }
 function soulDamageForTarget(actor,target,rate){return calculateTypedActionDamage('true',rate,actor,target)?.damageTaken??0}
@@ -1840,7 +1840,7 @@ function drawAllyPortraitHud(){
   rect(x,top,cardW,cardH,'rgba(14,23,42,.96)',targetSelected?'#eaca94':activeAlly?'#f3d79e':'rgba(129,164,191,.82)',12);
   hudPortrait(p.id==='zero'?images.zeroFront:p.id==='lily'?images.lilyFront:p.id==='dawn'?images.dawnFront:p.id==='logan'?images.loganPortrait:null,portraitX,portraitY,portraitSize,portraitSize,true);
   if(ko)rect(portraitX,portraitY,portraitSize,portraitSize,'rgba(30,17,23,.62)',null,10);
-  drawAllyUltimate(p,x+95,top-11,136);
+  drawAllyUltimate(p,x+95,top-15,136);
   drawAllyStatuses(p,portraitX,portraitY,portraitSize);
   text(ko?'0 / '+p.maxHp:`${p.hp} / ${p.maxHp}`,x+cardW-12,top+136,14,ko?'#f0afb7':'#e4f3ef','750','right');
   shieldedHealthBar(x+12,top+149,cardW-48,14,ko?0:p.hp,p.maxHp,p.shield,ko?'#b16b76':'#67e3b4','#23374d');
