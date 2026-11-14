@@ -5,6 +5,9 @@ const BATTLE_AREAS=Object.freeze({
 });
 const DEFAULT_BATTLE_AREA_ID='area-1';
 const COMBAT_ACTION_PHASE_GAP_MS=500;
+const ULTIMATE_PRESENTATION_MS=1800;
+const ULTIMATE_CAMERA_INTRO_MS=450;
+const ULTIMATE_CAMERA_TRACK_END_MS=1050;
 const ACTION_VISUALS=Object.freeze({
  zero:Object.freeze({basic:'soul-sword',skill:'soul-enhance',ultimate:'soul-storm'}),
  lily:Object.freeze({basic:'lily-petal',skill:'lily-ricochet',ultimate:'lily-haunting'}),
@@ -1023,7 +1026,7 @@ function executeCombatAction(a,action,ultimateSeq=null,allyTargetId=null){
   if(phase!=='resolve'||!attackInProgress||lastAttack?.serial!==serial)return;
   for(let n=0;n<targets.length;n++)if(targets[n].hp>0){let hitDamage=damage;if(a.id==='zero'&&(action==='basic'||action==='ultimate'))hitDamage=soulDamageForTarget(a,targets[n],soulRate);else if(a.id==='lily')hitDamage=calculateTypedActionDamage('magical',(action==='skill' ? 0.5 : 1)*celestialMultiplier(a.id,action)*(action==='ultimate'&&characterDuplicateRank(a.id)>=3?2:1)*(tuneBasicUsed?1+a.tune.damageBonus:1),a,targets[n])?.damageTaken??0;else if(a.id==='dawn'&&action==='basic')hitDamage=calculateTypedActionDamage('magical',2*celestialMultiplier(a.id,'basic')*(tuneBasicUsed?1+a.tune.damageBonus:1),a,targets[n])?.damageTaken??0;applyTrainingHit(targets[n],hitDamage,n+1,true)}
  },a.id==='zero'&&action==='basic'?645:340);
- schedule(()=>finishTrainingAttack(serial),a.id==='zero'&&action==='basic'?SOUL_BASIC_MS:dawnSupport?950:990);
+ schedule(()=>finishTrainingAttack(serial),a.id==='zero'&&action==='basic'?SOUL_BASIC_MS:action==='ultimate'?ULTIMATE_PRESENTATION_MS:dawnSupport?950:990);
  return true;
 }
 // Developer-only test helpers. They do not define the game's revival resource, cost, or eligibility rules.
@@ -1429,9 +1432,9 @@ function cameraShot(t=performance.now()){
  if(phase==='player')return cameraPreview==='party'?'party':cameraPreview==='target'?'target':'command';
  if(phase==='enemy')return 'enemy-windup';
  if(phase==='resolve'&&fx){const dt=t-fx.at;
-  if(fx.kind==='support')return fx.targetAllyId?'ally-impact':'command';
+  if(fx.kind==='support')return fx.targetAllyId?(fx.action==='ultimate'?'party':'ally-impact'):'command';
   if(fx.kind==='enemy')return dt<420?'enemy-windup':'enemy-impact';
-  if(fx.kind==='ultimate')return dt<350?'ultimate-intro':dt<610?'attack-track':'attack-impact';
+  if(fx.kind==='ultimate')return dt<ULTIMATE_CAMERA_INTRO_MS?'ultimate-intro':dt<ULTIMATE_CAMERA_TRACK_END_MS?'attack-track':'attack-impact';
   return dt<(fx.kind==='basic'&&fx.actor==='zero'?460:350)?'attack-track':'attack-impact';
  }
  // Animation lifetimes can end a frame before their resolution timers. Keep
@@ -1676,7 +1679,7 @@ function drawCombatSigil(x,y,r,colorName,alpha,style='ring'){
 }
 function enemyVisualPosition(id,geometry=null){const e=enemies.find(x=>x.id===id)||geometry;return e?{x:e.x+e.w/2+camera.currentX*.43,y:e.y+e.h*.55}:null}
 function drawFx(t){
- if(!fx)return;const dt=t-fx.at,duration=fx.kind==='basic'&&fx.actor==='zero'?SOUL_BASIC_MS:fx.kind==='support'?950:950;if(dt>duration){fx=null;return}
+ if(!fx)return;const dt=t-fx.at,duration=fx.kind==='basic'&&fx.actor==='zero'?SOUL_BASIC_MS:fx.action==='ultimate'?ULTIMATE_PRESENTATION_MS:950;if(dt>duration){fx=null;return}
  const q=clamp01(dt/duration),fade=1-q,visual=fx.visual||`${fx.actor}-${fx.kind}`;
  if(fx.kind==='self'){const pos=cameraAllyPosition(fx.actor,'command');if(pos){const x=pos.x+pos.w/2+camera.currentX*.52,y=pos.baseY-pos.h*.58;drawCombatSigil(x,y,35+q*80,'#75cfff',fade,'ring');drawCombatSigil(x,y,22+q*45,'#e2f7ff',fade*.8,'star')}return}
  if(fx.kind==='support'){
@@ -1684,8 +1687,8 @@ function drawFx(t){
    const pos=cameraAllyPosition(fx.actor,'command');if(pos){const x=pos.x+pos.w/2+camera.currentX*.52,y=pos.baseY-pos.h*.58;drawCombatSigil(x,y,32+q*66,'#83dcff',fade,'ring');drawCombatSigil(x,y,18+q*42,'#ffe0ed',fade*.75,'star')}
    text('BLOOD SHIELD',1050,432,20,`rgba(215,244,255,${fade})`,'900','center');return;
   }
-  const p=party.find(x=>x.id===fx.targetAllyId),view='ally-impact',pos=p&&cameraAllyPosition(p.id,view);if(!pos)return;
-  const x=pos.x+pos.w/2+camera.currentX*.52,y=pos.baseY-pos.h*.58,progress=clamp01(dt/950);
+  const p=party.find(x=>x.id===fx.targetAllyId),view=fx.action==='ultimate'?'party':'ally-impact',pos=p&&cameraAllyPosition(p.id,view);if(!pos)return;
+  const x=pos.x+pos.w/2+camera.currentX*(view==='party'?.32:.52),y=pos.baseY-pos.h*.58,progress=q;
   if(visual==='dawn-tune'){
    drawCombatSigil(x,y,45+progress*85,'#6dfff1',fade,'ring');drawCombatSigil(x-36,y-85-progress*22,25,'#e9ffe9',fade,'note');drawCombatSigil(x+43,y-40-progress*12,19,'#a1d8ff',fade*.9,'note');
    text('TUNE',x,y-145,20,`rgba(226,255,250,${fade})`,'900','center');
@@ -1935,17 +1938,17 @@ function drawHud(t){
  // health rows; each dot sits immediately left of its corresponding HP bar.
  const bossOnField=liveEnemies().find(e=>e.category==='boss');
  if(bossOnField){
- const bx=342,by=12,bw=970,bars=bossOnField.healthBars||1,bh=60+bars*14,segmentMax=bossOnField.maxHp/bars;
-  rect(bx,by,bw,bh,'rgba(10,16,31,.86)','rgba(244,202,139,.62)',12);
+ const bx=250,by=12,bw=1070,bars=bossOnField.healthBars||1,barH=13,barX=bx+34,barW=bw-54,bh=68+bars*20,segmentMax=bossOnField.maxHp/bars;
+  rect(bx,by,bw,bh,'rgba(10,16,31,.88)','rgba(244,202,139,.68)',12);
   text(`BOSS  •  ${bossOnField.name}`,bx+18,by+13,15,'#fff0d4','850');
-  text(`HP ${bossOnField.hp} / ${bossOnField.maxHp}`,bx+bw-18,by+13,14,'#f0e7eb','750','right');
-  text('BARRIER',bx+18,by+29,10,'#cbd7e4','800');
-  line(bx+82,by+26,bw-202,bossOnField.maxBarrier?bossOnField.barrier/bossOnField.maxBarrier:0,'#c4c9d2','#3e485a',6);
-  text(`${bossOnField.barrier} / ${bossOnField.maxBarrier}`,bx+bw-18,by+29,10,'#d5e0ec','750','right');
+  hudCircle(bx+bw-218,by+13,5,'#c4c9d2','#eff2f5',1);text('BARRIER',bx+bw-207,by+13,10,'#d5e0ec','800');
+  hudCircle(bx+bw-116,by+13,5,'#ee7882','#ffd3d7',1);text('HEALTH',bx+bw-105,by+13,10,'#f0e7eb','800');
+  line(barX,by+31,barW,bossOnField.maxBarrier?bossOnField.barrier/bossOnField.maxBarrier:0,'#c4c9d2','#3e485a',barH);
+  const activeHealthBar=Math.min(bars-1,Math.floor((bossOnField.maxHp-bossOnField.hp)/Math.max(1,segmentMax)));
   for(let i=0;i<bars;i++){
-   const segmentHp=Math.max(0,Math.min(segmentMax,bossOnField.hp-i*segmentMax)),ratio=segmentMax?segmentHp/segmentMax:0,rowY=by+42+i*14;
-   const remaining=segmentHp>0;hudCircle(bx+19,rowY+4,5,remaining?'#f3c778':'#43485a',remaining?'#fff0c5':'#72798a',2);
-   shieldedHealthBar(bx+34,rowY,(bw-52)/1.12,8,segmentHp,segmentMax,i===Math.floor((bossOnField.maxHp-bossOnField.hp)/segmentMax)?bossOnField.shield:0,ratio<1&&ratio>0?'#ffd57c':'#ee7882','#3e2938');
+   const segmentHp=Math.max(0,Math.min(segmentMax,bossOnField.hp-i*segmentMax)),ratio=segmentMax?segmentHp/segmentMax:0,rowY=by+51+i*20;
+   const remaining=segmentHp>0;hudCircle(bx+19,rowY+barH/2,5,remaining?'#f3c778':'#43485a',remaining?'#fff0c5':'#72798a',2);
+   line(barX,rowY,barW,ratio,i===activeHealthBar?'#ffd57c':'#ee7882','#3e2938',barH);
   }
  }
  // Compact expanded selected enemy information.
