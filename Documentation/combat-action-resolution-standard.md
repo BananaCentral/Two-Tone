@@ -27,6 +27,8 @@ Resolve battle actions in visible phases so players can follow the acting charac
 - When changing between forward and reverse battlefield views, show one scene at a time and ease into the destination without a flash or dark veil. Do not cross-render both scenes, since this duplicates characters, targets, and effects.
 - A new turn must not run an additional ally entrance animation while the previous action is still resolving.
 - Keep the selected target and action focus stable through resolution. Change camera focus only when the next actual action or target selection begins.
+- When an enemy reaches zero HP, keep its defeated sprite on stage for a 700 ms grayscale fade and sink. Treat it as defeated immediately for targeting and turn order, but keep its formation slot unavailable until the fade completes.
+- Deploy reinforcements only after the defeating action and its chained effects have finished, followed by the enemy defeat presentation beat. Apply the same delay to Bleed defeats and independent summon attacks so the replacement cannot appear during the death or attack animation.
 
 ## Lily and Soul example
 

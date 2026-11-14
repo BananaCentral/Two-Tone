@@ -6,6 +6,7 @@ const BATTLE_AREAS=Object.freeze({
 const DEFAULT_BATTLE_AREA_ID='area-1';
 const COMBAT_ACTION_PHASE_GAP_MS=500;
 const ULTIMATE_PRESENTATION_MS=1800;
+const ENEMY_DEATH_BEAT_MS=700;
 const ULTIMATE_CAMERA_INTRO_MS=550;
 const ACTION_VISUALS=Object.freeze({
  zero:Object.freeze({basic:'soul-sword',skill:'soul-enhance',ultimate:'soul-storm'}),
@@ -444,7 +445,7 @@ function finishSummonCreationForTest(ownerId){
 }
 function executeIndependentSummonTurn(s){
  if(!s||s.mode!=='independent')return nextTurn();
- s.remaining--;summonHistory.push({event:'acted',id:s.id,clock:turnTimeline.clock,remaining:s.remaining});
+ s.remaining--;attackInProgress=true;summonHistory.push({event:'acted',id:s.id,clock:turnTimeline.clock,remaining:s.remaining});
  activeId=null;actingEnemyId=null;phase='resolve';
  const owner=party.find(p=>p.id===s.ownerId);
  const foe=chosenEnemy();
@@ -458,7 +459,7 @@ function executeIndependentSummonTurn(s){
   }
  }
  log=`${s.name} • INITIAL AOE • TRUE DAMAGE`;
- const finishTurn=()=>{if(s.remaining<=0){summons=summons.filter(x=>x.id!==s.id);turnTimeline.states.delete(s.id);summonHistory.push({event:'expired',id:s.id})}drainUltimateQueueBefore(()=>nextTurn())};
+ const finishTurn=()=>{attackInProgress=false;settleAfterAttack();if(s.remaining<=0){summons=summons.filter(x=>x.id!==s.id);turnTimeline.states.delete(s.id);summonHistory.push({event:'expired',id:s.id})}drainUltimateQueueBefore(()=>nextTurn())};
  schedule(()=>{const pending=source.pendingRicochet,ricochetCount=pending?triggerRicochet(source,enemies.find(e=>e.id===pending.enemyId),pending.damage):0;if(ricochetCount)log=`Hauntling triggers Lily's Ricochet • ${ricochetCount} marked ${ricochetCount===1?'enemy':'enemies'}.`;schedule(finishTurn,COMBAT_ACTION_PHASE_GAP_MS)},950);
 }
 
@@ -738,17 +739,20 @@ function resetEnemies(){
  beginWave(0);
 }
 function resolveEnemyDefeat(victim){
- if(!victim||victim.hp>0||!enemies.some(e=>e.id===victim.id))return null;
- // Register the defeat NOW. Replacements and wave transitions wait for attack completion.
- enemies=enemies.filter(e=>e.id!==victim.id);delete gauges[victim.id];
+ if(!victim||victim.hp>0||victim.deathAt||!enemies.some(e=>e.id===victim.id))return null;
+ // Keep the defeated unit on stage for a visible fade-out. Its zero HP keeps it
+ // out of targeting and turn order while its slot remains unavailable.
+ victim.deathAt=performance.now();delete gauges[victim.id];
  pendingVacancies.push(victim.slot);waveKills++;totalEnemyDefeats++;
- if(lastAttack&&attackInProgress)lastAttack.defeats.push({id:victim.id,slot:victim.slot});
+ if(lastAttack&&attackInProgress&&!lastAttack.finished)lastAttack.defeats.push({id:victim.id,slot:victim.slot});
  syncEnemyHp();
- if(!attackInProgress)settleAfterAttack(); // debug/non-attack deletion has no running attack to await
+ if(!attackInProgress)schedule(()=>{if(!attackInProgress)settleAfterAttack()},ENEMY_DEATH_BEAT_MS);
  return victim;
 }
 function settleAfterAttack(){
  if(attackInProgress)return false;
+ // Remove stage corpses only when their presentation beat is complete.
+ enemies=enemies.filter(e=>e.hp>0);
  // Temporary implementation detail, not a finalized multi-KO gameplay rule:
  // vacated slots are filled in ascending slot order for deterministic test reproducibility.
  const vacancies=pendingVacancies.splice(0).sort((a,b)=>a-b);
@@ -868,6 +872,11 @@ function finishTrainingAttack(serial){
  if(lastAttack.actor==='zero'&&lastAttack.action==='ultimate'){soulFollowUpProcs=soulFollowUpLimit();soulFollowUpSources.clear();lastAttack.followUpRefill=soulFollowUpProcs}
  if(lastAttack.actor==='logan'&&lastAttack.action==='ultimate'&&characterDuplicateRank('logan')>=3)gainSp(1);
  const actingAlly=party.find(p=>p.id===lastAttack.actor);if(actingAlly){ageTaunt(actingAlly);if(lastAttack.action!=='ultimate')ageDawnTune(actingAlly);if(lastAttack.action!=='ultimate')ageResidue(actingAlly)}
+ if(pendingVacancies.length){schedule(()=>completeTrainingAttack(serial),ENEMY_DEATH_BEAT_MS);return}
+ completeTrainingAttack(serial);
+}
+function completeTrainingAttack(serial){
+ if(!lastAttack||lastAttack.serial!==serial||phase!=='resolve')return;
  settleAfterAttack();
  if(!encounterCleared&&lastAttack?.action!=='ultimate')finishSummonCreationForTest(lastAttack?.actor);
  if(phase!=='resolve')return;
@@ -953,7 +962,7 @@ function nextTurn(){
  const actingSummon=summons.find(s=>s.id===next&&s.mode==='independent');
  if(actingSummon){executeIndependentSummonTurn(actingSummon);return;}
  const attacking=enemies.find(e=>e.id===next&&e.hp>0);
- if(attacking&&attacking.bleedStacks?.length){resolveBleedTick(attacking);if(attacking.hp<=0){resolveEnemyDefeat(attacking);schedule(()=>nextTurn(),COMBAT_ACTION_PHASE_GAP_MS);return}}
+ if(attacking&&attacking.bleedStacks?.length){resolveBleedTick(attacking);if(attacking.hp<=0){resolveEnemyDefeat(attacking);schedule(()=>nextTurn(),ENEMY_DEATH_BEAT_MS);return}}
  if(attacking&&attacking.brokenTurns>0){attacking.brokenTurns--;if(attacking.brokenTurns===0){attacking.barrier=attacking.maxBarrier;cleanseEnemy(attacking);addActionAdvance(attacking.id,100);}schedule(()=>nextTurn(),0);return;}
  if(attacking?.marks)attacking.marks=attacking.marks.map(m=>({...m,turns:m.turns-1})).filter(m=>m.turns>0);
  if(attacking?.debuffs)attacking.debuffs=attacking.debuffs.map(d=>({...d,turns:d.turns-1})).filter(d=>d.turns>0);
@@ -1589,7 +1598,8 @@ function drawUnit(p,pos,view,t,acting=false){
  }
 
 }
-function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&pendingTargetAction&&cameraPreview!=='party'&&previewTargetMode()==='aoe'&&all.length){ctx.save();ctx.strokeStyle='rgba(102,243,211,.82)';ctx.lineWidth=5;ctx.setLineDash([22,12]);ctx.beginPath();ctx.ellipse(1093+camera.currentX*.43,558,453,67,0,0,Math.PI*2);ctx.stroke();ctx.restore()}for(const e of all){
+function drawEnemy(t,shot){const all=enemies;if(phase==='player'&&pendingTargetAction&&cameraPreview!=='party'&&previewTargetMode()==='aoe'&&combatEnemies().length){ctx.save();ctx.strokeStyle='rgba(102,243,211,.82)';ctx.lineWidth=5;ctx.setLineDash([22,12]);ctx.beginPath();ctx.ellipse(1093+camera.currentX*.43,558,453,67,0,0,Math.PI*2);ctx.stroke();ctx.restore()}for(const e of all){
+ const defeated=e.hp<=0,deathElapsed=defeated?Math.max(0,t-(e.deathAt||t)):0,deathProgress=Math.min(1,deathElapsed/ENEMY_DEATH_BEAT_MS);
  const isFocus=phase==='player'&&chosenEnemy()?.id===e.id;
  const patternHit=phase==='player'&&!!pendingTargetAction&&cameraPreview!=='party'&&chooseAttackTargets(previewTargetMode()).some(x=>x.id===e.id);
  const isActor=(shot==='enemy-windup'&&actingEnemyId===e.id)||(fx?.kind==='enemy'&&fx?.actorEnemyId===e.id&&shot==='enemy-impact');
@@ -1597,8 +1607,8 @@ function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&pendin
  const ww=e.w*sh,hh=e.h*sh,xx=e.x+camera.currentX*.43-(ww-e.w)/2,yy=e.y+(e.h-hh);
  const zbHit=fx?.kind==='basic'&&fx?.actor==='zero'&&fx.targetEnemyId===e.id?t-fx.at:null;
   const hitKick=zbHit!==null&&zbHit>=645&&zbHit<745?Math.sin((zbHit-645)*.06)*(1-(zbHit-645)/100)*2:0;
- let spriteCenterY=yy+hh/2,spriteVisibleW=ww,spriteVisibleH=hh;const spriteOffsetX=hitKick,spriteOffsetY=Math.sin(t*.0026+e.x)*2.2;
- ctx.save();ctx.globalAlpha=e.hp>0?1:Math.max(.02,.8-(t-fx.at)/1050);ctx.translate(spriteOffsetX,spriteOffsetY);
+ let spriteCenterY=yy+hh/2,spriteVisibleW=ww,spriteVisibleH=hh;const spriteOffsetX=defeated?0:hitKick,spriteOffsetY=defeated?Math.pow(deathProgress,1.4)*26:Math.sin(t*.0026+e.x)*2.2;
+ ctx.save();ctx.globalAlpha=defeated?Math.max(0,1-deathProgress):1;if(defeated)ctx.filter='grayscale(1)';ctx.translate(spriteOffsetX,spriteOffsetY);
  ctx.beginPath();ctx.ellipse(xx+ww/2,yy+hh-4,ww*.48,13,0,0,Math.PI*2);ctx.fillStyle='#1b213c70';ctx.fill();
  const spriteId=enemyBattleSprite(e);if(images[spriteId]?.complete&&images[spriteId].naturalWidth){const img=images[spriteId];ctx.imageSmoothingEnabled=spriteId==='slimeBattle';const ratioParts=String(e.battleAspectRatio||'').split(':').map(Number),aspect=ratioParts.length===2&&ratioParts.every(Number.isFinite)&&ratioParts[0]>0&&ratioParts[1]>0?ratioParts[0]/ratioParts[1]:img.naturalWidth/img.naturalHeight,canvasW=Math.min(ww,hh*aspect),canvasH=canvasW/aspect,scaleX=canvasW/img.naturalWidth,scaleY=canvasH/img.naturalHeight,bounds=spriteAlphaBounds(img),drawW=bounds.w*scaleX,drawH=bounds.h*scaleY,drawX=xx+(ww-drawW)/2,drawY=yy+hh-drawH;spriteVisibleW=drawW;spriteVisibleH=drawH;spriteCenterY=drawY+drawH/2;ctx.drawImage(img,bounds.x,bounds.y,bounds.w,bounds.h,drawX,drawY,drawW,drawH)}
  ctx.restore();
