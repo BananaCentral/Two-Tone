@@ -1643,14 +1643,9 @@ function drawBattleShot(t,shot){const reverse=shotWorld(shot)==='reverse',area=B
  const shade=ctx.createLinearGradient(0,565,0,900);shade.addColorStop(0,'rgba(12,12,26,0)');shade.addColorStop(1,'rgba(5,10,25,.52)');rect(0,555,W,345,shade);
 }
 function drawCameraStage(t){prepareCamera(t);
- // Keep one scene active at a time. A brief dimming masks the forward/reverse
- // view cut without double-rendering actors, targets, or combat effects.
- const p=camera.progress,worldChanged=shotWorld(camera.from)!==shotWorld(camera.shot);
- if(worldChanged&&p<1){
-  drawBattleShot(t,p<.5?camera.from:camera.shot);
-  const veil=(p<.5?smooth01(p*2):smooth01((1-p)*2))*.28;
-  if(veil>0){ctx.save();ctx.fillStyle=`rgba(5,9,20,${veil})`;ctx.fillRect(0,0,W,H);ctx.restore()}
- }else drawBattleShot(t,camera.shot);
+ // Render the destination scene continuously. Ease its pan into place without
+ // flashing the previous view or laying a dark veil over party selection.
+ drawBattleShot(t,camera.shot);
  // Camera test labels are shown in the HUD; no obscured scene banners.
 }
 
