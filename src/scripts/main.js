@@ -1430,7 +1430,7 @@ function cameraShot(t=performance.now()){
  if(phase==='enemy')return 'enemy-windup';
  if(phase==='resolve'&&fx){const dt=t-fx.at;
   if(fx.kind==='support')return fx.targetAllyId?'ally-impact':'command';
-  if(fx.kind==='enemy')return dt<420?'enemy-windup':fx.hits?.length>1?'party':'enemy-impact';
+  if(fx.kind==='enemy')return dt<420?'enemy-windup':'enemy-impact';
   if(fx.kind==='ultimate')return dt<350?'ultimate-intro':dt<610?'attack-track':'attack-impact';
   return dt<(fx.kind==='basic'&&fx.actor==='zero'?460:350)?'attack-track':'attack-impact';
  }
@@ -1535,6 +1535,12 @@ function cameraAllyPosition(id,view){
  // 'safe' slot above the party HUD. The HUD pass paints OVER the actor's lower body.
  // This is a presentation-only change. No world-space targeting mechanics depend on it.
  return {x:211,baseY:908,w:288,h:576};
+}
+function allyHudFxPosition(id){
+ const index=party.findIndex(p=>p.id===id);if(index<0)return null;
+ const cardW=248,gap=12,total=party.length*cardW+Math.max(0,party.length-1)*gap;
+ const x=Math.max(16,Math.round((1060-total)/2))+index*(cardW+gap);
+ return {x:x+cardW/2,y:688};
 }
 function drawUnit(p,pos,view,t,acting=false){
  if(!p||!pos)return;const {x,baseY,w,h}=pos,top=baseY-h;
@@ -1691,12 +1697,12 @@ function drawFx(t){
  }
  if(fx.kind==='enemy'){
   const view=camera.shot==='party'?'party':'command',pan=view==='party'?.32:.52,hits=fx.hits?.length?fx.hits:[{target:fx.target}];
-  for(const hit of hits){const pos=cameraAllyPosition(hit.target,view);if(!pos)continue;const x=pos.x+pos.w/2+camera.currentX*pan,y=pos.baseY-pos.h*.58;ctx.save();ctx.globalAlpha=fade;
+  for(const hit of hits){const hudHit=hits.length>1&&view!=='party',pos=hudHit?allyHudFxPosition(hit.target):cameraAllyPosition(hit.target,view);if(!pos)continue;const x=hudHit?pos.x:pos.x+pos.w/2+camera.currentX*pan,y=hudHit?pos.y:pos.baseY-pos.h*.58;ctx.save();ctx.globalAlpha=fade;
    if(fx.visual==='enemy-slime-acid'){ctx.fillStyle='#a8ff9d';ctx.strokeStyle='#ecffbc';for(let i=0;i<4;i++){ctx.beginPath();ctx.arc(x-30+i*20,y-5-Math.sin(i+q*6)*18,10+i%2*3,0,Math.PI*2);ctx.fill();ctx.lineWidth=2;ctx.stroke()}}
    else if(fx.visual==='slime-leader-blast'){drawCombatSigil(x,y,33+q*48,'#a9ff54',fade,'ring');for(let i=0;i<5;i++){ctx.fillStyle=i%2?'#caff78':'#82e62d';const a=i*Math.PI*2/5+q*2;ctx.beginPath();ctx.arc(x+Math.cos(a)*(35+q*15),y+Math.sin(a)*(34+q*14),8,0,Math.PI*2);ctx.fill()}}
    else if(fx.visual==='slime-monster-wave'){drawCombatSigil(x,y,65+q*100,'#8fe328',fade,'ring');ctx.fillStyle='#b7ff4c';for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(x-26+i*26,y-34-Math.sin(i+q*5)*18,10,0,Math.PI*2);ctx.fill()}}
    else{ctx.strokeStyle='#ff8997';ctx.lineWidth=11;ctx.lineCap='round';for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(x-54+i*15,y-66);ctx.lineTo(x+45+i*15,y+55);ctx.stroke()}}
-   ctx.restore();if(dt>100){const damage=hit.healthDamage??hit.damage??fx.damage;if(damage>0)text('-'+damage,x,y-65,34,hit.critical?'#ffd66e':'#ff9d9e','900','center');else if(hit.shieldDamage>0)text('BLOCKED',x,y-65,20,'#b6efff','900','center');if(hit.critical)text('CRITICAL',x,y-96,14,'#ffe9a9','900','center')}}return;
+   ctx.restore();if(dt>100){const labelY=hudHit?y+34:y-65,damage=hit.healthDamage??hit.damage??fx.damage;if(damage>0)text('-'+damage,x,labelY,26,hit.critical?'#ffd66e':'#ff9d9e','900','center');else if(hit.shieldDamage>0)text('BLOCKED',x,labelY,17,'#b6efff','900','center');if(hit.critical)text('CRITICAL',x,hudHit?y+12:y-96,12,'#ffe9a9','900','center')}}return;
  }
  const targetIds=fx.targetEnemyIds?.length?fx.targetEnemyIds:[fx.targetEnemyId],targets=targetIds.map(id=>enemyVisualPosition(id,fx.targetGeometry)).filter(Boolean);
  if(!targets.length){const p=enemyVisualPosition(fx.targetEnemyId,fx.targetGeometry);if(p)targets.push(p)}

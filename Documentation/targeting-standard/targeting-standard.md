@@ -16,6 +16,8 @@ Target selection policy is separate from target shape. For example, an automated
 
 Enemy Basic Attacks use the same `single`, `blast`, and `aoe` shapes against living allies. Single selects one random living ally. Blast selects a random living ally as the primary target and also hits living allies in the immediately adjacent party formation slots, up to three total. AoE hits every living ally. Each target receives the full attack unless the ability explicitly defines divided damage.
 
+- Reserve the party camera for ally-target selection and support targeting. Multi-ally enemy attacks remain in the enemy impact scene and show each target's damage over their battle card.
+
 ## Ally support targeting
 
 - A targeted support action enters selection after the ability is chosen, matching the enemy-target flow.
