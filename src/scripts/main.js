@@ -942,7 +942,6 @@ function nextTurn(){
  if(!alive().length){phase='defeat';return}
  syncTurnTimeline();const nextEvent=turnTimeline.take();if(!nextEvent)return;
  syncLegacyGauges();const next=nextEvent.id;
- const previousActor=activeId||actingEnemyId||enemies[Math.floor(enemies.length/2)]?.id||null;
  turn++;
  const actingSummon=summons.find(s=>s.id===next&&s.mode==='independent');
  if(actingSummon){executeIndependentSummonTurn(actingSummon);return;}
@@ -953,7 +952,7 @@ function nextTurn(){
  if(attacking?.debuffs)attacking.debuffs=attacking.debuffs.map(d=>({...d,turns:d.turns-1})).filter(d=>d.turns>0);
  if(attacking){activeId=null;zeroSkillArmed=false;pendingTargetAction=null;actingEnemyId=next;cameraPreview=null;phase='enemy';log=`${attacking.name} prepares an attack.`;
   schedule(()=>{if(phase!=='enemy'||paused)return;if(attacking.hp<=0){nextTurn();return}const candidates=alive();if(!candidates.length){cancelAllQueuedUltimates('defeat');phase='defeat';return}enemyCount++;const attack=resolveEnemyBasicAttack(attacking,candidates),firstHit=attack.hits[0];ageTaunt(attacking);saveVitals();cancelQueuedUltimatesOfDefeated();const visual=ENEMY_ACTION_VISUALS[attacking.archetypeId]?.basic||ENEMY_ACTION_VISUALS.slime.basic;fx={kind:'enemy',visual,at:performance.now(),damage:firstHit.damage,target:firstHit.target,hits:attack.hits,actorEnemyId:attacking.id};log=attack.enhanced?`${attacking.name} uses Slimy against all allied characters.`:attack.mode==='aoe'?`${attacking.name} attacks all allied characters for ${firstHit.damage} damage each.`:attack.mode==='blast'?`${attacking.name} blasts ${attack.hits.length} allied characters.`:`${attacking.name} hits ${party.find(p=>p.id===firstHit.target)?.name||'an ally'} for ${firstHit.damage}.`;phase='resolve';schedule(()=>drainUltimateQueueBefore(()=>{if(!alive().length){phase='defeat';log='All allied characters were defeated.'}else nextTurn()}),1000)},780);
- }else{actingEnemyId=null;activeId=next;zeroSkillArmed=false;pendingTargetAction=null;cameraPreview=null;turnCamera={fromId:previousActor,toId:next,start:performance.now(),duration:560};phase='player';log=`${active().name}'s turn — select an ability, then choose an enemy.`;}
+ }else{actingEnemyId=null;activeId=next;zeroSkillArmed=false;pendingTargetAction=null;cameraPreview=null;phase='player';log=`${active().name}'s turn — select an ability, then choose an enemy.`;}
 }
 // Normal turns can use Basic or Skill. Ultimate is off-turn and never spends a turn.
 function play(action){
@@ -1382,8 +1381,7 @@ function combatEnemies(){return liveEnemies()}
 // New reverse-view arena geometry and test-slot silhouettes are development placeholders.
 let cameraPreview=null,selectedAllyId=null,devPanelOpen=false;
 // Review-only HUD arrangement. Developer controls are hidden until explicitly opened.
-let turnCamera={fromId:null,toId:null,start:-1e6,duration:560};
-const camera={shot:'command',from:'command',start:performance.now(),duration:470,lastX:0,mode:'command',parallax:{},focus:null};
+const camera={shot:'command',from:'command',start:performance.now(),duration:250,lastX:0,mode:'command',parallax:{},focus:null};
 function smooth01(x){x=Math.max(0,Math.min(1,x));return x*x*(3-2*x)}
 function clamp01(x){return Math.min(1,Math.max(0,x))}
 // Zero's user-approved basic-attack assembly: 256×512 neutral + wind-up + slash.
@@ -1428,7 +1426,7 @@ function dxFor(relative,width){return relative*width}
 function cameraShot(t=performance.now()){
  if(phase==='setup'||phase==='intro'||phase==='victory'||phase==='defeat')return 'command';
  if(cameraPreview==='party'&&pendingTargetAction?.targetSide==='ally'&&!paused)return 'party';
- if(phase==='player')return cameraPreview==='party'?'party':cameraPreview==='target'?'target':(t-turnCamera.start<turnCamera.duration?'turn-transition':'command');
+ if(phase==='player')return cameraPreview==='party'?'party':cameraPreview==='target'?'target':'command';
  if(phase==='enemy')return 'enemy-windup';
  if(phase==='resolve'&&fx){const dt=t-fx.at;
   if(fx.kind==='support')return 'party';
@@ -1436,6 +1434,9 @@ function cameraShot(t=performance.now()){
   if(fx.kind==='ultimate')return dt<350?'ultimate-intro':dt<610?'attack-track':'attack-impact';
   return dt<(fx.kind==='basic'&&fx.actor==='zero'?460:350)?'attack-track':'attack-impact';
  }
+ // Animation lifetimes can end a frame before their resolution timers. Keep the
+ // last combat camera until the action actually advances instead of flashing command.
+ if(phase==='resolve'&&!fx)return camera.shot==='command'?'attack-impact':camera.shot;
  return 'command';
 }
 function shotPan(s){
@@ -1443,10 +1444,10 @@ function shotPan(s){
  if(s==='target')return Math.max(-88,Math.min(23,-35-(tgt?(tgt.x-1040)*.115:0)));
  if(s==='enemy-windup')return Math.max(-104,Math.min(30,-47-(att?(att.x-1040)*.14:0)));
  if(s==='attack-impact'||s==='attack-track')return Math.max(-110,Math.min(26,-30-(tgt?(tgt.x-1040)*.09:0)));
- return ({command:0,'turn-transition':-36,party:34,'enemy-impact':28,'ultimate-intro':-86})[s]||0
+ return ({command:0,party:34,'enemy-impact':28,'ultimate-intro':-86})[s]||0
 }
 function shotWorld(s){return s==='party'?'reverse':'forward'}
-function prepareCamera(t){const s=cameraShot(t);const focus=s==='target'?chosenEnemy()?.id:s==='enemy-windup'?actingEnemyId:s==='attack-impact'||s==='attack-track'?fx?.targetEnemyId:null;if(s!==camera.shot||focus!==camera.focus){camera.from=camera.shot;camera.shot=s;camera.focus=focus;camera.start=t;camera.duration=(shotWorld(s)!==shotWorld(camera.from)?480:350);camera.lastX=camera.currentX??shotPan(camera.from)}
+function prepareCamera(t){const s=cameraShot(t);const focus=phase==='resolve'&&!fx?camera.focus:s==='target'?chosenEnemy()?.id:s==='enemy-windup'?actingEnemyId:s==='attack-impact'||s==='attack-track'?fx?.targetEnemyId:null;if(s!==camera.shot||focus!==camera.focus){camera.from=camera.shot;camera.shot=s;camera.focus=focus;camera.start=t;camera.duration=(shotWorld(s)!==shotWorld(camera.from)?300:250);camera.lastX=camera.currentX??shotPan(camera.from)}
  camera.mode=shotWorld(camera.shot);
  camera.progress=smooth01((t-camera.start)/camera.duration);
  camera.currentX=camera.lastX+(shotPan(camera.shot)-camera.lastX)*camera.progress;
@@ -1607,18 +1608,11 @@ function drawActorsForShot(t,shot){
  }
  const ultimateActor=(pendingTargetAction?.action==='ultimate'&&party.find(p=>p.id===pendingTargetAction.actorId))||(ultimateExecuting&&lastAttack?.action==='ultimate'&&party.find(p=>p.id===lastAttack.actor));
  const chosen=ultimateActor|| (shot==='enemy-impact'?(party.find(p=>p.id===fx?.target)||active()||alive()[0]):active()||alive()[0]);
- if(shot==='turn-transition'){
-  const q=smooth01((t-turnCamera.start)/turnCamera.duration),old=party.find(p=>p.id===turnCamera.fromId);
-  drawEnemy(t,shot);
-  if(old&&old.id!==chosen?.id){ctx.save();ctx.globalAlpha=1-q;drawUnit(old,{...cameraAllyPosition(old.id,'command'),x:cameraAllyPosition(old.id,'command').x-110*q},'command',t,false);ctx.restore()}
-  if(chosen){ctx.save();ctx.globalAlpha=q;drawUnit(chosen,{...cameraAllyPosition(chosen.id,'command'),x:cameraAllyPosition(chosen.id,'command').x+110*(1-q)},'command',t,true);ctx.restore()}
-  return;
- }
  const pos=cameraAllyPosition(chosen?.id,'command');
  if(chosen&&pos){
   // True tracked character travel is independent of the background-layer camera offsets.
   const dt=fx?.kind!=='enemy'&&fx?.actor===chosen.id?t-fx.at:9999;
-  const travel=(shot==='attack-track'||shot==='attack-impact')?Math.sin(Math.PI*clamp01(dt/1120))*180:0;
+  const travel=(shot==='attack-track'||shot==='attack-impact')?Math.sin(Math.PI*clamp01(dt/900))*180:0;
   // Enemies are in the midground; render them first, then the close foreground ally.
   drawEnemy(t,shot);
   drawUnit(chosen,(chosen.id==='zero'&&zeroBasicStage(t)!==null)?zeroBasicTravel(t,pos):{...pos,x:pos.x+travel,baseY:pos.baseY-travel*.18},'command',t,phase==='player'&&cameraPreview!=='target');
@@ -1649,11 +1643,14 @@ function drawBattleShot(t,shot){const reverse=shotWorld(shot)==='reverse',area=B
  const shade=ctx.createLinearGradient(0,565,0,900);shade.addColorStop(0,'rgba(12,12,26,0)');shade.addColorStop(1,'rgba(5,10,25,.52)');rect(0,555,W,345,shade);
 }
 function drawCameraStage(t){prepareCamera(t);
- // View changes are cuts with a short masked dissolve. Within the same view, cameraX is eased.
- const p=camera.progress;
- if(shotWorld(camera.from)!==shotWorld(camera.shot)&&p<.82){
-  drawBattleShot(t,camera.from);ctx.save();ctx.globalAlpha=smooth01(p/.82);drawBattleShot(t,camera.shot);ctx.restore();
- }else drawBattleShot(t,camera.shot);
+ // Keep one scene active at a time. A brief dimming masks the forward/reverse
+ // view cut without double-rendering actors, targets, or combat effects.
+ const p=camera.progress,worldChanged=shotWorld(camera.from)!==shotWorld(camera.shot);
+ if(worldChanged&&p<1){
+  drawBattleShot(p<.5?camera.from:camera.shot);
+  const veil=(p<.5?smooth01(p*2):smooth01((1-p)*2))*.28;
+  if(veil>0){ctx.save();ctx.fillStyle=`rgba(5,9,20,${veil})`;ctx.fillRect(0,0,W,H);ctx.restore()}
+ }else drawBattleShot(camera.shot);
  // Camera test labels are shown in the HUD; no obscured scene banners.
 }
 

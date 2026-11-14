@@ -17,6 +17,14 @@ Resolve battle actions in visible phases so players can follow the acting charac
 - Show damage near each affected target and preserve the event order in the battle log.
 - This timing applies to chains of actions and triggered effects. It does not add an artificial pause between separate targets hit as part of one AoE action.
 
+## Camera and scene transitions
+
+- Keep the camera on the current combat shot until the action and its queued effects finish. An animation ending a frame before combat resolution must not reveal the command view or another screen.
+- Ease camera changes within the same view over 250 ms. Complete ally movement before returning the character to their resting position; never snap them home when the action ends.
+- When changing between forward and reverse battlefield views, show one scene at a time and mask the cut with a brief 300 ms dimmed transition. Do not cross-render both scenes, since this duplicates characters, targets, and effects.
+- A new turn must not run an additional ally entrance animation while the previous action is still resolving.
+- Keep the selected target and action focus stable through resolution. Change camera focus only when the next actual action or target selection begins.
+
 ## Lily and Soul example
 
 When Lily attacks Ricochet-marked enemies and Soul has a Follow-up available, display and resolve: Lily's initial attack, Lily's Ricochet True damage, then Soul's Follow-up True damage. Leave at least 500 ms between the Ricochet and Soul phases.
