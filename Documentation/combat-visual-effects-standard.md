@@ -32,9 +32,11 @@ This standard defines how combat actions and passive effects receive readable, c
 | Dawn | Skill / Tune | Teal note symbols and rings on the selected ally |
 | Dawn | Ultimate | Gold advance rings and energy trail on the selected ally |
 | Slime | Basic | Green acid globules on affected allies |
+| Slime Leader | Basic / blast | Bright green globules and an expanding target ring on each ally in the blast |
+| Slime Monster | Basic / AoE | Wide green shockwave with slime motes across the allied formation |
 | Wolf | Basic | Three red claw strokes on affected allies |
 
-The visual registry is implemented in `src/scripts/main.js` as `ACTION_VISUALS` and the combat visual drawing helpers. Keep the registry, rendering behavior, and this table aligned when adding or changing a character.
+The character and enemy visual registries are implemented in `src/scripts/main.js` as `ACTION_VISUALS` and `ENEMY_ACTION_VISUALS`, with the combat visual drawing helpers. Keep the registries, rendering behavior, and this table aligned when adding or changing an action.
 
 ## Rendering and gameplay boundary
 

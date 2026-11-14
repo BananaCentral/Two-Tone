@@ -47,7 +47,7 @@ function validateConfig(config) {
       assert((critical.rate===undefined||(Number.isFinite(critical.rate)&&critical.rate>=0))&&(critical.damage===undefined||(Number.isFinite(critical.damage)&&critical.damage>=0)),'Critical rate and damage must be finite non-negative values.');
       assert([instance.criticalRateBonus,archetype.criticalRateBonus,instance.criticalDamageBonus,archetype.criticalDamageBonus].every(value=>value===undefined||(Number.isFinite(value)&&value>=0)),'Critical bonuses must be finite non-negative values.');
       assert(archetype.basic && Number.isFinite(archetype.basic.multiplier) && ['physical', 'magical', 'true'].includes(archetype.basic.damageType), 'Archetype ' + instance.archetype + ' needs a typed Basic Attack.');
-      assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage', 'exposed', 'resourceful'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
+      assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage', 'exposed', 'resourceful', 'residue', 'lethalImpact'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
       for (const passive of archetype.passives || []) {
         if (passive.type === 'everyNthBasic') assert(Number.isInteger(passive.every) && passive.every > 0, 'everyNthBasic needs a positive integer interval.');
         if (passive.type === 'followUp') assert(Number.isFinite(passive.multiplier) && passive.multiplier >= 0, 'followUp needs a non-negative multiplier.');
@@ -123,6 +123,8 @@ function instantiate(config, side) {
       barrier: side === 'enemies' ? roundStat(stats.hp * (instance.barrierPercent ?? archetype.barrierPercent ?? 0.2)) : 0,
       barrierPercent: instance.barrierPercent ?? archetype.barrierPercent ?? 0.2,
       brokenTurns: 0,
+      residueStacks: 0,
+      residueTurns: 0,
       debuffs: [],
       marks: [],
       barriersBroken: 0,
@@ -165,7 +167,8 @@ function defenseValue(unit, type) {
 function damageFor(attacker, target, type, multiplier) {
   const attack = attackValue(attacker, type);
   if (attack <= 0) return 0;
-  const ignore=Math.min(1,Math.max(0,attacker.tune?.defenseIgnore||0)),physicalDefense=target.stats.physicalDefense*(1-ignore),magicalDefense=target.stats.magicalDefense*(1-ignore);
+  const lethalImpact=attacker.passives.find(passive=>passive.type==='lethalImpact')?.defenseIgnore||0;
+  const ignore=Math.min(1,Math.max(0,(attacker.tune?.defenseIgnore||0)+lethalImpact)),resistance=Math.max(0,1-(target.residueStacks||0)*.05),physicalDefense=target.stats.physicalDefense*resistance*(1-ignore),magicalDefense=target.stats.magicalDefense*resistance*(1-ignore);
   let reduction;
   if (type === 'true') {
     const physicalAttack=attackValue(attacker,'physical'),magicalAttack=attackValue(attacker,'magical');
@@ -234,7 +237,7 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
   const hits = [];
   for (const target of targets) {
     const hpBefore = target.hp;
-    const baseDamage = damageFor(attacker, target, spec.damageType, options.multiplier ?? spec.multiplier);
+    const baseDamage = damageFor(attacker, target, spec.damageType, (options.multiplier ?? spec.multiplier)*(1-(attacker.residueStacks||0)*.05));
     const roll=rollCritical(state,attacker,baseDamage),damage = roundStat(roll.damage*(1-(target.tune?.damageReduction||0)) * (target.side === 'enemies' && target.brokenTurns > 0 ? 1.5 : 1));
     target.hp = Math.max(0, target.hp - damage);
     const hpDamage=Math.min(hpBefore,damage);
@@ -260,6 +263,11 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
   if (targets.length > 1) attacker.aoeCount++;
   return hits;
 }
+function applyResidue(attacker,targets){
+ if(!attacker.passives.some(passive=>passive.type==='residue'))return;
+ for(const target of targets){if(target.hp<=0)continue;target.residueStacks=Math.min(5,(target.residueStacks||0)+1);target.residueTurns=2}
+}
+function ageResidue(unit){if(!unit.residueStacks)return;unit.residueTurns--;if(unit.residueTurns<=0){unit.residueStacks=0;unit.residueTurns=0}}
 function triggerFollowUps(state, sourceId, sourceActorId, affectedTargets) {
   const targets = [...new Set(affectedTargets.filter(target => target.hp > 0))];
   if (!targets.length) return;
@@ -404,6 +412,7 @@ function resolveEnemyAction(state, actor) {
     }
   }
   const hits = runAttack(state, actor, targets, basic, { targetMode, multiplier });
+  applyResidue(actor,hits.map(hit=>hit.target));
   if (rampage && hits.some(hit => hit.damage > 0)) rampage.stacks = Math.min(rampage.maxStacks, (rampage.stacks || 0) + 1);
 }
 function simulateBattle(config, seed = 1, maxActionsOverride = null) {
@@ -441,6 +450,7 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
     if (actor.side === 'allies') {
       state.allyTurns++;
       resolveAllyAction(state, actor);
+      ageResidue(actor);
     } else {
       state.enemyTurns++;
       if (actor.brokenTurns > 0) {

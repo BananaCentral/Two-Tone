@@ -34,4 +34,4 @@ Category classifies an enemy's encounter role. It does not itself define stat mu
 
 ## Current roster
 
-Slime and Wolf are the currently defined Common enemies. Every wave instance receives the validated category from its enemy archetype. The five formation slots define placement only. No Elite or Boss enemy is currently defined, so the category caps apply when those archetypes are added. The training encounter defaults to a mixed roster beginning with Wolf and can be set directly to Slime, Wolf, or Mixed in Battle Test Options.
+Slime and Wolf are Common enemies, Slime Leader is Elite, and Slime Monster is a Boss. Every wave instance receives the validated category and health-bar count from its enemy archetype. The training encounter can be set to Slime, Wolf, Mixed, Slime Leader, or Slime Monster in Battle Test Options. Slime Leader waves include at most five Leaders, with remaining slots filled by Common Slimes. Slime Monster waves include one Boss, with remaining slots filled by Common Slimes.

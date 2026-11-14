@@ -25,7 +25,7 @@
       "level": 1,
       "stats": { "hp": 100, "physicalAttack": 0, "magicalAttack": 30, "physicalDefense": 4, "magicalDefense": 4, "speed": 30 },
       "basic": { "damageType": "magical", "multiplier": 1, "target": "single", "energyGain": 10, "skillPointGain": 0 },
-      "skill": { "type": "ricochet", "damageType": "magical", "multiplier": 1, "target": "aoe", "energyGain": 20, "markTurns": 2 },
+      "skill": { "type": "ricochet", "damageType": "magical", "multiplier": 0.5, "target": "aoe", "energyGain": 20, "markTurns": 2 },
       "ultimate": { "damageType": "magical", "multiplier": 1, "target": "aoe", "energyCost": 100 },
       "passives": [{ "type": "exposed", "defenseReduction": 0.1, "duration": 2 }],
       "weapon": { "type": "standard", "potential": 1 },
@@ -53,6 +53,22 @@
       "stats": { "hp": 100, "physicalAttack": 0, "magicalAttack": 20, "physicalDefense": 4, "magicalDefense": 8, "speed": 20 },
       "basic": { "damageType": "magical", "multiplier": 1, "target": "random" },
       "passives": [{ "type": "everyNthBasic", "id": "slimy", "every": 3, "damageBonus": 0.25, "target": "aoe" }]
+    },
+    "slimeLeader": {
+      "name": "Slime Leader",
+      "level": 1,
+      "barrierPercent": 0.2,
+      "stats": { "hp": 200, "physicalAttack": 0, "magicalAttack": 40, "physicalDefense": 8, "magicalDefense": 16, "speed": 40 },
+      "basic": { "damageType": "magical", "multiplier": 1, "target": "blast" },
+      "passives": [{ "type": "residue", "maxStacks": 5 }]
+    },
+    "slimeMonster": {
+      "name": "Slime Monster",
+      "level": 1,
+      "barrierPercent": 0.2,
+      "stats": { "hp": 300, "physicalAttack": 0, "magicalAttack": 60, "physicalDefense": 12, "magicalDefense": 24, "speed": 60 },
+      "basic": { "damageType": "magical", "multiplier": 1, "target": "aoe" },
+      "passives": [{ "type": "lethalImpact", "defenseIgnore": 0.25 }]
     }
   },
   "teams": {

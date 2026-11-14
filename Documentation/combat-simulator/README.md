@@ -46,19 +46,21 @@ Supported Skill and Passive effect types:
 - `exposed`: applies Lily's defense-reduction mark after her Skill, Ultimate, and Hauntling attacks. Each stack scales the target's damage reduction by 0.9; Lily Duplicate 2 can maintain two stacks for three turns.
 - `resourceful`: Dawn's passive adds 2 to the shared Skill Point cap and starts the party with 2 extra Skill Points.
 - `tune`: models Dawn's single-ally Skill, enhanced next Basic, Skill Point recovery, stat and defense effects, Premium weapon duplicates, and her support Ultimate. The simulator targets Soul with Tune when present; otherwise it targets the living ally with the strongest Basic. It advances only that selected ally for Tune and Ultimate.
+- `residue`: the Slime Leader's blast applies a two-turn stack to each ally it damages. Each stack lowers that ally's defenses and damage dealt by 5%, to a maximum of five stacks.
+- `lethalImpact`: the Slime Monster ignores 25% of both defenses on its AoE magical attack.
 
 Lily's Ultimate creates an independent Hauntling after its initial AoE. It acts immediately, then takes two more scheduled turns, dealing AoE True damage with Lily's stats. Duplicate 1 applies a one-turn 10% enemy damage reduction; Duplicate 3 doubles initial Ultimate damage and adds a Hauntling turn. Lily's Premium weapon effects are not modeled.
 
 
 Soul's `characterDuplicates` field (0–4) enables his four character Duplicate effects. With a Premium weapon, potential levels 2–5 correspond to weapon duplicates 1–4. Soul's Premium weapon refunds one shared Skill Point per three Enhance points spent, starting at Potential 1. The simulator models this effect, Soul's configured character and weapon duplicates (including Duplicate 2's critical bonuses), and configured Celestial levels. Dawn's `characterDuplicates` and Premium weapon potential model her Tune upgrades; weapon potentials 2–5 map to Premium Duplicates 1–4.
 
-The [Dawn team example](example-dawn-party-vs-slime.json) demonstrates her Resourceful passive, Tune, and support Ultimate alongside Soul and Lily.
+The [Dawn team example](example-dawn-party-vs-slime.json) demonstrates her Resourceful passive, Tune, and support Ultimate alongside Soul and Lily. It also defines the Slime Leader and Slime Monster archetypes so their stats and attack/passive behavior can be selected in a scenario.
 
 ## Output
 
 The automated policy uses a ready Ultimate before that ally's next turn action, spends available shared Skill Points on Soul's Enhance, uses Lily's Ricochet Skill when a Skill Point is available, and has allies focus the lowest-HP enemy for single-target attacks. Enemies choose a random living ally. The batch summary reports win rate, average action counts, damage, Skill uses, Follow Ups, Ultimates, AoE attacks, and surviving unit counts. `averageAllyDps` is allied damage divided by elapsed simulator time; one time unit follows the Speed rate formula and is not a real second. `averageUnitStats` contains average damage, turns, and damage per simulator time unit by archetype. A battle reaching its action limit is counted as a draw.
 
-Blast includes the primary target and enemies in adjacent formation slots, up to three total. AoE hits all living enemies. The simulator uses the game's stat scaling, typed damage reduction, follow-up distribution, shared Skill Point rules, and Speed rate formula. It schedules turns by each unit's rate and does not model canvas presentation, random encounter reinforcements, general action advance/delay effects, or status effects that are not represented by the supported ability handlers. Dawn's configured Ultimate and Premium Duplicate 3 advance its selected ally. Keep scenario archetypes aligned with the approved character and enemy sheets. Soul's Enhanced Basic uses Blast targeting, except Premium Weapon Duplicate 3 changes it to AoE; Ultimate uses AoE.
+Blast includes the primary target and enemies in adjacent formation slots, up to three total; enemy Blast targets adjacent allies. AoE hits all living targets. The simulator uses the game's stat scaling, typed damage reduction, follow-up distribution, shared Skill Point rules, and Speed rate formula. It schedules turns by each unit's rate and does not model canvas presentation, random encounter reinforcements, general action advance/delay effects, or status effects that are not represented by the supported ability handlers. Dawn's configured Ultimate and Premium Duplicate 3 advance its selected ally. Keep scenario archetypes aligned with the approved character and enemy sheets. Soul's Enhanced Basic uses Blast targeting, except Premium Weapon Duplicate 3 changes it to AoE; Ultimate uses AoE.
 
 ## Enemy Barriers
 

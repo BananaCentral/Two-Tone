@@ -16,11 +16,11 @@ Deal Magical damage at a 1.0× multiplier and restore 10 Energy. It does not res
 
 ## Skill: Ricochet
 
-Costs 1 party Skill Point, restores 20 Energy, and deals AoE Magical damage at 1.0×. Enemies hit receive a Ricochet mark for two enemy turns. When any ally or summon damages an enemy with Ricochet, every living Ricochet-marked enemy takes additional True damage equal to 10% of the triggering hit's damage. Each action instance can trigger a given mark once. Lily Duplicate 4 triggers twice per action; the second hit is half strength. Mark trigger history expires with the mark.
+Costs 1 party Skill Point, restores 20 Energy, and deals AoE Magical damage at a 0.5× multiplier. Enemies hit receive a Ricochet mark for two enemy turns. When any ally or summon damages an enemy with Ricochet, every living Ricochet-marked enemy takes additional True damage equal to 10% of the triggering hit's damage. Each action instance can trigger a given mark once. Lily Duplicate 4 triggers twice per action; the second hit is half strength. Mark trigger history expires with the mark.
 
 ## Ultimate: Haunting
 
-Costs 100 Energy and deals AoE Magical damage at 1.0×. It summons an independent Hauntling immediately after the attack. The Hauntling deals AoE True damage at 1.0× on its immediate first turn and its next two scheduled turns, then expires. Its damage applies Exposed and can trigger Ricochet. Lily Duplicate 1 also reduces damage dealt by hit enemies by 10% for their next turn. Lily Duplicate 3 doubles the Ultimate's initial damage and grants the Hauntling one additional turn.
+Costs 100 Energy and deals AoE Magical damage at a 1.0× multiplier. It summons an independent Hauntling immediately after the attack. The Hauntling deals AoE True damage at 1.0× on its immediate first turn and its next two scheduled turns, then expires. Its damage applies Exposed and can trigger Ricochet. Lily Duplicate 1 also reduces damage dealt by hit enemies by 10% for their next turn. Lily Duplicate 3 doubles the Ultimate's initial damage and grants the Hauntling one additional turn.
 
 ## Character duplicates
 
