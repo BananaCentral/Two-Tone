@@ -21,6 +21,7 @@ Enemy Basic Attacks use the same `single`, `blast`, and `aoe` shapes against liv
 - A targeted support action enters selection after the ability is chosen, matching the enemy-target flow.
 - Ally-target selection uses the dedicated party camera and shows the full party formation together against the area's reverse battle background. Keep this scene distinct from the single-ally command view.
 - Switch directly to the destination scene and ease the camera pan into place; do not flash the prior scene or overlay a dark transition veil during target selection.
+- Keep party view only while ally selection or a support visual is active. When that visual ends, do not reuse the stale party shot while waiting for the next turn.
 - A support action that affects all living allies uses two-step confirmation. The first ability press opens the party view and highlights every living ally.
 - The player confirms a party-wide support action by tapping any highlighted ally or pressing that same ability button again. Either confirmation applies the effect to the full eligible party; the tapped ally does not become the sole target.
 - Validate Skill Point cost before entering confirmation and again before applying the action. Choosing another action or canceling clears the pending confirmation.

@@ -1434,9 +1434,10 @@ function cameraShot(t=performance.now()){
   if(fx.kind==='ultimate')return dt<350?'ultimate-intro':dt<610?'attack-track':'attack-impact';
   return dt<(fx.kind==='basic'&&fx.actor==='zero'?460:350)?'attack-track':'attack-impact';
  }
- // Animation lifetimes can end a frame before their resolution timers. Keep the
- // last combat camera until the action actually advances instead of flashing command.
- if(phase==='resolve'&&!fx)return camera.shot==='command'?'attack-impact':camera.shot;
+ // Animation lifetimes can end a frame before their resolution timers. Keep
+ // the impact framing, but do not retain a stale party-selection shot after
+ // the support effect itself has ended.
+ if(phase==='resolve'&&!fx)return camera.shot==='party'?'command':camera.shot==='command'?'attack-impact':camera.shot;
  return 'command';
 }
 function shotPan(s){
