@@ -575,6 +575,12 @@ function beginDawnAllyTargetSelection(action,actorId){
  const actor=party.find(p=>p.id===actorId);if(!actor||actor.id!=='dawn')return false;
  if(action==='ultimate'&&!canQueueUltimate(actor)){say(actor.hp<=0?'Defeated ally cannot use an Ultimate.':'Ultimate needs '+ULTIMATE_ENERGY_COST+' available Energy.');return false}
  if(action==='skill'&&sp<1){say('Tune needs 1 Skill Point.');return false}
+ if(pendingTargetAction?.targetSide==='ally'&&pendingTargetAction.action===action&&pendingTargetAction.actorId===actorId){
+  const target=party.find(p=>p.id===selectedAllyId&&p.hp>0);
+  if(!target){say('Select a living ally before confirming this action.');return false}
+  pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;
+  return action==='ultimate'?queueUltimate(actorId,target.id):executeCombatAction(actor,action,null,target.id);
+ }
  pendingTargetAction={action,actorId,targetSide:'ally'};cameraPreview='party';supportDemo=null;selectedAllyId=party.find(p=>p.hp>0&&p.id!==actorId)?.id||actorId;
  say(`Select a living ally for Dawn's ${action==='skill'?'Tune':'Ultimate'} on the field or in their portrait card.`);return true;
 }
@@ -643,7 +649,15 @@ function validateWaveComposition(wave){
  if(elites>ENCOUNTER_LIMITS.elitesPerWave)throw Error(`A wave can contain at most ${ENCOUNTER_LIMITS.elitesPerWave} Elite enemies.`);
  return wave;
 }
-function initialSlots(count){return ({1:[2],2:[1,3],3:[1,2,3],4:[0,1,3,4],5:[0,1,2,3,4]})[count].slice()}
+function initialSlots(count,bossWave=false,queuedEnemies=[]){
+ if(!bossWave)return ({1:[2],2:[1,3],3:[1,2,3],4:[0,1,3,4],5:[0,1,2,3,4]})[count].slice();
+ const middle=[2],sides=[1,3],outer=[0,4],fallback=[0,4,1,3],used=new Set();
+ return queuedEnemies.slice(0,count).map(enemy=>{
+  const preferred=enemy.category==='boss'?middle:enemy.category==='elite'?sides:outer;
+  const slot=preferred.shift()??fallback.find(candidate=>!used.has(candidate));used.add(slot);
+  return slot;
+ });
+}
 function canDeployEnemy(enemy){
  if(!enemy||enemies.length>=ENCOUNTER_LIMITS.enemiesOnField)return false;
  const eliteCount=enemies.filter(e=>e.category==='elite'&&e.hp>0).length,bossOnField=enemies.some(e=>e.category==='boss'&&e.hp>0);
@@ -664,9 +678,9 @@ function enterEnemy(slot){
 }
 function beginWave(index){saveVitals();
  if(index>=wavePlan.length){encounterCleared=true;enemies=[];selectedEnemyId=null;syncEnemyHp();return;}
- waveIndex=index;waveQueue=[...wavePlan[index]];waveKills=0;enemies=[];actingEnemyId=null;pendingVacancies=[];
+ const categoryOrder={boss:0,elite:1,common:2};waveIndex=index;waveQueue=[...wavePlan[index]].sort((a,b)=>categoryOrder[a.category]-categoryOrder[b.category]||a.order-b.order);waveKills=0;enemies=[];actingEnemyId=null;pendingVacancies=[];
  const initialCount=Math.min(ENCOUNTER_LIMITS.enemiesOnField,waveQueue.length);
- for(const slot of initialSlots(initialCount))enterEnemy(slot);
+ const bossWave=wavePlan[index].some(enemy=>enemy.category==='boss');for(const slot of initialSlots(initialCount,bossWave,waveQueue))enterEnemy(slot);
  const count=enemies.length;
  selectedEnemyId=enemies[Math.floor(enemies.length/2)]?.id||null;
  syncEnemyHp();
@@ -1474,7 +1488,7 @@ function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&pendin
  const isFocus=phase==='player'&&chosenEnemy()?.id===e.id;
  const patternHit=phase==='player'&&!!pendingTargetAction&&cameraPreview!=='party'&&chooseAttackTargets(previewTargetMode()).some(x=>x.id===e.id);
  const isActor=(shot==='enemy-windup'&&actingEnemyId===e.id)||(fx?.kind==='enemy'&&fx?.actorEnemyId===e.id&&shot==='enemy-impact');
- const sh=isActor?1.09:shot==='attack-impact'&&fx?.targetEnemyId===e.id?1.045:1;
+ const sh=(isActor?1.09:shot==='attack-impact'&&fx?.targetEnemyId===e.id?1.045:1)*(e.category==='boss'?1.55:1);
  const ww=e.w*sh,hh=e.h*sh,xx=e.x+camera.currentX*.43-(ww-e.w)/2,yy=e.y+(e.h-hh);
  const shimmer=isFocus?Math.sin(t*.004)*2:0;
  const zbHit=fx?.kind==='basic'&&fx?.actor==='zero'&&fx.targetEnemyId===e.id?t-fx.at:null;

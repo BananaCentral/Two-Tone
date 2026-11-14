@@ -20,6 +20,7 @@ Enemy Basic Attacks use the same `single`, `blast`, and `aoe` shapes against liv
 
 - A targeted support action enters selection after the ability is chosen, matching the enemy-target flow.
 - Select a living ally by tapping their battlefield sprite or HUD portrait card. The selected ally receives a visible circular outline, matching the enemy target indicator, and remains highlighted through resolution.
+- Pressing the same targeted ability again confirms the currently highlighted eligible ally. Selecting another ally changes the target; choosing another action switches the pending action.
 - Self-targeting abilities keep the acting ally selectable. Defeated allies are not valid targets unless the ability explicitly supports revival.
 
 ## Soul targeting

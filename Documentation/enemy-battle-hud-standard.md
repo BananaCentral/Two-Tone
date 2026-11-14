@@ -8,6 +8,7 @@ Enemy Critical Rate and Critical Damage are hidden combat values governed by the
 - The battle sprite asset should match its declared aspect ratio. If no ratio is defined, the renderer uses the asset's native pixel dimensions.
 - Ignore fully transparent pixels when positioning and targeting the sprite. Crop to the visible alpha bounds for rendering so transparent canvas padding cannot lift the visible artwork off the ground.
 - Preserve the declared canvas aspect ratio without stretching. Center the visible sprite horizontally and align its visible bottom edge to the formation slot's ground baseline. Formation slot dimensions control available space; they do not change the sprite's aspect ratio.
+- A Boss always occupies the center formation slot and renders at 155% of its normal formation scale. When a Boss and Elites share the field, place up to two Elites in the slots immediately to the Boss's left and right; place Common enemies in the outer slots.
 - Target circles are centered on the visible rendered bounds, not on transparent padding or unused formation-slot space.
 
 ## Enemy Bars
