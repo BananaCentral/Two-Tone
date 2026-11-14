@@ -12,7 +12,7 @@ When Lily's Skill or Ultimate damages an enemy, that enemy receives Exposed. Exp
 
 ## Basic Attack
 
-Deal Magical damage at a 1.0× multiplier and restore 10 Energy. It does not restore a Skill Point.
+Deal Magical damage at a 1.0× multiplier, restore 10 Energy, and restore 1 party Skill Point under the shared Basic Attack default.
 
 ## Skill: Ricochet
 

@@ -391,7 +391,7 @@ function resolveAllyAction(state, actor) {
   const hits = runAttack(state, actor, foes, basic, { multiplier:lilyBasic?basic.multiplier*celestialFactor(actor,'basic')*(actor.tune?.basicEnhanced?1+actor.tune.damageBonus:1):multiplier, targetMode });
   actor.basicAttackCount++;
   actor.energy = Math.min(actor.maxEnergy, actor.energy + (lilyBasic?10:(basic.energyGain ?? 0) + stacks * (skill?.energyPerStack ?? 0)));
-  state.skillPoints = Math.min(state.skillPointCap, state.skillPoints + (lilyBasic?0:(basic.skillPointGain ?? 0)));
+  state.skillPoints = Math.min(state.skillPointCap, state.skillPoints + (basic.skillPointGain ?? 1));
   if(actor.tune?.basicEnhanced){actor.tune.basicEnhanced=false;state.skillPoints=Math.min(state.skillPointCap,state.skillPoints+1)}
   actor.enhanceStacks = 0;
   const sourceId=++state.sourceSerial;applyRicochet(state,actor,sourceId,hits);triggerFollowUps(state, sourceId, actor.id, hits.map(hit => hit.target));

@@ -43,12 +43,12 @@ A field that does not apply must be marked as not applicable. Ability-specific e
 
 ## Shared Resource Defaults
 
-- Basic Attacks usually restore 1 party Skill Point.
+- Every allied Basic Attack restores 1 party Skill Point by default.
 - Skills usually cost 1 party Skill Point.
 - Ultimates use the character's defined Energy cost and do not consume a scheduled turn.
 - An ability that changes these defaults must state the exact resource change.
 
-The Skill Point Standard and Turn Order Standard define shared resource and timing rules.
+An ability-specific SP exception must be stated in both the character sheet and implementation. Enemy attacks do not restore party SP. The Skill Point Standard and Turn Order Standard define shared resource and timing rules.
 
 ## Character Entry Template
 

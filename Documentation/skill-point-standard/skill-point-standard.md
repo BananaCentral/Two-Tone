@@ -14,7 +14,7 @@ This standard defines how the party's shared Skill Points are gained, spent, and
 
 ## SP Gains and Costs
 
-- A Basic usually restores 1 SP.
+- Every allied Basic Attack restores 1 party SP by default.
 - A Skill usually costs 1 SP.
 - A Skill cannot be used if the party lacks the required SP, unless a rule explicitly allows it.
 - SP gains stop at the current cap by default. A rule may explicitly allow a gain to exceed it.
@@ -27,4 +27,4 @@ This standard defines how the party's shared Skill Points are gained, spent, and
 
 ## Exceptions
 
-Specific abilities or other mechanics may override these defaults when their rules state so.
+An ability may override this default only when its rules explicitly state a different SP gain. Enemy Basic Attacks do not restore party SP.

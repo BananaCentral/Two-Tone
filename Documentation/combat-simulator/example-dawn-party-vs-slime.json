@@ -24,7 +24,7 @@
       "name": "Lily",
       "level": 1,
       "stats": { "hp": 100, "physicalAttack": 0, "magicalAttack": 30, "physicalDefense": 4, "magicalDefense": 4, "speed": 30 },
-      "basic": { "damageType": "magical", "multiplier": 1, "target": "single", "energyGain": 10, "skillPointGain": 0 },
+      "basic": { "damageType": "magical", "multiplier": 1, "target": "single", "energyGain": 10, "skillPointGain": 1 },
       "skill": { "type": "ricochet", "damageType": "magical", "multiplier": 0.5, "target": "aoe", "energyGain": 20, "markTurns": 2 },
       "ultimate": { "damageType": "magical", "multiplier": 1, "target": "aoe", "energyCost": 100 },
       "passives": [{ "type": "exposed", "defenseReduction": 0.1, "duration": 2 }],
