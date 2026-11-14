@@ -32,6 +32,7 @@ Portrait and Ultimate controls should remain visually prominent, with enough spa
 
 - The Ultimate icon remains a usable control for queuing or activating that character's Ultimate under the combat UI rules.
 - Battle card presentation does not change combat stats, targeting, turn order, damage, or passive behavior.
-- Indicate the current ally turn with the highlighted battle card and the compact action cue above the cards. Do not print a second “X's turn” message across the battle cards.
-- Show targeting instructions in the combat HUD's contextual cue, and show action text in the resolution log while the action is resolving. Do not add generic turn or targeting tooltips on top of the battlefield.
+- Indicate the current ally turn with the highlighted battle card. Do not print a second “X's turn” message or a default “select an action” prompt across the battle cards.
+- Label every basic attack button `ATTACK` and every skill button `SKILL`; keep character-specific names and counters out of these standard action labels.
+- Show targeting instructions in the combat HUD only while target selection is pending, and show action text in the resolution log while the action is resolving. Do not add generic turn or targeting tooltips on top of the battlefield.
 - Transient hint popovers are for menus and setup screens. Suppress them throughout combat so they do not cover character art, cards, targets, or visual effects.

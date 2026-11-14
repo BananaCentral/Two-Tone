@@ -1957,12 +1957,12 @@ function drawHud(t){
  // Invisible 104x104 touch hit regions respect iPhone's minimum target dimension.
  choiceRects.push({x:1348,y:7,w:106,h:100,action:'dev-panel-toggle',enabled:true});
  choiceRects.push({x:1463,y:7,w:106,h:100,action:'pause',enabled:phase==='player'||paused});
- // Contextual action cue; the main stage stays unobstructed.
- if(phase==='player'){
-  const p=active();text(p?.name||'ALLY',1070,620,17,'#fae3b9','800');
+ // Show a cue only while target selection is pending. The active card and
+ // action buttons already identify whose turn it is and which actions exist.
+ if(phase==='player'&&pendingTargetAction){
   const mode=previewTargetMode(),hits=pendingTargetAction?chooseAttackTargets(mode):[];
-  text(pendingTargetAction?(pendingTargetAction.targetSide==='ally'?(pendingTargetAction.targetScope==='all'?`SELECT ANY ALLY OR PRESS ${pendingTargetAction.action.toUpperCase()} AGAIN`:`SELECT ALLY FOR DAWN ${pendingTargetAction.action.toUpperCase()}`):`SELECT TARGET FOR ${pendingTargetAction.action.toUpperCase()} • ${hits.length} TARGETS`):'SELECT BASIC, SKILL OR ULTIMATE',1190,620,15,'#d4e9f4','700');
-  if(pendingTargetAction)addButton(1102,642,180,30,'cancel-target','CANCEL TARGET');
+  text(pendingTargetAction.targetSide==='ally'?(pendingTargetAction.targetScope==='all'?`SELECT ANY ALLY OR PRESS ${pendingTargetAction.action.toUpperCase()} AGAIN`:`SELECT ALLY FOR ${pendingTargetAction.action.toUpperCase()}`):`SELECT TARGET FOR ${pendingTargetAction.action.toUpperCase()} • ${hits.length} TARGETS`,1190,620,15,'#d4e9f4','700');
+  addButton(1102,642,180,30,'cancel-target','CANCEL TARGET');
  }
  // Portrait-focused Ally HUD review layout, without altering combat resource logic.
  ctx.save();ctx.globalAlpha=cinematic?.88:1;
@@ -1981,8 +1981,8 @@ function drawHud(t){
  // Battle commands: only Basic and Skill. Ultimate is inside portrait HUDs.
  const playerReady=phase==='player'&&!paused;
  const actions=[
-  {key:'basic',cx:1353,cy:816,r:51,enabled:playerReady,icon:'⚔',label:'BASIC'},
-  {key:'skill',cx:1508,cy:800,r:64,enabled:playerReady&&sp>0,icon:'✦',label:activeId==='zero'?'ENHANCE '+soulEnhanceStacks:activeId==='dawn'?'TUNE':'SKILL'},
+  {key:'basic',cx:1353,cy:816,r:51,enabled:playerReady,icon:'⚔',label:'ATTACK'},
+  {key:'skill',cx:1508,cy:800,r:64,enabled:playerReady&&sp>0,icon:'✦',label:'SKILL'},
  ];
  for(const a of actions){
   const enabled=a.enabled,selected=pendingTargetAction?.action===a.key&&pendingTargetAction.actorId===activeId;
