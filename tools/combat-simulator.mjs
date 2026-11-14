@@ -446,6 +446,7 @@ function resolveAllyAction(state, actor) {
   const targetMode = skill && stacks >= (skill.blastAtStacks ?? Infinity) ? (actor.archetypeId === 'soul' && actor.premiumWeaponDuplicates >= 3 ? 'aoe' : 'blast') : basic.target;
   const lilyBasic=actor.archetypeId==='lily';
   const hits = runAttack(state, actor, foes, basic, { multiplier:lilyBasic?basic.multiplier*celestialFactor(actor,'basic')*(actor.tune?.basicEnhanced?1+actor.tune.damageBonus:1):multiplier, targetMode });
+  if(actor.archetypeId==='logan')for(const hit of hits)if(hit.target.hp>0)applyBleed(hit.target,actor,actor.characterDuplicates>=1?2:1);
   actor.basicAttackCount++;
   actor.energy = Math.min(actor.maxEnergy, actor.energy + (lilyBasic?10:(basic.energyGain ?? 0) + stacks * (skill?.energyPerStack ?? 0)));
   state.skillPoints = Math.min(state.skillPointCap, state.skillPoints + (basic.skillPointGain ?? 1));

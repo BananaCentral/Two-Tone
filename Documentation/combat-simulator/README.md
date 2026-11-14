@@ -56,6 +56,7 @@ Supported Skill and Passive effect types:
 - `lethalImpact`: the Slime Monster ignores 25% of both defenses on its AoE magical attack.
 - `lifesteal`: heals the damage source for its configured fraction of final actual HP damage. It applies to allies and enemies, including simulated direct and follow-up damage. Shields absorb damage before Lifesteal is calculated.
 - `bleed`: an optional ally passive that applies a Bleed stack when its attacks hit living enemies. The enemy ticks all stacks for 2% of its Max HP per stack at the start of its scheduled turn, then loses one stack. Five stacks is the default cap; `maxStacks` and `stacksPerHit` can be configured. Bleed is true damage, bypasses Barrier and defense, cannot crit, and is attributed to its applier (including Lifesteal). Shields absorb Bleed before HP.
+- Logan's Basic Attack and Ultimate apply Bleed directly; those stacks tick and are credited to Logan using the same Bleed rules.
 - `taunt`: redirects automatic targeting toward the taunter according to the active chance and duration recorded on the attacker.
 - `bloodShield`: models Logan's Skill Point-consuming Blood Shield, which applies a Shield equal to the HP cost to each living ally, plus the current-HP cost and Taunt effect.
 
