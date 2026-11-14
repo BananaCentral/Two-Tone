@@ -125,6 +125,9 @@ function instantiate(config, side) {
       brokenTurns: 0,
       residueStacks: 0,
       residueTurns: 0,
+      residueMaxStacks: 5,
+      residueDamageReductionPerStack: 0.05,
+      residueResistanceReductionPerStack: 0.05,
       debuffs: [],
       marks: [],
       barriersBroken: 0,
@@ -168,7 +171,7 @@ function damageFor(attacker, target, type, multiplier) {
   const attack = attackValue(attacker, type);
   if (attack <= 0) return 0;
   const lethalImpact=attacker.passives.find(passive=>passive.type==='lethalImpact')?.defenseIgnore||0;
-  const ignore=Math.min(1,Math.max(0,(attacker.tune?.defenseIgnore||0)+lethalImpact)),resistance=Math.max(0,1-(target.residueStacks||0)*.05),physicalDefense=target.stats.physicalDefense*resistance*(1-ignore),magicalDefense=target.stats.magicalDefense*resistance*(1-ignore);
+  const ignore=Math.min(1,Math.max(0,(attacker.tune?.defenseIgnore||0)+lethalImpact)),resistance=Math.max(0,1-(target.residueStacks||0)*(target.residueResistanceReductionPerStack??.05)),physicalDefense=target.stats.physicalDefense*resistance*(1-ignore),magicalDefense=target.stats.magicalDefense*resistance*(1-ignore);
   let reduction;
   if (type === 'true') {
     const physicalAttack=attackValue(attacker,'physical'),magicalAttack=attackValue(attacker,'magical');
@@ -237,7 +240,7 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
   const hits = [];
   for (const target of targets) {
     const hpBefore = target.hp;
-    const baseDamage = damageFor(attacker, target, spec.damageType, (options.multiplier ?? spec.multiplier)*(1-(attacker.residueStacks||0)*.05));
+    const baseDamage = damageFor(attacker, target, spec.damageType, (options.multiplier ?? spec.multiplier)*(1-(attacker.residueStacks||0)*(attacker.residueDamageReductionPerStack??.05)));
     const roll=rollCritical(state,attacker,baseDamage),damage = roundStat(roll.damage*(1-(target.tune?.damageReduction||0)) * (target.side === 'enemies' && target.brokenTurns > 0 ? 1.5 : 1));
     target.hp = Math.max(0, target.hp - damage);
     const hpDamage=Math.min(hpBefore,damage);
@@ -264,8 +267,8 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
   return hits;
 }
 function applyResidue(attacker,targets){
- if(!attacker.passives.some(passive=>passive.type==='residue'))return;
- for(const target of targets){if(target.hp<=0)continue;target.residueStacks=Math.min(5,(target.residueStacks||0)+1);target.residueTurns=2}
+ const passive=attacker.passives.find(entry=>entry.type==='residue');if(!passive)return;
+ for(const target of targets){if(target.hp<=0)continue;target.residueMaxStacks=passive.maxStacks??5;target.residueDamageReductionPerStack=passive.damageReductionPerStack??.05;target.residueResistanceReductionPerStack=passive.resistanceReductionPerStack??.05;target.residueStacks=Math.min(target.residueMaxStacks,(target.residueStacks||0)+1);target.residueTurns=2}
 }
 function ageResidue(unit){if(!unit.residueStacks)return;unit.residueTurns--;if(unit.residueTurns<=0){unit.residueStacks=0;unit.residueTurns=0}}
 function triggerFollowUps(state, sourceId, sourceActorId, affectedTargets) {
