@@ -22,6 +22,7 @@ Resolve battle actions in visible phases so players can follow the acting charac
 
 - Keep the camera on the current combat shot until the action and its queued effects finish. An animation ending a frame before combat resolution must not reveal the command view or another screen.
 - Ease camera changes within the same view over 250 ms. Complete ally movement before returning the character to their resting position; never snap them home when the action ends.
+- Keep actors stationary through camera cuts. Basic attacks may use their designated movement; Skills and Ultimates do not inherit a generic lunge. Keep idle movement subtle and avoid continuous screen shake.
 - Keep Ultimate presentation active for at least 1.8 seconds. An ally-targeted Ultimate stays on the party view through the recipient's effect so the camera does not cut away immediately.
 - When changing between forward and reverse battlefield views, show one scene at a time and ease into the destination without a flash or dark veil. Do not cross-render both scenes, since this duplicates characters, targets, and effects.
 - A new turn must not run an additional ally entrance animation while the previous action is still resolving.

@@ -6,8 +6,7 @@ const BATTLE_AREAS=Object.freeze({
 const DEFAULT_BATTLE_AREA_ID='area-1';
 const COMBAT_ACTION_PHASE_GAP_MS=500;
 const ULTIMATE_PRESENTATION_MS=1800;
-const ULTIMATE_CAMERA_INTRO_MS=450;
-const ULTIMATE_CAMERA_TRACK_END_MS=1050;
+const ULTIMATE_CAMERA_INTRO_MS=550;
 const ACTION_VISUALS=Object.freeze({
  zero:Object.freeze({basic:'soul-sword',skill:'soul-enhance',ultimate:'soul-storm'}),
  lily:Object.freeze({basic:'lily-petal',skill:'lily-ricochet',ultimate:'lily-haunting'}),
@@ -1440,7 +1439,7 @@ function cameraShot(t=performance.now()){
  if(phase==='resolve'&&fx){const dt=t-fx.at;
   if(fx.kind==='support')return fx.targetAllyId?(fx.action==='ultimate'?'party':'ally-impact'):'command';
   if(fx.kind==='enemy')return dt<420?'enemy-windup':'enemy-impact';
-  if(fx.kind==='ultimate')return dt<ULTIMATE_CAMERA_INTRO_MS?'ultimate-intro':dt<ULTIMATE_CAMERA_TRACK_END_MS?'attack-track':'attack-impact';
+  if(fx.kind==='ultimate')return dt<ULTIMATE_CAMERA_INTRO_MS?'ultimate-intro':'attack-impact';
   return dt<(fx.kind==='basic'&&fx.actor==='zero'?460:350)?'attack-track':'attack-impact';
  }
  // Animation lifetimes can end a frame before their resolution timers. Keep
@@ -1553,7 +1552,7 @@ function allyHudFxPosition(id){
 }
 function drawUnit(p,pos,view,t,acting=false){
  if(!p||!pos)return;const {x,baseY,w,h}=pos,top=baseY-h;
- const bob=Math.sin(t*.0024+(p.id==='zero'?0:1))*(p.hp>0?3:0);
+ const bob=Math.sin(t*.0012+(p.id==='zero'?0:1))*(p.hp>0?1.25:0);
  const select=view==='party'&&selectedAllyId===p.id;const allyTargeting=view==='party'&&pendingTargetAction?.targetSide==='ally',allTeamTargeting=allyTargeting&&pendingTargetAction?.targetScope==='all',supportAnimating=view==='ally-impact'&&phase==='resolve'&&fx?.kind==='support'&&fx.targetAllyId===p.id,eligible=view==='party'&&supportDemo?eligibleAllyTarget(p,supportDemo):allyTargeting?p.hp>0:true;
  ctx.save();ctx.translate(camera.currentX*(view==='party'?.32:.52),bob);
  ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.44,16,0,0,Math.PI*2);ctx.fillStyle='rgba(12,12,40,.45)';ctx.fill();
@@ -1596,10 +1595,9 @@ function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&pendin
  const isActor=(shot==='enemy-windup'&&actingEnemyId===e.id)||(fx?.kind==='enemy'&&fx?.actorEnemyId===e.id&&shot==='enemy-impact');
  const sh=(isActor?1.09:shot==='attack-impact'&&fx?.targetEnemyId===e.id?1.045:1)*(e.category==='boss'?1.55:1);
  const ww=e.w*sh,hh=e.h*sh,xx=e.x+camera.currentX*.43-(ww-e.w)/2,yy=e.y+(e.h-hh);
- const shimmer=isFocus?Math.sin(t*.004)*2:0;
  const zbHit=fx?.kind==='basic'&&fx?.actor==='zero'&&fx.targetEnemyId===e.id?t-fx.at:null;
-  const hitKick=zbHit!==null&&zbHit>=645&&zbHit<745?Math.sin((zbHit-645)*.18)*(1-(zbHit-645)/100)*4:0;
- let spriteCenterY=yy+hh/2,spriteVisibleW=ww,spriteVisibleH=hh;const spriteOffsetX=shimmer+hitKick,spriteOffsetY=Math.sin(t*.0026+e.x)*2.2;
+  const hitKick=zbHit!==null&&zbHit>=645&&zbHit<745?Math.sin((zbHit-645)*.06)*(1-(zbHit-645)/100)*2:0;
+ let spriteCenterY=yy+hh/2,spriteVisibleW=ww,spriteVisibleH=hh;const spriteOffsetX=hitKick,spriteOffsetY=Math.sin(t*.0026+e.x)*2.2;
  ctx.save();ctx.globalAlpha=e.hp>0?1:Math.max(.02,.8-(t-fx.at)/1050);ctx.translate(spriteOffsetX,spriteOffsetY);
  ctx.beginPath();ctx.ellipse(xx+ww/2,yy+hh-4,ww*.48,13,0,0,Math.PI*2);ctx.fillStyle='#1b213c70';ctx.fill();
  const spriteId=enemyBattleSprite(e);if(images[spriteId]?.complete&&images[spriteId].naturalWidth){const img=images[spriteId];ctx.imageSmoothingEnabled=spriteId==='slimeBattle';const ratioParts=String(e.battleAspectRatio||'').split(':').map(Number),aspect=ratioParts.length===2&&ratioParts.every(Number.isFinite)&&ratioParts[0]>0&&ratioParts[1]>0?ratioParts[0]/ratioParts[1]:img.naturalWidth/img.naturalHeight,canvasW=Math.min(ww,hh*aspect),canvasH=canvasW/aspect,scaleX=canvasW/img.naturalWidth,scaleY=canvasH/img.naturalHeight,bounds=spriteAlphaBounds(img),drawW=bounds.w*scaleX,drawH=bounds.h*scaleY,drawX=xx+(ww-drawW)/2,drawY=yy+hh-drawH;spriteVisibleW=drawW;spriteVisibleH=drawH;spriteCenterY=drawY+drawH/2;ctx.drawImage(img,bounds.x,bounds.y,bounds.w,bounds.h,drawX,drawY,drawW,drawH)}
@@ -1633,11 +1631,11 @@ function drawActorsForShot(t,shot){
  const pos=cameraAllyPosition(chosen?.id,'command');
  if(chosen&&pos){
   // True tracked character travel is independent of the background-layer camera offsets.
-  const dt=fx?.kind!=='enemy'&&fx?.actor===chosen.id?t-fx.at:9999;
-  const travel=(shot==='attack-track'||shot==='attack-impact')?Math.sin(Math.PI*clamp01(dt/900))*180:0;
+  const dt=fx?.actor===chosen.id?t-fx.at:9999;
+  const basicLunge=fx?.kind==='basic'&&fx.actor===chosen.id?74*smooth01(dt/300)*(1-smooth01((dt-420)/350)):0;
   // Enemies are in the midground; render them first, then the close foreground ally.
   drawEnemy(t,shot);
-  drawUnit(chosen,(chosen.id==='zero'&&zeroBasicStage(t)!==null)?zeroBasicTravel(t,pos):{...pos,x:pos.x+travel,baseY:pos.baseY-travel*.18},'command',t,phase==='player'&&cameraPreview!=='target');
+  drawUnit(chosen,(chosen.id==='zero'&&zeroBasicStage(t)!==null)?zeroBasicTravel(t,pos):{...pos,x:pos.x+basicLunge},'command',t,phase==='player'&&cameraPreview!=='target');
  }else{
   drawEnemy(t,shot);
  }
@@ -2053,8 +2051,7 @@ function drawSetup(){
 // message on the battlefield obscures character cards and action effects.
 function drawHint(t){if(hint&&t-hintAt<2300&&['startup','menu','partySetup','loadout','setup'].includes(phase)){rect(474,393,652,76,'rgba(15,21,39,.98)','#e6b98a',12);text(hint,800,431,20,'#fff4e8','700','center')}}
 function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='startup'){drawStartupMenu()}else if(phase==='menu'){drawMainMenu()}else if(phase==='partySetup'){drawPartySetup()}else if(phase==='loadout'){drawLoadout()}else if(phase!=='setup'){
-  const hit=zeroBasicStage(t);ctx.save();if(hit!==null&&hit>=645&&hit<=760){const q=1-(hit-645)/115;ctx.translate(Math.sin(hit*.42)*q*4,Math.cos(hit*.33)*q*2.5)}
-  drawCameraStage(t);drawFx(t);ctx.restore();drawHud(t)
+  drawCameraStage(t);drawFx(t);drawHud(t)
  }else{drawCameraStage(t);drawSetup()}drawHint(t);requestAnimationFrame(loop)}
 function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('roster-')){setEnemyRoster(cmd.slice(7));return}if(cmd.startsWith('loadout:')){handleLoadoutAction(cmd.slice(8));return}if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'){devPanelOpen=!devPanelOpen;return}if(cmd==='cancel-target'){cancelTargetSelection();return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(cameraPreview==='party'&&(phase==='player'||pendingTargetAction?.targetSide==='ally')){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(pendingTargetAction?.targetSide==='ally'&&pendingTargetAction.targetScope==='all'){if(!p||p.hp<=0){say('Choose a living party member to confirm the team skill.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;return executeCombatAction(actor,pending.action)}if(pendingTargetAction?.targetSide==='ally'){if(!p||p.hp<=0){say('Tune and Dawn’s Ultimate need a living ally.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;if(pending.action==='ultimate')return queueUltimate(pending.actorId,id);return executeCombatAction(actor,pending.action,null,id)}if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){beginTargetSelection('ultimate',cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){chargeUltimateForTest(cmd.slice(11));return}
  switch(cmd){case 'startup-start':phase='menu';hint='';break;case 'startup-load':requestSaveFileLoad();break;case 'save-progress':saveProgressFile();break;case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'support-heal':startSupportDemo('heal');break;case 'support-revive':startSupportDemo('revive');break;case 'confirm-support':confirmSupportDemo();break;case 'cancel-support':cancelSupportDemo();break;case 'camera-party':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':toggleWavePreset();break;case 'toggle-recovery':setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':testKO();break;case 'test-revive':testRevive();break;case 'skill':play('skill');break;case 'cap-test':cycleSpCapTest();break;case 'hud-status-test':toggleHudStatusDemo();break;case 'f05-advance':addActionAdvance(activeId,25);break;case 'f05-delay':addActionDelay(activeId,25);break;case 'f05-speed':setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':queueSummonForTest('independent');break;case 'f05-summon-controlled':queueSummonForTest('controlled');break;
