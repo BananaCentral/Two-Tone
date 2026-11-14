@@ -18,7 +18,7 @@ This standard defines how combat actions and passive effects receive readable, c
 
 | Source | Action or trigger | Visual treatment |
 |---|---|---|
-| Soul | Passive follow-up | Blue white cross-slash on each affected enemy |
+| Soul | Passive follow-up | Bright cyan starburst and ring, labeled Follow-Up, plus a bold cross-slash and damage cue on each affected enemy |
 | Soul | Basic | Steel blue sword slash |
 | Soul | Skill / Enhance | Blue runic ring and starburst around Soul |
 | Soul | Ultimate | Expanding blue and gold sigils on affected enemies |
