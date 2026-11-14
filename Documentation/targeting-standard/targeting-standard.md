@@ -19,7 +19,10 @@ Enemy Basic Attacks use the same `single`, `blast`, and `aoe` shapes against liv
 ## Ally support targeting
 
 - A targeted support action enters selection after the ability is chosen, matching the enemy-target flow.
-- A support action that affects all living allies resolves immediately after one ability press; it does not enter enemy or ally target selection. Validate its Skill Point cost before applying it.
+- A support action that affects all living allies uses two-step confirmation. The first ability press opens the party view and highlights every living ally.
+- The player confirms a party-wide support action by tapping any highlighted ally or pressing that same ability button again. Either confirmation applies the effect to the full eligible party; the tapped ally does not become the sole target.
+- Validate Skill Point cost before entering confirmation and again before applying the action. Choosing another action or canceling clears the pending confirmation.
+- Register this shape as `allAllies` in the action target-mode table. Logan's Blood Shield is the current example; use this flow for every future party-wide ally Skill.
 - Select a living ally by tapping their battlefield sprite or HUD portrait card. The selected ally receives a visible circular outline, matching the enemy target indicator, and remains highlighted through resolution.
 - Pressing the same targeted ability again confirms the currently highlighted eligible ally. Selecting another ally changes the target; choosing another action switches the pending action.
 - Self-targeting abilities keep the acting ally selectable. Defeated allies are not valid targets unless the ability explicitly supports revival.

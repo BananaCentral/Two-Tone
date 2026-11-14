@@ -8,7 +8,7 @@ Each allied character card presents combat information in this order:
 
 - Character portrait at the upper left.
 - Ultimate control in the upper-right area, above the HP value.
-- Current and maximum HP aligned on the right above the health bar.
+- Current HP only, aligned on the right and slightly above the health bar. Do not include Max HP in the card's text value.
 - Health bar beneath the portrait and HP value, spanning the card.
 - Passive indicator below the health bar.
 
