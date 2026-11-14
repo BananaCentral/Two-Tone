@@ -18,6 +18,22 @@ node tools/combat-simulator.mjs --config path/to/scenario.json --runs 1000 --see
 
 `Documentation/combat-simulator/example-soul-lily-vs-slimes.json` is a Level 1 Soul and Lily team scenario against five Slimes. `Documentation/combat-simulator/example-logan-party-vs-slime-boss.json` includes Soul, Lily, Dawn, and Logan against the Slime Monster boss.
 
+## Standard character benchmark suite
+
+Run the standard four-character encounter matrix with:
+
+```sh
+node tools/combat-simulator-benchmark.mjs --runs 1000 --seed 404
+```
+
+Run the mechanic-coverage regressions with `node --test tests/combat-simulator.test.mjs`.
+
+The suite compares a one-bar boss, two- and three-bar boss HP benchmarks, a boss with two Elite adds, five Slimes, and three Slime Leaders. Pass `--config path/to/full-party.json` to use another party and its enemy archetypes. `--json` emits the full reports. Every result includes a 95% confidence interval for win rate so small batches do not look more certain than they are.
+
+Add a `role` to each character archetype (`mainDps`, `subDps`, `support`, `sustain`, or a project-specific label) to group its results by intended job. Per-character reports separate direct damage, Bleed, Follow-up, Ricochet, and summon damage; they also report Tune damage added, Shield granted, received, and absorbed, HP spent, Lifesteal healing, survival, Skill Point spend and generation, Tune use, action advances, and taunt redirects. These metrics describe what each kit contributes. Do not rank supports by damage alone.
+
+The benchmark's enemy targeting and ally action policy are automated approximations, not a player-optimal strategy. A 2- or 3-bar scenario multiplies boss HP without modeling bar transitions. Compare several encounter types and inspect role-specific effects before changing a kit. Add a regression assertion for every newly supported character mechanic so future simulator changes cannot silently omit it.
+
 Use `--json` for machine-readable output, `--max-actions 2000` to set a battle limit, or `--help` for options. Re-running with the same config and seed produces the same batch.
 
 ## Scenario structure
@@ -69,7 +85,7 @@ The [Dawn team example](example-dawn-party-vs-slime.json) demonstrates her Resou
 
 ## Output
 
-The automated policy uses a ready Ultimate before that ally's next turn action, spends available shared Skill Points on Soul's Enhance, uses Lily's Ricochet Skill when a Skill Point is available, and has allies focus the lowest-HP enemy for single-target attacks. Enemies choose a random living ally. The batch summary reports win rate, average action counts, damage, Skill uses, Follow Ups, Ultimates, AoE attacks, and surviving unit counts. `averageAllyDps` is allied damage divided by elapsed simulator time; one time unit follows the Speed rate formula and is not a real second. `averageUnitStats` contains average damage, turns, and damage per simulator time unit by archetype. A battle reaching its action limit is counted as a draw.
+The automated policy uses a ready Ultimate before that ally's next turn action, spends available shared Skill Points on Soul's Enhance, uses Lily's Ricochet Skill when a Skill Point is available, and has allies focus the lowest-HP enemy for single-target attacks. Enemies choose a random living ally. The batch summary reports win rate and confidence interval, action counts, damage, Skill uses, Follow Ups, Ultimates, AoE attacks, and survivors. `averageAllyDps` is allied damage divided by elapsed simulator time; one time unit follows the Speed rate formula and is not a real second. `averageUnitStats` contains role-tagged damage and support contributions by archetype; `averageUnitDetails` reports the same measurements per party instance. A battle reaching its action limit is counted as a draw.
 
 Blast includes the primary target and enemies in adjacent formation slots, up to three total; enemy Blast targets adjacent allies. AoE hits all living targets. The simulator uses the game's stat scaling, typed damage reduction, follow-up distribution, shared Skill Point rules, and Speed rate formula. It schedules turns by each unit's rate and does not model canvas presentation, random encounter reinforcements, general action advance/delay effects, or status effects that are not represented by the supported ability handlers. Dawn's configured Ultimate and Premium Duplicate 3 advance its selected ally. Keep scenario archetypes aligned with the approved character and enemy sheets. Soul's Enhanced Basic uses Blast targeting, except Premium Weapon Duplicate 3 changes it to AoE; Ultimate uses AoE.
 

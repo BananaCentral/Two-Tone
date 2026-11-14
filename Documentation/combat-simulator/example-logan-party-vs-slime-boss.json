@@ -9,6 +9,7 @@
   "archetypes": {
     "soul": {
       "name": "Soul",
+      "role": "mainDps",
       "level": 1,
       "stats": {
         "hp": 100,
@@ -64,6 +65,7 @@
     },
     "lily": {
       "name": "Lily",
+      "role": "subDps",
       "level": 1,
       "stats": {
         "hp": 100,
@@ -118,6 +120,7 @@
     },
     "dawn": {
       "name": "Dawn",
+      "role": "support",
       "level": 1,
       "stats": {
         "hp": 50,
@@ -239,6 +242,7 @@
     },
     "logan": {
       "name": "Logan",
+      "role": "sustain",
       "level": 1,
       "stats": {
         "hp": 200,
