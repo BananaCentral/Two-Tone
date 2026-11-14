@@ -17,7 +17,7 @@ Every playable character must define these six base stats:
 
 Calculated values use the formulas in the matching stat standards. All six stats scale with character Level. A character starts at Level 1.
 
-Critical Rate and Critical Damage are hidden combat stats and are excluded from this six-stat list. Their default values and modifiers follow the [Critical Hit Standard](../critical-hit-standard.md).
+Critical Rate, Critical Damage, and Lifesteal are hidden combat stats and are excluded from this six-stat list. Their default values and modifiers follow the [Critical Hit Standard](../critical-hit-standard.md) and [Lifesteal Standard](../lifesteal-standard.md).
 
 Each character record must also include a stable character ID and display name. Test placeholders are not character records and do not satisfy this standard.
 

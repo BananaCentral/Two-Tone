@@ -1,6 +1,6 @@
 # Enemy Battle HUD and Sprite Standard
 
-Enemy Critical Rate and Critical Damage are hidden combat values governed by the [Critical Hit Standard](critical-hit-standard.md); do not add them to visible enemy stat cards.
+Enemy Critical Rate, Critical Damage, and Lifesteal are hidden combat values governed by the [Critical Hit Standard](critical-hit-standard.md) and [Lifesteal Standard](lifesteal-standard.md); do not add them to visible enemy stat cards. Bleed stacks are a visible debuff governed by the [Bleed Standard](bleed-standard.md), with stack changes and ticks shown as combat effects.
 
 ## Battle Sprite Shape and Grounding
 
