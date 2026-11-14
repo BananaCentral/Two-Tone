@@ -398,6 +398,11 @@ function syncLegacyGauges(){
   gauges[state.id]=Math.max(0,Math.min(100,approx));
  }
 }
+function prepareBattleIntro(){
+ syncTurnTimeline();const first=turnTimeline.preview(1)[0]?.id;
+ activeId=party.some(p=>p.id===first)?first:null;
+ actingEnemyId=liveEnemies().some(e=>e.id===first)?first:null;
+}
 function addActionAdvance(id,percent){
  if(!Number.isFinite(percent)||percent<0)return false;
  const enemy=enemies.find(e=>e.id===id);if(enemy&&enemy.brokenTurns>0)return false;
@@ -908,7 +913,7 @@ function startBattle(areaId=DEFAULT_BATTLE_AREA_ID){
  cameraPreview=null;selectedAllyId=null;supportDemo=null;zeroSkillArmed=false;targetingMode='single';battleToken++;
  party=draft.map(id=>spawnProgressedUnit(id));
  turnTimeline.reset();pendingTargetAction=null;speedModifiers=Object.create(null);summons=[];summonSerial=0;summonHistory=[];gauges={};for(const p of party)gauges[p.id]=0;
- resetEnemies();resetActionResources();enemyCount=0;turn=0;activeId=null;zeroSkillArmed=false;fx=null;paused=false;phase='intro';forceSelect=false;saveVitals();
+ resetEnemies();resetActionResources();enemyCount=0;turn=0;activeId=null;actingEnemyId=null;prepareBattleIntro();zeroSkillArmed=false;fx=null;paused=false;phase='intro';forceSelect=false;saveVitals();
  log=`Wave 1/${wavePlan.length}: ${wavePlan[0].length} training enemies (${enemies.length} on field).`;
  schedule(()=>{if(phase==='intro')nextTurn()},380);
 }
@@ -917,7 +922,7 @@ function startFromBattle(){
  cameraPreview=null;selectedAllyId=null;supportDemo=null;zeroSkillArmed=false;targetingMode='single';battleToken++;
  saveVitals();party=party.map(p=>spawnProgressedUnit(p.id));
  turnTimeline.reset();pendingTargetAction=null;speedModifiers=Object.create(null);summons=[];summonSerial=0;summonHistory=[];gauges={};for(const p of party)gauges[p.id]=0;
- resetEnemies();resetActionResources();enemyCount=0;turn=0;activeId=null;zeroSkillArmed=false;fx=null;paused=false;phase='intro';saveVitals();
+ resetEnemies();resetActionResources();enemyCount=0;turn=0;activeId=null;actingEnemyId=null;prepareBattleIntro();zeroSkillArmed=false;fx=null;paused=false;phase='intro';saveVitals();
  log=`Wave test restarted: ${wavePlan.length} waves, ${wavePlan.reduce((n,w)=>n+w.length,0)} total enemies.`;
  schedule(()=>{if(phase==='intro')nextTurn()},380);
 }
@@ -1427,7 +1432,8 @@ function zeroBasicPaint(x,baseY,w,h,dt){
 }
 function dxFor(relative,width){return relative*width}
 function cameraShot(t=performance.now()){
- if(phase==='setup'||phase==='intro'||phase==='victory'||phase==='defeat')return 'command';
+ if(phase==='setup'||phase==='victory'||phase==='defeat')return 'command';
+ if(phase==='intro')return actingEnemyId?'enemy-windup':'command';
  if(cameraPreview==='party'&&pendingTargetAction?.targetSide==='ally'&&!paused)return 'party';
  if(phase==='player')return cameraPreview==='party'?'party':cameraPreview==='target'?'target':'command';
  if(phase==='enemy')return 'enemy-windup';
@@ -1623,7 +1629,7 @@ function drawActorsForShot(t,shot){
   return;
  }
  const ultimateActor=(pendingTargetAction?.action==='ultimate'&&party.find(p=>p.id===pendingTargetAction.actorId))||(ultimateExecuting&&lastAttack?.action==='ultimate'&&party.find(p=>p.id===lastAttack.actor));
- const chosen=ultimateActor|| (shot==='enemy-impact'?(party.find(p=>p.id===fx?.target)||active()||alive()[0]):active()||alive()[0]);
+ const chosen=ultimateActor|| (shot==='enemy-impact'?(party.find(p=>p.id===fx?.target)||active()||alive()[0]):phase==='intro'?active():active()||alive()[0]);
  const pos=cameraAllyPosition(chosen?.id,'command');
  if(chosen&&pos){
   // True tracked character travel is independent of the background-layer camera offsets.

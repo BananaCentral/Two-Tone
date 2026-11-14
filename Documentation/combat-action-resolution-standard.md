@@ -12,6 +12,7 @@ Resolve battle actions in visible phases so players can follow the acting charac
 ## Timing and feedback
 
 - Leave at least 500 ms between distinct damage phases. A follow-up must not resolve in the same frame as the hit that caused it.
+- Begin the battle intro on the first actor in the scheduled turn order. Do not show the first roster ally as a temporary fallback before turn order is initialized.
 - Keep the action in resolution until its chained effects have been applied, so another turn cannot interrupt the sequence.
 - Keep a visible action banner on screen during resolution. Label primary damage with its actor and ability. Give each follow-up its own source/effect label and separate damage value; do not combine primary, Ricochet, and Follow-up damage into one floating number.
 - Show damage near each affected target and preserve the event order in the battle log.
