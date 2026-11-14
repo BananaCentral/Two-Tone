@@ -1332,15 +1332,14 @@ function drawUnit(p,pos,view,t,acting=false){
  ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.44,16,0,0,Math.PI*2);ctx.fillStyle='rgba(12,12,40,.45)';ctx.fill();
  if(acting||select){ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.51,22,0,0,Math.PI*2);ctx.lineWidth=4;ctx.strokeStyle=select?'#eaca94':'#8be3fb';ctx.stroke()}
  if(p.hp<=0)ctx.globalAlpha=.37;
- const art=p.id==='zero'?'zero':p.id==='lily'?'lilyBack':p.id==='dawn'?'dawnBattle':null;
+ const art=p.id==='zero'?(view==='party'?'zeroFront':'zero'):p.id==='lily'?(view==='party'?'lilyFront':'lilyBack'):p.id==='dawn'?(view==='party'?'dawnFront':'dawnBattle'):null;
  const zb=view==='command'&&p.id==='zero'?zeroBasicStage(t):null;
   if(zb!==null)zeroBasicPaint(x,baseY,w,h,zb);
   else if(art&&images[art]?.complete&&images[art].naturalWidth){
-  const img=images[art];ctx.imageSmoothingEnabled=art==='zeroFront'||art==='dawnFront';
-  if(art==='zeroFront'||art==='dawnFront'){
-   // Party portraits use a centered upper-body crop; the full-body art remains available as the source asset.
-   const cropH=img.naturalHeight*.6,cropW=cropH*.5,sx=(img.naturalWidth-cropW)/2;
-   ctx.drawImage(img,sx,0,cropW,cropH,x,top,w,h);
+  const img=images[art],fullArtwork=art==='zeroFront'||art==='lilyFront'||art==='dawnFront';ctx.imageSmoothingEnabled=fullArtwork;
+  if(fullArtwork){
+   // Ally targeting uses the same full-body front artwork across the entire party.
+   ctx.drawImage(img,x,top,w,h);
   }else if(art==='zero'||art==='lilyBack'){
    // Fit the visible cutout to the same enlarged battle-stage height across
    // playable characters, removing transparent source-image margins.
