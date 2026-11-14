@@ -4,7 +4,7 @@ Battle-stage artwork uses `assets/soul-battle.png` under the shared Character Ba
 
 ## Identity
 
-- Character ID: `soul` (legacy runtime key: `zero`)
+- Character ID: `soul`
 - Display name: Soul
 - Level: 1 by default
 
@@ -73,5 +73,5 @@ Calculated stats scale with Level and use the matching stat standards.
 
 ## Implementation Notes
 
-- The runtime retains the historical internal ID `zero` so existing saved parties and progression remain valid; the player-facing name and character sheet use Soul.
+- Older saves that used `zero` for Soul are migrated to `soul` when loaded, reserving `zero` for the new character.
 - Unique source means one damaging action instance from another ally, including a source action that hits multiple targets or has multiple hits.

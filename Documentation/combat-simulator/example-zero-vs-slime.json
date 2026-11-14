@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "name": "Zero vs Slime",
+  "settings": {
+    "initialSkillPoints": 3,
+    "skillPointCap": 5,
+    "maxActions": 2000
+  },
+  "archetypes": {
+    "zero": {
+      "name": "Zero",
+      "role": "mainDps",
+      "level": 1,
+      "stats": { "hp": 50, "physicalAttack": 40, "magicalAttack": 0, "physicalDefense": 2, "magicalDefense": 2, "speed": 40 },
+      "basic": { "damageType": "physical", "multiplier": 0.5, "target": "blast", "energyGain": 20, "skillPointGain": 1 },
+      "skill": { "type": "firstStrike", "damageType": "physical", "multiplier": 1.0, "firstHitMultiplier": 1.5, "energyGain": 20 },
+      "ultimate": { "damageType": "physical", "multiplier": 1.0, "target": "aoe", "energyCost": 100 },
+      "passives": [{ "type": "cutthroat", "criticalRateBonus": 0.1, "criticalDamageBonus": 0.25 }],
+      "weapon": { "type": "standard", "potential": 1 },
+      "energy": { "start": 20 },
+      "characterDuplicates": 0
+    },
+    "slime": {
+      "name": "Slime",
+      "role": "enemy",
+      "level": 1,
+      "stats": { "hp": 50, "physicalAttack": 20, "magicalAttack": 0, "physicalDefense": 2, "magicalDefense": 2, "speed": 20 },
+      "basic": { "damageType": "physical", "multiplier": 1, "target": "single" },
+      "passives": []
+    }
+  },
+  "teams": {
+    "allies": [{ "id": "zero", "archetype": "zero" }],
+    "enemies": [{ "id": "slime", "archetype": "slime" }]
+  }
+}

@@ -1,5 +1,5 @@
 'use strict';
-const sources={arena:'/assets/embedded-image-01.png',area1Background:'/assets/area-1-meadow.jpg',zero:'/assets/soul-battle.png',lily:'/assets/lily-front.png',lilyFront:'/assets/lily-front.png',lilyBack:'/assets/lily-back.png',dawnBattle:'/assets/dawn-battle.png',dawnFront:'/assets/dawn-front.png',loganBattle:'/assets/logan.png',loganFront:'/assets/logan-front.png',loganPortrait:'/assets/logan-front.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',slimeLeaderBattle:'/assets/slime-leader.png',slimeLeaderArtwork:'/assets/slime-leader.png',slimeMonsterBattle:'/assets/slime-monster.png',slimeMonsterArtwork:'/assets/slime-monster.png',wolfBattle:'/assets/wolf.png',wolfArtwork:'/assets/wolf-artwork.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',zeroFront:'/assets/soul-portrait.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png'};
+const sources={arena:'/assets/embedded-image-01.png',area1Background:'/assets/area-1-meadow.jpg',soul:'/assets/soul-battle.png',lily:'/assets/lily-front.png',lilyFront:'/assets/lily-front.png',lilyBack:'/assets/lily-back.png',dawnBattle:'/assets/dawn-battle.png',dawnFront:'/assets/dawn-front.png',loganBattle:'/assets/logan.png',loganFront:'/assets/logan-front.png',loganPortrait:'/assets/logan-front.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',slimeLeaderBattle:'/assets/slime-leader.png',slimeLeaderArtwork:'/assets/slime-leader.png',slimeMonsterBattle:'/assets/slime-monster.png',slimeMonsterArtwork:'/assets/slime-monster.png',wolfBattle:'/assets/wolf.png',wolfArtwork:'/assets/wolf-artwork.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',soulFront:'/assets/soul-portrait.png',zeroFront:'/assets/zero.png',zeroBattle:'/assets/zero-battle.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png'};
 const BATTLE_AREAS=Object.freeze({
  'area-1':Object.freeze({name:'Area 1',background:'area1Background'})
 });
@@ -16,7 +16,8 @@ const ENEMY_DEATH_BEAT_MS=ANIMATION_STEP_MS*2;
 const ENEMY_REINFORCEMENT_ENTRY_MS=ANIMATION_STEP_MS*2;
 const ULTIMATE_CAMERA_INTRO_MS=ANIMATION_STEP_MS*2;
 const ACTION_VISUALS=Object.freeze({
- zero:Object.freeze({basic:'soul-sword',skill:'soul-enhance',ultimate:'soul-storm'}),
+ soul:Object.freeze({basic:'soul-sword',skill:'soul-enhance',ultimate:'soul-storm'}),
+ zero:Object.freeze({basic:'zero-cut',skill:'zero-first-strike',ultimate:'zero-execution'}),
  lily:Object.freeze({basic:'lily-petal',skill:'lily-ricochet',ultimate:'lily-haunting'}),
  dawn:Object.freeze({basic:'dawn-star',skill:'dawn-tune',ultimate:'dawn-advance'}),
  logan:Object.freeze({basic:'logan-blood-slash',skill:'logan-blood-shield',ultimate:'logan-red-tide'})
@@ -116,8 +117,8 @@ class TwoToneTurnTimeline {
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={TwoToneTurnTimeline};
 
-sources.zeroBasicWindup='/assets/embedded-image-09.png';
-sources.zeroBasicSlash='/assets/embedded-image-10.png';
+sources.soulBasicWindup='/assets/embedded-image-09.png';
+sources.soulBasicSlash='/assets/embedded-image-10.png';
 const images={};for(const [k,src] of Object.entries(sources)){const img=new Image();img.src=src;images[k]=img;}
 const visibleSpriteBounds=new WeakMap();
 function spriteAlphaBounds(img){
@@ -132,7 +133,25 @@ function spriteAlphaBounds(img){
 }
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:false});
 const W=1600,H=900, TEAM_KEY='two-tone-demo-team-fundamental-1-v1';
-const PROGRESSION_KEY='two-tone-character-progress-v1',VITALS_KEY='two-tone-character-vitals-v1',LOADOUT_KEY='two-tone-character-loadouts-v1',PLAYER_RANK_KEY='two-tone-player-rank-v1';
+const PROGRESSION_KEY='two-tone-character-progress-v1',VITALS_KEY='two-tone-character-vitals-v1',LOADOUT_KEY='two-tone-character-loadouts-v1',PLAYER_RANK_KEY='two-tone-player-rank-v1',CHARACTER_ID_SCHEMA_KEY='two-tone-character-id-schema-v2';
+function moveLegacyCharacterRecord(value){
+ if(!value||typeof value!=='object'||Array.isArray(value))return value;
+ if(value.soul===undefined&&value.zero!==undefined)value.soul=value.zero;
+ delete value.zero;return value;
+}
+function migrateLegacyCharacterIds(){
+ try{
+  if(localStorage.getItem(CHARACTER_ID_SCHEMA_KEY)==='soul-zero-v2')return;
+  const team=JSON.parse(localStorage.getItem(TEAM_KEY)||'null');
+  if(Array.isArray(team)){const migrated=team.map(id=>id==='zero'?'soul':id);localStorage.setItem(TEAM_KEY,JSON.stringify(migrated))}
+  for(const key of [PROGRESSION_KEY,VITALS_KEY,LOADOUT_KEY]){
+   const raw=localStorage.getItem(key);if(raw===null)continue;
+   const data=moveLegacyCharacterRecord(JSON.parse(raw));localStorage.setItem(key,JSON.stringify(data));
+  }
+  localStorage.setItem(CHARACTER_ID_SCHEMA_KEY,'soul-zero-v2');
+ }catch(e){}
+}
+migrateLegacyCharacterIds();
 const CHARACTER_MAX_LEVEL=50,ASCENSION_GATES=[10,20,30,40],MAX_PARTY_SIZE=4;
 // Rank progression is not implemented yet; this value is the account Rank hook.
 function loadPlayerRank(){try{const n=Number(localStorage.getItem(PLAYER_RANK_KEY));return Number.isInteger(n)&&n>=1&&n<=50?n:1}catch(e){return 1}}
@@ -141,7 +160,8 @@ let playerRank=loadPlayerRank();
 // Numerical Base HP values are inherited/development-only combat fixtures, NOT
 // approved per-character stats. The unnamed units remain developer test slots.
 const ROSTER=[
- {id:'zero',name:'SOUL',label:'Character',hp:100,basePhysicalAttack:20,baseMagicalAttack:20,basePhysicalDefense:4,baseMagicalDefense:4,speed:20,lifesteal:0,art:'zero',test:false},
+ {id:'soul',name:'SOUL',label:'Character',hp:100,basePhysicalAttack:20,baseMagicalAttack:20,basePhysicalDefense:4,baseMagicalDefense:4,speed:20,lifesteal:0,art:'soul',test:false},
+ {id:'zero',name:'ZERO',label:'Character',hp:50,basePhysicalAttack:40,baseMagicalAttack:0,basePhysicalDefense:2,baseMagicalDefense:2,speed:40,lifesteal:0,art:'zeroBattle',test:false,passive:{id:'cutthroat',criticalRateBonus:.1,criticalDamageBonus:.25}},
  {id:'lily',name:'LILY',label:'Character',hp:100,basePhysicalAttack:0,baseMagicalAttack:30,basePhysicalDefense:4,baseMagicalDefense:4,speed:30,lifesteal:0,art:'lily',test:false},
  {id:'dawn',name:'DAWN',label:'Character',hp:50,basePhysicalAttack:0,baseMagicalAttack:40,basePhysicalDefense:2,baseMagicalDefense:6,speed:30,lifesteal:0,art:'dawn',test:false},
  {id:'logan',name:'LOGAN',label:'Character',hp:200,basePhysicalAttack:10,baseMagicalAttack:0,basePhysicalDefense:6,baseMagicalDefense:6,speed:10,lifesteal:0,art:'logan',test:false},
@@ -221,8 +241,8 @@ function calculateTypedActionDamage(type,attackRate,attacker,target){
  const damageBeforeDefense=attack*attackRate*damageDealtMultiplier(attacker);
  return {type,attackBasis:attack,defenseBasis:effectiveDefense*(1-defenseIgnore),attackRate,damageBeforeDefense,reduction,damageTaken:roundHp(damageBeforeDefense*(1-reduction))};
 }
-function criticalRateOf(unit){return Math.min(1,Math.max(0,(Number.isFinite(unit?.criticalRate)?unit.criticalRate:.1)+(Number.isFinite(unit?.criticalRateBonus)?unit.criticalRateBonus:0)+(unit?.tune?.criticalRateBonus||0)+Object.values(unit?.criticalRateModifiers||{}).reduce((sum,value)=>sum+(Number.isFinite(value)?value:0),0)))}
-function criticalDamageOf(unit){return Math.max(0,(Number.isFinite(unit?.criticalDamage)?unit.criticalDamage:.5)+(Number.isFinite(unit?.criticalDamageBonus)?unit.criticalDamageBonus:0)+(unit?.tune?.criticalDamageBonus||0)+Object.values(unit?.criticalDamageModifiers||{}).reduce((sum,value)=>sum+(Number.isFinite(value)?value:0),0))}
+function criticalRateOf(unit){return Math.min(1,Math.max(0,(Number.isFinite(unit?.criticalRate)?unit.criticalRate:.1)+(Number.isFinite(unit?.criticalRateBonus)?unit.criticalRateBonus:0)+(unit?.passive?.criticalRateBonus||0)+(unit?.tune?.criticalRateBonus||0)+Object.values(unit?.criticalRateModifiers||{}).reduce((sum,value)=>sum+(Number.isFinite(value)?value:0),0)))}
+function criticalDamageOf(unit){return Math.max(0,(Number.isFinite(unit?.criticalDamage)?unit.criticalDamage:.5)+(Number.isFinite(unit?.criticalDamageBonus)?unit.criticalDamageBonus:0)+(unit?.passive?.criticalDamageBonus||0)+(unit?.tune?.criticalDamageBonus||0)+Object.values(unit?.criticalDamageModifiers||{}).reduce((sum,value)=>sum+(Number.isFinite(value)?value:0),0))}
 function lifestealRateOf(unit){const base=(Number.isFinite(unit?.lifesteal)?unit.lifesteal:0)+(Number.isFinite(unit?.lifestealBonus)?unit.lifestealBonus:0)+Object.values(unit?.lifestealModifiers||{}).reduce((sum,value)=>sum+(Number.isFinite(value)?value:0),0),tasteForBlood=party.includes(unit)&&party.some(member=>member.id==='logan'&&member.hp>0)?(characterDuplicateRank('logan')>=4?.2:.1):0;return Math.max(0,base+tasteForBlood)}
 function shieldOf(unit){return Math.max(0,Number.isFinite(unit?.shield)?unit.shield:0)}
 function absorbShield(unit,damage){const absorbed=Math.min(shieldOf(unit),Math.max(0,damage));if(absorbed>0){unit.shield=Math.max(0,shieldOf(unit)-absorbed);emitCombatVisual('shield-absorbed',[unit.id],COMBAT_ACTION_EFFECT_MS,{damage:absorbed,remaining:unit.shield})}return absorbed}
@@ -368,7 +388,14 @@ function spawnProgressedUnit(id){
  const savedMax=Number.isFinite(saved?.maxHp)&&saved.maxHp>0?saved.maxHp:maxHp;
  const savedHp=Number.isFinite(saved?.hp)?saved.hp:maxHp;
  const hp=restore?maxHp:savedHp<=0?0:Math.max(0,roundHp(maxHp*(savedHp/savedMax)));
- return {...model,baseHp:model.hp,level:progress.level,hp,maxHp,...modifiers,shield:0,tauntEffects:[],energy:20,energyReserved:0};
+ const passive={...(model.passive||{})};
+ if(id==='zero'){
+  const premiumDuplicates=premiumWeaponDuplicateRank('zero');
+  passive.criticalRateBonus=.1+(premiumDuplicates>=4?.1:0);
+  passive.criticalDamageBonus=.25+(premiumDuplicates>=4?.25:0);
+  passive.defenseIgnore=premiumDuplicates>=3?.2:0;
+ }
+ return {...model,passive,baseHp:model.hp,level:progress.level,hp,maxHp,...modifiers,shield:0,tauntEffects:[],energy:20,energyReserved:0};
 }
 
 const turnTimeline=new TwoToneTurnTimeline();
@@ -509,7 +536,7 @@ let currentBattleAreaId=DEFAULT_BATTLE_AREA_ID,wavePreset='stress',waveOverride=
 // Soul Enhanced Basic uses Blast unless Premium Weapon Duplicate 3 changes it to AoE; Ultimate is AoE. The pattern toolbar,
 // 5-hit and support actions remain development-only controls. Damage/cost values are provisional.
 let targetingMode='single',pendingTargetAction=null,supportDemo=null,zeroSkillArmed=false,attackInProgress=false,attackSerial=0,
-     pendingVacancies=[],lastAttack=null,supportTestHistory=[],soulEnhanceStacks=0,soulFollowUpProcs=5,soulFollowUpSources=new Set(),soulEnhanceSpendingRemainder=0,soulFollowUpActivationCount=0;
+     pendingVacancies=[],lastAttack=null,supportTestHistory=[],soulEnhanceStacks=0,soulFollowUpProcs=5,soulFollowUpSources=new Set(),soulEnhanceSpendingRemainder=0,soulFollowUpActivationCount=0,zeroHitEnemyIds=new Set();
 // Fundamental 4. Numerical energy costs and debug bonuses are inherited/provisional,
 // not character-balancing approvals. No gameplay source grants an SP-cap bonus by default.
 const ULTIMATE_ENERGY_COST=100,BASE_SP_MAX=5;
@@ -534,10 +561,11 @@ function gainSp(amount,{allowOvercap=false}={}){
 }
 function availableEnergy(p){return p?Math.max(0,p.energy-(p.energyReserved||0)):0}
 function isUltPending(id){return ultimateQueue.some(q=>q.actorId===id)||(ultimateExecuting&&lastAttack?.action==='ultimate'&&lastAttack.actor===id)}
+function ultimateEnergyCost(p){return p?.id==='zero'&&premiumWeaponDuplicateRank('zero')>=2?80:ULTIMATE_ENERGY_COST}
 function canQueueUltimate(p){return !!p&&p.hp>0&&!paused&&['player','enemy','resolve'].includes(phase)
-  &&availableEnergy(p)>=ULTIMATE_ENERGY_COST&&!isUltPending(p.id)}
+  &&availableEnergy(p)>=ultimateEnergyCost(p)&&!isUltPending(p.id)}
 function emitCombatVisual(type,targetIds=[],duration=COMBAT_ACTION_EFFECT_MS,details={}){combatVisualEvents.push({type,targetIds:[...targetIds],at:performance.now(),duration,...details})}
-function resetActionResources(){const resourceful=party.some(p=>p.id==='dawn');combatVisualEvents=[];sp=resourceful?5:3;soulEnhanceStacks=0;soulFollowUpProcs=soulFollowUpLimit();soulFollowUpSources=new Set();soulEnhanceSpendingRemainder=0;soulFollowUpActivationCount=0;spCapModifiers=Object.create(null);if(resourceful){setSpCapModifier('dawn-resourceful',2);emitCombatVisual('dawn-resourceful',party.map(p=>p.id),1250)}ultimateQueue=[];ultimateSequence=0;ultimateHistory=[];ultimateResume=null;ultimateExecuting=false;
+function resetActionResources(){const resourceful=party.some(p=>p.id==='dawn');combatVisualEvents=[];sp=resourceful?5:3;soulEnhanceStacks=0;soulFollowUpProcs=soulFollowUpLimit();soulFollowUpSources=new Set();soulEnhanceSpendingRemainder=0;soulFollowUpActivationCount=0;zeroHitEnemyIds=new Set();spCapModifiers=Object.create(null);if(resourceful){setSpCapModifier('dawn-resourceful',2);emitCombatVisual('dawn-resourceful',party.map(p=>p.id),1250)}ultimateQueue=[];ultimateSequence=0;ultimateHistory=[];ultimateResume=null;ultimateExecuting=false;
   for(const p of party)p.energyReserved=0;}
 function setSpCapTestSource(source,bonus){
  if(!SP_CAP_SOURCES.has(source)||!Number.isInteger(bonus)||bonus<0||bonus>20)return false;
@@ -564,8 +592,8 @@ function cancelAllQueuedUltimates(reason){for(const q of ultimateQueue){const p=
 // actions and enemy windups are never interrupted; the queue drains at boundaries.
 function queueUltimate(id,allyTargetId=null){
  const p=party.find(p=>p.id===id);
- if(!canQueueUltimate(p)){say(!p?'Unknown ally.':p.hp<=0?'Defeated ally cannot Ult.':isUltPending(id)?'Ultimate already queued.':'Ultimate needs '+ULTIMATE_ENERGY_COST+' available energy.');return false}
- const q={actorId:id,cost:ULTIMATE_ENERGY_COST,seq:++ultimateSequence,requestedTurn:turn,allyTargetId};
+ if(!canQueueUltimate(p)){say(!p?'Unknown ally.':p.hp<=0?'Defeated ally cannot Ult.':isUltPending(id)?'Ultimate already queued.':'Ultimate needs '+ultimateEnergyCost(p)+' available energy.');return false}
+ const q={actorId:id,cost:ultimateEnergyCost(p),seq:++ultimateSequence,requestedTurn:turn,allyTargetId};
  p.energyReserved=(p.energyReserved||0)+q.cost;ultimateQueue.push(q);
  ultimateHistory.push({event:'queued',actor:id,seq:q.seq,energy:p.energy,reserved:p.energyReserved,phase});
  log=`${p.name} Ultimate queued (${ultimateQueue.length} waiting). Energy reserved, not spent.`;
@@ -613,11 +641,11 @@ function chooseAttackTargets(mode=targetingMode,primary=chosenEnemy()){
 }
 function closestSurvivingEnemy(slot){return liveEnemies().slice().sort((a,b)=>Math.abs(a.slot-slot)-Math.abs(b.slot-slot)||a.slot-b.slot)[0]||null}
 // Soul's Basic becomes Blast at three Enhance stacks; the Ultimate is AoE.
-function actionTargetMode(actor,action){const allyMode=ALLY_ACTION_TARGET_MODES[actor?.id]?.[action];if(allyMode)return allyMode;if((actor?.id==='zero'&&action==='ultimate')||(actor?.id==='lily'&&(action==='skill'||action==='ultimate'))||(actor?.id==='logan'&&action==='ultimate'))return 'aoe';if(actor?.id==='zero'&&action==='basic')return soulEnhancedBasicTargetMode(soulEnhanceStacks);if(actor?.id==='logan'&&action==='basic')return 'single';return actor?.id==='zero'&&action==='skill'?'blast':targetingMode}
+function actionTargetMode(actor,action){const allyMode=ALLY_ACTION_TARGET_MODES[actor?.id]?.[action];if(allyMode)return allyMode;if((actor?.id==='soul'&&action==='ultimate')||(actor?.id==='zero'&&action==='ultimate')||(actor?.id==='lily'&&(action==='skill'||action==='ultimate'))||(actor?.id==='logan'&&action==='ultimate'))return 'aoe';if(actor?.id==='soul'&&action==='basic')return soulEnhancedBasicTargetMode(soulEnhanceStacks);if(actor?.id==='zero'&&action==='basic')return 'blast';if(actor?.id==='zero'&&action==='skill')return 'single';if(actor?.id==='logan'&&action==='basic')return 'single';return actor?.id==='soul'&&action==='skill'?'blast':targetingMode}
 function previewTargetMode(){if(pendingTargetAction){const actor=party.find(p=>p.id===pendingTargetAction.actorId);return actionTargetMode(actor,pendingTargetAction.action)}return targetingMode}
 function beginDawnAllyTargetSelection(action,actorId){
  const actor=party.find(p=>p.id===actorId);if(!actor||actor.id!=='dawn')return false;
- if(action==='ultimate'&&!canQueueUltimate(actor)){say(actor.hp<=0?'Defeated ally cannot use an Ultimate.':'Ultimate needs '+ULTIMATE_ENERGY_COST+' available Energy.');return false}
+ if(action==='ultimate'&&!canQueueUltimate(actor)){say(actor.hp<=0?'Defeated ally cannot use an Ultimate.':'Ultimate needs '+ultimateEnergyCost(actor)+' available Energy.');return false}
  if(action==='skill'&&sp<1){say('Tune needs 1 Skill Point.');return false}
  if(pendingTargetAction?.targetSide==='ally'&&pendingTargetAction.action===action&&pendingTargetAction.actorId===actorId){
   const target=party.find(p=>p.id===selectedAllyId&&p.hp>0);
@@ -631,8 +659,8 @@ function beginDawnAllyTargetSelection(action,actorId){
 function beginTargetSelection(action,actorId=activeId){
  const actor=party.find(p=>p.id===actorId);if(!actor||actor.hp<=0)return false;
  if(actor.id==='dawn'&&(action==='skill'||action==='ultimate'))return beginDawnAllyTargetSelection(action,actorId);
- if(action==='skill'&&actor.id!=='zero'&&sp<1){say('Not enough shared SP. Basic restores 1 SP.');return false}
- if(action==='ultimate'&&!canQueueUltimate(actor)){say(actor.hp<=0?'Defeated ally cannot use an Ultimate.':'Ultimate needs '+ULTIMATE_ENERGY_COST+' available Energy.');return false}
+ if(action==='skill'&&actor.id!=='soul'&&sp<1){say('Not enough shared SP. Basic restores 1 SP.');return false}
+ if(action==='ultimate'&&!canQueueUltimate(actor)){say(actor.hp<=0?'Defeated ally cannot use an Ultimate.':'Ultimate needs '+ultimateEnergyCost(actor)+' available Energy.');return false}
  if(actionTargetMode(actor,action)==='allAllies'){
   if(pendingTargetAction?.actorId===actorId&&pendingTargetAction.action===action&&pendingTargetAction.targetScope==='all'){
    pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;return executeCombatAction(actor,action)
@@ -649,10 +677,10 @@ function cancelTargetSelection(){if(!pendingTargetAction)return false;pendingTar
 function setTargetingMode(mode){if(!['single','blast','aoe','five-hit'].includes(mode)||phase!=='player'||paused)return false;targetingMode=mode;zeroSkillArmed=false;supportDemo=null;cameraPreview='target';return true}
 function zeroSkillControl(){return activateSoulEnhance();}
 function activateSoulEnhance(){
- const a=active();if(phase!=='player'||paused||!a||a.id!=='zero'){say('Enhance is available on Soul’s turn.');return false}
+ const a=active();if(phase!=='player'||paused||!a||a.id!=='soul'){say('Enhance is available on Soul’s turn.');return false}
  if(sp<1){say('Soul Enhance needs 1 Skill Point.');return false}
  sp--;soulEnhanceStacks++;let refunded=false;
- if(loadoutFor('zero').weapon.selected==='premium'&&loadoutFor('zero').weapon.premiumOwned){soulEnhanceSpendingRemainder++;if(soulEnhanceSpendingRemainder>=3){soulEnhanceSpendingRemainder-=3;gainSp(1);refunded=true}}
+ if(loadoutFor('soul').weapon.selected==='premium'&&loadoutFor('soul').weapon.premiumOwned){soulEnhanceSpendingRemainder++;if(soulEnhanceSpendingRemainder>=3){soulEnhanceSpendingRemainder-=3;gainSp(1);refunded=true}}
  zeroSkillArmed=false;pendingTargetAction=null;cameraPreview=null;fx={kind:'self',visual:'soul-enhance',at:performance.now(),actor:a.id};
  log='SOUL ENHANCE: '+soulEnhanceStacks+' Skill Point(s) banked for the next Basic Attack.'+(refunded?' Standard signature weapon restored 1 Skill Point.':'');return true;
 }
@@ -775,7 +803,8 @@ function applyTrainingHit(enemy,damage,hitNumber,deferRicochet=false){
  if(!enemy||enemy.hp<=0||!attackInProgress)return false;
  const source=party.find(p=>p.id===lastAttack.actor)||summons.find(s=>s.id===lastAttack.actor)||null;
  const dealt=applyEnemyDamage(enemy,damage,source);
- if((lastAttack.actor!=='lily'||lastAttack.action==='summon')&&enemy.marks?.some(m=>m.id==='exposed')&&premiumWeaponDuplicateRank('lily')>=0){const lily=party.find(p=>p.id==='lily');if(lily&&loadoutFor('lily').weapon.selected==='premium'&&loadoutFor('lily').weapon.premiumOwned)lily.energy=Math.min(120,lily.energy+5)}
+ if(source?.id==='zero'&&dealt.damage>0)zeroHitEnemyIds.add(enemy.id);
+ if((lastAttack.actor!=='lily'||lastAttack.action==='summon')&&enemy.marks?.some(m=>m.id==='exposed')){const lily=party.find(p=>p.id==='lily');if(lily&&loadoutFor('lily').weapon.selected==='premium'&&loadoutFor('lily').weapon.premiumOwned)lily.energy=Math.min(120,lily.energy+5)}
  lastAttack.hits.push({index:hitNumber,target:enemy.id,slot:enemy.slot,damage:dealt.damage+dealt.breakDamage,healthDamage:dealt.healthDamage,shieldDamage:dealt.shieldDamage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,breakDamage:dealt.breakDamage,barrierAfter:enemy.barrier,broken:dealt.broken,critical:dealt.critical,criticalMultiplier:dealt.criticalMultiplier,phase:'initial'});
  if(lastAttack.actor==='lily'&&(lastAttack.action==='skill'||lastAttack.action==='ultimate')){
   emitCombatVisual('lily-exposed',[enemy.id],COMBAT_ACTION_EFFECT_MS);
@@ -784,6 +813,7 @@ function applyTrainingHit(enemy,damage,hitNumber,deferRicochet=false){
   else{enemy.marks=enemy.marks.filter(m=>m.id!=='exposed');enemy.marks.push({id:'exposed',turns:2})}
  }
  if(lastAttack.actor==='logan'&&(lastAttack.action==='basic'||lastAttack.action==='ultimate')){const logan=party.find(p=>p.id==='logan'),stacks=lastAttack.action==='basic'?(characterDuplicateRank('logan')>=1?2:1):(characterDuplicateRank('logan')>=3?2:1);applyBleed(enemy,logan,stacks)}
+ if(lastAttack.actor==='zero'&&lastAttack.action==='basic'&&premiumWeaponDuplicateRank('zero')>=1){const zero=party.find(p=>p.id==='zero');applyBleed(enemy,zero,1)}
  if(deferRicochet){if(!lastAttack.pendingRicochet)lastAttack.pendingRicochet={enemyId:enemy.id,damage:dealt.damage}}
  else triggerRicochet(lastAttack,enemy,dealt.damage);
  if(lastAttack.actor==='lily'&&lastAttack.action==='ultimate')applyLilyUltimateDebuff(enemy);
@@ -845,7 +875,7 @@ function resolveBleedTick(target){
  target.bleedStacks.shift();emitCombatVisual('bleed-tick',[target.id],1000,{damage:total,stacks:target.bleedStacks.length});syncEnemyHp();return total;
 }
 function resolveSoulFollowUp(sourceAttack){
- const soul=party.find(p=>p.id==='zero'&&p.hp>0);if(!soul||soulFollowUpProcs<=0||soulFollowUpSources.has(sourceAttack.serial))return false;
+ const soul=party.find(p=>p.id==='soul'&&p.hp>0);if(!soul||soulFollowUpProcs<=0||soulFollowUpSources.has(sourceAttack.serial))return false;
  const affected=[...new Set(sourceAttack.hits.filter(h=>h.damage>0).map(h=>h.target))].map(id=>enemies.find(e=>e.id===id)).filter(e=>e&&e.hp>0);
  if(!affected.length)return false;soulFollowUpSources.add(sourceAttack.serial);soulFollowUpProcs--;
  const attack=calculateTrueAttack(soul),dupeBonus=characterDuplicateRank(soul.id)>=2?2:1,rawTotal=Number.isFinite(attack)?roundHp(attack*.5*dupeBonus*celestialMultiplier(soul.id,'passive')):0,base=Math.floor(rawTotal/affected.length),remainder=rawTotal%affected.length;let total=0;
@@ -863,7 +893,7 @@ function finishTrainingAttack(serial){
  }
  if(lastAttack.resolutionPhase==='follow-up'){
   lastAttack.resolutionPhase='complete';
-  const soulFollowUpTriggered=lastAttack.actor&&lastAttack.actor!=='zero'&&party.some(p=>p.id===lastAttack.actor)?resolveSoulFollowUp(lastAttack):false;
+  const soulFollowUpTriggered=lastAttack.actor&&lastAttack.actor!=='soul'&&party.some(p=>p.id===lastAttack.actor)?resolveSoulFollowUp(lastAttack):false;
   if(soulFollowUpTriggered||lastAttack.followUp){
    const followUp=lastAttack.followUp;log=`Soul Follow-up • ${followUp.targets.length} ${followUp.targets.length===1?'enemy':'enemies'} take ${followUp.damage} True damage.`;
    schedule(()=>finishTrainingAttack(serial),COMBAT_ACTION_PHASE_GAP_MS);return;
@@ -876,7 +906,12 @@ function finishTrainingAttack(serial){
   const existing=summons.find(s=>s.ownerId==='lily');if(existing){summons=summons.filter(s=>s.id!==existing.id);turnTimeline.states.delete(existing.id)}
   const duration=characterDuplicateRank('lily')>=3?4:3,s={id:'lily-hauntling-'+(++summonSerial),name:'HAUNTLING',ownerId:'lily',speed:30,mode:'independent',remaining:duration,pendingCreation:false,test:false};summons.push(s);syncTurnTimeline();turnTimeline.immediateFirst(s.id);
  }
- if(lastAttack.actor==='zero'&&lastAttack.action==='ultimate'){soulFollowUpProcs=soulFollowUpLimit();soulFollowUpSources.clear();lastAttack.followUpRefill=soulFollowUpProcs}
+ if(lastAttack.actor==='soul'&&lastAttack.action==='ultimate'){soulFollowUpProcs=soulFollowUpLimit();soulFollowUpSources.clear();lastAttack.followUpRefill=soulFollowUpProcs}
+ if(lastAttack.actor==='zero'&&lastAttack.action==='ultimate'){
+  addActionAdvance('zero',100);
+  if(characterDuplicateRank('zero')>=1){for(const enemy of liveEnemies())addActionDelay(enemy.id,20);emitCombatVisual('zero-delay',liveEnemies().map(enemy=>enemy.id),COMBAT_ACTION_EFFECT_MS)}
+  if(loadoutFor('zero').weapon.selected==='premium'&&loadoutFor('zero').weapon.premiumOwned)gainSp(1);
+ }
  if(lastAttack.actor==='logan'&&lastAttack.action==='ultimate'&&characterDuplicateRank('logan')>=3)gainSp(1);
  const actingAlly=party.find(p=>p.id===lastAttack.actor);if(actingAlly){ageTaunt(actingAlly);if(lastAttack.action!=='ultimate')ageDawnTune(actingAlly);if(lastAttack.action!=='ultimate')ageResidue(actingAlly)}
  if(pendingVacancies.length){schedule(()=>completeTrainingAttack(serial),ENEMY_DEATH_BEAT_MS);return}
@@ -900,7 +935,7 @@ function setEnemyRoster(mode){if(phase!=='setup'||!['slime','wolf','mixed','slim
 const savedTeam=loadTeam();
 let draft=[...savedTeam];
 function validTeam(ids){return Array.isArray(ids)&&ids.length>=1&&ids.length<=MAX_PARTY_SIZE&&ids.every(id=>ROSTER_IDS.has(id))&&new Set(ids).size===ids.length}
-function loadTeam(){try{const a=JSON.parse(localStorage.getItem(TEAM_KEY)||'null');if(Array.isArray(a)&&a.every(id=>ROSTER_IDS.has(id))&&new Set(a).size===a.length){const saved=a.slice(0,MAX_PARTY_SIZE);if(saved.length===2&&saved[0]==='zero'&&saved[1]==='lily')return [...saved,'dawn'];return saved}}catch(e){}return ['zero','lily','dawn']}
+function loadTeam(){try{const a=JSON.parse(localStorage.getItem(TEAM_KEY)||'null');if(Array.isArray(a)&&a.every(id=>ROSTER_IDS.has(id))&&new Set(a).size===a.length){const saved=a.slice(0,MAX_PARTY_SIZE);if(saved.length===2&&saved[0]==='soul'&&saved[1]==='lily')return [...saved,'dawn'];return saved}}catch(e){}return ['soul','lily','dawn']}
 function saveTeam(){try{localStorage.setItem(TEAM_KEY,JSON.stringify(draft))}catch(e){}}
 function roster(id){return ROSTER.find(x=>x.id===id)}
 function alive(){return party.filter(x=>x.hp>0)}
@@ -982,7 +1017,7 @@ function nextTurn(){
 function play(action){
  if(phase!=='player'||paused||!['basic','skill','ultimate'].includes(action))return false;
  const a=active();if(!a||a.hp<=0)return false;
- if(action==='skill'&&a.id==='zero'){pendingTargetAction=null;cameraPreview=null;return activateSoulEnhance()}
+ if(action==='skill'&&a.id==='soul'){pendingTargetAction=null;cameraPreview=null;return activateSoulEnhance()}
  if(action==='skill'&&a.id==='dawn')return beginDawnAllyTargetSelection('skill',a.id);
  return beginTargetSelection(action,a.id);
 }
@@ -1014,11 +1049,20 @@ function executeCombatAction(a,action,ultimateSeq=null,allyTargetId=null){
  const mode=supportAction?'ally':actionTargetMode(a,action),targets=supportAction?[]:chooseAttackTargets(mode,victim);
  const controlledSummon=action==='skill'&&a.test?summons.find(s=>s.mode==='controlled'&&!s.pendingCreation&&s.ownerId===a.id):null;
  const energyBefore=a.energy,spBefore=sp,spMaxBefore=effectiveSpMax();
- let damage=0,enhanceSpent=0,soulRate=null,tuneBasicUsed=action==='basic'&&!!a.tune?.basicEnhanced;
- if(a.id==='zero'&&action==='basic'){
+ let damage=0,enhanceSpent=0,soulRate=null,zeroRate=null,tuneBasicUsed=action==='basic'&&!!a.tune?.basicEnhanced;
+ if(a.id==='soul'&&action==='basic'){
   enhanceSpent=soulEnhanceStacks;soulEnhanceStacks=0;const basicDupe=premiumWeaponDuplicateRank(a.id)>=1?2:1,skillPerPoint=characterDuplicateRank(a.id)>=4?2:1;soulRate=(basicDupe*celestialMultiplier(a.id,'basic')+enhanceSpent*skillPerPoint*celestialMultiplier(a.id,'skill'))*(tuneBasicUsed?1+a.tune.damageBonus:1);
   damage=soulDamageForTarget(a,targets[0],soulRate);a.energy=Math.min(120,a.energy+10+10*enhanceSpent);
- }else if(a.id==='zero'&&action==='ultimate'){const ultimateDupe=characterDuplicateRank(a.id)>=3?2:1;soulRate=2*ultimateDupe*celestialMultiplier(a.id,'ultimate');damage=soulDamageForTarget(a,targets[0],soulRate)}
+ }else if(a.id==='soul'&&action==='ultimate'){const ultimateDupe=characterDuplicateRank(a.id)>=3?2:1;soulRate=2*ultimateDupe*celestialMultiplier(a.id,'ultimate');damage=soulDamageForTarget(a,targets[0],soulRate)}
+ else if(a.id==='zero'&&action==='basic'){
+  zeroRate=0.5*celestialMultiplier(a.id,'basic')*(characterDuplicateRank(a.id)>=2?2:1);damage=calculateTypedActionDamage('physical',zeroRate,a,targets[0])?.damageTaken??0;a.energy=Math.min(120,a.energy+20);
+ }else if(a.id==='zero'&&action==='skill'){
+  if(sp<1){say('First Strike needs 1 Skill Point.');return false}
+  const firstStrike=!zeroHitEnemyIds.has(targets[0]?.id),base=firstStrike?1.5:1.0;
+  zeroRate=base*(characterDuplicateRank(a.id)>=4?2:1)*celestialMultiplier(a.id,'skill');damage=calculateTypedActionDamage('physical',zeroRate,a,targets[0])?.damageTaken??0;sp--;a.energy=Math.min(120,a.energy+20);
+ }else if(a.id==='zero'&&action==='ultimate'){
+  zeroRate=1.0*(characterDuplicateRank(a.id)>=3?2:1)*celestialMultiplier(a.id,'ultimate');damage=calculateTypedActionDamage('physical',zeroRate,a,targets[0])?.damageTaken??0;
+ }
  else if(a.id==='lily'&&action==='basic'){damage=calculateTypedActionDamage('magical',celestialMultiplier(a.id,'basic')*(tuneBasicUsed?1+a.tune.damageBonus:1),a,targets[0])?.damageTaken??0;a.energy=Math.min(120,a.energy+10)}
  else if(a.id==='lily'&&action==='skill'){damage=calculateTypedActionDamage('magical',0.5*celestialMultiplier(a.id,'skill'),a,targets[0])?.damageTaken??0;a.energy=Math.min(120,a.energy+20);sp=Math.max(0,sp-1)}
  else if(a.id==='lily'&&action==='ultimate'){const rate=celestialMultiplier(a.id,'ultimate')*(characterDuplicateRank(a.id)>=3?2:1);damage=calculateTypedActionDamage('magical',rate,a,targets[0])?.damageTaken??0}
@@ -1036,18 +1080,18 @@ function executeCombatAction(a,action,ultimateSeq=null,allyTargetId=null){
  const serial=++attackSerial,ricochetEligibleEnemyIds=liveEnemies().filter(enemy=>enemy.marks?.some(mark=>mark.id==='ricochet')).map(enemy=>enemy.id);
  attackInProgress=true;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;cameraPreview=null;selectedAllyId=null;
  lastAttack={serial,actor:a.id,action,mode,ultimateSeq,allyTargetId:allyTarget?.id||null,tuneBasicUsed,controlledSummonId:controlledSummon?.id||null,initialTarget:victim?.id||allyTarget?.id||null,initialTargets:targets.map(e=>e.id),
-  ricochetEligibleEnemyIds,hits:[],defeats:[],finished:false,startedAt:performance.now(),finishedAt:null,energyBefore,energyAfter:a.energy,spBefore,spAfter:sp,spMaxBefore,spMaxAfter:effectiveSpMax(),enhanceSpent,soulRate};
+  ricochetEligibleEnemyIds,hits:[],defeats:[],finished:false,startedAt:performance.now(),finishedAt:null,energyBefore,energyAfter:a.energy,spBefore,spAfter:sp,spMaxBefore,spMaxAfter:effectiveSpMax(),enhanceSpent,soulRate,zeroRate};
  phase='resolve';if(dawnSupport)selectedAllyId=allyTarget.id;const actionVisual=ACTION_VISUALS[a.id]?.[action]||`${a.id}-${action}`;fx=supportAction?{kind:'support',visual:actionVisual,at:performance.now(),damage:0,actor:a.id,targetAllyId:allyTarget?.id||null,targetAllyIds:teamWideSupport?party.filter(ally=>ally.hp>0).map(ally=>ally.id):null,action}:{kind:action,visual:actionVisual,at:performance.now(),damage,actor:a.id,targetEnemyId:victim?.id||null,targetEnemyIds:targets.map(e=>e.id),targetGeometry};
- log=a.id==='zero'?(action==='ultimate'?'SOUL ULTIMATE • INITIAL TRUE AOE':action==='basic'?'SOUL BASIC • INITIAL TRUE HIT':'SOUL '+action.toUpperCase()):a.id==='dawn'?(action==='skill'?'DAWN TUNE • '+allyTarget.name:action==='ultimate'?'DAWN ULTIMATE • '+allyTarget.name:'DAWN BASIC • INITIAL MAGICAL HIT'):a.id==='lily'?'LILY '+action.toUpperCase()+' • INITIAL HIT':a.id==='logan'?(action==='skill'?'LOGAN BLOOD SHIELD • TEAM GUARD':action==='ultimate'?'LOGAN ULTIMATE • RED TIDE AOE':'LOGAN BASIC • BLEEDING STRIKE'):'TEST '+mode.toUpperCase()+': '+a.name+' uses '+action+' • '+targets.length+' initial target(s).';
+ log=a.id==='soul'?(action==='ultimate'?'SOUL ULTIMATE • INITIAL TRUE AOE':action==='basic'?'SOUL BASIC • INITIAL TRUE HIT':'SOUL '+action.toUpperCase()):a.id==='zero'?'ZERO '+(action==='skill'?'FIRST STRIKE':action==='ultimate'?'EXECUTION':'BASIC ATTACK')+' • PHYSICAL HIT':a.id==='dawn'?(action==='skill'?'DAWN TUNE • '+allyTarget.name:action==='ultimate'?'DAWN ULTIMATE • '+allyTarget.name:'DAWN BASIC • INITIAL MAGICAL HIT'):a.id==='lily'?'LILY '+action.toUpperCase()+' • INITIAL HIT':a.id==='logan'?(action==='skill'?'LOGAN BLOOD SHIELD • TEAM GUARD':action==='ultimate'?'LOGAN ULTIMATE • RED TIDE AOE':'LOGAN BASIC • BLEEDING STRIKE'):'TEST '+mode.toUpperCase()+': '+a.name+' uses '+action+' • '+targets.length+' initial target(s).';
  if(controlledSummon)summonHistory.push({event:'controlled-activation',id:controlledSummon.id,ownerId:a.id,clock:turnTimeline.clock});
  if(mode==='five-hit'){
   let focused=victim,lastSlot=victim.slot;
   for(let n=0;n<5;n++)schedule(()=>{if(phase!=='resolve'||!attackInProgress||lastAttack?.serial!==serial)return;if(!focused||focused.hp<=0)focused=closestSurvivingEnemy(lastSlot);if(!focused)return;lastSlot=focused.slot;const part=Math.floor(damage/5)+(n<damage%5?1:0);applyTrainingHit(focused,part,n+1,true)},ANIMATION_STEP_MS*(n+1));
  }else schedule(()=>{
   if(phase!=='resolve'||!attackInProgress||lastAttack?.serial!==serial)return;
-  for(let n=0;n<targets.length;n++)if(targets[n].hp>0){let hitDamage=damage;if(a.id==='zero'&&(action==='basic'||action==='ultimate'))hitDamage=soulDamageForTarget(a,targets[n],soulRate);else if(a.id==='lily')hitDamage=calculateTypedActionDamage('magical',(action==='skill' ? 0.5 : 1)*celestialMultiplier(a.id,action)*(action==='ultimate'&&characterDuplicateRank(a.id)>=3?2:1)*(tuneBasicUsed?1+a.tune.damageBonus:1),a,targets[n])?.damageTaken??0;else if(a.id==='dawn'&&action==='basic')hitDamage=calculateTypedActionDamage('magical',2*celestialMultiplier(a.id,'basic')*(tuneBasicUsed?1+a.tune.damageBonus:1),a,targets[n])?.damageTaken??0;applyTrainingHit(targets[n],hitDamage,n+1,true)}
- },a.id==='zero'&&action==='basic'?ANIMATION_STEP_MS*3:ANIMATION_STEP_MS);
- schedule(()=>finishTrainingAttack(serial),mode==='five-hit'?ULTIMATE_PRESENTATION_MS:a.id==='zero'&&action==='basic'?SOUL_BASIC_MS:action==='ultimate'?ULTIMATE_PRESENTATION_MS:COMBAT_ACTION_EFFECT_MS);
+  for(let n=0;n<targets.length;n++)if(targets[n].hp>0){let hitDamage=damage;if(a.id==='soul'&&(action==='basic'||action==='ultimate'))hitDamage=soulDamageForTarget(a,targets[n],soulRate);else if(a.id==='zero')hitDamage=calculateTypedActionDamage('physical',zeroRate,a,targets[n])?.damageTaken??0;else if(a.id==='lily')hitDamage=calculateTypedActionDamage('magical',(action==='skill' ? 0.5 : 1)*celestialMultiplier(a.id,action)*(action==='ultimate'&&characterDuplicateRank(a.id)>=3?2:1)*(tuneBasicUsed?1+a.tune.damageBonus:1),a,targets[n])?.damageTaken??0;else if(a.id==='dawn'&&action==='basic')hitDamage=calculateTypedActionDamage('magical',2*celestialMultiplier(a.id,'basic')*(tuneBasicUsed?1+a.tune.damageBonus:1),a,targets[n])?.damageTaken??0;applyTrainingHit(targets[n],hitDamage,n+1,true)}
+ },a.id==='soul'&&action==='basic'?ANIMATION_STEP_MS*3:ANIMATION_STEP_MS);
+ schedule(()=>finishTrainingAttack(serial),mode==='five-hit'?ULTIMATE_PRESENTATION_MS:a.id==='soul'&&action==='basic'?SOUL_BASIC_MS:action==='ultimate'?ULTIMATE_PRESENTATION_MS:COMBAT_ACTION_EFFECT_MS);
  return true;
 }
 // Developer-only test helpers. They do not define the game's revival resource, cost, or eligibility rules.
@@ -1095,10 +1139,10 @@ function normalizeLoadout(value){
  return base
 }
 function loadCharacterLoadouts(){let stored={};try{stored=JSON.parse(localStorage.getItem(LOADOUT_KEY)||'{}')||{}}catch(e){}return Object.fromEntries(ROSTER.map(model=>[model.id,normalizeLoadout(stored[model.id])]))}
-let characterLoadouts=loadCharacterLoadouts(),loadoutCharacterId='zero',selectedLoadoutRune=0,loadoutPage='characters',runeStatPicker=null;
+let characterLoadouts=loadCharacterLoadouts(),loadoutCharacterId='soul',selectedLoadoutRune=0,loadoutPage='characters',runeStatPicker=null;
 function loadoutFor(id=loadoutCharacterId){return characterLoadouts[id]||(characterLoadouts[id]=defaultLoadout())}
 function saveLoadouts(){try{localStorage.setItem(LOADOUT_KEY,JSON.stringify(characterLoadouts))}catch(e){}}
-const SAVE_FILE_FORMAT='two-tone-save',SAVE_FILE_VERSION=1;
+const SAVE_FILE_FORMAT='two-tone-save',SAVE_FILE_VERSION=2;
 function saveProgressFile(){
  try{
   saveProgress();saveVitals();saveLoadouts();savePlayerRank();if(validTeam(draft))saveTeam();
@@ -1109,8 +1153,10 @@ function saveProgressFile(){
  }catch(error){say('The save file could not be created. Check available storage and try again.');return false}
 }
 function normalizeSaveFile(value){
- if(!value||typeof value!=='object'||value.format!==SAVE_FILE_FORMAT||value.version!==SAVE_FILE_VERSION||!value.data||typeof value.data!=='object')return null;
- const data=value.data,rank=data.playerRank,cap=characterLevelCap(rank);
+ if(!value||typeof value!=='object'||value.format!==SAVE_FILE_FORMAT||![1,SAVE_FILE_VERSION].includes(value.version)||!value.data||typeof value.data!=='object')return null;
+ const data={...value.data};
+ if(value.version===1){data.team=Array.isArray(data.team)?data.team.map(id=>id==='zero'?'soul':id):data.team;data.characterProgress=moveLegacyCharacterRecord({...data.characterProgress});data.vitals=moveLegacyCharacterRecord({...data.vitals});data.loadouts=moveLegacyCharacterRecord({...data.loadouts})}
+ const rank=data.playerRank,cap=characterLevelCap(rank);
  if(!cap||!validTeam(data.team)||!data.characterProgress||typeof data.characterProgress!=='object')return null;
  const progress={};for(const model of ROSTER){const entry=data.characterProgress[model.id]??defaultProgress();if(!validateProgress(entry,cap))return null;progress[model.id]={level:entry.level,exp:entry.exp,ascended:[...entry.ascended]}}
  if(data.vitals!==undefined&&(!data.vitals||typeof data.vitals!=='object'||Array.isArray(data.vitals)))return null;
@@ -1144,12 +1190,12 @@ function loadoutStatModifiers(id,characterLevel=1){
  magicalAttackFlatModifiers:{},magicalAttackPercentModifiers:pct,magicalAttackEquipmentFlatModifiers:{runes:totals.magicalAttack},
  physicalDefenseFlatModifiers:{},physicalDefensePercentModifiers:pct,physicalDefenseEquipmentFlatModifiers:{runes:totals.physicalDefense},
  magicalDefenseFlatModifiers:{},magicalDefensePercentModifiers:pct,magicalDefenseEquipmentFlatModifiers:{runes:totals.magicalDefense},
- speedFlatModifiers:{},speedPercentModifiers:pct,speedEquipmentFlatModifiers:{runes:totals.speed},criticalRateModifiers:{runes:criticalRateFromRunes,premiumWeaponDuplicate2:id==='zero'&&premiumWeaponDuplicateRank(id)>=2 ? .1 : 0},criticalDamageModifiers:{runes:criticalDamageFromRunes,premiumWeaponDuplicate2:id==='zero'&&premiumWeaponDuplicateRank(id)>=2 ? .25 : 0}}
+ speedFlatModifiers:{},speedPercentModifiers:pct,speedEquipmentFlatModifiers:{runes:totals.speed},criticalRateModifiers:{runes:criticalRateFromRunes,premiumWeaponDuplicate2:id==='soul'&&premiumWeaponDuplicateRank(id)>=2 ? .1 : 0},criticalDamageModifiers:{runes:criticalDamageFromRunes,premiumWeaponDuplicate2:id==='soul'&&premiumWeaponDuplicateRank(id)>=2 ? .25 : 0}}
 }
 function celestialMultiplier(id,key){return 1+.10*(loadoutFor(id).celestials[key]||1)}
-function characterDuplicateRank(id='zero'){return loadoutFor(id).characterDuplicates||0}
-function premiumWeaponDuplicateRank(id='zero'){const w=loadoutFor(id).weapon;return w.selected==='premium'&&w.premiumOwned?Math.max(0,w.premiumPotential-1):0}
-function soulFollowUpLimit(){return characterDuplicateRank('zero')>=1?7:5}
+function characterDuplicateRank(id='soul'){return loadoutFor(id).characterDuplicates||0}
+function premiumWeaponDuplicateRank(id='soul'){const w=loadoutFor(id).weapon;return w.selected==='premium'&&w.premiumOwned?Math.max(0,w.premiumPotential-1):0}
+function soulFollowUpLimit(){return characterDuplicateRank('soul')>=1?7:5}
 function soulEnhancedBasicTargetMode(stacks){if(stacks<3)return 'single';return premiumWeaponDuplicateRank()>=3?'aoe':'blast'}
 
 function loadoutStats(id){
@@ -1159,7 +1205,7 @@ function loadoutStats(id){
  'Physical Attack':calculatePhysicalAttack(unit),'Magical Attack':calculateMagicalAttack(unit),
  'Physical Defense':calculatePhysicalDefense(unit),'Magical Defense':calculateMagicalDefense(unit),Speed:calculateSpeed(unit)}
 }
-function enterLoadout(){loadoutCharacterId='zero';selectedLoadoutRune=0;loadoutPage='characters';runeStatPicker=null;phase='loadout';hint=''}
+function enterLoadout(){loadoutCharacterId='soul';selectedLoadoutRune=0;loadoutPage='characters';runeStatPicker=null;phase='loadout';hint=''}
 function handleLoadoutAction(action){
  const [kind,arg]=action.split(':'),record=loadoutFor(),weapon=record.weapon,rune=record.runes[selectedLoadoutRune];
  if(kind==='back'){if(runeStatPicker){runeStatPicker=null;return}if(loadoutPage==='characters')phase='menu';else if(loadoutPage==='menu')loadoutPage='characters';else loadoutPage='menu';return}
@@ -1196,7 +1242,7 @@ function loadoutCharacter(){return roster(loadoutCharacterId)}
 function drawLoadoutCharacters(){
  loadoutPanel('LOADOUT','Choose a character to open their equipment and progression menus.','MAIN MENU');
  for(let i=0;i<ROSTER.length;i++){
-  const p=ROSTER[i],y=190+i*145,active=loadoutCharacterId===p.id;
+  const p=ROSTER[i],y=190+i*125,active=loadoutCharacterId===p.id;
   rect(150,y,1300,118,'rgba(25,37,58,.94)',active?'#edcf98':'#718ba4',14);
   addButton(174,y+20,1252,78,'loadout:character:'+p.id,p.name,p.test?'PLACEHOLDER • NO LOADOUT':'LEVEL '+(progressFor(p.id)?.level||1),!p.test);
  }
@@ -1240,7 +1286,9 @@ function drawLoadoutWeapons(){
   }
  }
  rect(145,705,1310,95,'rgba(25,37,58,.94)','#536983',12);
- text('PREMIUM EFFECT • Spend 3 Enhance points to restore 1 Skill Point. Costs and acquisition are not configured.',175,755,16,'#d6e2ef','650');
+ const zeroPremiumEffect=['Ultimate restores 1 Skill Point.','Duplicate 1: Basic applies 1 Bleed stack.','Duplicate 2: Ultimate costs 80 Energy.','Duplicate 3: Ignore 20% of enemy Physical Defense.','Duplicate 4: Double Cutthroat’s bonus stats.'];
+ const premiumEffect=model.id==='soul'?'Restores 1 Skill Point after every 3 Enhance points.':model.id==='zero'?zeroPremiumEffect[Math.min(4,premiumWeaponDuplicateRank('zero'))]:'Character-specific Premium effects are listed in the character sheet.';
+ text('PREMIUM EFFECT • '+premiumEffect,175,755,16,'#d6e2ef','650');
 }
 function drawRuneStatPicker(rune){
  if(!runeStatPicker)return;
@@ -1322,7 +1370,10 @@ function drawLoadoutLevels(){
  text('Duplicate preview: '+record.characterDuplicates+' / 4',830,295,19,'#d6e2ef','700');
  addButton(830,335,95,58,'loadout:character-duplicate:-1','−','',record.characterDuplicates>0);
  addButton(940,335,95,58,'loadout:character-duplicate:1','+','',record.characterDuplicates<4);
- text('Duplicate effects currently preview without resource costs.',830,430,14,'#aebfd0','550');
+ const zeroDuplicates=['Ultimate delays all enemies by 20%.','Basic multiplier +100%.','Ultimate multiplier +100%.','First Strike multipliers +100%, including its first-hit bonus.'];
+ const soulDuplicates=['Follow Up capacity increases by 2.','Follow Up multiplier doubles.','Ultimate multiplier doubles.','Each Enhance stack adds +200% Basic damage.'];
+ const duplicateSet=model.id==='zero'?zeroDuplicates:model.id==='soul'?soulDuplicates:null;
+ text(record.characterDuplicates&&duplicateSet?`DUPLICATE ${record.characterDuplicates} • ${duplicateSet[record.characterDuplicates-1]}`:'Duplicate effects currently preview without resource costs.',830,430,14,'#aebfd0','550');
  text('Levels affect all six base combat stats.',830,490,16,'#d6e2ef','650');
  text('Current loadout bonuses are included in the stat values.',830,525,14,'#aebfd0','550');
 }
@@ -1392,7 +1443,7 @@ function drawPartySetup(){
    const p=ROSTER[i],x=172+i*247,y=520,w=230,h=132,selected=draft.includes(p.id);
   rect(x,y,w,h,selected?'rgba(35,59,76,.92)':'rgba(29,41,67,.94)',selected?'#8fbcad':'#7e97b0',11);
   text(p.name,x+18,y+33,23,'#f5e9dc','800');
-  text(p.test?'TEST PLACEHOLDER • NO CHARACTER ASSET':'CHARACTER',x+18,y+65,14,'#bdccdd','600');
+  text(p.test?'TEST PLACEHOLDER • NO CHARACTER ASSET':'CHARACTER',x+18,y+65,14,p.test?'#e5ca99':'#bdccdd','600');
   addButton(x+w-140,y+83,122,34,`add:${p.id}`,selected?'IN PARTY':'ADD','',!selected&&draft.length<MAX_PARTY_SIZE);
  }
  addButton(212,711,250,62,'main-menu','CANCEL','Discard changes');
@@ -1412,14 +1463,14 @@ function clamp01(x){return Math.min(1,Math.max(0,x))}
 // The motion is presentation-only; all damage, targeting and turn logic stays in combat actions.
 // 1250 ms: approach 0–250, hold 250–750, strike 750–1000, return 1000–1250.
 const SOUL_BASIC_MS=ANIMATION_STEP_MS*5;
-function zeroBasicStage(t){
- if(phase!=='resolve'||fx?.kind!=='basic'||fx.actor!=='zero')return null;
+function soulBasicStage(t){
+ if(phase!=='resolve'||fx?.kind!=='basic'||fx.actor!=='soul')return null;
  const dt=Math.max(0,t-fx.at);return dt<=SOUL_BASIC_MS?dt:null;
 }
 function easeOutCubic(x){x=clamp01(x);return 1-(1-x)*(1-x)*(1-x)}
 function lerp(a,b,x){return a+(b-a)*x}
-function zeroBasicTravel(t,pos){
- const dt=zeroBasicStage(t),target=fx?.targetGeometry;
+function soulBasicTravel(t,pos){
+ const dt=soulBasicStage(t),target=fx?.targetGeometry;
  if(dt===null||!target)return pos;
  // Parallax-safe destination: camera remains independent from the actor's world motion.
  let approach=dt<ANIMATION_STEP_MS?easeOutCubic(dt/ANIMATION_STEP_MS):dt<ANIMATION_STEP_MS*3?1:1-smooth01((dt-ANIMATION_STEP_MS*3)/(ANIMATION_STEP_MS*2));
@@ -1429,21 +1480,21 @@ function zeroBasicTravel(t,pos){
  const targetFeet=target.y+target.h+12;
  return {...pos,x:lerp(pos.x,targetLeft,approach),baseY:lerp(pos.baseY,targetFeet,approach),w:pos.w*scale,h:pos.h*scale};
 }
-function zeroBasicPaint(x,baseY,w,h,dt){
+function soulBasicPaint(x,baseY,w,h,dt){
  // Anchor images using their real painted-foot margins; never crop or rewrite Approved PNGs.
  const draw=(key,opacity=1)=>{const img=images[key];if(!img?.complete||!img.naturalWidth)return;
-  const m=key==='zeroBasicSlash'?{foot:485,scale:1.08,dx:-.04}:key==='zeroBasicWindup'?{foot:500,scale:1,dx:0}:{foot:512,scale:1,dx:0};
+  const m=key==='soulBasicSlash'?{foot:485,scale:1.08,dx:-.04}:key==='soulBasicWindup'?{foot:500,scale:1,dx:0}:{foot:512,scale:1,dx:0};
   const sh=h*m.scale,sw=w*m.scale;
   ctx.save();ctx.globalAlpha*=opacity;ctx.imageSmoothingEnabled=true;
   ctx.drawImage(img,x+(w-sw)/2+dxFor(m.dx,w),baseY-sh*m.foot/512,sw,sh);ctx.restore();
  };
  const mix=(before,after,a)=>{draw(before,1-a);draw(after,a)};
- if(dt<ANIMATION_STEP_MS)draw('zero');
- else if(dt<ANIMATION_STEP_MS*2)mix('zero','zeroBasicWindup',(dt-ANIMATION_STEP_MS)/ANIMATION_STEP_MS);
- else if(dt<ANIMATION_STEP_MS*3)draw('zeroBasicWindup');
- else if(dt<ANIMATION_STEP_MS*4)draw('zeroBasicSlash');
- else if(dt<ANIMATION_STEP_MS*5)mix('zeroBasicSlash','zero',(dt-ANIMATION_STEP_MS*4)/ANIMATION_STEP_MS);
- else draw('zero');
+ if(dt<ANIMATION_STEP_MS)draw('soul');
+ else if(dt<ANIMATION_STEP_MS*2)mix('soul','soulBasicWindup',(dt-ANIMATION_STEP_MS)/ANIMATION_STEP_MS);
+ else if(dt<ANIMATION_STEP_MS*3)draw('soulBasicWindup');
+ else if(dt<ANIMATION_STEP_MS*4)draw('soulBasicSlash');
+ else if(dt<ANIMATION_STEP_MS*5)mix('soulBasicSlash','soul',(dt-ANIMATION_STEP_MS*4)/ANIMATION_STEP_MS);
+ else draw('soul');
 }
 function dxFor(relative,width){return relative*width}
 function cameraShot(t=performance.now()){
@@ -1456,7 +1507,7 @@ function cameraShot(t=performance.now()){
   if(fx.kind==='support')return fx.targetAllyId?(fx.action==='ultimate'?'party':'ally-impact'):'command';
   if(fx.kind==='enemy')return dt<COMBAT_ACTION_PHASE_GAP_MS?'enemy-windup':'enemy-impact';
   if(fx.kind==='ultimate')return dt<ULTIMATE_CAMERA_INTRO_MS?'ultimate-intro':'attack-impact';
- return dt<(fx.kind==='basic'&&fx.actor==='zero'?ANIMATION_STEP_MS*2:ANIMATION_STEP_MS)?'attack-track':'attack-impact';
+ return dt<(fx.kind==='basic'&&fx.actor==='soul'?ANIMATION_STEP_MS*2:ANIMATION_STEP_MS)?'attack-track':'attack-impact';
  }
  // Animation lifetimes can end a frame before their resolution timers. Keep
  // the impact framing, but do not retain a stale party-selection shot after
@@ -1568,21 +1619,21 @@ function allyHudFxPosition(id){
 }
 function drawUnit(p,pos,view,t,acting=false){
  if(!p||!pos)return;const {x,baseY,w,h}=pos,top=baseY-h;
- const bob=Math.sin(t*.0012+(p.id==='zero'?0:1))*(p.hp>0?1.25:0);
+ const bob=Math.sin(t*.0012+(p.id==='soul'?0:1))*(p.hp>0?1.25:0);
  const select=view==='party'&&selectedAllyId===p.id;const allyTargeting=view==='party'&&pendingTargetAction?.targetSide==='ally',allTeamTargeting=allyTargeting&&pendingTargetAction?.targetScope==='all',supportAnimating=view==='ally-impact'&&phase==='resolve'&&fx?.kind==='support'&&fx.targetAllyId===p.id,eligible=view==='party'&&supportDemo?eligibleAllyTarget(p,supportDemo):allyTargeting?p.hp>0:true;
  ctx.save();ctx.translate(camera.currentX*(view==='party'?.32:.52),bob);
  ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.44,16,0,0,Math.PI*2);ctx.fillStyle='rgba(12,12,40,.45)';ctx.fill();
  if(acting||select){ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.51,22,0,0,Math.PI*2);ctx.lineWidth=4;ctx.strokeStyle=select?(allyTargeting||supportAnimating?'#55aaff':'#eaca94'):'#8be3fb';ctx.stroke()}
  if(p.hp<=0)ctx.globalAlpha=.37;
- const art=p.id==='zero'?(view==='party'||view==='ally-impact'?'zeroFront':'zero'):p.id==='lily'?(view==='party'||view==='ally-impact'?'lilyFront':'lilyBack'):p.id==='dawn'?(view==='party'||view==='ally-impact'?'dawnFront':'dawnBattle'):p.id==='logan'?(view==='party'||view==='ally-impact'?'loganFront':'loganBattle'):null;
- const zb=view==='command'&&p.id==='zero'?zeroBasicStage(t):null;
-  if(zb!==null)zeroBasicPaint(x,baseY,w,h,zb);
+ const art=p.id==='soul'?(view==='party'||view==='ally-impact'?'soulFront':'soul'):p.id==='zero'?(view==='party'||view==='ally-impact'?'zeroFront':'zeroBattle'):p.id==='lily'?(view==='party'||view==='ally-impact'?'lilyFront':'lilyBack'):p.id==='dawn'?(view==='party'||view==='ally-impact'?'dawnFront':'dawnBattle'):p.id==='logan'?(view==='party'||view==='ally-impact'?'loganFront':'loganBattle'):null;
+ const zb=view==='command'&&p.id==='soul'?soulBasicStage(t):null;
+  if(zb!==null)soulBasicPaint(x,baseY,w,h,zb);
   else if(art&&images[art]?.complete&&images[art].naturalWidth){
-  const img=images[art],fullArtwork=art==='zeroFront'||art==='lilyFront'||art==='dawnFront'||art==='loganFront';ctx.imageSmoothingEnabled=fullArtwork;
+  const img=images[art],fullArtwork=art==='soulFront'||art==='zeroFront'||art==='lilyFront'||art==='dawnFront'||art==='loganFront';ctx.imageSmoothingEnabled=fullArtwork;
   if(fullArtwork){
    // Ally targeting uses the same full-body front artwork across the entire party.
    ctx.drawImage(img,x,top,w,h);
-  }else if(art==='zero'||art==='lilyBack'||art==='loganBattle'){
+  }else if(art==='soul'||art==='zeroBattle'||art==='lilyBack'||art==='loganBattle'){
    // Fit the visible cutout to the same enlarged battle-stage height across
    // playable characters, removing transparent source-image margins.
    const b=spriteAlphaBounds(img),scale=(h*1.12)/b.h,drawW=b.w*scale,drawH=b.h*scale;
@@ -1613,7 +1664,7 @@ function drawEnemy(t,shot){const all=enemies;if(phase==='player'&&pendingTargetA
  const isActor=(shot==='enemy-windup'&&actingEnemyId===e.id)||(fx?.kind==='enemy'&&fx?.actorEnemyId===e.id&&shot==='enemy-impact');
  const sh=(isActor?1.09:shot==='attack-impact'&&fx?.targetEnemyId===e.id?1.045:1)*(e.category==='boss'?1.55:1)*((e.reinforcement&&e.enteredAt)?0.92+entryProgress*.08:1);
  const ww=e.w*sh,hh=e.h*sh,xx=e.x+camera.currentX*.43-(ww-e.w)/2,yy=e.y+(e.h-hh)+(entering?(1-entryProgress)*27:0)+(defeated?Math.pow(deathProgress,1.4)*26:0);
- const zbHit=fx?.kind==='basic'&&fx?.actor==='zero'&&fx.targetEnemyId===e.id?t-fx.at:null;
+ const zbHit=fx?.kind==='basic'&&fx?.actor==='soul'&&fx.targetEnemyId===e.id?t-fx.at:null;
  const hitKick=zbHit!==null&&zbHit>=ANIMATION_STEP_MS*3&&zbHit<ANIMATION_STEP_MS*4?Math.sin((zbHit-ANIMATION_STEP_MS*3)*.025)*(1-(zbHit-ANIMATION_STEP_MS*3)/ANIMATION_STEP_MS)*2:0;
  let spriteCenterY=yy+hh/2,spriteVisibleW=ww,spriteVisibleH=hh;const spriteOffsetX=defeated?0:hitKick,spriteOffsetY=defeated||entering?0:Math.sin(t*.0026+e.x)*2.2;
  ctx.save();ctx.globalAlpha=opacity;if(defeated)ctx.filter='grayscale(1)';ctx.translate(spriteOffsetX,spriteOffsetY);
@@ -1654,15 +1705,15 @@ function drawActorsForShot(t,shot){
   const basicLunge=fx?.kind==='basic'&&fx.actor===chosen.id?74*smooth01(dt/ANIMATION_STEP_MS)*(1-smooth01((dt-ANIMATION_STEP_MS)/(ANIMATION_STEP_MS*2))):0;
   // Enemies are in the midground; render them first, then the close foreground ally.
   drawEnemy(t,shot);
-  drawUnit(chosen,(chosen.id==='zero'&&zeroBasicStage(t)!==null)?zeroBasicTravel(t,pos):{...pos,x:pos.x+basicLunge},'command',t,phase==='player'&&cameraPreview!=='target');
+  drawUnit(chosen,(chosen.id==='soul'&&soulBasicStage(t)!==null)?soulBasicTravel(t,pos):{...pos,x:pos.x+basicLunge},'command',t,phase==='player'&&cameraPreview!=='target');
  }else{
   drawEnemy(t,shot);
  }
- if(shot==='ultimate-intro'&&chosen?.id==='zero'){
+ if(shot==='ultimate-intro'&&chosen?.id==='soul'){
   // Zero-specific development camera cut-in. A full bespoke ultimate animation remains an art dependency.
   ctx.save();ctx.globalAlpha=.92;
   rect(550,130,470,505,'rgba(17,27,51,.76)','#e6c892',22);
-  if(images.zeroFront?.complete&&images.zeroFront.naturalWidth){ctx.drawImage(images.zeroFront,644,150,279,475)}
+  if(images.soulFront?.complete&&images.soulFront.naturalWidth){ctx.drawImage(images.soulFront,644,150,279,475)}
   text('SOUL  /  ULTIMATE',784,623,29,'#fff1cc','850','center');ctx.restore();
  }
 }
@@ -1702,7 +1753,7 @@ function drawCombatSigil(x,y,r,colorName,alpha,style='ring'){
 }
 function enemyVisualPosition(id,geometry=null){const e=enemies.find(x=>x.id===id)||geometry;return e?{x:e.x+e.w/2+camera.currentX*.43,y:e.y+e.h*.55}:null}
 function drawFx(t){
- if(!fx)return;const dt=t-fx.at,duration=fx.kind==='basic'&&fx.actor==='zero'?SOUL_BASIC_MS:fx.action==='ultimate'?ULTIMATE_PRESENTATION_MS:fx.kind==='enemy'?ENEMY_ATTACK_EFFECT_MS:lastAttack?.mode==='five-hit'?ULTIMATE_PRESENTATION_MS:COMBAT_ACTION_EFFECT_MS;if(dt>duration){fx=null;return}
+ if(!fx)return;const dt=t-fx.at,duration=fx.kind==='basic'&&fx.actor==='soul'?SOUL_BASIC_MS:fx.action==='ultimate'?ULTIMATE_PRESENTATION_MS:fx.kind==='enemy'?ENEMY_ATTACK_EFFECT_MS:lastAttack?.mode==='five-hit'?ULTIMATE_PRESENTATION_MS:COMBAT_ACTION_EFFECT_MS;if(dt>duration){fx=null;return}
  const q=clamp01(dt/duration),fade=1-q,visual=fx.visual||`${fx.actor}-${fx.kind}`;
  if(fx.kind==='self'){const pos=cameraAllyPosition(fx.actor,'command');if(pos){const x=pos.x+pos.w/2+camera.currentX*.52,y=pos.baseY-pos.h*.58;drawCombatSigil(x,y,35+q*80,'#75cfff',fade,'ring');drawCombatSigil(x,y,22+q*45,'#e2f7ff',fade*.8,'star')}return}
  if(fx.kind==='support'){
@@ -1734,7 +1785,13 @@ function drawFx(t){
  if(!targets.length){const p=enemyVisualPosition(fx.targetEnemyId,fx.targetGeometry);if(p)targets.push(p)}
  for(let i=0;i<targets.length;i++){
   const {x,y}=targets[i],offset=i*85;
-  if(visual==='soul-sword'){
+  if(visual==='zero-cut'){
+   ctx.save();ctx.translate(x,y);ctx.globalAlpha=fade;ctx.lineCap='round';ctx.strokeStyle='#e64559';ctx.lineWidth=15;ctx.beginPath();ctx.moveTo(-90,72);ctx.lineTo(86,-78);ctx.stroke();ctx.strokeStyle='#fff1dc';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-94,67);ctx.lineTo(82,-82);ctx.stroke();ctx.restore();
+  }else if(visual==='zero-first-strike'){
+   ctx.save();ctx.translate(x,y);ctx.globalAlpha=fade;ctx.lineCap='round';ctx.strokeStyle='#f35667';ctx.lineWidth=11;for(let k=0;k<3;k++){const a=q*2+k*Math.PI/3;ctx.beginPath();ctx.moveTo(Math.cos(a)*-68,Math.sin(a)*-54);ctx.lineTo(Math.cos(a)*68,Math.sin(a)*54);ctx.stroke()}ctx.strokeStyle='#fff3dc';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-72,65);ctx.lineTo(74,-66);ctx.stroke();ctx.restore();
+  }else if(visual==='zero-execution'){
+   drawCombatSigil(x,y,42+q*112,'#ee5868',fade,'ring');drawCombatSigil(x,y,20+q*72,'#fff0d5',fade*.9,'star');ctx.save();ctx.translate(x,y);ctx.globalAlpha=fade;ctx.strokeStyle='#ff7e89';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(-80,-45);ctx.lineTo(80,45);ctx.moveTo(80,-45);ctx.lineTo(-80,45);ctx.stroke();ctx.restore();
+  }else if(visual==='soul-sword'){
    const a=fade*(dt>ANIMATION_STEP_MS*3?clamp01((duration-dt)/ANIMATION_STEP_MS):1);ctx.save();ctx.translate(x,y);ctx.rotate(-.4);ctx.globalAlpha=a;ctx.lineCap='round';ctx.strokeStyle='#eff8ff';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(-108,-90);ctx.quadraticCurveTo(80,-40,100,92);ctx.stroke();ctx.strokeStyle='#80dcff';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-118,-104);ctx.quadraticCurveTo(70,-55,116,85);ctx.stroke();ctx.restore();
   }else if(visual==='soul-enhance'){
    drawCombatSigil(x,y,44+q*70,'#75cfff',fade,'ring');drawCombatSigil(x,y,25+q*36,'#e2f7ff',fade*.8,'star');
@@ -1762,6 +1819,9 @@ function drawFx(t){
 function drawCombatVisualEvents(t,shot){
  combatVisualEvents=combatVisualEvents.filter(e=>t-e.at<e.duration);
  for(const event of combatVisualEvents){const q=clamp01((t-event.at)/event.duration),fade=1-q;
+  if(event.type==='zero-delay'){
+   for(const id of event.targetIds){const pos=enemyVisualPosition(id);if(!pos)continue;drawCombatSigil(pos.x,pos.y,28+q*44,'#f57482',fade,'ring');text('DELAYED 20%',pos.x,pos.y-58,13,`rgba(255,220,223,${fade})`,'900','center')}continue;
+  }
   if(event.type==='dawn-resourceful'){
    const x=W/2,y=435;drawCombatSigil(x,y,58+q*100,'#80f2ed',fade,'ring');text('RESOURCEFUL  •  +2 SP',x,y-125,24,`rgba(224,255,247,${fade})`,'900','center');continue;
   }
@@ -1811,7 +1871,7 @@ function hudPortrait(img,x,y,w,h,headShoulders=false){
  ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,10);ctx.clip();rect(x,y,w,h,'rgba(65,93,116,.42)');
  if(img?.complete&&img.naturalWidth){ctx.imageSmoothingEnabled=true;
    const iw=img.naturalWidth,ih=img.naturalHeight;
-   // Use an existing approved Zero front image as a cropped UI portrait, not the retired old portrait.
+   // Portraits use their own front-facing artwork; they never borrow battle sprites.
    const cropH=Math.min(ih,Math.round(ih*(headShoulders?.31:.49))),cropW=Math.min(iw,Math.round(cropH*w/h));
    ctx.drawImage(img,(iw-cropW)/2,0,cropW,cropH,x,y,w,h);
  }else{hudCircle(x+w/2,y+h*.39,w*.18,'#899bb1');rect(x+w*.16,y+h*.57,w*.68,h*.48,'#526e8b',null,9)}
@@ -1854,7 +1914,7 @@ function drawAllyUltimate(p,x,y,sz){
  hudCircle(cx,cy,radius,'#11233b',selected?'#55aaff':ready?'#ffdfa0':queued?'#e9b77d':'#90a6bc',selected?4:ready?4:2.5);
  ctx.shadowBlur=0;
  // Interior fill is the sole energy meter: bottom-to-top and no numeric or ring indicator.
- const availableFrac=queued?0:Math.max(0,Math.min(1,availableEnergy(p)/ULTIMATE_ENERGY_COST));
+ const availableFrac=queued?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p)));
  const inner=radius-3.3;
  ctx.save();ctx.beginPath();ctx.arc(cx,cy,inner,0,Math.PI*2);ctx.clip();
  const tint=ctx.createLinearGradient(cx,cy+inner,cx,cy-inner);
@@ -1876,13 +1936,13 @@ function drawAllyPortraitHud(){
   const portraitX=x+12,portraitY=top+10,portraitSize=112;
   ctx.save();ctx.globalAlpha=ko?.57:activeAlly?1:.84;
   rect(x,top,cardW,cardH,'rgba(14,23,42,.96)',targetSelected?'#eaca94':activeAlly?'#f3d79e':'rgba(129,164,191,.82)',12);
-  hudPortrait(p.id==='zero'?images.zeroFront:p.id==='lily'?images.lilyFront:p.id==='dawn'?images.dawnFront:p.id==='logan'?images.loganPortrait:null,portraitX,portraitY,portraitSize,portraitSize,true);
+  hudPortrait(p.id==='soul'?images.soulFront:p.id==='zero'?images.zeroFront:p.id==='lily'?images.lilyFront:p.id==='dawn'?images.dawnFront:p.id==='logan'?images.loganPortrait:null,portraitX,portraitY,portraitSize,portraitSize,true);
   if(ko)rect(portraitX,portraitY,portraitSize,portraitSize,'rgba(30,17,23,.62)',null,10);
   drawAllyUltimate(p,x+95,top-15,136);
   drawAllyStatuses(p,portraitX,portraitY,portraitSize);
   text(String(ko?0:p.hp),x+cardW-12,top+132,14,ko?'#f0afb7':'#e4f3ef','750','right');
   shieldedHealthBar(x+12,top+149,cardW-48,14,ko?0:p.hp,p.maxHp,p.shield,ko?'#b16b76':'#67e3b4','#23374d');
-  if(p.id==='zero'){
+  if(p.id==='soul'){
    const maximum=soulFollowUpLimit(),current=Math.max(0,Math.min(maximum,soulFollowUpProcs));
    const dotSize=12,pitch=22,rowWidth=(maximum-1)*pitch+dotSize,startX=x+(cardW-rowWidth)/2;
    for(let i=0;i<maximum;i++)hudCircle(startX+i*pitch+dotSize/2,top+184,dotSize/2,i<current?'#72d8f5':'rgba(65,84,108,.9)',i<current?'#d7f6ff':'#8295a9',1.8);
@@ -1949,6 +2009,7 @@ function drawHud(t){
   rect(xx,yy,64,58,now?'rgba(38,66,90,.95)':'rgba(17,28,47,.87)',now?'#f9dea5':foe?'#a77c89':'#759bbb',12);
   if(foe)hudPortrait(images[foe.art],xx+7,yy+5,49,44);
   else if(summon){hudCircle(xx+31,yy+25,19,'#508c8f','#d4f5ed',2);text('✧',xx+31,yy+25,22,'#ffffff','800','center');}
+  else if(id==='soul')hudPortrait(images.soulFront,xx+7,yy+5,49,44);
   else if(id==='zero')hudPortrait(images.zeroFront,xx+7,yy+5,49,44);
   else if(id==='lily')hudPortrait(images.lilyFront,xx+7,yy+5,49,44);
   else if(id==='dawn')hudPortrait(images.dawnFront,xx+7,yy+5,49,44);
@@ -2099,7 +2160,7 @@ canvas.addEventListener('pointerdown',e=>{e.preventDefault();const r=canvas.getB
 window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)cancelTargetSelection();if(e.key==='1')play('basic');if(e.key==='2')play('skill');if(e.key==='3')play('ultimate');if(e.key.toLowerCase()==='m'&&phase==='player')cycleSpCapTest();if(['q','w','e','f'].includes(e.key.toLowerCase())&&phase==='player')setTargetingMode(({q:'single',w:'blast',e:'aoe',f:'five-hit'})[e.key.toLowerCase()]);if(e.key.toLowerCase()==='v'&&phase==='player'){cameraPreview=cameraPreview==='party'?null:'party';selectedAllyId=activeId}if(e.key.toLowerCase()==='t'&&phase==='player')cameraPreview=cameraPreview==='target'?null:'target';if(e.key.toLowerCase()==='r'&&phase!=='setup')replay()});window.addEventListener('contextmenu',e=>e.preventDefault());
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ULTIMATE_ENERGY_COST)),statusCount:hudStatusList(p).length})),version:'v0.0.17',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.18',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
  characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
  unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}})),
@@ -2109,7 +2170,7 @@ window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLeve
  unitMagicalDefense:party.map(p=>({id:p.id,level:p.level,baseMagicalDefense:p.baseMagicalDefense,magicalDefense:calculateMagicalDefense(p),flat:{...p.magicalDefenseFlatModifiers},percent:{...p.magicalDefensePercentModifiers}})),
  unitTrueDamageBasis:party.map(p=>({id:p.id,trueAttack:calculateTrueAttack(p),trueDefense:calculateTrueDefense(p),selfTrueDamageReduction:calculateTrueDamageReduction(p,p)}))});
 window.twoToneTest={testGrantExp,testAscend,setPlayerRankForTest,setHpBonusForTest,calculateMaxHp,calculateLevelScaledStat,calculatePhysicalAttack,calculateMagicalAttack,calculatePhysicalDefense,calculateMagicalDefense,calculateTrueAttack,calculateTrueDefense,calculateTrueDamageReduction,calculateDamageAfterDefense,calculatePhysicalDamageAfterDefense,calculateMagicalDamageAfterDefense,calculateTrueDamageAfterDefense,calculateTypedActionDamage,requiredExp,setTrainingRecoveryMode,roundHp,addActionAdvance,addActionDelay,setSpeedMultiplierForTest,queueSummonForTest,turnTimelineSnapshot:()=>turnTimeline.snapshot(),queueUltimate,chargeUltimateForTest,toggleHudStatusDemo,setHudStatusesForTest:(id,items)=>{const p=party.find(p=>p.id===id);if(!p||!Array.isArray(items)||items.length>80)return false;p.hudStatuses=items.map(e=>({kind:e.kind==='debuff'?'debuff':'buff',icon:String(e.icon||'✦').slice(0,2),turns:e.turns===null?null:(Number.isInteger(e.turns)&&e.turns>=0?e.turns:null)}));return true;},setSpCapTestSource,cycleSpCapTest,canQueueUltimate,debugKOForTest:(id)=>{if(['setup','intro','victory','defeat'].includes(phase))return false;const p=party.find(p=>p.id===id);if(!p||p.hp<=0)return false;p.hp=0;gauges[p.id]=0;saveVitals();cancelQueuedUltimatesOfDefeated();return true},startBattle,addUnit,removeUnit,enterSelection,enterPartySetup,saveParty,testKO,testRevive,play,replay,zeroSkillControl,setTargetingMode,startSupportDemo,confirmSupportDemo,cancelSupportDemo,eligibleAllyTarget:(id,kind)=>eligibleAllyTarget(party.find(p=>p.id===id),kind),setEnemyHpForTest:(id,hp)=>{if(phase!=='player'||attackInProgress)return false;const e=liveEnemies().find(e=>e.id===id);if(!e||!Number.isFinite(hp)||hp<1||hp>e.maxHp)return false;e.hp=hp;syncEnemyHp();return true},applyBleedForTest:(enemyId,sourceId,stacks=1,maxStacks=5)=>{const enemy=liveEnemies().find(unit=>unit.id===enemyId),source=party.find(unit=>unit.id===sourceId);return enemy&&source?applyBleed(enemy,source,stacks,maxStacks):false},setEnemyTarget,setWavePlanForTest,toggleWavePreset,setEnemyRoster,debugDefeatEnemy:(id)=>{const e=liveEnemies().find(e=>e.id===id);if(!e||phase==='setup'||phase==='victory'||phase==='defeat')return false;e.hp=0;resolveEnemyDefeat(e);return true;},selectEnemy:(id)=>setEnemyTarget(id),setCameraPreview:(view)=>{if(phase==='player'){cameraPreview=view;selectedAllyId=activeId}},cameraStatus:()=>cameraShot()};
-window.zeroBasicAnimationDebug=()=>({durationMs:SOUL_BASIC_MS,elapsed:fx?.kind==='basic'&&fx.actor==='zero'?Math.max(0,performance.now()-fx.at):null,active:zeroBasicStage(performance.now())!==null,assets:['zero','zeroBasicWindup','zeroBasicSlash'].map(id=>({id,loaded:!!images[id]?.complete&&!!images[id]?.naturalWidth}))});
+window.zeroBasicAnimationDebug=()=>({durationMs:SOUL_BASIC_MS,elapsed:fx?.kind==='basic'&&fx.actor==='soul'?Math.max(0,performance.now()-fx.at):null,active:soulBasicStage(performance.now())!==null,assets:['soul','soulBasicWindup','soulBasicSlash'].map(id=>({id,loaded:!!images[id]?.complete&&!!images[id]?.naturalWidth}))});
 window.twoToneTest.applyTauntForTest=(targetId,sourceId,rate,turns)=>{const target=party.find(unit=>unit.id===targetId)||enemies.find(unit=>unit.id===targetId),source=party.find(unit=>unit.id===sourceId)||enemies.find(unit=>unit.id===sourceId);return target&&source?applyTaunt(target,source,rate,turns):false};
 window.twoToneTauntStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,activeRate:tauntRateOf(unit),effects:(unit.tauntEffects||[]).map(effect=>({...effect}))}));
 requestAnimationFrame(loop);

@@ -23,4 +23,5 @@ This standard applies to full-body character art rendered in battle-stage and al
 | Lily | `assets/lily-back.png` (northeast-facing) | `assets/lily-front.png` | `assets/lily-front.png` |
 | Dawn | `assets/dawn-battle.png` (side-facing) | `assets/dawn-front.png` | `assets/dawn-front.png` |
 | Logan | `assets/logan.png` (rear-facing) | `assets/logan-front.png` (front-facing) | `assets/logan-front.png` (head-and-shoulders crop) |
+| Zero | `assets/zero-battle.png` (northeast-facing) | `assets/zero.png` (front-facing full-body artwork) | `assets/zero.png` |
 

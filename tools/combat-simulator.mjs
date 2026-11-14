@@ -54,14 +54,14 @@ function validateConfig(config) {
       const taunt=instance.taunt??archetype.taunt;
       assert(taunt===undefined||(taunt&&Number.isFinite(taunt.rate)&&taunt.rate>=0&&taunt.rate<=1&&Number.isInteger(taunt.turns)&&taunt.turns>0),'Taunt needs a rate from 0 to 1 and a positive integer duration.');
       assert(archetype.basic && Number.isFinite(archetype.basic.multiplier) && ['physical', 'magical', 'true'].includes(archetype.basic.damageType), 'Archetype ' + instance.archetype + ' needs a typed Basic Attack.');
-      assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage', 'exposed', 'resourceful', 'residue', 'lethalImpact', 'bleed'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
+      assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage', 'exposed', 'resourceful', 'residue', 'lethalImpact', 'bleed', 'cutthroat'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
       for (const passive of archetype.passives || []) {
         if (passive.type === 'everyNthBasic') assert(Number.isInteger(passive.every) && passive.every > 0, 'everyNthBasic needs a positive integer interval.');
         if (passive.type === 'followUp') assert(Number.isFinite(passive.multiplier) && passive.multiplier >= 0, 'followUp needs a non-negative multiplier.');
         if (passive.type === 'rampage') assert(Number.isFinite(passive.damageBonus) && passive.damageBonus >= 0 && Number.isInteger(passive.maxStacks) && passive.maxStacks >= 0, 'rampage needs a non-negative damageBonus and a non-negative integer maxStacks.');
         if (passive.type === 'bleed') assert(Number.isInteger(passive.stacksPerHit??1)&&(passive.stacksPerHit??1)>0&&Number.isInteger(passive.maxStacks??5)&&(passive.maxStacks??5)>0,'bleed needs positive integer stacksPerHit and maxStacks.');
       }
-      assert(!archetype.skill || ['enhanceBasic', 'ricochet', 'tune', 'bloodShield'].includes(archetype.skill.type), 'Unsupported skill type in ' + instance.archetype + '.');
+      assert(!archetype.skill || ['enhanceBasic', 'ricochet', 'tune', 'bloodShield', 'firstStrike'].includes(archetype.skill.type), 'Unsupported skill type in ' + instance.archetype + '.');
       assert(!archetype.ultimate || archetype.ultimate.type==='dawnSupport'||['physical', 'magical', 'true'].includes(archetype.ultimate.damageType), 'Ultimate needs a supported damage type or support handler.');
     }
   }
@@ -125,8 +125,9 @@ function instantiate(config, side) {
       shield: Math.max(0,instance.shield??archetype.shield??0),
       criticalRate:instance.critical?.rate??archetype.critical?.rate??.1,
       criticalDamage:instance.critical?.damage??archetype.critical?.damage??.5,
-      criticalRateBonus:(archetype.criticalRateBonus||0)+(instance.criticalRateBonus||0)+(instance.archetype==='soul'&&premiumWeaponDuplicates>=2?.1:0),
-      criticalDamageBonus:(archetype.criticalDamageBonus||0)+(instance.criticalDamageBonus||0)+(instance.archetype==='soul'&&premiumWeaponDuplicates>=2?.25:0),
+      criticalRateBonus:(archetype.criticalRateBonus||0)+(instance.criticalRateBonus||0)+(instance.archetype==='soul'&&premiumWeaponDuplicates>=2?.1:0)+(instance.archetype==='zero'?.1*(premiumWeaponDuplicates>=4?2:1):0),
+      criticalDamageBonus:(archetype.criticalDamageBonus||0)+(instance.criticalDamageBonus||0)+(instance.archetype==='soul'&&premiumWeaponDuplicates>=2?.25:0)+(instance.archetype==='zero'?.25*(premiumWeaponDuplicates>=4?2:1):0),
+      defenseIgnoreBonus:instance.archetype==='zero'&&premiumWeaponDuplicates>=3?.2:0,
       lifestealRate:(instance.lifesteal??archetype.lifesteal??0)+(instance.lifestealBonus||0)+(archetype.lifestealBonus||0),
       lifestealHealing:0,
       criticalHits:0,
@@ -179,6 +180,7 @@ function instantiate(config, side) {
       energyGranted:0,
       tauntRedirectedHits:0,
       skillUses:0,
+      firstStrikeTargets:new Set(),
       turns: 0,
       ultimateCount: 0,
       followUpCount: 0,
@@ -227,7 +229,7 @@ function damageFor(attacker, target, type, multiplier) {
   const attack = attackValue(attacker, type);
   if (attack <= 0) return 0;
   const lethalImpact=attacker.passives.find(passive=>passive.type==='lethalImpact')?.defenseIgnore||0;
-  const ignore=Math.min(1,Math.max(0,(attacker.tune?.defenseIgnore||0)+lethalImpact)),resistance=Math.max(0,1-(target.residueStacks||0)*(target.residueResistanceReductionPerStack??.05)),physicalDefense=target.stats.physicalDefense*resistance*(1-ignore),magicalDefense=target.stats.magicalDefense*resistance*(1-ignore);
+  const ignore=Math.min(1,Math.max(0,(attacker.tune?.defenseIgnore||0)+(attacker.defenseIgnoreBonus||0)+lethalImpact)),resistance=Math.max(0,1-(target.residueStacks||0)*(target.residueResistanceReductionPerStack??.05)),physicalDefense=target.stats.physicalDefense*resistance*(1-ignore),magicalDefense=target.stats.magicalDefense*resistance*(1-ignore);
   let reduction;
   if (type === 'true') {
     const physicalAttack=attackValue(attacker,'physical'),magicalAttack=attackValue(attacker,'magical');
@@ -328,6 +330,7 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
     const bleedPassive=attacker.passives.find(passive=>passive.type==='bleed');
     if(bleedPassive&&target.side==='enemies'&&target.hp>0)applyBleed(target,attacker,bleedPassive.stacksPerHit??1,bleedPassive.maxStacks??5);
     hits.push({ target, damage: finalHpDamage, shieldDamage:shieldAbsorbed, barrierDamage, breakDamage, barrierRemaining: target.barrier, broken,critical:roll.critical });
+    if(attacker.archetypeId==='zero'&&finalHpDamage>0)attacker.firstStrikeTargets.add(target.id);
   }
   if (targets.length > 1) attacker.aoeCount++;
   return hits;
@@ -380,6 +383,7 @@ function chooseDawnTarget(state,actor){
  return living.filter(unit=>unit.id!==actor.id).slice().sort((a,b)=>attackValue(b,b.basic.damageType)*b.basic.multiplier-attackValue(a,a.basic.damageType)*a.basic.multiplier||a.id.localeCompare(b.id))[0]||actor;
 }
 function advanceTurn(state,unit,percent){unit.timeToNextTurn=Math.max(state.currentTime,unit.timeToNextTurn-percent/100/Math.max(unit.turnRate,EPSILON))}
+function delayTurn(state,unit,percent){unit.timeToNextTurn+=percent/100/Math.max(unit.turnRate,EPSILON)}
 function applyDawnTune(state,actor,target){
  const premium=dawnPremiumDuplicates(actor),duplicates=actor.characterDuplicates||0;
  target.tune={sourceId:actor.id,turns:duplicates>=3?2:1,skipFirstTick:target.id===actor.id,basicEnhanced:true,damageBonus:.4+(duplicates>=4 ? .4 : 0),attackBonus:duplicates>=3 ? .2 : 0,defenseIgnore:actor.weapon&&(actor.weapon.type==='standard'||actor.weapon.type==='premium') ? .2 : 0,damageReduction:premium>=1 ? .2 : 0,barrierDamageBonus:premium>=2 ? .2 : 0,criticalRateBonus:premium>=4 ? .2 : 0,criticalDamageBonus:premium>=4 ? .5 : 0};
@@ -397,14 +401,15 @@ function resolveAllyAction(state, actor) {
     actor.turnsRemaining--;if(actor.turnsRemaining<=0)actor.hp=0;return;
   }
   const ultimate = actor.ultimate;
-  if (ultimate && actor.energy >= (ultimate.energyCost ?? 100)) {
-    actor.energy -= ultimate.energyCost ?? 100;
+  const ultimateCost=actor.archetypeId==='zero'&&actor.premiumWeaponDuplicates>=2?80:(ultimate?.energyCost??100);
+  if (ultimate && actor.energy >= ultimateCost) {
+    actor.energy -= ultimateCost;
     actor.ultimateCount++;
     if(ultimate.type==='dawnSupport'&&actor.archetypeId==='dawn'){
       const target=chooseDawnTarget(state,actor),energyBefore=target.energy,spBefore=state.skillPoints;target.energy=Math.min(target.maxEnergy,target.energy+target.maxEnergy*(actor.characterDuplicates>=1?1:.5));target.energyGranted+=target.energy-energyBefore;
       state.skillPoints=Math.min(state.skillPointCap,state.skillPoints+(actor.characterDuplicates>=2?3:1));const grantedSp=state.skillPoints-spBefore;actor.skillPointsGenerated+=grantedSp;actor.skillPointsGranted+=grantedSp;advanceTurn(state,target,100);target.turnsAdvanced+=1;
     }else{
-    const duplicate=actor.archetypeId==='soul'&&actor.characterDuplicates>=3?2:actor.archetypeId==='lily'&&actor.characterDuplicates>=3?2:1;
+    const duplicate=actor.archetypeId==='soul'&&actor.characterDuplicates>=3?2:actor.archetypeId==='lily'&&actor.characterDuplicates>=3?2:actor.archetypeId==='zero'&&actor.characterDuplicates>=3?2:1;
     const loganMultiplier=actor.archetypeId==='logan'&&actor.premiumWeaponDuplicates>=3?2:1;
     const hits = runAttack(state, actor, foes, ultimate, { multiplier: ultimate.multiplier * duplicate * loganMultiplier * celestialFactor(actor, 'ultimate') });
     if(actor.archetypeId==='logan')for(const hit of hits)if(hit.target.hp>0)applyBleed(hit.target,actor,actor.characterDuplicates>=3?2:1);
@@ -413,6 +418,11 @@ function resolveAllyAction(state, actor) {
     if(actor.archetypeId==='lily')applyLilyWeakened(actor,hits.map(hit=>hit.target));
     applyRicochet(state,actor,sourceId,hits);triggerFollowUps(state, sourceId, actor.id, hits.map(hit => hit.target));
     if(actor.archetypeId==='logan'&&actor.characterDuplicates>=3){const spBefore=state.skillPoints;state.skillPoints=Math.min(state.skillPointCap,state.skillPoints+1);const grantedSp=state.skillPoints-spBefore;actor.skillPointsGenerated+=grantedSp;actor.skillPointsGranted+=grantedSp}
+    if(actor.archetypeId==='zero'){
+      advanceTurn(state,actor,100);actor.turnsAdvanced++;
+      if(actor.characterDuplicates>=1)for(const enemy of state.enemies)if(enemy.hp>0)delayTurn(state,enemy,20);
+      if(actor.weapon?.type==='premium'){const spBefore=state.skillPoints;state.skillPoints=Math.min(state.skillPointCap,state.skillPoints+1);const grantedSp=state.skillPoints-spBefore;actor.skillPointsGenerated+=grantedSp;actor.skillPointsGranted+=grantedSp}
+    }
     if (ultimate.refillFollowUps) refillPassives(actor);
     if(actor.archetypeId==='lily'&&state.enemies.some(unit=>unit.hp>0)){
       const summon={...actor,id:'hauntling-'+sourceId,name:'Hauntling',isHauntling:true,turnsRemaining:actor.characterDuplicates>=3?4:3,hp:1,maxHp:1,energy:0,ultimate:null,skill:null,basic:{damageType:'true',multiplier:1,target:'aoe'},passives:[],timeToNextTurn:state.currentTime,turnRate:actor.turnRate,turns:0,damageDealt:0,damageBreakdown:newDamageBreakdown(),damageTaken:0,supportDamageAmplified:0,shieldGranted:0,shieldReceived:0,shieldAbsorbed:0,hpSpent:0,tuneUses:0,tunesReceived:0,turnsAdvanced:0,skillPointsSpent:0,skillPointsGenerated:0,skillPointsGranted:0,energyGranted:0,tauntRedirectedHits:0,skillUses:0,followUpCount:0,ultimateCount:0,aoeCount:0};
@@ -435,6 +445,13 @@ function resolveAllyAction(state, actor) {
   if(skill?.type==='tune'&&actor.archetypeId==='dawn'&&state.skillPoints>0){
     state.skillPoints--;actor.skillPointsSpent++;state.skillUses++;actor.skillUses++;actor.energy=Math.min(actor.maxEnergy,actor.energy+(skill.energyGain??20));
     applyDawnTune(state,actor,chooseDawnTarget(state,actor));ageTune(actor);return;
+  }
+  if(skill?.type==='firstStrike'&&actor.archetypeId==='zero'&&state.skillPoints>0){
+    state.skillPoints--;actor.skillPointsSpent++;state.skillUses++;actor.skillUses++;
+    actor.energy=Math.min(actor.maxEnergy,actor.energy+(skill.energyGain??20));
+    const target=foes.slice().sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp||a.id.localeCompare(b.id))[0];
+    if(target){const first=!actor.firstStrikeTargets.has(target.id),duplicateMultiplier=actor.characterDuplicates>=4?2:1,multiplier=(first?(skill.firstHitMultiplier??1.5):skill.multiplier)*duplicateMultiplier*celestialFactor(actor,'skill'),hits=runAttack(state,actor,[target],skill,{multiplier,targetMode:'single'});const sourceId=++state.sourceSerial;triggerFollowUps(state,sourceId,actor.id,hits.map(hit=>hit.target))}
+    ageTune(actor);return;
   }
   if (skill?.type === 'enhanceBasic') {
     while (state.skillPoints > 0 && actor.enhanceStacks < (skill.maxStacks ?? Infinity)) {
@@ -460,7 +477,7 @@ function resolveAllyAction(state, actor) {
   }
   const basic = actor.basic;
   const stacks = actor.enhanceStacks;
-  const baseBasicMultiplier = basic.multiplier * (actor.archetypeId === 'soul' && actor.premiumWeaponDuplicates >= 1 ? 2 : 1) * (actor.archetypeId==='logan'&&actor.premiumWeaponDuplicates>=1?2:1);
+  const baseBasicMultiplier = basic.multiplier * (actor.archetypeId === 'soul' && actor.premiumWeaponDuplicates >= 1 ? 2 : 1) * (actor.archetypeId==='logan'&&actor.premiumWeaponDuplicates>=1?2:1) * (actor.archetypeId==='zero'&&actor.characterDuplicates>=2?2:1);
   const skillPerStack = (skill?.damagePerStack ?? 0) * (actor.archetypeId === 'soul' && actor.characterDuplicates >= 4 ? 2 : 1);
   const tunedBasicFactor=actor.tune?.basicEnhanced?1+actor.tune.damageBonus:1;
   const soulBasicMultiplier=baseBasicMultiplier * celestialFactor(actor, 'basic') + stacks * skillPerStack * celestialFactor(actor, 'skill');
@@ -469,6 +486,7 @@ function resolveAllyAction(state, actor) {
   const basicMultiplier=lilyBasic?basic.multiplier*celestialFactor(actor,'basic'):soulBasicMultiplier;
   const hits = runAttack(state, actor, foes, basic, { multiplier:basicMultiplier*tunedBasicFactor,unbuffedMultiplier:actor.tune?.basicEnhanced?basicMultiplier:undefined,targetMode });
   if(actor.archetypeId==='logan')for(const hit of hits)if(hit.target.hp>0)applyBleed(hit.target,actor,actor.characterDuplicates>=1?2:1);
+  if(actor.archetypeId==='zero'&&actor.premiumWeaponDuplicates>=1)for(const hit of hits)if(hit.target.hp>0)applyBleed(hit.target,actor,1);
   actor.basicAttackCount++;
   actor.energy = Math.min(actor.maxEnergy, actor.energy + (lilyBasic?10:(basic.energyGain ?? 0) + stacks * (skill?.energyPerStack ?? 0)));
   const skillPointsBefore=state.skillPoints;state.skillPoints = Math.min(state.skillPointCap, state.skillPoints + (basic.skillPointGain ?? 1));actor.skillPointsGenerated+=state.skillPoints-skillPointsBefore;

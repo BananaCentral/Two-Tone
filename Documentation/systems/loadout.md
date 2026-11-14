@@ -44,12 +44,14 @@ Each Celestial level adds 10% of the ability's base multiplier. This is applied 
 
 ## Character and weapon duplicates
 
-Character Duplicates are separate from weapon Potential and persist on each character's Loadout. Soul's, Lily's, and Dawn's Duplicate effects are listed in their Character Sheets.
+Character Duplicates are separate from weapon Potential and persist on each character's Loadout. Each playable character's Duplicate effects are listed in their Character Sheet.
 
 Soul's Premium signature effect at Potential 1 and above refunds 1 Skill Point after each three Skill Points spent on Enhance. Soul's Premium signature duplicates map to Premium Potential 2–5: each potential above 1 is one duplicate. Duplicate 1 doubles Basic's base multiplier; Duplicate 2 adds 10 percentage points of Critical Rate and 25 percentage points of Critical Damage; Duplicate 3 makes a 3-stack Enhanced Basic AoE; Duplicate 4 restores one Follow Up after every two Follow Up activations. Premium weapon effects only apply while Soul owns and has selected the Premium weapon.
 
 Dawn's Standard and Premium signature weapons let Tuned allies ignore 20% of enemy defenses. While the owned Premium weapon is equipped, Duplicates 1–4 add Tune damage reduction, Barrier damage, 20% Advance for its target, and Critical Rate/Critical Damage, respectively.
 
+Zero's Premium signature weapon restores 1 Skill Point when he uses his Ultimate. Its Duplicates 1–4 add Basic Attack Bleed, reduce Ultimate Energy cost to 80, grant 20% defense ignore, and double Cutthroat's Critical Rate/Critical Damage bonuses. See the [Zero Character Sheet](../characters/zero.md) for exact values and trigger rules.
+
 ## Prototype boundaries
 
-The Loadout screen persists weapon potential, rune configuration, Celestial levels, and character Duplicate level locally. Its upgrade controls do not charge resources because upgrade costs have not been defined. Premium weapons remain locked until Store acquisition is implemented. Rune-set choices/passives and weapon effects without character-specific definitions remain pending. Premium Potential 2–5 map to weapon Duplicates 1–4. The current playable roster is Soul, Lily, and Dawn; Premium effects require an owned, equipped Premium weapon.
+The Loadout screen persists weapon potential, rune configuration, Celestial levels, and character Duplicate level locally. Its upgrade controls do not charge resources because upgrade costs have not been defined. Premium weapons remain locked until Store acquisition is implemented. Rune-set choices/passives and weapon effects without character-specific definitions remain pending. Premium Potential 2–5 map to weapon Duplicates 1–4. Premium effects require an owned, equipped Premium weapon.

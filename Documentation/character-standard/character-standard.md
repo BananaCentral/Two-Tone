@@ -50,6 +50,10 @@ A field that does not apply must be marked as not applicable. Ability-specific e
 
 An ability-specific SP exception must be stated in both the character sheet and implementation. Enemy attacks do not restore party SP. The Skill Point Standard and Turn Order Standard define shared resource and timing rules.
 
+## Per-target first-hit effects
+
+An ability whose multiplier depends on the first time its user hits a particular target tracks that state per target and per battle. Any successful damaging action by that character counts as a hit unless the ability explicitly narrows the trigger. The record resets when a new battle starts. A character sheet must state the first-hit multiplier, subsequent multiplier, and what counts as a successful hit.
+
 ## Character Entry Template
 
 ```text

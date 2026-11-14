@@ -34,6 +34,7 @@ This standard defines how combat turns are scheduled and how actions affect turn
 - Taunt duration decreases at the start of its bearer's scheduled turn. Automatic target selection resolves active Taunts by rate before falling back to its normal target. See the [Taunt Standard](../taunt-standard.md).
 - Advance moves a unit's next turn earlier; Delay moves it later. Effects stack, and enough Advance can bring a turn forward to the current timeline position.
 - Action Advance is expressed as a percentage of one turn interval. Dawn's Ultimate advances its selected ally by 100%; her Premium Weapon Duplicate 3 advances the selected Tune target by 20% when Tune is applied.
+- An Ultimate user's self-advance applies after that Ultimate resolves. Zero's Ultimate advances Zero by 100%, bringing his next scheduled turn to the current timeline position; Character Duplicate 1 delays each surviving enemy by 20% of that enemy's turn interval.
 - When a wave changes, the timeline continues. Living allies keep their place; new enemies join from the current timeline position.
 - A replacement enemy joins as a new unit from the current timeline position.
 
