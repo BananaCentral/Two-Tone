@@ -21,7 +21,7 @@ Enemy Critical Rate and Critical Damage are hidden combat values governed by the
 
 ## Boss Health Bars
 
-- A Boss uses a dedicated screen-space health display at the top of the screen while it is on the field. Do not show a duplicate HP bar above its battlefield sprite; its Barrier bar remains above the sprite.
+- A Boss uses a dedicated screen-space display at the top of the screen while it is on the field. Show its Barrier bar above its HP bar rows, with current and maximum Barrier values. Do not show an enemy nameplate, Barrier bar, or duplicate HP bar above its battlefield sprite.
 - Each Boss has one health bar by default and may define up to three with the `healthBars` field. Non-Boss enemies use one health bar.
 - Stack the Boss's health bars in rows. Put one dot immediately to the left of each row; the total dot count shows the Boss's total number of health bars. Dim a dot after its corresponding bar is depleted.
 - Divide the Boss's existing Max HP evenly across its bars. Damage drains the bars in order and carries across boundaries. The bars do not multiply Max HP or restore HP when a segment is depleted; the Boss is defeated when total HP reaches zero.

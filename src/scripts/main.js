@@ -1518,10 +1518,12 @@ function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&pendin
  if(e.hp<=0)continue;
  if(isActor){ctx.strokeStyle='#b7e6ff';ctx.lineWidth=4;ctx.strokeRect(xx-8,yy-6,ww+16,hh+13)}
  if(patternHit){const ringRadius=Math.max(spriteVisibleW,spriteVisibleH)/2+8;ctx.beginPath();ctx.arc(xx+ww/2+spriteOffsetX,spriteCenterY+spriteOffsetY,ringRadius,0,Math.PI*2);ctx.strokeStyle='#55aaff';ctx.lineWidth=4;ctx.stroke()}
- rect(xx-3,yy-58,ww+6,30,'#1c2843e8','#8d96a9',6);
- text(e.name,xx+ww/2,yy-43,14,'#fff4e8','800','center');
- line(xx+2,yy-25,ww-4,e.maxBarrier?e.barrier/e.maxBarrier:0,'#c4c9d2','#626a75',8);
- if(e.category!=='boss')segmentedHealthBar(xx+2,yy-13,ww-4,11,e.hp,e.maxHp,e.healthBars,isFocus?'#ffd88e':'#ff8276','#4b2637');
+ if(e.category!=='boss'){
+  rect(xx-3,yy-58,ww+6,30,'#1c2843e8','#8d96a9',6);
+  text(e.name,xx+ww/2,yy-43,14,'#fff4e8','800','center');
+  line(xx+2,yy-25,ww-4,e.maxBarrier?e.barrier/e.maxBarrier:0,'#c4c9d2','#626a75',8);
+  segmentedHealthBar(xx+2,yy-13,ww-4,11,e.hp,e.maxHp,e.healthBars,isFocus?'#ffd88e':'#ff8276','#4b2637');
+ }
  if(e.brokenTurns>0)text('BROKEN '+e.brokenTurns,xx+ww/2,yy+9,12,'#9cecff','800','center');
  if(phase==='player'&&!paused&&cameraPreview!=='party')choiceRects.push({x:xx-13,y:yy-64,w:ww+26,h:hh+74,action:'enemy-target:'+e.id,enabled:true});
  }}
@@ -1825,16 +1827,19 @@ function drawHud(t){
   text(now?'NOW':String(i+1),xx+54,yy+48,10,now?'#fff2cb':'#bacbdf','850','right');
  }
  ctx.restore();
- // Boss HP is a screen-space display. Each dot corresponds to one equal share
- // of the boss's total HP and sits immediately left of its health bar.
+ // Boss barrier and HP are screen-space displays. The barrier sits above the
+ // health rows; each dot sits immediately left of its corresponding HP bar.
  const bossOnField=liveEnemies().find(e=>e.category==='boss');
  if(bossOnField){
-  const bx=342,by=12,bw=970,bars=bossOnField.healthBars||1,bh=42+bars*14,segmentMax=bossOnField.maxHp/bars;
+  const bx=342,by=12,bw=970,bars=bossOnField.healthBars||1,bh=54+bars*14,segmentMax=bossOnField.maxHp/bars;
   rect(bx,by,bw,bh,'rgba(10,16,31,.86)','rgba(244,202,139,.62)',12);
   text(`BOSS  •  ${bossOnField.name}`,bx+18,by+18,17,'#fff0d4','850');
   text(`HP ${bossOnField.hp} / ${bossOnField.maxHp}`,bx+bw-18,by+18,15,'#f0e7eb','750','right');
+  text('BARRIER',bx+18,by+34,12,'#cbd7e4','800');
+  line(bx+100,by+30,bw-220,bossOnField.maxBarrier?bossOnField.barrier/bossOnField.maxBarrier:0,'#c4c9d2','#3e485a',8);
+  text(`${bossOnField.barrier} / ${bossOnField.maxBarrier}`,bx+bw-18,by+34,12,'#d5e0ec','750','right');
   for(let i=0;i<bars;i++){
-   const segmentHp=Math.max(0,Math.min(segmentMax,bossOnField.hp-i*segmentMax)),ratio=segmentMax?segmentHp/segmentMax:0,rowY=by+36+i*14;
+   const segmentHp=Math.max(0,Math.min(segmentMax,bossOnField.hp-i*segmentMax)),ratio=segmentMax?segmentHp/segmentMax:0,rowY=by+48+i*14;
    const remaining=segmentHp>0;hudCircle(bx+19,rowY+4,5,remaining?'#f3c778':'#43485a',remaining?'#fff0c5':'#72798a',2);
    line(bx+34,rowY,bw-52,ratio,ratio<1&&ratio>0?'#ffd57c':'#ee7882','#3e2938',8);
   }
