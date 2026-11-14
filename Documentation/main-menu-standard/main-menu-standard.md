@@ -31,6 +31,12 @@ The main menu displays the player's Rank, as defined in the Rank Standard.
 - Save files have an explicit format name and version. Loading must validate the entire file before replacing local progress.
 - Local browser storage remains the active device's automatic save; file export lets the player carry or back up progress.
 
+## Fullscreen and Home Screen App
+
+- Show a fullscreen control where the browser supports the Fullscreen API.
+- iPhone Safari does not allow a web page to force arbitrary content into fullscreen. Explain that players can use **Share → Add to Home Screen**, then launch Two-Tone from its icon to hide Safari's browser controls.
+- Declare standalone display metadata so installed Home Screen versions open as an app. Hide the fullscreen control when already running standalone.
+
 ## Placeholder Sections
 
 - Sections may appear before they are implemented.

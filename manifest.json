@@ -1,0 +1,11 @@
+{
+  "name": "Two-Tone",
+  "short_name": "Two-Tone",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#090e1a",
+  "theme_color": "#0d111f"
+}

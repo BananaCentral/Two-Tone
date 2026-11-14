@@ -1912,16 +1912,20 @@ function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRect
  case 'hp-test-percent':{const a=active();if(a)setHpBonusForTest(a.id,'debug-percent','percent',(a.hpPercentModifiers['debug-percent']||0)+.2);break}default:zeroSkillArmed=false;play(cmd)}return}}
 const screenElement=document.getElementById('screen'),fullscreenButton=document.getElementById('fullscreen-toggle');
 function isFullscreen(){return document.fullscreenElement===screenElement||document.webkitFullscreenElement===screenElement}
-function syncFullscreenButton(){const active=isFullscreen();fullscreenButton.textContent=active?'×':'⛶';fullscreenButton.setAttribute('aria-label',active?'Exit fullscreen':'Enter fullscreen');fullscreenButton.title=active?'Exit fullscreen':'Enter fullscreen'}
+function isStandaloneApp(){return navigator.standalone===true||window.matchMedia?.('(display-mode: standalone)').matches||window.matchMedia?.('(display-mode: fullscreen)').matches}
+function isIPhoneBrowser(){return /iPhone|iPod/i.test(navigator.userAgent)&&!isStandaloneApp()}
+function syncFullscreenButton(){const active=isFullscreen();document.body.classList.toggle('standalone-app',isStandaloneApp());fullscreenButton.textContent=active?'×':'⛶';fullscreenButton.setAttribute('aria-label',active?'Exit fullscreen':'Enter fullscreen');fullscreenButton.title=active?'Exit fullscreen':'Enter fullscreen'}
 async function toggleFullscreen(){
  try{
+  if(isStandaloneApp()){say('Two-Tone is already open as a Home Screen app.');return}
   if(isFullscreen()){if(document.exitFullscreen)await document.exitFullscreen();else if(document.webkitExitFullscreen)document.webkitExitFullscreen();return}
   if(screenElement.requestFullscreen)await screenElement.requestFullscreen({navigationUI:'hide'});
   else if(screenElement.webkitRequestFullscreen)screenElement.webkitRequestFullscreen();
-  else{say('Fullscreen is not supported in this browser. Try Add to Home Screen from the browser menu.');return}
- }catch(error){say('Fullscreen was blocked by the browser. Try Add to Home Screen from the browser menu.')}
+  else if(isIPhoneBrowser())say('On iPhone: Share → Add to Home Screen, then open Two-Tone from its icon.');
+  else say('This browser blocks page fullscreen. Try opening Two-Tone as a Home Screen app.');
+ }catch(error){if(isIPhoneBrowser())say('On iPhone: Share → Add to Home Screen, then open Two-Tone from its icon.');else say('Fullscreen was blocked by the browser. Try opening Two-Tone as a Home Screen app.')}
 }
-fullscreenButton.addEventListener('click',toggleFullscreen);document.addEventListener('fullscreenchange',syncFullscreenButton);document.addEventListener('webkitfullscreenchange',syncFullscreenButton);
+fullscreenButton.addEventListener('click',toggleFullscreen);document.addEventListener('fullscreenchange',syncFullscreenButton);document.addEventListener('webkitfullscreenchange',syncFullscreenButton);syncFullscreenButton();
 const saveFileInput=document.getElementById('save-file-picker');saveFileInput.addEventListener('change',async()=>{const file=saveFileInput.files?.[0];if(!file)return;if(file.size>2_000_000){say('This save file is too large to load.');saveFileInput.value='';return}try{importSaveFile(JSON.parse(await file.text()))}catch(error){say('This file could not be read as a Two-Tone save.')}finally{saveFileInput.value=''}});
 canvas.addEventListener('pointerdown',e=>{e.preventDefault();const r=canvas.getBoundingClientRect();choose((e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height)},{passive:false});
 window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)cancelTargetSelection();if(e.key==='1')play('basic');if(e.key==='2')play('skill');if(e.key==='3')play('ultimate');if(e.key.toLowerCase()==='m'&&phase==='player')cycleSpCapTest();if(['q','w','e','f'].includes(e.key.toLowerCase())&&phase==='player')setTargetingMode(({q:'single',w:'blast',e:'aoe',f:'five-hit'})[e.key.toLowerCase()]);if(e.key.toLowerCase()==='v'&&phase==='player'){cameraPreview=cameraPreview==='party'?null:'party';selectedAllyId=activeId}if(e.key.toLowerCase()==='t'&&phase==='player')cameraPreview=cameraPreview==='target'?null:'target';if(e.key.toLowerCase()==='r'&&phase!=='setup')replay()});window.addEventListener('contextmenu',e=>e.preventDefault());
