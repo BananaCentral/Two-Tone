@@ -14,6 +14,13 @@ Each allied character card presents combat information in this order:
 
 Portrait and Ultimate controls should remain visually prominent, with enough spacing for the HP bar and passive indicator.
 
+## Shield Layer
+
+- When a unit has Shield, draw a translucent gray layer over the green HP bar. Keep the green fill visible beneath it.
+- Extend the gray layer beyond the current HP fill to show the additional Shield buffer, with a small reserved extension past the normal HP scale.
+- Do not show a numeric Shield total on ally cards. Use the same visual treatment on enemy and boss HP bars; Shield text feedback may say `BLOCKED` without a numeric Shield value.
+- Increase card height as needed to keep the layered bar and passive indicators clear. Current cards use 210 px height.
+
 ## Soul Follow Up Indicator
 
 - Do not display the passive name or a numeric current/maximum label on Soul's battle card.

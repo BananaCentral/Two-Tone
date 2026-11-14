@@ -18,7 +18,7 @@ Shields are a per-unit damage buffer. They are separate from HP and enemy Barrie
 
 ## Display
 
-Show current Shield separately from HP and Barrier in battle HUDs. When Shield absorbs damage, display the absorbed amount and remaining Shield so the player can follow the damage sequence.
+Show Shield as a translucent gray layer over the green HP bar. Extend the gray layer past the current HP fill to visualize the Shield buffer, with a small amount of extra room beyond the HP scale. Keep HP green visible through the layer. Do not print the current Shield total on ally cards or enemy and boss HUDs. Increase the ally battle card height to give the layered bar room. Damage feedback may still identify how much damage a Shield absorbed.
 
 ## Runtime
 

@@ -1030,6 +1030,12 @@ function segmentedHealthBar(x,y,w,h,hp,maxHp,bars=1,fill='#ff8276',background='#
  const count=Math.max(1,Math.min(3,Number.isInteger(bars)?bars:1)),gap=count>1?3:0,segmentWidth=(w-gap*(count-1))/count,segmentMax=maxHp/count;
  for(let i=0;i<count;i++){const amount=Math.max(0,Math.min(segmentMax,hp-i*segmentMax));line(x+i*(segmentWidth+gap),y,segmentWidth,segmentMax?amount/segmentMax:0,fill,background,h)}
 }
+function shieldedHealthBar(x,y,w,h,hp,maxHp,shield,fill='#72e3ae',background='#303649'){
+ line(x,y,w,maxHp?hp/maxHp:0,fill,background,h);
+ if(!(shield>0)||!(maxHp>0))return;
+ const extra=Math.min(w*.12,Math.max(3,w*shield/maxHp)),covered=Math.min(w*1.12,w*Math.max(0,hp/maxHp)+extra);
+ ctx.save();ctx.fillStyle='rgba(178,187,196,.48)';ctx.beginPath();ctx.roundRect(x,y-4,covered,h+8,Math.min(7,(h+8)/2));ctx.fill();ctx.restore();
+}
 function addButton(x,y,w,h,action,label,sub='',enabled=true){choiceRects.push({x,y,w,h,action,enabled});rect(x,y,w,h,enabled?'#263754':'#1d2538',enabled?'#a5c9dc':'#526176',11);text(label,x+w/2,y+h/2-(sub?10:0),19,enabled?'#fff4e6':'#9eafc1','750','center');if(sub)text(sub,x+w/2,y+h/2+16,13,'#bacadb','500','center')}
 function drawBackground(){ctx.imageSmoothingEnabled=false;if(images.arena.complete&&images.arena.naturalWidth)ctx.drawImage(images.arena,0,0,W,H);else{rect(0,0,W,H,'#596f83');rect(0,480,W,420,'#a38f9e')}rect(0,0,W,165,'rgba(8,10,22,.24)');const shade=ctx.createLinearGradient(0,580,0,900);shade.addColorStop(0,'#17122500');shade.addColorStop(1,'#090d23dc');rect(0,560,W,340,shade)}
 
@@ -1579,9 +1585,8 @@ function drawEnemy(t,shot){const all=combatEnemies();if(phase==='player'&&pendin
  if(e.category!=='boss'){
   rect(xx-3,yy-68,ww+6,27,'#1c2843e8','#8d96a9',6);
   text(e.name,xx+ww/2,yy-55,13,'#fff4e8','800','center');
-  if(e.shield>0)line(xx+2,yy-37,ww-4,Math.min(1,e.shield/e.maxHp),'#81dcff','#344c62',5);
   line(xx+2,yy-29,ww-4,e.maxBarrier?e.barrier/e.maxBarrier:0,'#c4c9d2','#626a75',6);
-  segmentedHealthBar(xx+2,yy-19,ww-4,10,e.hp,e.maxHp,e.healthBars,isFocus?'#ffd88e':'#ff8276','#4b2637');
+  shieldedHealthBar(xx+2,yy-19,ww-14,10,e.hp,e.maxHp,e.shield,isFocus?'#ffd88e':'#ff8276','#4b2637');
  }
  if(e.brokenTurns>0)text('BROKEN '+e.brokenTurns,xx+ww/2,yy+9,12,'#9cecff','800','center');
  if(phase==='player'&&!paused&&cameraPreview!=='party')choiceRects.push({x:xx-13,y:yy-64,w:ww+26,h:hh+74,action:'enemy-target:'+e.id,enabled:true});
@@ -1685,7 +1690,7 @@ function drawFx(t){
    else if(fx.visual==='slime-leader-blast'){drawCombatSigil(x,y,33+q*48,'#a9ff54',fade,'ring');for(let i=0;i<5;i++){ctx.fillStyle=i%2?'#caff78':'#82e62d';const a=i*Math.PI*2/5+q*2;ctx.beginPath();ctx.arc(x+Math.cos(a)*(35+q*15),y+Math.sin(a)*(34+q*14),8,0,Math.PI*2);ctx.fill()}}
    else if(fx.visual==='slime-monster-wave'){drawCombatSigil(x,y,65+q*100,'#8fe328',fade,'ring');ctx.fillStyle='#b7ff4c';for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(x-26+i*26,y-34-Math.sin(i+q*5)*18,10,0,Math.PI*2);ctx.fill()}}
    else{ctx.strokeStyle='#ff8997';ctx.lineWidth=11;ctx.lineCap='round';for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(x-54+i*15,y-66);ctx.lineTo(x+45+i*15,y+55);ctx.stroke()}}
-   ctx.restore();if(dt>100){const damage=hit.healthDamage??hit.damage??fx.damage;if(damage>0)text('-'+damage,x,y-65,34,hit.critical?'#ffd66e':'#ff9d9e','900','center');else if(hit.shieldDamage>0)text('BLOCKED',x,y-65,20,'#b6efff','900','center');if(hit.shieldDamage>0)text(`SHIELD -${hit.shieldDamage}`,x,y-96,14,'#b6efff','900','center');if(hit.critical)text('CRITICAL',x,y-122,14,'#ffe9a9','900','center')}}return;
+   ctx.restore();if(dt>100){const damage=hit.healthDamage??hit.damage??fx.damage;if(damage>0)text('-'+damage,x,y-65,34,hit.critical?'#ffd66e':'#ff9d9e','900','center');else if(hit.shieldDamage>0)text('BLOCKED',x,y-65,20,'#b6efff','900','center');if(hit.critical)text('CRITICAL',x,y-96,14,'#ffe9a9','900','center')}}return;
  }
  const targetIds=fx.targetEnemyIds?.length?fx.targetEnemyIds:[fx.targetEnemyId],targets=targetIds.map(id=>enemyVisualPosition(id,fx.targetGeometry)).filter(Boolean);
  if(!targets.length){const p=enemyVisualPosition(fx.targetEnemyId,fx.targetGeometry);if(p)targets.push(p)}
@@ -1714,7 +1719,7 @@ function drawFx(t){
    ctx.save();ctx.translate(x,y);ctx.rotate(-.35);ctx.strokeStyle=`rgba(255,247,238,${fade})`;ctx.lineWidth=12;ctx.beginPath();ctx.ellipse(0,0,90+80*q,32+80*q,0,0,Math.PI*1.65);ctx.stroke();ctx.restore();
   }
  }
- if(dt>100){const hits=(lastAttack?.hits||[]).filter(h=>h.phase==='initial'),ids=[...new Set(hits.filter(h=>h.damage>0).map(h=>h.target))];for(const id of ids){const p=enemyVisualPosition(id);if(!p)continue;const amount=hits.filter(h=>h.target===id).reduce((sum,h)=>sum+(h.healthDamage??h.damage??0),0),shielded=hits.filter(h=>h.target===id).reduce((sum,h)=>sum+(h.shieldDamage||0),0);if(amount>0)text('-'+amount,p.x,p.y-50,33,'#fff0ba','900','center');if(shielded>0)text(`SHIELD -${shielded}`,p.x,p.y-80,14,'#b6efff','900','center');if(hits.some(h=>h.target===id&&h.critical))text('CRITICAL',p.x,p.y-110,14,'#ffe9a9','900','center')}}
+ if(dt>100){const hits=(lastAttack?.hits||[]).filter(h=>h.phase==='initial'),ids=[...new Set(hits.filter(h=>h.damage>0).map(h=>h.target))];for(const id of ids){const p=enemyVisualPosition(id);if(!p)continue;const amount=hits.filter(h=>h.target===id).reduce((sum,h)=>sum+(h.healthDamage??h.damage??0),0),shielded=hits.some(h=>h.target===id&&(h.shieldDamage||0)>0);if(amount>0)text('-'+amount,p.x,p.y-50,33,'#fff0ba','900','center');else if(shielded)text('BLOCKED',p.x,p.y-50,17,'#b6efff','900','center');if(hits.some(h=>h.target===id&&h.critical))text('CRITICAL',p.x,p.y-80,14,'#ffe9a9','900','center')}}
 }
 function drawCombatVisualEvents(t,shot){
  combatVisualEvents=combatVisualEvents.filter(e=>t-e.at<e.duration);
@@ -1738,7 +1743,7 @@ function drawCombatVisualEvents(t,shot){
   }
   if(event.type==='shield-applied'||event.type==='shield-absorbed'||event.type==='logan-signature-heal'){
    const view=shotWorld(shot)==='reverse'?'party':'command',pan=view==='party'?.32:.52;
-   for(const id of event.targetIds){const ally=party.find(unit=>unit.id===id),allyPosition=ally&&cameraAllyPosition(id,view),enemyPosition=!ally&&enemyVisualPosition(id);const x=allyPosition?allyPosition.x+allyPosition.w/2+camera.currentX*pan:enemyPosition?.x,y=allyPosition?allyPosition.baseY-allyPosition.h*.62:enemyPosition?.y;if(!Number.isFinite(x)||!Number.isFinite(y))continue;const isShield=event.type!=='logan-signature-heal',amount=event.shield??event.damage??event.healing??0;drawCombatSigil(x,y,28+q*20,isShield?'#83dcff':'#6ef0a5',fade,'ring');const label=event.type==='shield-applied'?`SHIELD +${amount}`:event.type==='shield-absorbed'?`SHIELD -${amount}`:`TASTE FOR BLOOD +${amount}`;text(label,x,y-54,14,isShield?`rgba(203,243,255,${fade})`:`rgba(193,255,216,${fade})`,'900','center')}
+   for(const id of event.targetIds){const ally=party.find(unit=>unit.id===id),allyPosition=ally&&cameraAllyPosition(id,view),enemyPosition=!ally&&enemyVisualPosition(id);const x=allyPosition?allyPosition.x+allyPosition.w/2+camera.currentX*pan:enemyPosition?.x,y=allyPosition?allyPosition.baseY-allyPosition.h*.62:enemyPosition?.y;if(!Number.isFinite(x)||!Number.isFinite(y))continue;const isShield=event.type!=='logan-signature-heal';drawCombatSigil(x,y,28+q*20,isShield?'#aeb5bd':'#6ef0a5',fade,'ring');const label=event.type==='shield-applied'?'SHIELD APPLIED':event.type==='shield-absorbed'?'SHIELD ABSORBED':`TASTE FOR BLOOD +${event.healing||0}`;text(label,x,y-54,14,isShield?`rgba(218,223,229,${fade})`:`rgba(193,255,216,${fade})`,'900','center')}
    continue;
   }
   if(event.type==='slime-residue'){
@@ -1825,7 +1830,7 @@ function drawAllyUltimate(p,x,y,sz){
 }
 function drawAllyPortraitHud(){
  // Wide lower-screen cards emphasize the portrait and ultimate while keeping HP and passive indicators legible.
- const cardW=248,cardH=194,gap=12,top=678,total=party.length*cardW+Math.max(0,party.length-1)*gap;
+ const cardW=248,cardH=210,gap=12,top=678,total=party.length*cardW+Math.max(0,party.length-1)*gap;
  let x=Math.max(16,Math.round((1060-total)/2));
  for(const p of party){
   const activeAlly=phase==='player'&&activeId===p.id&&p.hp>0,ko=p.hp<=0;
@@ -1837,13 +1842,12 @@ function drawAllyPortraitHud(){
   if(ko)rect(portraitX,portraitY,portraitSize,portraitSize,'rgba(30,17,23,.62)',null,10);
   drawAllyUltimate(p,x+95,top-11,136);
   drawAllyStatuses(p,portraitX,portraitY,portraitSize);
-  text(ko?'0 / '+p.maxHp:`${p.hp} / ${p.maxHp}${p.shield>0?'  •  SHIELD '+p.shield:''}`,x+cardW-12,top+136,p.shield>0?12:14,ko?'#f0afb7':'#e4f3ef','750','right');
-  line(x+12,top+146,cardW-24,ko?0:p.hp/p.maxHp,ko?'#b16b76':'#67e3b4','#23374d',14);
-  if(p.shield>0)line(x+12,top+162,cardW-24,Math.min(1,p.shield/p.maxHp),'#81dcff','#23374d',6);
+  text(ko?'0 / '+p.maxHp:`${p.hp} / ${p.maxHp}`,x+cardW-12,top+136,14,ko?'#f0afb7':'#e4f3ef','750','right');
+  shieldedHealthBar(x+12,top+149,cardW-48,14,ko?0:p.hp,p.maxHp,p.shield,ko?'#b16b76':'#67e3b4','#23374d');
   if(p.id==='zero'){
    const maximum=soulFollowUpLimit(),current=Math.max(0,Math.min(maximum,soulFollowUpProcs));
    const dotSize=12,pitch=22,rowWidth=(maximum-1)*pitch+dotSize,startX=x+(cardW-rowWidth)/2;
-   for(let i=0;i<maximum;i++)hudCircle(startX+i*pitch+dotSize/2,top+174,dotSize/2,i<current?'#72d8f5':'rgba(65,84,108,.9)',i<current?'#d7f6ff':'#8295a9',1.8);
+   for(let i=0;i<maximum;i++)hudCircle(startX+i*pitch+dotSize/2,top+184,dotSize/2,i<current?'#72d8f5':'rgba(65,84,108,.9)',i<current?'#d7f6ff':'#8295a9',1.8);
   }
   ctx.restore();
   if(selectingAlly)choiceRects.push({x,y:top,w:cardW,h:cardH,action:'camera-select:'+p.id,enabled:p.hp>0});
@@ -1923,16 +1927,13 @@ function drawHud(t){
   rect(bx,by,bw,bh,'rgba(10,16,31,.86)','rgba(244,202,139,.62)',12);
   text(`BOSS  •  ${bossOnField.name}`,bx+18,by+13,15,'#fff0d4','850');
   text(`HP ${bossOnField.hp} / ${bossOnField.maxHp}`,bx+bw-18,by+13,14,'#f0e7eb','750','right');
-  text('SHIELD',bx+18,by+29,10,'#cbd7e4','800');
-  line(bx+82,by+26,bw-202,Math.min(1,(bossOnField.shield||0)/bossOnField.maxHp),'#81dcff','#3e485a',6);
-  text(`${bossOnField.shield||0}`,bx+bw-18,by+29,10,'#d5e0ec','750','right');
-  text('BARRIER',bx+18,by+42,10,'#cbd7e4','800');
-  line(bx+82,by+39,bw-202,bossOnField.maxBarrier?bossOnField.barrier/bossOnField.maxBarrier:0,'#c4c9d2','#3e485a',6);
-  text(`${bossOnField.barrier} / ${bossOnField.maxBarrier}`,bx+bw-18,by+42,10,'#d5e0ec','750','right');
+  text('BARRIER',bx+18,by+29,10,'#cbd7e4','800');
+  line(bx+82,by+26,bw-202,bossOnField.maxBarrier?bossOnField.barrier/bossOnField.maxBarrier:0,'#c4c9d2','#3e485a',6);
+  text(`${bossOnField.barrier} / ${bossOnField.maxBarrier}`,bx+bw-18,by+29,10,'#d5e0ec','750','right');
   for(let i=0;i<bars;i++){
-   const segmentHp=Math.max(0,Math.min(segmentMax,bossOnField.hp-i*segmentMax)),ratio=segmentMax?segmentHp/segmentMax:0,rowY=by+54+i*14;
+   const segmentHp=Math.max(0,Math.min(segmentMax,bossOnField.hp-i*segmentMax)),ratio=segmentMax?segmentHp/segmentMax:0,rowY=by+42+i*14;
    const remaining=segmentHp>0;hudCircle(bx+19,rowY+4,5,remaining?'#f3c778':'#43485a',remaining?'#fff0c5':'#72798a',2);
-   line(bx+34,rowY,bw-52,ratio,ratio<1&&ratio>0?'#ffd57c':'#ee7882','#3e2938',8);
+   shieldedHealthBar(bx+34,rowY,(bw-52)/1.12,8,segmentHp,segmentMax,i===Math.floor((bossOnField.maxHp-bossOnField.hp)/segmentMax)?bossOnField.shield:0,ratio<1&&ratio>0?'#ffd57c':'#ee7882','#3e2938');
   }
  }
  // Compact expanded selected enemy information.
@@ -1941,7 +1942,7 @@ function drawHud(t){
   rect(938,22,399,72,'rgba(10,16,31,.78)','rgba(210,213,220,.40)',14);
   text(focus.name,961,44,19,'#fff3db','750');
   text(`HP ${focus.hp} / ${focus.maxHp}`,1315,44,15,'#f0e7eb','700','right');
-  line(961,65,348,focus.hp/focus.maxHp,'#f38382','#343d51',9);
+  shieldedHealthBar(961,65,310,9,focus.hp,focus.maxHp,focus.shield,'#f38382','#343d51');
  }else if(cameraPreview==='party'&&!bossOnField){
   rect(1010,24,386,62,'rgba(10,16,31,.76)','rgba(200,207,225,.38)',14);
   text('SELECT AN ALLY',1035,55,20,'#f7e7ca','800');
