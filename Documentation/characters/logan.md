@@ -23,4 +23,4 @@
 
 ## Artwork
 
-Logan uses the supplied transparent full-body artwork for battle, ally targeting, and his HUD portrait. See [Character Battle Sprite Standard](../character-battle-sprite-standard.md).
+Logan uses the supplied rear-facing art for his battle sprite and the supplied front-facing art for ally targeting. His HUD and turn-order cards crop the same front-facing artwork to a head-and-shoulders portrait. See [Character Battle Sprite Standard](../character-battle-sprite-standard.md).

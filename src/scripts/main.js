@@ -1,5 +1,5 @@
 'use strict';
-const sources={arena:'/assets/embedded-image-01.png',area1Background:'/assets/area-1-meadow.jpg',zero:'/assets/soul-battle.png',lily:'/assets/lily-front.png',lilyFront:'/assets/lily-front.png',lilyBack:'/assets/lily-back.png',dawnBattle:'/assets/dawn-battle.png',dawnFront:'/assets/dawn-front.png',loganBattle:'/assets/logan.png',loganFront:'/assets/logan.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',slimeLeaderBattle:'/assets/slime-leader.png',slimeLeaderArtwork:'/assets/slime-leader.png',slimeMonsterBattle:'/assets/slime-monster.png',slimeMonsterArtwork:'/assets/slime-monster.png',wolfBattle:'/assets/wolf.png',wolfArtwork:'/assets/wolf-artwork.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',zeroFront:'/assets/soul-portrait.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png'};
+const sources={arena:'/assets/embedded-image-01.png',area1Background:'/assets/area-1-meadow.jpg',zero:'/assets/soul-battle.png',lily:'/assets/lily-front.png',lilyFront:'/assets/lily-front.png',lilyBack:'/assets/lily-back.png',dawnBattle:'/assets/dawn-battle.png',dawnFront:'/assets/dawn-front.png',loganBattle:'/assets/logan.png',loganFront:'/assets/logan-front.png',loganPortrait:'/assets/logan-front.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',slimeLeaderBattle:'/assets/slime-leader.png',slimeLeaderArtwork:'/assets/slime-leader.png',slimeMonsterBattle:'/assets/slime-monster.png',slimeMonsterArtwork:'/assets/slime-monster.png',wolfBattle:'/assets/wolf.png',wolfArtwork:'/assets/wolf-artwork.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',zeroFront:'/assets/soul-portrait.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png'};
 const BATTLE_AREAS=Object.freeze({
  'area-1':Object.freeze({name:'Area 1',background:'area1Background'})
 });
@@ -1833,7 +1833,7 @@ function drawAllyPortraitHud(){
   const portraitX=x+12,portraitY=top+10,portraitSize=112;
   ctx.save();ctx.globalAlpha=ko?.57:activeAlly?1:.84;
   rect(x,top,cardW,cardH,'rgba(14,23,42,.96)',targetSelected?'#eaca94':activeAlly?'#f3d79e':'rgba(129,164,191,.82)',12);
-  hudPortrait(p.id==='zero'?images.zeroFront:p.id==='lily'?images.lilyFront:p.id==='dawn'?images.dawnFront:p.id==='logan'?images.loganFront:null,portraitX,portraitY,portraitSize,portraitSize,true);
+  hudPortrait(p.id==='zero'?images.zeroFront:p.id==='lily'?images.lilyFront:p.id==='dawn'?images.dawnFront:p.id==='logan'?images.loganPortrait:null,portraitX,portraitY,portraitSize,portraitSize,true);
   if(ko)rect(portraitX,portraitY,portraitSize,portraitSize,'rgba(30,17,23,.62)',null,10);
   drawAllyUltimate(p,x+95,top-11,136);
   drawAllyStatuses(p,portraitX,portraitY,portraitSize);
@@ -1910,6 +1910,7 @@ function drawHud(t){
   else if(id==='zero')hudPortrait(images.zeroFront,xx+7,yy+5,49,44);
   else if(id==='lily')hudPortrait(images.lilyFront,xx+7,yy+5,49,44);
   else if(id==='dawn')hudPortrait(images.dawnFront,xx+7,yy+5,49,44);
+  else if(id==='logan')hudPortrait(images.loganPortrait,xx+7,yy+5,49,44);
   else{hudCircle(xx+31,yy+21,13,'#6e8eac');rect(xx+19,yy+33,24,16,'#6784a1',null,7)}
   text(now?'NOW':String(i+1),xx+54,yy+48,10,now?'#fff2cb':'#bacbdf','850','right');
  }
