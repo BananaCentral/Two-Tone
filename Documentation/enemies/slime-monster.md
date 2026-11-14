@@ -29,4 +29,4 @@ The Slime Monster ignores 25% of its targets' Physical and Magical Defense when 
 
 ## Barrier and Battle Display
 
-Slime Monster uses the standard enemy Barrier equal to 20% of Max HP. Its Boss HP is displayed at the top of the screen with one dot to the left of each HP bar. Its supplied transparent 256 × 512 sprite is used for battlefield rendering and its turn-order portrait.
+Slime Monster uses the standard enemy Barrier equal to 20% of Max HP. Its Boss HP is displayed at the top of the screen with one dot to the left of each HP bar. Its supplied bulky transparent 256 × 256 sprite is used for battlefield rendering and its turn-order portrait.

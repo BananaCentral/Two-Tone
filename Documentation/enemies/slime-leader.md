@@ -31,4 +31,4 @@ When the Slime Leader damages an ally, it applies one Residue stack to that ally
 
 ## Barrier and Battle Display
 
-Slime Leader uses the standard enemy Barrier equal to 20% of Max HP. Its supplied transparent 256 × 256 sprite is used for both battlefield rendering and its turn-order portrait.
+Slime Leader uses the standard enemy Barrier equal to 20% of Max HP. Its supplied tall transparent 256 × 512 sprite is used for battlefield rendering and its turn-order portrait.
