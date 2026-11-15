@@ -54,4 +54,6 @@ All sprites are stored in `assets/` and registered in the application asset cata
 
 Rune Set selection is available per character in Loadout → Runes → Sets. Selecting a set replaces the character's previous set; each character stores their selection independently. The equipped set's effect is active in combat, and the selected set icon appears on its Loadout card. Set effects use fixed values at every Rune level.
 
-All nine sets are currently selectable without a resource cost because Rune Set acquisition and costs have not been defined. The existing four Rune stat slots remain under Loadout → Runes → Stats. Set cooldowns and durations are tracked per wearer for the current battle and reset when a new battle starts. Recycle and Amplify become ready again after the wearer's next two scheduled turns. United remains active through the wearer's next two scheduled turns.
+The player must equip four Rune pieces from the selected set to activate its set effect. A character cannot mix Rune Sets. Changing the selected set returns that character's equipped pieces to the Rune inventory. The four Rune stat slots remain under Loadout → Runes → Stats, where each equipped piece's stats can be customized.
+
+Set cooldowns and durations are tracked per wearer for the current battle and reset when a new battle starts. Recycle and Amplify become ready again after the wearer's next two scheduled turns. United remains active through the wearer's next two scheduled turns. Runes are intended to come from Challenges; Challenge content and reward rules are not configured yet.

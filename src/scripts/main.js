@@ -439,7 +439,9 @@ const turnTimeline=new TwoToneTurnTimeline();
 let speedModifiers=Object.create(null),summons=[],summonSerial=0,summonHistory=[],runeCombatState=Object.create(null);
 function runeSetState(id){return runeCombatState[id]||(runeCombatState[id]={cooldowns:{recycle:0,amplify:0},cooldownStartedTurn:{},unitedTurns:0,unitedStartedTurn:null})}
 function equippedRuneSetId(id){if(typeof id!=='string'||!ROSTER_IDS.has(id))return null;const key=loadoutFor(id).runeSetId;return Object.hasOwn(RUNE_SET_DEFINITIONS,key)?key:null}
-function hasRuneSet(id,key){return equippedRuneSetId(id)===key}
+function runeSetPieceCount(id,key=equippedRuneSetId(id)){return typeof id==='string'&&ROSTER_IDS.has(id)&&key?loadoutFor(id).runes.filter(rune=>rune?.setId===key).length:0}
+function ownedRuneCount(setId){return (itemInventory?.runes?.[setId]?.length||0)+Object.values(characterLoadouts||{}).reduce((count,record)=>count+record.runes.filter(rune=>rune?.setId===setId).length,0)}
+function hasRuneSet(id,key){return equippedRuneSetId(id)===key&&runeSetPieceCount(id,key)===4}
 function runeEffectReady(id,effect){return (runeSetState(id).cooldowns[effect]||0)===0}
 function startRuneCooldown(id,effect){const state=runeSetState(id);if(state.cooldowns[effect]>0)return false;state.cooldowns[effect]=2;state.cooldownStartedTurn[effect]=turn;return true}
 function applyUnitedRune(id){const state=runeSetState(id);state.unitedTurns=2;state.unitedStartedTurn=turn;syncTurnTimeline();emitCombatVisual('rune-united',[id],COMBAT_ACTION_EFFECT_MS,{turns:2});return true}
@@ -1187,8 +1189,10 @@ function defaultLoadout(){return {characterDuplicates:0,weapon:{selected:'standa
 function normalizeRune(value){
  if(!value||typeof value!=='object'||!RUNE_STATS.includes(value.main)||!Array.isArray(value.subs))return null;
  const subs=value.subs.filter((x,i,a)=>RUNE_STATS.includes(x)&&x!==value.main&&a.indexOf(x)===i).slice(0,3);
- return subs.length===3?{level:Number.isInteger(value.level)?Math.max(1,Math.min(5,value.level)):1,main:value.main,subs,setId:typeof value.setId==='string'?value.setId:null,criticalRateBonus:Number.isFinite(value.criticalRateBonus)?Math.max(0,value.criticalRateBonus):0,criticalDamageBonus:Number.isFinite(value.criticalDamageBonus)?Math.max(0,value.criticalDamageBonus):0}:null
+ const setId=typeof value.setId==='string'&&Object.hasOwn(RUNE_SET_DEFINITIONS,value.setId)?value.setId:null;
+ return subs.length===3?{level:Number.isInteger(value.level)?Math.max(1,Math.min(5,value.level)):1,main:value.main,subs,setId,criticalRateBonus:Number.isFinite(value.criticalRateBonus)?Math.max(0,value.criticalRateBonus):0,criticalDamageBonus:Number.isFinite(value.criticalDamageBonus)?Math.max(0,value.criticalDamageBonus):0}:null
 }
+function createRune(setId){return {level:1,main:'hp',subs:['physicalAttack','magicalAttack','physicalDefense'],setId,criticalRateBonus:0,criticalDamageBonus:0}}
 function normalizeLoadout(value,cap=characterLevelCap()){
  const base=defaultLoadout();if(!value||typeof value!=='object')return base;
  base.characterDuplicates=Number.isInteger(value.characterDuplicates)?Math.max(0,Math.min(4,value.characterDuplicates)):0;
@@ -1209,8 +1213,7 @@ function normalizeLoadout(value,cap=characterLevelCap()){
  base.weapon.selected=weapon.selected==='premium'&&base.weapon.premiumOwned?'premium':'standard';
  const legacySetId=Array.isArray(value.runes)?value.runes.find(rune=>typeof rune?.setId==='string'&&Object.hasOwn(RUNE_SET_DEFINITIONS,rune.setId))?.setId:null;
  base.runeSetId=typeof value.runeSetId==='string'&&Object.hasOwn(RUNE_SET_DEFINITIONS,value.runeSetId)?value.runeSetId:legacySetId;
- if(Array.isArray(value.runes))base.runes=Array.from({length:4},(_,i)=>normalizeRune(value.runes[i]));
- for(const rune of base.runes)if(rune)rune.setId=base.runeSetId;
+ if(Array.isArray(value.runes))base.runes=Array.from({length:4},(_,i)=>normalizeRune(value.runes[i])).map(rune=>{if(!rune||rune.setId&&rune.setId!==base.runeSetId)return null;rune.setId=base.runeSetId;return rune});
  if(value.celestials&&typeof value.celestials==='object')for(const [key] of CELESTIALS){const n=value.celestials[key];base.celestials[key]=Number.isInteger(n)?Math.max(1,Math.min(10,n)):1}
  return base
 }
@@ -1218,13 +1221,14 @@ function loadCharacterLoadouts(){let stored={};try{stored=JSON.parse(localStorag
 let characterLoadouts=loadCharacterLoadouts(),loadoutCharacterId='soul',selectedLoadoutRune=0,loadoutPage='characters',runePanelMode='sets',runeStatPicker=null,weaponBookSelection={small:0,medium:0,large:0};
 function loadoutFor(id=loadoutCharacterId){return characterLoadouts[id]||(characterLoadouts[id]=defaultLoadout())}
 function saveLoadouts(){try{localStorage.setItem(LOADOUT_KEY,JSON.stringify(characterLoadouts))}catch(e){}}
-function defaultItemInventory(){return {bottles:{small:0,medium:0,large:0},books:{small:0,medium:0,large:0},cores:0,gems:0}}
+function defaultItemInventory(){return {bottles:{small:0,medium:0,large:0},books:{small:0,medium:0,large:0},cores:0,gems:0,runes:Object.fromEntries(Object.keys(RUNE_SET_DEFINITIONS).map(id=>[id,[]]))}}
 function normalizeItemInventory(value){
  const base=defaultItemInventory();if(!value||typeof value!=='object'||Array.isArray(value))return base;
  for(const [group] of [['bottles'],['books']])for(const size of ['small','medium','large']){
   const count=value[group]?.[size];base[group][size]=Number.isSafeInteger(count)&&count>=0?count:0;
  }
  for(const id of ['cores','gems']){const count=value[id];base[id]=Number.isSafeInteger(count)&&count>=0?count:0}
+ for(const setId of Object.keys(RUNE_SET_DEFINITIONS))if(Array.isArray(value.runes?.[setId]))base.runes[setId]=value.runes[setId].map(normalizeRune).filter(rune=>rune?.setId===setId);
  return base;
 }
 function validItemInventory(value){
@@ -1234,6 +1238,7 @@ function validItemInventory(value){
   if(!value[group]||typeof value[group]!=='object'||Array.isArray(value[group]))return false;
   for(const size of ['small','medium','large'])if(value[group][size]!==undefined&&(!Number.isSafeInteger(value[group][size])||value[group][size]<0))return false;
  }
+ if(value.runes!==undefined){if(!value.runes||typeof value.runes!=='object'||Array.isArray(value.runes)||Object.keys(value.runes).some(setId=>!Object.hasOwn(RUNE_SET_DEFINITIONS,setId)))return false;for(const [setId,runes] of Object.entries(value.runes))if(!Array.isArray(runes)||runes.some(rune=>!normalizeRune(rune)||rune.setId!==setId))return false}
  return true;
 }
 function loadItemInventory(){try{return normalizeItemInventory(JSON.parse(localStorage.getItem(ITEM_INVENTORY_KEY)||'null'))}catch(e){return defaultItemInventory()}}
@@ -1248,6 +1253,7 @@ function grantItem(itemId,amount=1){
  const match=/^(bottle|book):(small|medium|large)$/.exec(itemId||'');
  if(match){const group=match[1]==='bottle'?'bottles':'books',next=itemInventory[group][match[2]]+amount;if(!Number.isSafeInteger(next))return false;itemInventory[group][match[2]]=next}
  else if(['core','gem'].includes(itemId)){const key=itemId==='core'?'cores':'gems',next=itemInventory[key]+amount;if(!Number.isSafeInteger(next))return false;itemInventory[key]=next}
+ else if(typeof itemId==='string'&&itemId.startsWith('rune:')){const setId=itemId.slice(5),runes=itemInventory.runes[setId];if(!runes||runes.length+amount>10000)return false;for(let i=0;i<amount;i++)runes.push(createRune(setId))}
  else return false;
  saveItemInventory();return true;
 }
@@ -1256,9 +1262,12 @@ function consumeItem(itemId,amount=1){
  const match=/^(bottle|book):(small|medium|large)$/.exec(itemId||'');
  if(match){const group=match[1]==='bottle'?'bottles':'books';if(itemInventory[group][match[2]]<amount)return false;itemInventory[group][match[2]]-=amount}
  else if(['core','gem'].includes(itemId)){const key=itemId==='core'?'cores':'gems';if(itemInventory[key]<amount)return false;itemInventory[key]-=amount}
+ else if(typeof itemId==='string'&&itemId.startsWith('rune:')){const runes=itemInventory.runes[itemId.slice(5)];if(!runes||runes.length<amount)return false;runes.splice(-amount,amount)}
  else return false;
  saveItemInventory();return true;
 }
+function takeRuneFromInventory(setId){const runes=itemInventory.runes[setId];if(!Array.isArray(runes)||!runes.length)return null;const rune=runes.pop();saveItemInventory();return rune}
+function returnRuneToInventory(rune){if(!rune||!Object.hasOwn(RUNE_SET_DEFINITIONS,rune.setId)||!Array.isArray(itemInventory.runes[rune.setId]))return false;itemInventory.runes[rune.setId].push(normalizeRune(rune));saveItemInventory();return true}
 if(DEV_MODE)globalThis.TwoToneItems=Object.freeze({grant:grantItem,getInventory:()=>JSON.parse(JSON.stringify(itemInventory)),grantCoins:grantStoreCoins,getCoins:()=>storeCoins});
 FeaturedLottery.setRewardGrant(grantItem);
 const SAVE_FILE_FORMAT='two-tone-save',SAVE_FILE_VERSION=4;
@@ -1366,7 +1375,7 @@ function ascendWeaponWithGem(id,type){
 function loadoutStatModifiers(id,characterLevel=1){
  const record=loadoutFor(id),bonus=weaponBonus(record,id),totals=Object.fromEntries(RUNE_STATS.map(k=>[k,0]));
  for(const rune of record.runes){if(!rune)continue;totals[rune.main]+=RUNE_STAT_INFO[rune.main].main*rune.level;for(const sub of rune.subs)totals[sub]+=RUNE_STAT_INFO[sub].main*.25*rune.level}
- const pct={signatureWeapon:bonus},criticalRateFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalRateBonus||0),0)+(record.runeSetId==='radiant-moon' ? .10 : 0),criticalDamageFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalDamageBonus||0),0)+(record.runeSetId==='eternal-sun' ? .25 : 0);
+ const fullRuneSet=record.runes.filter(rune=>rune?.setId===record.runeSetId).length===4,pct={signatureWeapon:bonus},criticalRateFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalRateBonus||0),0)+(fullRuneSet&&record.runeSetId==='radiant-moon' ? .10 : 0),criticalDamageFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalDamageBonus||0),0)+(fullRuneSet&&record.runeSetId==='eternal-sun' ? .25 : 0);
  return {hpFlatModifiers:{},hpPercentModifiers:pct,hpEquipmentFlatModifiers:{runes:totals.hp},
  physicalAttackFlatModifiers:{},physicalAttackPercentModifiers:pct,physicalAttackEquipmentFlatModifiers:{runes:totals.physicalAttack},
  magicalAttackFlatModifiers:{},magicalAttackPercentModifiers:pct,magicalAttackEquipmentFlatModifiers:{runes:totals.magicalAttack},
@@ -1394,7 +1403,11 @@ function handleLoadoutAction(action){
  if(kind==='character'){if(ROSTER_IDS.has(arg)&&!roster(arg)?.test){loadoutCharacterId=arg;weaponBookSelection={small:0,medium:0,large:0}}return}
  if(kind==='page'){if(['details','weapons','runes','celestials'].includes(arg)){loadoutPage=arg;if(arg==='runes')runePanelMode='sets';weaponBookSelection={small:0,medium:0,large:0}}return}
  if(kind==='rune-view'&&['sets','stats'].includes(arg)){runePanelMode=arg;runeStatPicker=null;return}
- if(kind==='rune-set'&&(arg===''||Object.hasOwn(RUNE_SET_DEFINITIONS,arg))){record.runeSetId=arg||null;for(const equipped of record.runes)if(equipped)equipped.setId=record.runeSetId;saveLoadouts();return}
+ if(kind==='rune-set'&&(arg===''||Object.hasOwn(RUNE_SET_DEFINITIONS,arg))){
+  const nextSet=arg||null;
+  if(nextSet!==record.runeSetId){for(let index=0;index<record.runes.length;index++)if(record.runes[index]){returnRuneToInventory(record.runes[index]);record.runes[index]=null}record.runeSetId=nextSet;saveLoadouts()}
+  runePanelMode=nextSet?'stats':'sets';return
+ }
  if(kind==='upgrade'&&arg==='weapon'){
   const type=weapon.selected,level=weapon[type+'Level'],gate=ASCENSION_GATES.includes(level)&&!weapon[type+'Ascended'].includes(level);
   if(gate){say(ascendWeaponWithGem(loadoutCharacterId,type)?'Weapon Ascension completed. One Gem was consumed.':'One Gem is required to Ascend this weapon.')}
@@ -1416,8 +1429,8 @@ function handleLoadoutAction(action){
  else if(kind==='weapon-premium'){if(weapon.premiumOwned){weapon.selected='premium';weaponBookSelection={small:0,medium:0,large:0}}}
  else if(kind==='potential'&&DEV_MODE){const [type,delta]=arg.split(','),key=type==='premium'?'premiumPotential':'standardPotential';weapon[key]=Math.max(1,Math.min(5,weapon[key]+Number(delta)))}
  else if(kind==='rune-select')selectedLoadoutRune=Math.max(0,Math.min(3,Number(arg)||0));
- else if(kind==='rune-equip'&&DEV_MODE){const index=Math.max(0,Math.min(3,Number(arg)||0));record.runes[index]={level:1,main:'hp',subs:['physicalAttack','magicalAttack','physicalDefense'],setId:record.runeSetId};selectedLoadoutRune=index}
- else if(kind==='rune-remove')record.runes[selectedLoadoutRune]=null;
+ else if(kind==='rune-equip'&&record.runeSetId){const index=Math.max(0,Math.min(3,Number(arg)||0));if(!record.runes[index]){const rune=takeRuneFromInventory(record.runeSetId);if(rune){record.runes[index]=rune;selectedLoadoutRune=index;saveLoadouts()}else say('No Rune from this set is available.') }}
+ else if(kind==='rune-remove'&&record.runes[selectedLoadoutRune]){returnRuneToInventory(record.runes[selectedLoadoutRune]);record.runes[selectedLoadoutRune]=null;saveLoadouts()}
  else if(kind==='rune-level'&&rune&&Number(arg)===1){const level=upgradeRuneWithCore(loadoutCharacterId,selectedLoadoutRune);say(level?`Rune upgraded to Level ${level}.`:'A Core is required and the Rune must be below Level 5.')}
  else if(kind==='rune-main'&&rune){runeStatPicker={slot:'main',subIndex:-1};return}
  else if(kind==='rune-sub'&&rune){const index=Number(arg);if(Number.isInteger(index)&&index>=0&&index<3){runeStatPicker={slot:'sub',subIndex:index};return}}
@@ -1662,11 +1675,12 @@ function drawLoadoutRunesPanel(record){
  if(runePanelMode==='sets')rect(1088,172,149,38,'rgba(0,0,0,0)','#e9cc8b',11);
  else rect(1241,172,149,38,'rgba(0,0,0,0)','#e9cc8b',11);
  if(runePanelMode==='sets'){drawRuneSetChoices(record);return}
- text('CORES ×'+itemInventory.cores,1090,214,12,'#b9c8d7','650');
+ const activeSet=RUNE_SET_DEFINITIONS[record.runeSetId],ownedRunes=record.runeSetId?(itemInventory.runes[record.runeSetId]?.length||0):0;
+ text((activeSet?activeSet.name.toUpperCase()+' • SLOTS '+runeSetPieceCount(loadoutCharacterId,record.runeSetId)+'/4 • AVAILABLE '+ownedRunes+' • ':'SELECT A SET • ')+'CORES ×'+itemInventory.cores,1090,214,10,'#b9c8d7','650');
  for(let i=0;i<4;i++){
   const y=238+i*143,rune=record.runes[i],active=i===selectedLoadoutRune;rect(1083,y,462,130,'rgba(27,39,59,.78)',active?'#d5ba7c':'rgba(148,169,194,.35)',12);
   addButton(1094,y+9,95,37,'loadout:rune-select:'+i,'SLOT '+(i+1),rune?'LEVEL '+rune.level+'/5':'',true,12);
-  if(!rune){text('EMPTY',1210,y+33,13,'#aebed0','700');if(DEV_MODE)addButton(1200,y+59,330,37,'loadout:rune-equip:'+i,'ADD RUNE • PREVIEW','',true,11);continue}
+  if(!rune){text(record.runeSetId?'EMPTY':'SELECT A SET',1210,y+33,13,'#aebed0','700');if(record.runeSetId)addButton(1200,y+59,330,37,'loadout:rune-equip:'+i,'EQUIP RUNE','OWNED ×'+ownedRunes,ownedRunes>0,11);continue}
   const main=RUNE_STAT_INFO[rune.main];addButton(1197,y+9,220,37,'loadout:rune-main',main.label.toUpperCase(),'+'+(main.main*rune.level)+' • MAIN STAT',true,11);
   addButton(1425,y+9,105,37,'loadout:rune-level:1','UPGRADE','CORE ×'+itemInventory.cores,rune.level<5&&itemInventory.cores>0,10);
   for(let j=0;j<3;j++){const info=RUNE_STAT_INFO[rune.subs[j]];addButton(1094+j*137,y+59,128,48,'loadout:rune-sub:'+j,info.label,'+'+(info.main*.25*rune.level),true,10)}
@@ -1679,9 +1693,10 @@ function drawRuneSetChoices(record){
   const key=keys[i],set=RUNE_SET_DEFINITIONS[key],col=i%3,row=Math.floor(i/3),x=1086+col*153,y=220+row*198,selected=record.runeSetId===key;
   choiceRects.push({x,y,w:145,h:188,action:'loadout:rune-set:'+key,enabled:true});rect(x,y,145,188,selected?'rgba(80,69,48,.72)':'rgba(27,39,59,.78)',selected?'#e9cc8b':'rgba(148,169,194,.35)',12);
   const icon=images[set.image];if(icon?.complete&&icon.naturalWidth){ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(icon,x+43,y+10,59,59);ctx.restore()}
-  text(set.name,x+72,y+81,12,selected?'#f6dfa8':'#e5edf5','800','center');
-  for(let lineIndex=0;lineIndex<set.lines.length;lineIndex++)text(set.lines[lineIndex],x+72,y+111+lineIndex*18,10,'#c4d2df','650','center');
-  if(selected)text('EQUIPPED',x+72,y+169,9,'#f3d99c','800','center');
+  text(set.name,x+72,y+78,12,selected?'#f6dfa8':'#e5edf5','800','center');
+  text('OWNED ×'+ownedRuneCount(key),x+72,y+98,9,'#b9c8d7','700','center');
+  for(let lineIndex=0;lineIndex<set.lines.length;lineIndex++)text(set.lines[lineIndex],x+72,y+119+lineIndex*16,10,'#c4d2df','650','center');
+  if(selected){const equipped=runeSetPieceCount(loadoutCharacterId,key);text(equipped===4?'SET ACTIVE':`SLOTS ${equipped}/4`,x+72,y+173,9,'#f3d99c','800','center')}
  }
 }
 function drawLoadoutCelestialsPanel(record){
@@ -2012,6 +2027,9 @@ function drawItemInventory(){
    text('×'+item[1],x+cardW/2,y+163,14,'#f0f3f7','750','center');
   });
  }
+ text('RUNES',155,752,14,'#f3dfb9','850');
+ const runeKeys=Object.keys(RUNE_SET_DEFINITIONS),runeCardW=136,runeGap=10,runeStartX=155;
+ runeKeys.forEach((key,index)=>{const set=RUNE_SET_DEFINITIONS[key],x=runeStartX+index*(runeCardW+runeGap),y=763;rect(x,y,runeCardW,72,'rgba(18,27,44,.76)','rgba(121,143,168,.45)',9);const icon=images[set.image];if(icon?.complete&&icon.naturalWidth){ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(icon,x+8,y+8,36,36);ctx.restore()}text(set.name,x+48,y+20,10,'#f3e5c9','750');text('×'+ownedRuneCount(key),x+48,y+48,12,'#f0f3f7','750')});
 }
 function drawChallenges(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.74)');rect(180,100,1240,700,'rgba(13,20,39,.98)','#ccb88e',20);

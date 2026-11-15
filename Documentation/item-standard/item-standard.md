@@ -32,6 +32,10 @@ Book artwork uses blue for Small, purple for Medium, and gold for Large.
 
 Character XP and Weapon XP use the progressions in the [Character Level Standard](../character-level-standard/character-level-standard.md) and [Weapon Level Standard](../weapon-level-standard/weapon-level-standard.md). Items cannot advance a character or weapon beyond its current level cap.
 
+## Runes
+
+Runes are individual pieces belonging to one of the nine Rune Sets. They are obtained through Challenges. Challenge content and Rune reward rules are not configured yet. Each character may equip up to four owned Runes, all from the selected set. Equipping a Rune moves it from inventory to a loadout slot; removing it or changing sets returns it to inventory. A four-piece set activates its fixed set effect. Each equipped Rune can be leveled with a Core and customized with one main stat and three distinct substats.
+
 ## Cores
 
 A Core is a shared upgrade material that can raise the level of one Rune or one Celestial by one level. One Core is consumed per level increase. Cores can be obtained from Rare lottery drops, Events, Story, and Game Modes. Rune Set effects are defined in the [Rune Set Standard](../rune-standard/rune-standard.md).

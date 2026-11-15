@@ -30,7 +30,7 @@ See the [Weapon Level Standard](../weapon-level-standard/weapon-level-standard.m
 
 ## Runes
 
-A character can equip one Rune Set, selected independently in the **Sets** view. A different set replaces the current set; effects from sets cannot be combined on one character. Set effects are fixed at every Rune level and affect the wearer as defined in the [Rune Set Standard](../rune-standard/rune-standard.md). The **Stats** view retains the four Rune stat slots.
+A character selects one Rune Set in the **Sets** view, then equips up to four owned pieces from that set in **Stats**. Four equipped pieces activate the set effect. Changing the selected set returns the character's equipped pieces to inventory. A piece must be owned to equip; each equipped piece can be leveled and its main and substats customized. Set effects are fixed at every Rune level and affect the wearer as defined in the [Rune Set Standard](../rune-standard/rune-standard.md).
 
 Each rune has a level from 1 to 5, one main stat, and three substats. Within each rune, all four selected stats must be different. Main and substats may repeat across different runes.
 
