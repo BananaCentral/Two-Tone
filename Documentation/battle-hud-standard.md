@@ -31,6 +31,7 @@ Portrait and Ultimate controls should remain visually prominent, with enough spa
 ## Interaction
 
 - The Ultimate icon remains a usable control for queuing or activating that character's Ultimate under the combat UI rules.
+- Ultimate portrait controls are gameplay controls and must function in both Regular and Dev Mode. Only controls explicitly labeled as tests are Dev-only.
 - Battle card presentation does not change combat stats, targeting, turn order, damage, or passive behavior.
 - Indicate the current ally turn with the highlighted battle card. Do not print a second “X's turn” message or a default “select an action” prompt across the battle cards.
 - Label every basic attack button `ATTACK` and every skill button `SKILL`; keep character-specific names and counters out of these standard action labels.
