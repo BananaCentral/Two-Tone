@@ -134,6 +134,7 @@ function spriteAlphaBounds(img){
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:false});
 const W=1600,H=900, TEAM_KEY='two-tone-demo-team-fundamental-1-v1';
 const PROGRESSION_KEY='two-tone-character-progress-v1',VITALS_KEY='two-tone-character-vitals-v1',LOADOUT_KEY='two-tone-character-loadouts-v1',ITEM_INVENTORY_KEY='two-tone-item-inventory-v1',STORE_COINS_KEY='two-tone-store-coins-v1',PLAYER_RANK_KEY='two-tone-player-rank-v1',CHARACTER_ID_SCHEMA_KEY='two-tone-character-id-schema-v2';
+const DEV_MODE=new URLSearchParams(location.search).get('dev')==='1';
 function moveLegacyCharacterRecord(value){
  if(!value||typeof value!=='object'||Array.isArray(value))return value;
  if(value.soul===undefined&&value.zero!==undefined)value.soul=value.zero;
@@ -1581,7 +1582,8 @@ function drawStoreLottery(type){
 function handleStoreAction(action){
  if(storeReveal)return;
  const [,kind,type,value]=action.split(':');
- if(kind==='target'){
+ if(kind==='grant'&&DEV_MODE){const amount=Number(type);if(grantStoreCoins(amount))lastStoreNotice=`Dev mode: added ${amount.toLocaleString()} coins.`;else lastStoreNotice='Could not add coins.';
+ }else if(kind==='target'){
   const rotation=getStoreRotation(),ids=type==='character'?rotation.featuredCharacters:rotation.featuredWeapons;
   FeaturedLottery.setTarget(type,value,ids);lastStoreNotice='Target selected. Draws cost 100 coins.';
  }else if(kind==='draw')drawStoreLottery(type);
@@ -1643,6 +1645,7 @@ function drawStoreReveal(now){
 function drawStore(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.84)');
  text('FEATURED SUMMONS',800,72,35,'#ffedd1','900','center');text('Two limited banners • choose one target on each',800,108,15,'#c4d6e5','550','center');
+ if(DEV_MODE){rect(24,49,118,49,'rgba(83,52,35,.96)','#e2a86f',10);text('DEV MODE',83,80,14,'#ffdfa8','850','center');[100,500,1000,5000].forEach((amount,index)=>addButton(152+index*101,49,93,49,`store:grant:${amount}`,'+'+amount.toLocaleString(),'COINS',!storeReveal))}
  rect(1190,49,116,49,'rgba(25,37,58,.96)','#cfae6e',12);text('◈  '+storeCoins,1248,80,17,'#f4d99c','850','center');addButton(1320,48,170,52,'main-menu','BACK','');
  const rotation=getStoreRotation(),state=FeaturedLottery.getState();
  drawStoreLotteryCard('character',100,rotation,state);drawStoreLotteryCard('weapon',810,rotation,state);

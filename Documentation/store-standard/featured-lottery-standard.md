@@ -6,6 +6,8 @@ The Store offers featured character and premium weapon lotteries. Each lottery d
 
 The prototype wallet initializes with 1,000 coins so the lottery flow can be played before coin rewards from other game modes are defined. Coin balance is saved with player progress.
 
+For manual testing, append `?dev=1` to the site URL to show Store controls that grant 100, 500, 1,000, or 5,000 coins to the saved wallet. The controls are hidden during ordinary play.
+
 ## Featured Rotation
 
 The Store may feature up to three character and signature premium weapon pairs at once. A player chooses one featured target for each lottery type they use. The character and weapon in each pair correspond to one another.
