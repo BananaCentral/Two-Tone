@@ -25,6 +25,24 @@ This standard defines Rune Set equipment and combat effects. Rune Sets are selec
 | **Amplify** | When Amplify is not on cooldown, the wearer's Basic Attack deals 50% more damage. Apply the bonus once per Basic Attack action to the complete action, including all its hits and targets, whether Single Target, Blast, or AoE. After the Basic Attack resolves, Amplify is unavailable for the wearer's next two turns. |
 | **United** | When the wearer successfully uses a Skill or Ultimate on one or more allies, increase the wearer's Speed by 25% for the wearer's next two turns. This affects only the wearer. Reapplying United refreshes its duration; the Speed bonus does not stack. |
 
+## Rune Set Artwork
+
+Each Rune Set uses its supplied 256 × 256 transparent sprite as its icon. The sprite filenames and application asset keys are standardized here:
+
+| Rune Set | Sprite | Asset key | Visual |
+|---|---|---|---|
+| **Radiant Moon** | `rune-radiant-moon.png` | `runeRadiantMoon` | Crescent moon and star |
+| **Eternal Sun** | `rune-eternal-sun.png` | `runeEternalSun` | Sun |
+| **Celestial Star** | `rune-celestial-star.png` | `runeCelestialStar` | Star |
+| **Dark Matter** | `rune-dark-matter.png` | `runeDarkMatter` | Black hole |
+| **Clear Skies** | `rune-clear-skies.png` | `runeClearSkies` | Clouds and clear sky |
+| **Infinite Space** | `rune-infinite-space.png` | `runeInfiniteSpace` | Infinity symbol and stars |
+| **Recycle** | `rune-recycle.png` | `runeRecycle` | Repeating arrows |
+| **Amplify** | `rune-amplify.png` | `runeAmplify` | Upward power motif |
+| **United** | `rune-united.png` | `runeUnited` | Allies and upward arrow |
+
+All sprites are stored in `assets/` and registered in the application asset catalog. Use these icons wherever a Rune Set is represented in the interface.
+
 ## Timing and Combination Rules
 
 - A cooldown starts after its triggering action resolves. The next two scheduled turns belonging to the Rune's wearer are the cooldown turns; the effect is ready again after those turns.
@@ -34,4 +52,6 @@ This standard defines Rune Set equipment and combat effects. Rune Sets are selec
 
 ## Implementation Status
 
-This document defines the intended Rune Set behavior. The current Loadout implementation supports four Rune stat slots and Rune leveling, but does not yet provide Rune Set selection or apply these set effects in combat.
+Rune Set selection is available per character in Loadout → Runes → Sets. Selecting a set replaces the character's previous set; each character stores their selection independently. The equipped set's effect is active in combat, and the selected set icon appears on its Loadout card. Set effects use fixed values at every Rune level.
+
+All nine sets are currently selectable without a resource cost because Rune Set acquisition and costs have not been defined. The existing four Rune stat slots remain under Loadout → Runes → Stats. Set cooldowns and durations are tracked per wearer for the current battle and reset when a new battle starts. Recycle and Amplify become ready again after the wearer's next two scheduled turns. United remains active through the wearer's next two scheduled turns.

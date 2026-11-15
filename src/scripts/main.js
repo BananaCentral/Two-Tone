@@ -1,9 +1,20 @@
 'use strict';
-const sources={arena:'/assets/embedded-image-01.png',area1Background:'/assets/area-1-meadow.jpg',soul:'/assets/soul-battle-standard.png',soulBattleStandard:'/assets/soul-battle-standard.png',soulBattlePremium:'/assets/soul-battle-premium.png',lily:'/assets/lily-front.png',lilyFront:'/assets/lily-front.png',lilyBack:'/assets/lily-back.png',dawnBattle:'/assets/dawn-battle.png',dawnFront:'/assets/dawn-front.png',loganBattle:'/assets/logan.png',loganFront:'/assets/logan-front.png',loganPortrait:'/assets/logan-front.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',slimeLeaderBattle:'/assets/slime-leader.png',slimeLeaderArtwork:'/assets/slime-leader.png',slimeMonsterBattle:'/assets/slime-monster.png',slimeMonsterArtwork:'/assets/slime-monster.png',wolfBattle:'/assets/wolf.png',wolfArtwork:'/assets/wolf-artwork.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',soulFront:'/assets/soul-portrait.png',soulWeaponStandard:'/assets/soul-weapon-standard.png',soulWeaponPremium:'/assets/soul-weapon-premium.png',zeroFront:'/assets/zero.png',zeroBattle:'/assets/zero-battle.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png',enchantedBottleSmall:'/assets/enchanted-bottle-small.png',enchantedBottleMedium:'/assets/enchanted-bottle-medium.png',enchantedBottleLarge:'/assets/enchanted-bottle-large.png',enchantedBookSmall:'/assets/enchanted-book-small.png',enchantedBookMedium:'/assets/enchanted-book-medium.png',enchantedBookLarge:'/assets/enchanted-book-large.png',core:'/assets/core.png',gem:'/assets/gem.png',coin:'/assets/coins.png'};
+const sources={arena:'/assets/embedded-image-01.png',area1Background:'/assets/area-1-meadow.jpg',soul:'/assets/soul-battle-standard.png',soulBattleStandard:'/assets/soul-battle-standard.png',soulBattlePremium:'/assets/soul-battle-premium.png',lily:'/assets/lily-front.png',lilyFront:'/assets/lily-front.png',lilyBack:'/assets/lily-back.png',dawnBattle:'/assets/dawn-battle.png',dawnFront:'/assets/dawn-front.png',loganBattle:'/assets/logan.png',loganFront:'/assets/logan-front.png',loganPortrait:'/assets/logan-front.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',slimeLeaderBattle:'/assets/slime-leader.png',slimeLeaderArtwork:'/assets/slime-leader.png',slimeMonsterBattle:'/assets/slime-monster.png',slimeMonsterArtwork:'/assets/slime-monster.png',wolfBattle:'/assets/wolf.png',wolfArtwork:'/assets/wolf-artwork.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',soulFront:'/assets/soul-portrait.png',soulWeaponStandard:'/assets/soul-weapon-standard.png',soulWeaponPremium:'/assets/soul-weapon-premium.png',zeroFront:'/assets/zero.png',zeroBattle:'/assets/zero-battle.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png',enchantedBottleSmall:'/assets/enchanted-bottle-small.png',enchantedBottleMedium:'/assets/enchanted-bottle-medium.png',enchantedBottleLarge:'/assets/enchanted-bottle-large.png',enchantedBookSmall:'/assets/enchanted-book-small.png',enchantedBookMedium:'/assets/enchanted-book-medium.png',enchantedBookLarge:'/assets/enchanted-book-large.png',core:'/assets/core.png',gem:'/assets/gem.png',coin:'/assets/coins.png',runeRadiantMoon:'/assets/rune-radiant-moon.png',runeEternalSun:'/assets/rune-eternal-sun.png',runeCelestialStar:'/assets/rune-celestial-star.png',runeDarkMatter:'/assets/rune-dark-matter.png',runeClearSkies:'/assets/rune-clear-skies.png',runeInfiniteSpace:'/assets/rune-infinite-space.png',runeRecycle:'/assets/rune-recycle.png',runeAmplify:'/assets/rune-amplify.png',runeUnited:'/assets/rune-united.png'};
 const BATTLE_AREAS=Object.freeze({
  'area-1':Object.freeze({name:'Area 1',background:'area1Background'})
 });
 const DEFAULT_BATTLE_AREA_ID='area-1';
+const RUNE_SET_DEFINITIONS=Object.freeze({
+ 'radiant-moon':Object.freeze({name:'Radiant Moon',image:'runeRadiantMoon',lines:['CRIT RATE','+10 points']}),
+ 'eternal-sun':Object.freeze({name:'Eternal Sun',image:'runeEternalSun',lines:['CRIT DAMAGE','+25 points']}),
+ 'celestial-star':Object.freeze({name:'Celestial Star',image:'runeCelestialStar',lines:['ULTIMATE','Advance self 50%']}),
+ 'dark-matter':Object.freeze({name:'Dark Matter',image:'runeDarkMatter',lines:['MAGICAL DEFENSE','Ignore 20%']}),
+ 'clear-skies':Object.freeze({name:'Clear Skies',image:'runeClearSkies',lines:['PHYSICAL DEFENSE','Ignore 20%']}),
+ 'infinite-space':Object.freeze({name:'Infinite Space',image:'runeInfiniteSpace',lines:['ULTIMATE','Delay damaged enemies 25%']}),
+ recycle:Object.freeze({name:'Recycle',image:'runeRecycle',lines:['SKILL','Restore 1 Skill Point','2-turn cooldown']}),
+ amplify:Object.freeze({name:'Amplify',image:'runeAmplify',lines:['BASIC ATTACK','+50% damage','2-turn cooldown']}),
+ united:Object.freeze({name:'United',image:'runeUnited',lines:['ALLY SKILL / ULTIMATE','Self Speed +25%','for 2 turns']})
+});
 const ANIMATION_STEP_MS=250;
 const CAMERA_TRANSITION_SAME_VIEW_MS=ANIMATION_STEP_MS;
 const CAMERA_TRANSITION_BETWEEN_SIDES_MS=ANIMATION_STEP_MS*2;
@@ -229,11 +240,11 @@ function calculateTrueDefense(unit){
  const physical=calculatePhysicalDefense(unit),magical=calculateMagicalDefense(unit);
  return physical===null||magical===null?null:(physical+magical)*.5;
 }
-function defenseIgnoreOf(attacker){return Math.min(1,Math.max(0,(Number.isFinite(attacker?.tune?.defenseIgnore)?attacker.tune.defenseIgnore:0)+(Number.isFinite(attacker?.passive?.defenseIgnore)?attacker.passive.defenseIgnore:0)))}
+function baseDefenseIgnoreOf(attacker){return Math.min(1,Math.max(0,(Number.isFinite(attacker?.tune?.defenseIgnore)?attacker.tune.defenseIgnore:0)+(Number.isFinite(attacker?.passive?.defenseIgnore)?attacker.passive.defenseIgnore:0)))}
+function defenseIgnoreOf(attacker,type=null){const runeBonus=type==='physical'&&hasRuneSet(attacker?.id,'clear-skies') ? .2 : type==='magical'&&hasRuneSet(attacker?.id,'dark-matter') ? .2 : 0;return Math.min(1,baseDefenseIgnoreOf(attacker)+runeBonus)}
 function calculateTrueDamageReduction(attacker,target){
  const physicalAttack=calculatePhysicalAttack(attacker),magicalAttack=calculateMagicalAttack(attacker);
- const defenseIgnore=defenseIgnoreOf(attacker);
- const residueFactor=1-residueReduction(target),physicalDefense=calculatePhysicalDefense(target)*residueFactor*(1-defenseIgnore),magicalDefense=calculateMagicalDefense(target)*residueFactor*(1-defenseIgnore);
+ const residueFactor=1-residueReduction(target),physicalDefense=calculatePhysicalDefense(target)*residueFactor*(1-defenseIgnoreOf(attacker,'physical')),magicalDefense=calculateMagicalDefense(target)*residueFactor*(1-defenseIgnoreOf(attacker,'magical'));
  if(!Number.isFinite(physicalAttack)||physicalAttack<0||!Number.isFinite(magicalAttack)||magicalAttack<0||!Number.isFinite(physicalDefense)||physicalDefense<0||!Number.isFinite(magicalDefense)||magicalDefense<0)return null;
  const physicalContribution=physicalAttack>0 ? 0.5*Math.min(physicalDefense/physicalAttack,1) : 0;
  const magicalContribution=magicalAttack>0 ? 0.5*Math.min(magicalDefense/magicalAttack,1) : 0;
@@ -259,12 +270,13 @@ function calculateTypedActionDamage(type,attackRate,attacker,target){
  if(!['physical','magical','true'].includes(type)||!Number.isFinite(attackRate)||attackRate<0)return null;
  const attack=type==='physical'?calculatePhysicalAttack(attacker):type==='magical'?calculateMagicalAttack(attacker):calculateTrueAttack(attacker);
  const defense=type==='physical'?calculatePhysicalDefense(target):type==='magical'?calculateMagicalDefense(target):calculateTrueDefense(target);
- const defenseIgnore=defenseIgnoreOf(attacker),effectiveDefense=defense*(1-residueReduction(target));
+ const defenseIgnore=defenseIgnoreOf(attacker,type),effectiveDefense=defense*(1-residueReduction(target));
+ const trueDefenseBasis=(calculatePhysicalDefense(target)*(1-residueReduction(target))*(1-defenseIgnoreOf(attacker,'physical'))+calculateMagicalDefense(target)*(1-residueReduction(target))*(1-defenseIgnoreOf(attacker,'magical')))/2;
  let reduction=type==='true'?calculateTrueDamageReduction(attacker,target):(Number.isFinite(attack)&&attack>0&&Number.isFinite(effectiveDefense)&&effectiveDefense>=0?Math.min(effectiveDefense*(1-defenseIgnore)/attack,1):null);
  if(target?.marks?.some(m=>m.id==='exposed'))reduction=Math.max(0,reduction*Math.pow(.9,target.marks.filter(m=>m.id==='exposed').length));
  if(!Number.isFinite(attack)||attack<=0||!Number.isFinite(defense)||defense<0||!Number.isFinite(reduction))return null;
  const damageBeforeDefense=attack*attackRate*damageDealtMultiplier(attacker);
- return {type,attackBasis:attack,defenseBasis:effectiveDefense*(1-defenseIgnore),attackRate,damageBeforeDefense,reduction,damageTaken:roundHp(damageBeforeDefense*(1-reduction))};
+ return {type,attackBasis:attack,defenseBasis:type==='true'?trueDefenseBasis:effectiveDefense*(1-defenseIgnore),attackRate,damageBeforeDefense,reduction,damageTaken:roundHp(damageBeforeDefense*(1-reduction))};
 }
 function criticalRateOf(unit){return Math.min(1,Math.max(0,(Number.isFinite(unit?.criticalRate)?unit.criticalRate:.1)+(Number.isFinite(unit?.criticalRateBonus)?unit.criticalRateBonus:0)+(unit?.passive?.criticalRateBonus||0)+(unit?.tune?.criticalRateBonus||0)+Object.values(unit?.criticalRateModifiers||{}).reduce((sum,value)=>sum+(Number.isFinite(value)?value:0),0)))}
 function criticalDamageOf(unit){return Math.max(0,(Number.isFinite(unit?.criticalDamage)?unit.criticalDamage:.5)+(Number.isFinite(unit?.criticalDamageBonus)?unit.criticalDamageBonus:0)+(unit?.passive?.criticalDamageBonus||0)+(unit?.tune?.criticalDamageBonus||0)+Object.values(unit?.criticalDamageModifiers||{}).reduce((sum,value)=>sum+(Number.isFinite(value)?value:0),0))}
@@ -424,7 +436,14 @@ function spawnProgressedUnit(id){
 }
 
 const turnTimeline=new TwoToneTurnTimeline();
-let speedModifiers=Object.create(null),summons=[],summonSerial=0,summonHistory=[];
+let speedModifiers=Object.create(null),summons=[],summonSerial=0,summonHistory=[],runeCombatState=Object.create(null);
+function runeSetState(id){return runeCombatState[id]||(runeCombatState[id]={cooldowns:{recycle:0,amplify:0},cooldownStartedTurn:{},unitedTurns:0,unitedStartedTurn:null})}
+function equippedRuneSetId(id){if(typeof id!=='string'||!ROSTER_IDS.has(id))return null;const key=loadoutFor(id).runeSetId;return Object.hasOwn(RUNE_SET_DEFINITIONS,key)?key:null}
+function hasRuneSet(id,key){return equippedRuneSetId(id)===key}
+function runeEffectReady(id,effect){return (runeSetState(id).cooldowns[effect]||0)===0}
+function startRuneCooldown(id,effect){const state=runeSetState(id);if(state.cooldowns[effect]>0)return false;state.cooldowns[effect]=2;state.cooldownStartedTurn[effect]=turn;return true}
+function applyUnitedRune(id){const state=runeSetState(id);state.unitedTurns=2;state.unitedStartedTurn=turn;syncTurnTimeline();emitCombatVisual('rune-united',[id],COMBAT_ACTION_EFFECT_MS,{turns:2});return true}
+function ageRuneTurn(id){const state=runeSetState(id);let speedChanged=false;for(const effect of ['recycle','amplify'])if(state.cooldowns[effect]>0&&state.cooldownStartedTurn[effect]<turn){state.cooldowns[effect]--;if(!state.cooldowns[effect])delete state.cooldownStartedTurn[effect]}if(state.unitedTurns>0&&state.unitedStartedTurn<turn){state.unitedTurns--;speedChanged=state.unitedTurns===0}if(speedChanged)syncTurnTimeline()}
 function calculateSpeed(unit){
  if(!unit)return null;
  const base=Number.isFinite(unit.baseSpeed)?unit.baseSpeed:unit.speed;
@@ -432,7 +451,7 @@ function calculateSpeed(unit){
  const effectMultiplier=speedModifiers[unit.id]||1;
  return calculateLevelScaledStat(base,Number.isInteger(unit.level)?unit.level:1,
   {...(unit.speedFlatModifiers||{})},
-  {...(unit.speedPercentModifiers||{}),temporarySpeedEffect:effectMultiplier-1},unit.speedEquipmentFlatModifiers||{});
+  {...(unit.speedPercentModifiers||{}),temporarySpeedEffect:effectMultiplier-1,runeUnited:(runeCombatState[unit.id]?.unitedTurns||0)>0 ? .25 : 0},unit.speedEquipmentFlatModifiers||{});
 }
 function speedOf(unit){return Math.max(1,calculateSpeed(unit)||1)}
 function timelineEnemyMembers(){
@@ -590,7 +609,7 @@ function ultimateEnergyCost(p){return p?.id==='zero'&&premiumWeaponDuplicateRank
 function canQueueUltimate(p){return !!p&&p.hp>0&&!paused&&['player','enemy','resolve'].includes(phase)
   &&availableEnergy(p)>=ultimateEnergyCost(p)&&!isUltPending(p.id)}
 function emitCombatVisual(type,targetIds=[],duration=COMBAT_ACTION_EFFECT_MS,details={}){combatVisualEvents.push({type,targetIds:[...targetIds],at:performance.now(),duration,...details})}
-function resetActionResources(){const resourceful=party.some(p=>p.id==='dawn');combatVisualEvents=[];sp=resourceful?5:3;soulEnhanceStacks=0;soulFollowUpProcs=soulFollowUpLimit();soulFollowUpSources=new Set();soulEnhanceSpendingRemainder=0;soulFollowUpActivationCount=0;zeroHitEnemyIds=new Set();spCapModifiers=Object.create(null);if(resourceful){setSpCapModifier('dawn-resourceful',2);emitCombatVisual('dawn-resourceful',party.map(p=>p.id),1250)}ultimateQueue=[];ultimateSequence=0;ultimateHistory=[];ultimateResume=null;ultimateExecuting=false;
+function resetActionResources(){const resourceful=party.some(p=>p.id==='dawn');combatVisualEvents=[];runeCombatState=Object.create(null);sp=resourceful?5:3;soulEnhanceStacks=0;soulFollowUpProcs=soulFollowUpLimit();soulFollowUpSources=new Set();soulEnhanceSpendingRemainder=0;soulFollowUpActivationCount=0;zeroHitEnemyIds=new Set();spCapModifiers=Object.create(null);if(resourceful){setSpCapModifier('dawn-resourceful',2);emitCombatVisual('dawn-resourceful',party.map(p=>p.id),1250)}ultimateQueue=[];ultimateSequence=0;ultimateHistory=[];ultimateResume=null;ultimateExecuting=false;
   for(const p of party)p.energyReserved=0;}
 function setSpCapTestSource(source,bonus){
  if(!SP_CAP_SOURCES.has(source)||!Number.isInteger(bonus)||bonus<0||bonus>20)return false;
@@ -704,10 +723,11 @@ function zeroSkillControl(){return activateSoulEnhance();}
 function activateSoulEnhance(){
  const a=active();if(phase!=='player'||paused||!a||a.id!=='soul'){say('Enhance is available on Soul’s turn.');return false}
  if(sp<1){say('Soul Enhance needs 1 Skill Point.');return false}
- sp--;soulEnhanceStacks++;let refunded=false;
+ sp--;soulEnhanceStacks++;let refunded=false,recycled=false;
+ if(hasRuneSet(a.id,'recycle')&&runeEffectReady(a.id,'recycle')){gainSp(1);startRuneCooldown(a.id,'recycle');recycled=true;emitCombatVisual('rune-recycle',[a.id],COMBAT_ACTION_EFFECT_MS,{skillPoints:1})}
  if(loadoutFor('soul').weapon.selected==='premium'&&loadoutFor('soul').weapon.premiumOwned){soulEnhanceSpendingRemainder++;if(soulEnhanceSpendingRemainder>=3){soulEnhanceSpendingRemainder-=3;gainSp(1);refunded=true}}
  zeroSkillArmed=false;pendingTargetAction=null;cameraPreview=null;fx={kind:'self',visual:'soul-enhance',at:performance.now(),actor:a.id};
- log='SOUL ENHANCE: '+soulEnhanceStacks+' Skill Point(s) banked for the next Basic Attack.'+(refunded?' Standard signature weapon restored 1 Skill Point.':'');return true;
+ log='SOUL ENHANCE: '+soulEnhanceStacks+' Skill Point(s) banked for the next Basic Attack.'+(recycled?' Recycle restored 1 Skill Point.':'')+(refunded?' Standard signature weapon restored 1 Skill Point.':'');return true;
 }
 function startSupportDemo(kind){
  if(phase!=='player'||paused||!['heal','revive'].includes(kind))return false;
@@ -827,7 +847,8 @@ function settleAfterAttack(){
 function applyTrainingHit(enemy,damage,hitNumber,deferRicochet=false){
  if(!enemy||enemy.hp<=0||!attackInProgress)return false;
  const source=party.find(p=>p.id===lastAttack.actor)||summons.find(s=>s.id===lastAttack.actor)||null;
- const dealt=applyEnemyDamage(enemy,damage,source);
+ const actionDamage=lastAttack.runeAmplifyActive?roundHp(damage*1.5):damage;
+ const dealt=applyEnemyDamage(enemy,actionDamage,source);
  if(source?.id==='zero'&&dealt.damage>0)zeroHitEnemyIds.add(enemy.id);
  if((lastAttack.actor!=='lily'||lastAttack.action==='summon')&&enemy.marks?.some(m=>m.id==='exposed')){const lily=party.find(p=>p.id==='lily');if(lily&&loadoutFor('lily').weapon.selected==='premium'&&loadoutFor('lily').weapon.premiumOwned)lily.energy=Math.min(120,lily.energy+5)}
  lastAttack.hits.push({index:hitNumber,target:enemy.id,slot:enemy.slot,damage:dealt.damage+dealt.breakDamage,healthDamage:dealt.healthDamage,shieldDamage:dealt.shieldDamage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,breakDamage:dealt.breakDamage,barrierAfter:enemy.barrier,broken:dealt.broken,critical:dealt.critical,criticalMultiplier:dealt.criticalMultiplier,phase:'initial'});
@@ -909,6 +930,17 @@ function resolveSoulFollowUp(sourceAttack){
   if(premiumWeaponDuplicateRank(soul.id)>=4&&soulFollowUpActivationCount%2===0)soulFollowUpProcs=Math.min(soulFollowUpLimit(),soulFollowUpProcs+1);
  sourceAttack.followUp={sourceSerial:sourceAttack.serial,damage:total,targets:affected.map(e=>e.id),procsRemaining:soulFollowUpProcs};emitCombatVisual('soul-follow-up',affected.map(e=>e.id),ANIMATION_STEP_MS*5,{damageByTarget:Object.fromEntries(sourceAttack.hits.filter(hit=>hit.followUp).map(hit=>[hit.target,hit.damage])),targetGeometry:Object.fromEntries(affected.map(e=>[e.id,{x:e.x,y:e.y,w:e.w,h:e.h}]))});syncEnemyHp();return total>0;
 }
+function resolveRuneUltimateEffects(attack){
+ if(!attack||attack.action!=='ultimate'||attack.runeSetEffectsApplied)return false;
+ attack.runeSetEffectsApplied=true;
+ if(hasRuneSet(attack.actor,'infinite-space')){
+  const damagedIds=[...new Set(attack.hits.filter(hit=>hit.phase==='initial'&&hit.damage>0).map(hit=>hit.target))];
+  for(const id of damagedIds)addActionDelay(id,25);
+  if(damagedIds.length)emitCombatVisual('rune-infinite-space',damagedIds,COMBAT_ACTION_EFFECT_MS,{delayPercent:25});
+ }
+ if(hasRuneSet(attack.actor,'celestial-star')){addActionAdvance(attack.actor,50);emitCombatVisual('rune-celestial-star',[attack.actor],COMBAT_ACTION_EFFECT_MS,{advancePercent:50})}
+ return true;
+}
 function finishTrainingAttack(serial){
  if(!attackInProgress||!lastAttack||lastAttack.serial!==serial)return;
  if(!lastAttack.resolutionPhase){
@@ -924,6 +956,7 @@ function finishTrainingAttack(serial){
    schedule(()=>finishTrainingAttack(serial),COMBAT_ACTION_PHASE_GAP_MS);return;
   }
  }
+ resolveRuneUltimateEffects(lastAttack);
  attackInProgress=false;lastAttack.finished=true;lastAttack.finishedAt=performance.now();
  if(lastAttack.actor==='lily'&&lastAttack.action==='ultimate'&&!encounterCleared){
   if(loadoutFor('lily').weapon.selected==='premium'&&loadoutFor('lily').weapon.premiumOwned)gainSp(1);
@@ -938,7 +971,7 @@ function finishTrainingAttack(serial){
   if(loadoutFor('zero').weapon.selected==='premium'&&loadoutFor('zero').weapon.premiumOwned)gainSp(1);
  }
  if(lastAttack.actor==='logan'&&lastAttack.action==='ultimate'&&characterDuplicateRank('logan')>=3)gainSp(1);
- const actingAlly=party.find(p=>p.id===lastAttack.actor);if(actingAlly){ageTaunt(actingAlly);if(lastAttack.action!=='ultimate')ageDawnTune(actingAlly);if(lastAttack.action!=='ultimate')ageResidue(actingAlly)}
+ const actingAlly=party.find(p=>p.id===lastAttack.actor);if(actingAlly){ageTaunt(actingAlly);if(lastAttack.action!=='ultimate'){ageDawnTune(actingAlly);ageResidue(actingAlly);ageRuneTurn(actingAlly.id)}}
  if(pendingVacancies.length){schedule(()=>completeTrainingAttack(serial),ENEMY_DEATH_BEAT_MS);return}
  completeTrainingAttack(serial);
 }
@@ -1073,6 +1106,8 @@ function executeCombatAction(a,action,ultimateSeq=null,allyTargetId=null){
  const targetGeometry=victim?{x:victim.x,y:victim.y,w:victim.w,h:victim.h,slot:victim.slot}:null;
  const mode=supportAction?'ally':actionTargetMode(a,action),targets=supportAction?[]:chooseAttackTargets(mode,victim);
  const controlledSummon=action==='skill'&&a.test?summons.find(s=>s.mode==='controlled'&&!s.pendingCreation&&s.ownerId===a.id):null;
+ const runeAmplifyActive=action==='basic'&&hasRuneSet(a.id,'amplify')&&runeEffectReady(a.id,'amplify'),runeRecycleActive=action==='skill'&&hasRuneSet(a.id,'recycle')&&runeEffectReady(a.id,'recycle');
+ if(runeAmplifyActive)startRuneCooldown(a.id,'amplify');
  const energyBefore=a.energy,spBefore=sp,spMaxBefore=effectiveSpMax();
  let damage=0,enhanceSpent=0,soulRate=null,zeroRate=null,tuneBasicUsed=action==='basic'&&!!a.tune?.basicEnhanced;
  if(a.id==='soul'&&action==='basic'){
@@ -1102,10 +1137,13 @@ function executeCombatAction(a,action,ultimateSeq=null,allyTargetId=null){
  else damage=980;
  if(action==='basic')gainSp(1);
  if(tuneBasicUsed)gainSp(1);
+ if(runeRecycleActive){gainSp(1);startRuneCooldown(a.id,'recycle');emitCombatVisual('rune-recycle',[a.id],COMBAT_ACTION_EFFECT_MS,{skillPoints:1})}
+ if(supportAction&&(action==='skill'||action==='ultimate')&&hasRuneSet(a.id,'united')&&(allyTarget||teamWideSupport&&party.some(ally=>ally.hp>0)))applyUnitedRune(a.id);
  const serial=++attackSerial,ricochetEligibleEnemyIds=liveEnemies().filter(enemy=>enemy.marks?.some(mark=>mark.id==='ricochet')).map(enemy=>enemy.id);
  attackInProgress=true;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;cameraPreview=null;selectedAllyId=null;
- lastAttack={serial,actor:a.id,action,mode,ultimateSeq,allyTargetId:allyTarget?.id||null,tuneBasicUsed,controlledSummonId:controlledSummon?.id||null,initialTarget:victim?.id||allyTarget?.id||null,initialTargets:targets.map(e=>e.id),
+ lastAttack={serial,actor:a.id,action,mode,ultimateSeq,allyTargetId:allyTarget?.id||null,tuneBasicUsed,runeAmplifyActive,controlledSummonId:controlledSummon?.id||null,initialTarget:victim?.id||allyTarget?.id||null,initialTargets:targets.map(e=>e.id),
   ricochetEligibleEnemyIds,hits:[],defeats:[],finished:false,startedAt:performance.now(),finishedAt:null,energyBefore,energyAfter:a.energy,spBefore,spAfter:sp,spMaxBefore,spMaxAfter:effectiveSpMax(),enhanceSpent,soulRate,zeroRate};
+ if(runeAmplifyActive)emitCombatVisual('rune-amplify',targets.map(enemy=>enemy.id),COMBAT_ACTION_EFFECT_MS,{damageBonus:.5});
  phase='resolve';if(dawnSupport)selectedAllyId=allyTarget.id;const actionVisual=ACTION_VISUALS[a.id]?.[action]||`${a.id}-${action}`;fx=supportAction?{kind:'support',visual:actionVisual,at:performance.now(),damage:0,actor:a.id,targetAllyId:allyTarget?.id||null,targetAllyIds:teamWideSupport?party.filter(ally=>ally.hp>0).map(ally=>ally.id):null,action}:{kind:action,visual:actionVisual,at:performance.now(),damage,actor:a.id,targetEnemyId:victim?.id||null,targetEnemyIds:targets.map(e=>e.id),targetGeometry};
  log=a.id==='soul'?(action==='ultimate'?'SOUL ULTIMATE • INITIAL TRUE AOE':action==='basic'?'SOUL BASIC • INITIAL TRUE HIT':'SOUL '+action.toUpperCase()):a.id==='zero'?'ZERO '+(action==='skill'?'FIRST STRIKE':action==='ultimate'?'EXECUTION':'BASIC ATTACK')+' • PHYSICAL HIT':a.id==='dawn'?(action==='skill'?'DAWN TUNE • '+allyTarget.name:action==='ultimate'?'DAWN ULTIMATE • '+allyTarget.name:'DAWN BASIC • INITIAL MAGICAL HIT'):a.id==='lily'?'LILY '+action.toUpperCase()+' • INITIAL HIT':a.id==='logan'?(action==='skill'?'LOGAN BLOOD SHIELD • TEAM GUARD':action==='ultimate'?'LOGAN ULTIMATE • RED TIDE AOE':'LOGAN BASIC • BLEEDING STRIKE'):'TEST '+mode.toUpperCase()+': '+a.name+' uses '+action+' • '+targets.length+' initial target(s).';
  if(controlledSummon)summonHistory.push({event:'controlled-activation',id:controlledSummon.id,ownerId:a.id,clock:turnTimeline.clock});
@@ -1145,7 +1183,7 @@ const RUNE_STAT_INFO={
  magicalDefense:{label:'Magical Defense',main:4},speed:{label:'Speed',main:20}
 };
 const CELESTIALS=[['passive','PASSIVE'],['basic','BASIC'],['skill','SKILL'],['ultimate','ULTIMATE']];
-function defaultLoadout(){return {characterDuplicates:0,weapon:{selected:'standard',standardPotential:1,premiumPotential:1,premiumOwned:false,standardLevel:1,standardExp:0,standardAscended:[],premiumLevel:1,premiumExp:0,premiumAscended:[]},runes:[null,null,null,null],celestials:{passive:1,basic:1,skill:1,ultimate:1}}}
+function defaultLoadout(){return {characterDuplicates:0,weapon:{selected:'standard',standardPotential:1,premiumPotential:1,premiumOwned:false,standardLevel:1,standardExp:0,standardAscended:[],premiumLevel:1,premiumExp:0,premiumAscended:[]},runeSetId:null,runes:[null,null,null,null],celestials:{passive:1,basic:1,skill:1,ultimate:1}}}
 function normalizeRune(value){
  if(!value||typeof value!=='object'||!RUNE_STATS.includes(value.main)||!Array.isArray(value.subs))return null;
  const subs=value.subs.filter((x,i,a)=>RUNE_STATS.includes(x)&&x!==value.main&&a.indexOf(x)===i).slice(0,3);
@@ -1169,12 +1207,15 @@ function normalizeLoadout(value,cap=characterLevelCap()){
   if(base.weapon[levelKey]>=cap)base.weapon[expKey]=0;
  }
  base.weapon.selected=weapon.selected==='premium'&&base.weapon.premiumOwned?'premium':'standard';
+ const legacySetId=Array.isArray(value.runes)?value.runes.find(rune=>typeof rune?.setId==='string'&&Object.hasOwn(RUNE_SET_DEFINITIONS,rune.setId))?.setId:null;
+ base.runeSetId=typeof value.runeSetId==='string'&&Object.hasOwn(RUNE_SET_DEFINITIONS,value.runeSetId)?value.runeSetId:legacySetId;
  if(Array.isArray(value.runes))base.runes=Array.from({length:4},(_,i)=>normalizeRune(value.runes[i]));
+ for(const rune of base.runes)if(rune)rune.setId=base.runeSetId;
  if(value.celestials&&typeof value.celestials==='object')for(const [key] of CELESTIALS){const n=value.celestials[key];base.celestials[key]=Number.isInteger(n)?Math.max(1,Math.min(10,n)):1}
  return base
 }
 function loadCharacterLoadouts(){let stored={};try{stored=JSON.parse(localStorage.getItem(LOADOUT_KEY)||'{}')||{}}catch(e){}return Object.fromEntries(ROSTER.map(model=>[model.id,normalizeLoadout(stored[model.id])]))}
-let characterLoadouts=loadCharacterLoadouts(),loadoutCharacterId='soul',selectedLoadoutRune=0,loadoutPage='characters',runeStatPicker=null,weaponBookSelection={small:0,medium:0,large:0};
+let characterLoadouts=loadCharacterLoadouts(),loadoutCharacterId='soul',selectedLoadoutRune=0,loadoutPage='characters',runePanelMode='sets',runeStatPicker=null,weaponBookSelection={small:0,medium:0,large:0};
 function loadoutFor(id=loadoutCharacterId){return characterLoadouts[id]||(characterLoadouts[id]=defaultLoadout())}
 function saveLoadouts(){try{localStorage.setItem(LOADOUT_KEY,JSON.stringify(characterLoadouts))}catch(e){}}
 function defaultItemInventory(){return {bottles:{small:0,medium:0,large:0},books:{small:0,medium:0,large:0},cores:0,gems:0}}
@@ -1325,7 +1366,7 @@ function ascendWeaponWithGem(id,type){
 function loadoutStatModifiers(id,characterLevel=1){
  const record=loadoutFor(id),bonus=weaponBonus(record,id),totals=Object.fromEntries(RUNE_STATS.map(k=>[k,0]));
  for(const rune of record.runes){if(!rune)continue;totals[rune.main]+=RUNE_STAT_INFO[rune.main].main*rune.level;for(const sub of rune.subs)totals[sub]+=RUNE_STAT_INFO[sub].main*.25*rune.level}
- const pct={signatureWeapon:bonus},criticalRateFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalRateBonus||0),0),criticalDamageFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalDamageBonus||0),0);
+ const pct={signatureWeapon:bonus},criticalRateFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalRateBonus||0),0)+(record.runeSetId==='radiant-moon' ? .10 : 0),criticalDamageFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalDamageBonus||0),0)+(record.runeSetId==='eternal-sun' ? .25 : 0);
  return {hpFlatModifiers:{},hpPercentModifiers:pct,hpEquipmentFlatModifiers:{runes:totals.hp},
  physicalAttackFlatModifiers:{},physicalAttackPercentModifiers:pct,physicalAttackEquipmentFlatModifiers:{runes:totals.physicalAttack},
  magicalAttackFlatModifiers:{},magicalAttackPercentModifiers:pct,magicalAttackEquipmentFlatModifiers:{runes:totals.magicalAttack},
@@ -1346,12 +1387,14 @@ function loadoutStats(id){
  'Physical Attack':calculatePhysicalAttack(unit),'Magical Attack':calculateMagicalAttack(unit),
  'Physical Defense':calculatePhysicalDefense(unit),'Magical Defense':calculateMagicalDefense(unit),Speed:calculateSpeed(unit)}
 }
-function enterLoadout(){loadoutCharacterId='soul';selectedLoadoutRune=0;loadoutPage='details';runeStatPicker=null;weaponBookSelection={small:0,medium:0,large:0};phase='loadout';hint=''}
+function enterLoadout(){loadoutCharacterId='soul';selectedLoadoutRune=0;loadoutPage='details';runePanelMode='sets';runeStatPicker=null;weaponBookSelection={small:0,medium:0,large:0};phase='loadout';hint=''}
 function handleLoadoutAction(action){
  const [kind,arg]=action.split(':'),record=loadoutFor(),weapon=record.weapon,rune=record.runes[selectedLoadoutRune];
  if(kind==='back'){if(runeStatPicker){runeStatPicker=null;return}phase='menu';return}
  if(kind==='character'){if(ROSTER_IDS.has(arg)&&!roster(arg)?.test){loadoutCharacterId=arg;weaponBookSelection={small:0,medium:0,large:0}}return}
- if(kind==='page'){if(['details','weapons','runes','celestials'].includes(arg)){loadoutPage=arg;weaponBookSelection={small:0,medium:0,large:0}}return}
+ if(kind==='page'){if(['details','weapons','runes','celestials'].includes(arg)){loadoutPage=arg;if(arg==='runes')runePanelMode='sets';weaponBookSelection={small:0,medium:0,large:0}}return}
+ if(kind==='rune-view'&&['sets','stats'].includes(arg)){runePanelMode=arg;runeStatPicker=null;return}
+ if(kind==='rune-set'&&(arg===''||Object.hasOwn(RUNE_SET_DEFINITIONS,arg))){record.runeSetId=arg||null;for(const equipped of record.runes)if(equipped)equipped.setId=record.runeSetId;saveLoadouts();return}
  if(kind==='upgrade'&&arg==='weapon'){
   const type=weapon.selected,level=weapon[type+'Level'],gate=ASCENSION_GATES.includes(level)&&!weapon[type+'Ascended'].includes(level);
   if(gate){say(ascendWeaponWithGem(loadoutCharacterId,type)?'Weapon Ascension completed. One Gem was consumed.':'One Gem is required to Ascend this weapon.')}
@@ -1373,7 +1416,7 @@ function handleLoadoutAction(action){
  else if(kind==='weapon-premium'){if(weapon.premiumOwned){weapon.selected='premium';weaponBookSelection={small:0,medium:0,large:0}}}
  else if(kind==='potential'&&DEV_MODE){const [type,delta]=arg.split(','),key=type==='premium'?'premiumPotential':'standardPotential';weapon[key]=Math.max(1,Math.min(5,weapon[key]+Number(delta)))}
  else if(kind==='rune-select')selectedLoadoutRune=Math.max(0,Math.min(3,Number(arg)||0));
- else if(kind==='rune-equip'&&DEV_MODE){const index=Math.max(0,Math.min(3,Number(arg)||0));record.runes[index]={level:1,main:'hp',subs:['physicalAttack','magicalAttack','physicalDefense'],setId:null};selectedLoadoutRune=index}
+ else if(kind==='rune-equip'&&DEV_MODE){const index=Math.max(0,Math.min(3,Number(arg)||0));record.runes[index]={level:1,main:'hp',subs:['physicalAttack','magicalAttack','physicalDefense'],setId:record.runeSetId};selectedLoadoutRune=index}
  else if(kind==='rune-remove')record.runes[selectedLoadoutRune]=null;
  else if(kind==='rune-level'&&rune&&Number(arg)===1){const level=upgradeRuneWithCore(loadoutCharacterId,selectedLoadoutRune);say(level?`Rune upgraded to Level ${level}.`:'A Core is required and the Rune must be below Level 5.')}
  else if(kind==='rune-main'&&rune){runeStatPicker={slot:'main',subIndex:-1};return}
@@ -1476,31 +1519,6 @@ function drawRuneStatPicker(rune){
   if(selected)rect(x-3,y-3,396,161,'rgba(0,0,0,0)','#edcf98',12);
  }
 }
-function drawLoadoutRunes(){
- const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId);
- loadoutPanel(model.name+' • RUNES','Equip up to four runes. Main and substats are flat bonuses; each rune is level 1–5.');
- for(let i=0;i<4;i++){
-  const x=125+(i%2)*690,y=190+Math.floor(i/2)*300,rune=record.runes[i],selected=i===selectedLoadoutRune;
-  rect(x,y,650,276,'rgba(25,37,58,.94)',selected?'#edcf98':'#718ba4',13);
-  text('RUNE SLOT '+(i+1),x+24,y+32,18,'#d6e2ef','850');
-  addButton(x+450,y+12,82,42,'loadout:rune-select:'+i,'SELECT','',selected);
-  if(!rune){
-   text('EMPTY',x+30,y+104,18,'#aebfd0','650');
-   if(DEV_MODE)addButton(x+30,y+150,590,64,'loadout:rune-equip:'+i,'ADD RUNE • PREVIEW','Rune inventory and set bonuses are not configured');
-   continue;
-  }
-  text('LEVEL '+rune.level+' / 5',x+250,y+32,15,'#f1dfbf','750','center');
-  addButton(x+315,y+12,125,42,'loadout:rune-level:1','UPGRADE','CORE ×'+itemInventory.cores,rune.level<5&&itemInventory.cores>0);
-  addButton(x+540,y+12,92,42,'loadout:rune-remove','UNEQUIP');
-  const main=RUNE_STAT_INFO[rune.main];
-  addButton(x+24,y+58,602,64,'loadout:rune-main','MAIN STAT • '+main.label,'+'+(main.main*rune.level)+' • SELECT TO CHANGE');
-  for(let j=0;j<3;j++){
-   const sub=rune.subs[j],sx=x+24+j*204,info=RUNE_STAT_INFO[sub];
-   addButton(sx,y+140,194,92,'loadout:rune-sub:'+j,info.label,'+'+(info.main*.25*rune.level));
-  }
- }
- const rune=record.runes[selectedLoadoutRune];if(rune)drawRuneStatPicker(rune);
-}
 function drawLoadoutCelestials(){
  const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId);
  loadoutPanel(model.name+' • CELESTIALS',`Four ability upgrades. Each level adds 10% to its base multiplier. Cores: ${itemInventory.cores}.`);
@@ -1581,7 +1599,7 @@ function drawLoadout(){
  else if(loadoutPage==='weapons')drawLoadoutWeaponsPanel(model,record);
  else if(loadoutPage==='runes')drawLoadoutRunesPanel(record);
  else drawLoadoutCelestialsPanel(record);
- if(loadoutPage==='runes'){const rune=record.runes[selectedLoadoutRune];if(rune)drawRuneStatPicker(rune)}
+ if(loadoutPage==='runes'&&runePanelMode==='stats'){const rune=record.runes[selectedLoadoutRune];if(rune)drawRuneStatPicker(rune)}
 }
 function drawLoadoutDetailsPanel(model,record,progress,cap){
  const stats=loadoutStats(loadoutCharacterId),needed=requiredExp(progress.level),gate=ASCENSION_GATES.includes(progress.level)&&!progress.ascended.includes(progress.level);
@@ -1638,15 +1656,32 @@ function drawLoadoutBookCard(x,y,w,h,type,size,enabled){
  addButton(x+w-46,buttonY,34,30,'loadout:book-select:'+size+',1','+','',enabled&&selected<qty,14);
 }
 function drawLoadoutRunesPanel(record){
- text('CORES ×'+itemInventory.cores,1090,191,12,'#b9c8d7','650');
+ addButton(1090,174,145,34,'loadout:rune-view:sets','SETS','',true,12);
+ addButton(1243,174,145,34,'loadout:rune-view:stats','STATS','',true,12);
+ addButton(1396,174,148,34,'loadout:rune-set:','CLEAR SET','',!!record.runeSetId,11);
+ if(runePanelMode==='sets')rect(1088,172,149,38,'rgba(0,0,0,0)','#e9cc8b',11);
+ else rect(1241,172,149,38,'rgba(0,0,0,0)','#e9cc8b',11);
+ if(runePanelMode==='sets'){drawRuneSetChoices(record);return}
+ text('CORES ×'+itemInventory.cores,1090,214,12,'#b9c8d7','650');
  for(let i=0;i<4;i++){
-  const y=218+i*151,rune=record.runes[i],active=i===selectedLoadoutRune;rect(1083,y,462,138,'rgba(27,39,59,.78)',active?'#d5ba7c':'rgba(148,169,194,.35)',12);
+  const y=238+i*143,rune=record.runes[i],active=i===selectedLoadoutRune;rect(1083,y,462,130,'rgba(27,39,59,.78)',active?'#d5ba7c':'rgba(148,169,194,.35)',12);
   addButton(1094,y+9,95,37,'loadout:rune-select:'+i,'SLOT '+(i+1),rune?'LEVEL '+rune.level+'/5':'',true,12);
   if(!rune){text('EMPTY',1210,y+33,13,'#aebed0','700');if(DEV_MODE)addButton(1200,y+59,330,37,'loadout:rune-equip:'+i,'ADD RUNE • PREVIEW','',true,11);continue}
   const main=RUNE_STAT_INFO[rune.main];addButton(1197,y+9,220,37,'loadout:rune-main',main.label.toUpperCase(),'+'+(main.main*rune.level)+' • MAIN STAT',true,11);
   addButton(1425,y+9,105,37,'loadout:rune-level:1','UPGRADE','CORE ×'+itemInventory.cores,rune.level<5&&itemInventory.cores>0,10);
-  for(let j=0;j<3;j++){const info=RUNE_STAT_INFO[rune.subs[j]];addButton(1094+j*137,y+59,128,54,'loadout:rune-sub:'+j,info.label,'+'+(info.main*.25*rune.level),true,10)}
-  choiceRects.push({x:1504,y:y+59,w:32,h:54,action:'loadout:rune-remove',enabled:true});rect(1504,y+59,32,54,'#263754','#a5c9dc',8);text('×',1520,y+93,17,'#fff4e6','750','center');
+  for(let j=0;j<3;j++){const info=RUNE_STAT_INFO[rune.subs[j]];addButton(1094+j*137,y+59,128,48,'loadout:rune-sub:'+j,info.label,'+'+(info.main*.25*rune.level),true,10)}
+  choiceRects.push({x:1504,y:y+59,w:32,h:48,action:'loadout:rune-remove',enabled:true});rect(1504,y+59,32,48,'#263754','#a5c9dc',8);text('×',1520,y+83,17,'#fff4e6','750','center');
+ }
+}
+function drawRuneSetChoices(record){
+ const keys=Object.keys(RUNE_SET_DEFINITIONS);
+ for(let i=0;i<keys.length;i++){
+  const key=keys[i],set=RUNE_SET_DEFINITIONS[key],col=i%3,row=Math.floor(i/3),x=1086+col*153,y=220+row*198,selected=record.runeSetId===key;
+  choiceRects.push({x,y,w:145,h:188,action:'loadout:rune-set:'+key,enabled:true});rect(x,y,145,188,selected?'rgba(80,69,48,.72)':'rgba(27,39,59,.78)',selected?'#e9cc8b':'rgba(148,169,194,.35)',12);
+  const icon=images[set.image];if(icon?.complete&&icon.naturalWidth){ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(icon,x+43,y+10,59,59);ctx.restore()}
+  text(set.name,x+72,y+81,12,selected?'#f6dfa8':'#e5edf5','800','center');
+  for(let lineIndex=0;lineIndex<set.lines.length;lineIndex++)text(set.lines[lineIndex],x+72,y+111+lineIndex*18,10,'#c4d2df','650','center');
+  if(selected)text('EQUIPPED',x+72,y+169,9,'#f3d99c','800','center');
  }
 }
 function drawLoadoutCelestialsPanel(record){
@@ -2390,6 +2425,12 @@ function drawCombatVisualEvents(t,shot){
   if(event.type==='zero-delay'){
    for(const id of event.targetIds){const pos=enemyVisualPosition(id);if(!pos)continue;drawCombatSigil(pos.x,pos.y,28+q*44,'#f57482',fade,'ring');text('DELAYED 20%',pos.x,pos.y-58,13,`rgba(255,220,223,${fade})`,'900','center')}continue;
   }
+  if(event.type.startsWith('rune-')){
+   const runeKey=event.type.slice(5),set=RUNE_SET_DEFINITIONS[runeKey],labels={recycle:'+1 SKILL POINT',amplify:'BASIC ATTACK +50%',united:'SPEED +25%', 'celestial-star':'ADVANCE 50%', 'infinite-space':'DELAY 25%'};
+   const view=shotWorld(shot)==='reverse'?'party':'command',pan=view==='party'?.32:.52;
+   for(const id of event.targetIds){const ally=party.find(unit=>unit.id===id),allyPosition=ally&&cameraAllyPosition(id,view),enemyPosition=!ally&&enemyVisualPosition(id);const x=allyPosition?allyPosition.x+allyPosition.w/2+camera.currentX*pan:enemyPosition?.x,y=allyPosition?allyPosition.baseY-allyPosition.h*.62:enemyPosition?.y;if(!Number.isFinite(x)||!Number.isFinite(y))continue;drawCombatSigil(x,y,30+q*24,set?.name==='Recycle'?'#80ecbb':'#f1d28b',fade,'ring');const icon=images[set?.image];if(icon?.complete&&icon.naturalWidth){ctx.save();ctx.globalAlpha=fade;ctx.imageSmoothingEnabled=true;ctx.drawImage(icon,x-16,y-58,32,32);ctx.restore()}text(labels[runeKey]||set?.name||'RUNE',x,y-72,13,`rgba(255,244,220,${fade})`,'900','center')}
+   continue;
+  }
   if(event.type==='dawn-resourceful'){
    const x=W/2,y=435;drawCombatSigil(x,y,58+q*100,'#80f2ed',fade,'ring');text('RESOURCEFUL  •  +2 SP',x,y-125,24,`rgba(224,255,247,${fade})`,'900','center');continue;
   }
@@ -2446,7 +2487,7 @@ function hudPortrait(img,x,y,w,h,headShoulders=false){
  ctx.restore();
 }
 // Render active combat statuses beside each ally portrait.
-function hudStatusList(p){return [...(Array.isArray(p.hudStatuses)?p.hudStatuses:[]),...(p.tune?[{kind:'buff',icon:'♫',turns:p.tune.turns}]:[]),...(p.residueStacks?[{kind:'debuff',icon:'R',stacks:p.residueStacks,turns:p.residueTurns}]:[])]}
+function hudStatusList(p){const runeState=runeCombatState[p.id],runeStatuses=[];if(hasRuneSet(p.id,'united')&&runeState?.unitedTurns>0)runeStatuses.push({kind:'buff',image:'runeUnited',turns:runeState.unitedTurns});if(hasRuneSet(p.id,'recycle')&&runeState?.cooldowns.recycle>0)runeStatuses.push({kind:'debuff',image:'runeRecycle',turns:runeState.cooldowns.recycle});if(hasRuneSet(p.id,'amplify')&&runeState?.cooldowns.amplify>0)runeStatuses.push({kind:'debuff',image:'runeAmplify',turns:runeState.cooldowns.amplify});return [...(Array.isArray(p.hudStatuses)?p.hudStatuses:[]),...runeStatuses,...(p.tune?[{kind:'buff',icon:'♫',turns:p.tune.turns}]:[]),...(p.residueStacks?[{kind:'debuff',icon:'R',stacks:p.residueStacks,turns:p.residueTurns}]:[])]}
 function drawAllyStatuses(p,x,portraitY,sz){
  const effects=hudStatusList(p);if(!effects.length)return;
  const iconSize=23,pitch=26,perRow=Math.max(1,Math.floor((sz+3)/pitch));
@@ -2458,7 +2499,7 @@ function drawAllyStatuses(p,x,portraitY,sz){
   const favorable=ef.kind!=='debuff';
   rect(bx,by,iconSize,iconSize,favorable?'rgba(23,77,104,.98)':'rgba(105,45,65,.98)',favorable?'#8bd1ef':'#ec9da9',4);
   ctx.save();ctx.beginPath();ctx.rect(bx+1,by+1,iconSize-2,iconSize-2);ctx.clip();
-  text(String(ef.icon||'✦').slice(0,2),bx+iconSize/2,by+15,15,'#f7f5ff','750','center');
+  const statusImage=ef.image&&images[ef.image];if(statusImage?.complete&&statusImage.naturalWidth){ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(statusImage,bx+2,by+2,iconSize-4,iconSize-4);ctx.restore()}else text(String(ef.icon||'✦').slice(0,2),bx+iconSize/2,by+15,15,'#f7f5ff','750','center');
   if(Number.isInteger(ef.stacks)&&ef.stacks>0){
    const count=String(ef.stacks);rect(bx+iconSize-13,by+iconSize-13,12,12,'rgba(6,15,26,.98)',null,2);text(count,bx+iconSize-7,by+iconSize-4,9,'#fffafa','900','center');
    if(Number.isInteger(ef.turns)&&ef.turns>=0){rect(bx+1,by+1,13,10,'rgba(6,15,26,.98)',null,2);text(`${ef.turns}T`,bx+7,by+6,7,'#fffafa','900','center')}
