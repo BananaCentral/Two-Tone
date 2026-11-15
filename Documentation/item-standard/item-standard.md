@@ -1,5 +1,7 @@
 # Two-Tone Item Standard
 
+Item inventory cards follow the shared [UI Layout Standard](../project-standard/ui-layout-standard.md): consistent item-card sizes, centered artwork, concise labels, and owned quantities.
+
 ## Enchanted Bottles
 
 Enchanted Bottles grant Character XP when used on a selected character:

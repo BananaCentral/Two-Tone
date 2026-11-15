@@ -1639,7 +1639,7 @@ function drawLoadoutBookCard(x,y,w,h,type,size,enabled){
  addButton(x+w-46,buttonY,34,30,'loadout:book-select:'+size+',1','+','',enabled&&selected<qty,14);
 }
 function drawLoadoutRunesPanel(record){
- text('FOUR SLOTS • CORES ×'+itemInventory.cores,1090,191,12,'#b9c8d7','650');
+ text('CORES ×'+itemInventory.cores,1090,191,12,'#b9c8d7','650');
  for(let i=0;i<4;i++){
   const y=218+i*151,rune=record.runes[i],active=i===selectedLoadoutRune;rect(1083,y,462,138,'rgba(27,39,59,.78)',active?'#d5ba7c':'rgba(148,169,194,.35)',12);
   addButton(1094,y+9,95,37,'loadout:rune-select:'+i,'SLOT '+(i+1),rune?'LEVEL '+rune.level+'/5':'EMPTY',true,12);
@@ -1651,7 +1651,7 @@ function drawLoadoutRunesPanel(record){
  }
 }
 function drawLoadoutCelestialsPanel(record){
- text('ONE CORE PER LEVEL • MAX LEVEL 10 • CORES ×'+itemInventory.cores,1090,191,12,'#b9c8d7','650');
+ text('CORES ×'+itemInventory.cores,1090,191,12,'#b9c8d7','650');
  for(let i=0;i<CELESTIALS.length;i++){
   const [key,label]=CELESTIALS[i],y=224+i*145,level=record.celestials[key];rect(1083,y,462,129,'rgba(27,39,59,.78)','#71869e',12);
   text(label.toUpperCase(),1104,y+34,16,'#f3dfb9','800');text('LEVEL '+level+' / 10',1104,y+63,13,'#d6e2ef','650');
@@ -1663,9 +1663,8 @@ function drawStartupMenu(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.72)');
  text('TWO-TONE',800,208,64,'#f8f4ea','900','center');
  text('YOUR ADVENTURE, YOUR PROGRESS',800,272,19,'#eacb87','800','center');
- addButton(620,365,360,112,'startup-start','START','CONTINUE TO MAIN MENU');
- addButton(620,507,360,112,'startup-load','LOAD','IMPORT A SAVE FILE');
- text('Progress is saved in your browser. Export a file from SAVE to carry it between devices.',800,690,17,'#d6dceb','550','center');
+ addButton(620,365,360,112,'startup-start','START','');
+ addButton(620,507,360,112,'startup-load','LOAD','');
 }
 function drawMainMenuIcon(kind,cx,cy,color){
  ctx.save();ctx.translate(cx,cy);ctx.strokeStyle=color;ctx.fillStyle='rgba(0,0,0,0)';ctx.lineWidth=2.6;ctx.lineCap='round';ctx.lineJoin='round';
@@ -1701,36 +1700,37 @@ function drawMainMenuTile(item,x,y,w,h){
  rect(x,y,w,h,fill,active?'rgba(216,219,224,.35)':'rgba(152,160,173,.22)',15);
  if(active){ctx.save();ctx.strokeStyle='rgba(247,225,183,.14)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x+18,y+1);ctx.lineTo(x+w-18,y+1);ctx.stroke();ctx.restore()}
  drawMainMenuIcon(item.icon,x+w/2,y+72,active?'#e6dcc5':'#8993a2');
- text(item.label,x+w/2,y+145,19,active?'#f2eee7':'#bac0ca','800','center');
- if(item.detail)text(item.detail,x+w/2,y+176,11,active?'#aeb8c7':'#8993a2','600','center');
+ text(item.label,x+w/2,y+154,20,active?'#f2eee7':'#bac0ca','800','center');
+ if(item.detail)text(item.detail,x+w/2,y+180,12,active?'#aeb8c7':'#8993a2','650','center');
  if(!active){rect(x+w/2-56,y+h-30,112,18,'rgba(8,12,19,.78)','rgba(139,149,163,.3)',9);text('COMING SOON',x+w/2,y+h-21,9,'#9099a7','750','center')}
 }
 function drawMainMenu(){
  drawBackground();rect(0,0,W,H,'rgba(4,7,13,.72)');
  rect(78,52,1444,796,'rgba(7,11,19,.62)','rgba(224,225,225,.22)',22);
  const items=[
-  {label:'STORY',icon:'story',action:'open-story',detail:DEV_MODE?'BATTLE TESTS':'BEGIN YOUR JOURNEY'},
+  {label:'STORY',icon:'story',action:'open-story'},
   {label:'EVENTS',icon:'events',active:false},
-  {label:DEV_MODE?'DEV MODE':'REGULAR MODE',icon:'mode',action:'toggle-game-mode',detail:DEV_MODE?'SWITCH TO REGULAR MODE':'SWITCH TO DEV MODE'},
-  {label:'STORE',icon:'store',action:'open-store',detail:'FEATURED LOTTERIES'},
-  {label:'LOADOUT',icon:'loadout',action:'open-loadout',detail:'WEAPONS • RUNES • CELESTIALS'},
-  {label:'PARTY',icon:'party',action:'open-party',detail:'MANAGE YOUR PARTY'},
-  {label:'ITEMS',icon:'items',action:'open-inventory',detail:'ITEM INVENTORY'},
-  {label:'CHALLENGES',icon:'challenges',action:'open-challenges',detail:'REWARD TRACKER'},
-  {label:'SAVE',icon:'save',action:'save-progress',detail:'EXPORT SAVE FILE'},
-  {label:'SETTINGS',icon:'settings',action:'open-settings',detail:'DISPLAY OPTIONS'}
+  {label:'GAME MODE',icon:'mode',action:'toggle-game-mode',detail:DEV_MODE?'DEV MODE':'REGULAR'},
+  {label:'STORE',icon:'store',action:'open-store'},
+  {label:'LOADOUT',icon:'loadout',action:'open-loadout'},
+  {label:'PARTY',icon:'party',action:'open-party'},
+  {label:'ITEMS',icon:'items',action:'open-inventory'},
+  {label:'CHALLENGES',icon:'challenges',action:'open-challenges'},
+  {label:'SAVE',icon:'save',action:'save-progress'},
+  {label:'SETTINGS',icon:'settings',action:'open-settings'}
  ];
  const x0=124,y0=91,cardW=318,cardH=226,gapX=20,gapY=16,positions=[[0,0],[1,0],[2,0],[3,0],[0,1],[1,1],[2,1],[3,1],[1,2],[2,2]];
  items.forEach((item,index)=>{const [column,row]=positions[index];drawMainMenuTile(item,x0+column*(cardW+gapX),y0+row*(cardH+gapY),cardW,cardH)});
 }
 function drawSettings(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.76)');rect(250,130,1100,640,'rgba(13,20,39,.98)','#ccb88e',20);
- text('SETTINGS',320,205,42,'#ffedd1','850');addButton(1130,168,170,54,'main-menu','MAIN MENU','');
- rect(330,280,940,330,'rgba(25,37,58,.94)','#718ba4',16);
- text('DISPLAY',385,345,22,'#f3dfb9','850');
+ text('SETTINGS',800,244,30,'#ffedd1','850','center');addButton(1130,168,170,54,'main-menu','MAIN MENU','');
+ rect(330,300,940,300,'rgba(25,37,58,.94)','#718ba4',16);
+ text('DISPLAY',800,280,18,'#f3dfb9','850','center');
  const standalone=isStandaloneApp();
- addButton(385,390,830,92,'toggle-fullscreen',isFullscreen()?'EXIT FULLSCREEN':'ENTER FULLSCREEN',standalone?'Already fullscreen as a Home Screen app':'Use the full screen for Two-Tone',!standalone);
- text('Press Escape to leave fullscreen.',385,540,16,'#b8c9d9','550');
+ text('FULLSCREEN',375,382,18,'#edf3fa','700');
+ if(standalone)text('Unavailable in the installed app',375,411,14,'#aebed0','550');
+ addButton(905,365,320,64,'toggle-fullscreen',isFullscreen()?'EXIT FULLSCREEN':'ENTER FULLSCREEN','',!standalone);
 }
 let lastStoreNotice='',storeReveal=null,activeStoreBanner=null;
 const STORE_ITEM_SPRITES=Object.freeze({core:'core',gem:'gem','bottle:small':'enchantedBottleSmall','bottle:medium':'enchantedBottleMedium','bottle:large':'enchantedBottleLarge','book:small':'enchantedBookSmall','book:medium':'enchantedBookMedium','book:large':'enchantedBookLarge'});
@@ -1958,39 +1958,49 @@ function drawStore(){
 }
 function drawItemInventory(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.74)');rect(105,55,1390,790,'rgba(13,20,39,.98)','#ccb88e',20);
- text('ITEM INVENTORY',155,112,40,'#ffedd1','850');addButton(1280,78,165,52,'main-menu','MAIN MENU','');
+ text('ITEM INVENTORY',800,103,32,'#ffedd1','850','center');addButton(1280,78,165,52,'main-menu','MAIN MENU','');
  const sections=[
-  {x:155,y:165,title:'ENCHANTED BOTTLES • CHARACTER XP',group:'bottles',items:[['Small Enchanted Bottle',itemInventory.bottles.small,'10 XP'],['Medium Enchanted Bottle',itemInventory.bottles.medium,'100 XP'],['Large Enchanted Bottle',itemInventory.bottles.large,'1,000 XP']]},
-  {x:825,y:165,title:'ENCHANTED BOOKS • WEAPON XP',group:'books',items:[['Small Enchanted Book',itemInventory.books.small,'10 XP'],['Medium Enchanted Book',itemInventory.books.medium,'100 XP'],['Large Enchanted Book',itemInventory.books.large,'1,000 XP']]},
-  {x:155,y:475,title:'CORES',group:'core',items:[['Core',itemInventory.cores,'Rune / Celestial']]},
-  {x:825,y:475,title:'GEMS',group:'gem',items:[['Gem',itemInventory.gems,'Character / Weapon Ascension']]},
+  {x:155,y:157,title:'ENCHANTED BOTTLES',group:'bottles',items:[['SMALL',itemInventory.bottles.small,'10 XP'],['MEDIUM',itemInventory.bottles.medium,'100 XP'],['LARGE',itemInventory.bottles.large,'1,000 XP']]},
+  {x:825,y:157,title:'ENCHANTED BOOKS',group:'books',items:[['SMALL',itemInventory.books.small,'10 XP'],['MEDIUM',itemInventory.books.medium,'100 XP'],['LARGE',itemInventory.books.large,'1,000 XP']]},
+  {x:155,y:475,title:'CORES',group:'core',items:[['CORE',itemInventory.cores,'']]},
+  {x:825,y:475,title:'GEMS',group:'gem',items:[['GEM',itemInventory.gems,'']]},
  ];
- for(const section of sections){rect(section.x,section.y,620,255,'rgba(25,37,58,.94)','#718ba4',14);text(section.title,section.x+24,section.y+40,19,'#f3dfb9','850');
-  section.items.forEach((item,index)=>{const y=section.y+87+index*48,iconKey=section.group==='bottles'?'enchantedBottle'+['Small','Medium','Large'][index]:section.group==='books'?'enchantedBook'+['Small','Medium','Large'][index]:section.group,icon=images[iconKey];if(icon?.complete&&icon.naturalWidth)ctx.drawImage(icon,section.x+20,y-22,44,44);text(item[0],section.x+76,y,16,'#d6e2ef','650');text('×'+item[1],section.x+390,y,18,'#fff1d5','800');text(item[2],section.x+485,y,14,'#aebfd0','550')});
+ for(const section of sections){
+  text(section.title,section.x+310,section.y+19,17,'#f3dfb9','850','center');
+  rect(section.x,section.y+34,620,230,'rgba(25,37,58,.94)','#718ba4',14);
+  const cardW=section.items.length===1?170:180,gap=section.items.length===1?0:20,startX=section.x+20;
+  section.items.forEach((item,index)=>{
+   const x=startX+index*(cardW+gap),y=section.y+55,iconKey=section.group==='bottles'?'enchantedBottle'+['Small','Medium','Large'][index]:section.group==='books'?'enchantedBook'+['Small','Medium','Large'][index]:section.group,icon=images[iconKey];
+   rect(x,y,cardW,184,'rgba(18,27,44,.76)','rgba(121,143,168,.45)',10);
+   if(icon?.complete&&icon.naturalWidth)drawStoreBannerImage(icon,x+48,y+8,cardW-96,82);
+   text(item[0],x+cardW/2,y+113,14,'#f3e5c9','800','center');
+   if(item[2])text(item[2],x+cardW/2,y+136,13,'#c4d0dd','600','center');
+   text('×'+item[1],x+cardW/2,y+163,14,'#f0f3f7','750','center');
+  });
  }
- text('Use Enchanted Bottles, Enchanted Books, Cores, and Gems from the relevant Loadout screen.',800,790,16,'#c4d6e5','550','center');
 }
 function drawChallenges(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.74)');rect(180,100,1240,700,'rgba(13,20,39,.98)','#ccb88e',20);
- text('CHALLENGES',235,165,40,'#ffedd1','850');addButton(1200,125,165,52,'main-menu','MAIN MENU','');
- text('Challenge rewards are not configured yet.',800,380,25,'#d6e2ef','700','center');
- text('Challenge rewards can include Enchanted Bottles and Enchanted Books.',800,430,18,'#c4d6e5','550','center');
+ text('CHALLENGES',800,196,32,'#ffedd1','850','center');addButton(1200,125,165,52,'main-menu','MAIN MENU','');
+ rect(345,245,910,385,'rgba(25,37,58,.94)','#718ba4',16);
+ text('NO CHALLENGES AVAILABLE',800,438,22,'#d6e2ef','700','center');
 }
 function drawPartySetup(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.72)');
  rect(145,58,1310,780,'rgba(13,20,39,.98)','#ccb88e',20);
- text('PARTY',205,111,43,'#ffedd1','850');
+ text('PARTY',800,105,34,'#ffedd1','850','center');
  addButton(1226,82,190,54,'main-menu','MAIN MENU','');
  text(`CURRENT PARTY  •  ${draft.length}/${MAX_PARTY_SIZE}`,208,177,21,'#bad4e9','800');
- text('Choose 1–4 unique characters. Party order has no special meaning.',208,207,16,'#c4d6e5','550');
  for(let i=0;i<MAX_PARTY_SIZE;i++){
   const x=212+i*295,y=238,w=275,h=215,id=draft[i],p=id?roster(id):null;
   rect(x,y,w,h,p?'rgba(38,54,79,.94)':'rgba(21,33,56,.88)',p?'#9eb8d3':'#4c607a',13);
   if(p){
-   text(p.name,x+w/2,y+55,23,'#f6eefa','800','center');
-   text(p.test?'TEST PLACEHOLDER':'CHARACTER',x+w/2,y+91,14,p.test?'#e5ca99':'#bdccdd','650','center');
-   text(`LEVEL ${progressFor(p.id).level}`,x+w/2,y+121,15,'#c4d6e5','600','center');
-   addButton(x+28,y+154,w-56,43,`remove:${i}`,'REMOVE','',draft.length>1);
+   const portrait=images[({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'})[p.id]];
+   if(portrait?.complete&&portrait.naturalWidth)drawCharacterPortrait(portrait,p.id,x+w/2-42,y+8,84);
+   text(p.name,x+w/2,y+112,21,'#f6eefa','800','center');
+   if(p.test)text('TEST PLACEHOLDER',x+w/2,y+136,12,'#e5ca99','650','center');
+   else text(`LEVEL ${progressFor(p.id).level}`,x+w/2,y+136,13,'#c4d6e5','600','center');
+   addButton(x+28,y+158,w-56,42,`remove:${i}`,'REMOVE','',draft.length>1);
   }else{
    text('EMPTY',x+w/2,y+91,20,'#8494a9','750','center');
   }
@@ -1999,11 +2009,13 @@ function drawPartySetup(){
  for(let i=0;i<ROSTER.length;i++){
    const p=ROSTER[i],x=172+i*247,y=520,w=230,h=132,selected=draft.includes(p.id);
   rect(x,y,w,h,selected?'rgba(35,59,76,.92)':'rgba(29,41,67,.94)',selected?'#8fbcad':'#7e97b0',11);
-  text(p.name,x+18,y+33,23,'#f5e9dc','800');
-  text(p.test?'TEST PLACEHOLDER • NO CHARACTER ASSET':'CHARACTER',x+18,y+65,14,p.test?'#e5ca99':'#bdccdd','600');
+  const portrait=images[({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'})[p.id]];
+  if(portrait?.complete&&portrait.naturalWidth)drawCharacterPortrait(portrait,p.id,x+12,y+24,66);
+  text(p.name,x+90,y+40,19,'#f5e9dc','800');
+  if(p.test)text('TEST PLACEHOLDER',x+90,y+63,11,'#e5ca99','600');
   addButton(x+w-140,y+83,122,34,`add:${p.id}`,selected?'IN PARTY':'ADD','',!selected&&draft.length<MAX_PARTY_SIZE);
  }
- addButton(212,711,250,62,'main-menu','CANCEL','Discard changes');
+ addButton(212,711,250,62,'main-menu','CANCEL','');
  addButton(1126,711,250,62,'save-party','SAVE PARTY','',validTeam(draft));
 }
 function silhouette(x,y,w,h,name,testOnly=false){ctx.save();ctx.translate(x,y);const c='#7789a3';ctx.fillStyle=c;ctx.beginPath();ctx.ellipse(w*.5,h*.16,w*.17,h*.14,0,0,Math.PI*2);ctx.fill();rect(w*.32,h*.30,w*.36,h*.38,c,null,13);rect(w*.15,h*.35,w*.15,h*.37,c,null,10);rect(w*.70,h*.35,w*.15,h*.37,c,null,10);rect(w*.34,h*.65,w*.13,h*.35,c,null,7);rect(w*.53,h*.65,w*.13,h*.35,c,null,7);ctx.restore();text(testOnly?'TEST ONLY':name.toUpperCase(),x+w/2,y+h*.55,14,'#131e33','800','center')}
@@ -2650,43 +2662,54 @@ function drawHud(t){
  if(DEV_MODE&&devPanelOpen&&!['victory','defeat'].includes(phase))drawDeveloperPanel();
  if(paused)drawPause();if(phase==='victory'||phase==='defeat')drawResult();
 }
-function drawPause(){rect(0,0,W,H,'rgba(2,5,15,.68)');rect(366,220,868,443,'#101729f4','#e4cda4',18);text('PAUSED • PARTY LOCKED',800,293,39,'#fff3e9','800','center');if(DEV_MODE){text('TEST CONTROLS • DEVELOPMENT ONLY',800,351,20,'#d6dceb','600','center');addButton(465,420,230,90,'test-ko','DEBUG: K.O.','Knock out non-active ally');addButton(714,420,230,90,'test-revive','DEBUG: REVIVE','Restore same party slot');addButton(964,420,180,90,'unpause','RESUME','')}else{text('Battle paused.',800,365,20,'#d6dceb','600','center');addButton(714,420,230,90,'unpause','RESUME','')}addButton(630,559,220,66,'restart','RESTART BATTLE','');addButton(868,559,210,66,'main-menu','MAIN MENU','')}
+function drawPause(){
+ rect(0,0,W,H,'rgba(2,5,15,.68)');text('PAUSED',800,208,34,'#fff3e9','850','center');
+ rect(366,230,868,433,'#101729f4','#e4cda4',18);
+ if(DEV_MODE){
+  addButton(444,365,214,82,'test-ko','K.O. ALLY','');
+  addButton(693,365,214,82,'test-revive','REVIVE ALLY','');
+  addButton(942,365,214,82,'unpause','RESUME','');
+ }else addButton(685,365,230,82,'unpause','RESUME','');
+ addButton(570,548,220,66,'restart','RESTART BATTLE','');
+ addButton(810,548,220,66,'main-menu','MAIN MENU','');
+}
 function drawResult(){
  rect(0,0,W,H,'rgba(3,7,15,.72)');
- rect(310,215,980,460,'rgba(13,21,38,.98)',color.gold,20);
- text(phase==='victory'?'VICTORY':'DEFEAT',800,317,58,phase==='victory'?'#f7dd9f':'#f29ba4','900','center');
- text(phase==='victory'?'All '+totalEnemyDefeats+' enemies defeated across '+wavePlan.length+' waves.':'All allies have fallen in training.',800,397,27,'#edf2f7','600','center');
- text('Turns processed: '+turn+'    Party: '+party.length+'/'+MAX_PARTY_SIZE,800,447,20,'#a9bcce','500','center');
- addButton(430,532,220,90,'restart','REPLAY','Same party');
- addButton(690,532,220,90,'change-team','PARTY','Manage members');
+ text(phase==='victory'?'VICTORY':'DEFEAT',800,196,42,phase==='victory'?'#f7dd9f':'#f29ba4','900','center');
+ rect(310,220,980,455,'rgba(13,21,38,.98)','#d8c38f',20);
+ text(phase==='victory'?'ENEMIES DEFEATED  •  '+totalEnemyDefeats+' / '+wavePlan.length+' WAVES':'ALLIES DEFEATED',370,310,23,'#edf2f7','750');
+ text('TURNS  '+turn,370,356,18,'#a9bcce','600');
+ text('PARTY  '+party.length+' / '+MAX_PARTY_SIZE,370,390,18,'#a9bcce','600');
+ addButton(430,532,220,90,'restart','REPLAY','');
+ addButton(690,532,220,90,'change-team','PARTY','');
  addButton(950,532,220,90,'main-menu','MAIN MENU','');
 }
 function drawSetup(){
  rect(0,0,W,H,'rgba(4,8,20,.77)');
  rect(180,74,1240,760,'rgba(13,20,39,.98)','#ccb88e',20);
- text('STORY BATTLE SETUP',228,133,39,'#ffedd1','850');
+ text('STORY BATTLE SETUP',800,54,34,'#ffedd1','850','center');
  addButton(1234,96,160,52,'main-menu','MAIN MENU','');
- text('Party membership is managed from Party on the main menu.',231,180,18,'#c4d6e5','550');
- text('CURRENT PARTY  '+draft.length+'/'+MAX_PARTY_SIZE,240,231,20,'#bad4e9','800');
+ text('CURRENT PARTY  '+draft.length+'/'+MAX_PARTY_SIZE,240,197,20,'#bad4e9','800');
  for(let i=0;i<MAX_PARTY_SIZE;i++){
-  const x=218+i*285,y=256,w=260,h=142,p=roster(draft[i]);
+  const x=218+i*285,y=220,w=260,h=142,p=roster(draft[i]);
   rect(x,y,w,h,p?'rgba(38,54,79,.94)':'rgba(21,33,56,.88)',p?'#9eb8d3':'#4c607a',12);
-  text(p?p.name:'EMPTY',x+w/2,y+58,20,p?'#f6eefa':'#8494a9','800','center');
-  if(p)text(p.test?'TEST PLACEHOLDER':'LEVEL '+progressFor(p.id).level,x+w/2,y+96,14,p.test?'#e5ca99':'#c4d6e5','600','center');
+  if(p){
+   const portrait=images[({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'})[p.id]];
+   if(portrait?.complete&&portrait.naturalWidth)drawCharacterPortrait(portrait,p.id,x+12,y+24,68);
+   text(p.name,x+92,y+63,18,'#f6eefa','800');
+   text(p.test?'TEST PLACEHOLDER':'LEVEL '+progressFor(p.id).level,x+92,y+94,13,p.test?'#e5ca99':'#c4d6e5','600');
+  }else text('EMPTY',x+w/2,y+78,18,'#8494a9','750','center');
  }
  if(DEV_MODE){
-  text('BATTLE TEST OPTIONS',240,467,19,'#bad4e9','800');
-  text('TEST WAVES: '+(waveOverride||WAVE_PRESETS[wavePreset]).join(' + ')+'  UP TO 5 ACTIVE',240,510,17,'#d2ddec','650');
-  addButton(240,542,250,58,'toggle-waves','CHANGE WAVES','');
-  text('ENEMY ROSTER — MIXED ADDS A LEADER AND FINAL-WAVE BOSS',240,626,17,'#d2ddec','650');
-  for(const [i,mode,label] of [['slime','SLIME'],['wolf','WOLF'],['mixed','MIXED'],['slime-leader','SLIME LEADER'],['slime-monster','SLIME MONSTER']].entries())addButton(240+i*160,655,154,52,'roster-'+mode,label,enemyRosterMode===mode?'SELECTED':'');
-  text('TRAINING RECOVERY: '+(trainingRecoveryMode==='restore'?'RESTORE FULL HP':'PRESERVE HP')+'  TEST ONLY',538,510,16,'#d2ddec','650');
-  addButton(538,542,470,58,'toggle-recovery','TOGGLE HP RECOVERY MODE',trainingRecoveryMode==='restore'?'CURRENT: RESTORE':'CURRENT: PRESERVE');
- }else{
-  text('READY FOR BATTLE',240,467,19,'#bad4e9','800');
-  text('Your saved party is ready. Battle settings are handled automatically.',240,510,18,'#d2ddec','600');
+  text('BATTLE TEST OPTIONS',240,430,19,'#bad4e9','800');
+  text('WAVES  '+(waveOverride||WAVE_PRESETS[wavePreset]).join(' + '),240,468,16,'#d2ddec','650');
+  addButton(240,487,250,54,'toggle-waves','CHANGE WAVES','');
+  text('ENEMY ROSTER',240,582,16,'#d2ddec','700');
+  for(const [i,mode,label] of [['slime','SLIME'],['wolf','WOLF'],['mixed','MIXED'],['slime-leader','SLIME LEADER'],['slime-monster','SLIME MONSTER']].entries())addButton(240+i*160,600,154,48,'roster-'+mode,label,enemyRosterMode===mode?'SELECTED':'');
+  text('HP RECOVERY  •  '+(trainingRecoveryMode==='restore'?'RESTORE':'PRESERVE'),538,468,16,'#d2ddec','650');
+  addButton(538,487,470,54,'toggle-recovery','CHANGE HP RECOVERY','');
  }
- addButton(1039,733,313,79,'start','START BATTLE','Current party',validTeam(draft));
+ addButton(1039,733,313,79,'start','START BATTLE','',validTeam(draft));
 }
 // Transient hint popovers belong to menus and setup screens. Combat has
 // dedicated turn, targeting, and action-resolution cues; overlaying another
@@ -2721,7 +2744,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)c
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 if(DEV_MODE){
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.41',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.42',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
  characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
  unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}})),
