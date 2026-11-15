@@ -1660,12 +1660,8 @@ function drawStoreLotteryCard(type,x,rotation,state){
  ctx.restore();
  rect(x+23,211,196,28,character?'rgba(7,32,53,.66)':'rgba(34,22,42,.66)',character?'rgba(192,239,255,.35)':'rgba(255,231,188,.35)',14);
  text(character?'CHARACTER EVENT':'WEAPON EVENT',x+121,225,12,'#fff1d8','850','center');
- text(character?'FEATURED CHARACTER':'FEATURED SIGNATURE',x+27,273,14,'#d9edf5','750');
- text(targetName||'SELECT A TARGET',x+27,316,model?.name?.length>10?26:31,'#fff4de','900');
+ if(targetName)text(targetName,x+27,316,model?.name?.length>10?26:31,'#fff4de','900');
  text(character?'LIMITED-TIME MYTHIC CHARACTER':'PREMIUM SIGNATURE WEAPON',x+28,348,12,character?'#c2f3ff':'#ffe4b2','800');
- rect(x+26,380,184,34,'rgba(5,15,28,.48)',character?'rgba(171,228,244,.4)':'rgba(248,216,160,.42)',17);
- text('✦  UP-RATE FEATURED',x+118,397,12,'#fff0cf','850','center');
- text(character?'Choose one featured character':'Choose the matching signature weapon',x+28,439,12,'rgba(255,255,255,.8)','550');
  // Compact in-banner selectors replace the row of large generic buttons.
  const chipY=482,gap=8,chipW=(642-gap*Math.max(0,ids.length-1))/Math.max(1,ids.length);
  for(let i=0;i<ids.length;i++){
@@ -1750,7 +1746,7 @@ function drawStoreReveal(now){
 }
 function drawStore(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.84)');
- text('FEATURED SUMMONS',800,72,35,'#ffedd1','900','center');text('Two limited banners • choose one target on each',800,108,15,'#c4d6e5','550','center');
+ text('FEATURED SUMMONS',800,72,35,'#ffedd1','900','center');
  if(DEV_MODE){rect(24,49,118,49,'rgba(83,52,35,.96)','#e2a86f',10);text('DEV MODE',83,80,14,'#ffdfa8','850','center');[100,500,1000,5000].forEach((amount,index)=>addButton(152+index*101,49,93,49,`store:grant:${amount}`,'+'+amount.toLocaleString(),'COINS',!storeReveal))}
  rect(1190,49,116,49,'rgba(25,37,58,.96)','#cfae6e',12);if(images.coin?.complete&&images.coin.naturalWidth)ctx.drawImage(images.coin,1194,51,44,44);text(storeCoins.toLocaleString(),1240,80,16,'#f4d99c','850','left');addButton(1320,48,170,52,'main-menu','BACK','');
  const rotation=getStoreRotation(),state=FeaturedLottery.getState();
