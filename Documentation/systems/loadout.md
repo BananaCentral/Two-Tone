@@ -8,14 +8,14 @@ Follow the [UI Copy Standard](../project-standard/ui-copy-standard.md): show the
 
 The Loadout uses one character-details view with a persistent four-part frame:
 
-- A portrait strip across the top switches the selected character without leaving the current tab.
+- A strip of large, circular portrait crops across the top switches the selected character without leaving the current tab. Use face portraits cropped from character artwork, not scaled-down full-body artwork.
 - A vertical navigation rail on the left opens **Details**, **Weapons**, **Runes**, and **Celestials**.
 - The selected character's standing character artwork occupies the center. Battle sprites are reserved for combat.
 - The right panel contains the active tab's information and controls. The close button returns to the main menu.
 
 Character level, combat stats, Enchanted Bottles, and character Ascension are grouped under **Details**. Weapon level, Potential, Enchanted Books, weapon Ascension, and equip state are grouped under **Weapons**. Rune slots and Core upgrades are grouped under **Runes**. Celestial upgrades are grouped under **Celestials**. Character selection and tab navigation remain available while using each panel. Dev-only preview controls remain hidden in Regular Mode.
 
-On the Weapons panel, center only the currently selected weapon's name directly above its artwork. Put the current all-stats bonus below the XP bar, left-aligned with the other weapon details. Keep it above the **Upgrade** and **Switch** buttons. Keep the three Enchanted Book selectors visible at the bottom of the panel, with each book's XP value, owned quantity, and selected quantity. The player selects book amounts with the selectors and **Upgrade** confirms and consumes those amounts. At an uncompleted Ascension gate, that same control becomes **Ascend**, the Enchanted Book selectors are replaced by the owned Gem count, and one Gem is consumed on confirmation. At the current level cap it is disabled. **Switch** equips the other signature weapon when the Premium weapon is owned. Premium Potential increases when a duplicate Premium weapon is awarded by the lottery.
+On the Weapons panel, show only the selected weapon's name, left-aligned with the **WEAPONS** heading and directly above its artwork. Give the weapon artwork the full panel width. Put the current all-stats bonus below the XP bar, left-aligned with the other weapon details and above the **Upgrade** and **Switch** buttons. Keep the three Enchanted Book selectors visible at the bottom of the panel, with each book's XP value, owned quantity, and selected quantity. The player selects book amounts with the selectors and **Upgrade** confirms and consumes those amounts. At an uncompleted Ascension gate, that same control becomes **Ascend** and the book selectors are replaced by one Gem card, the same size as a book card and centered in the panel, showing the owned Gem count. One Gem is consumed on confirmation. At the current level cap it is disabled. **Switch** equips the other signature weapon when the Premium weapon is owned. Premium Potential increases when a duplicate Premium weapon is awarded by the lottery.
 
 ## Signature weapons
 

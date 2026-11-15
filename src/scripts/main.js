@@ -1553,13 +1553,13 @@ function drawLoadout(){
  // Star-field details frame the character art without competing with the controls.
  for(let i=0;i<70;i++){const x=(i*193+61)%W,y=(i*317+37)%H,r=i%7===0?2:1;rect(x,y,r,r,'rgba(220,232,255,'+(i%3===0?'.52':'.25')+')')}
  text('CHARACTER DETAILS',42,42,14,'#d7c69f','800');text(model.name,42,72,25,'#fff1d5','850');
- text('LEVEL '+progress.level+' / '+cap+'     •     SIGNATURE LOADOUT',42,98,13,'#c4d6e5','650');
+ text('LEVEL '+progress.level+' / '+cap,42,98,13,'#c4d6e5','650');
  // Character selector stays available across every loadout tab.
  for(let i=0;i<ROSTER.length;i++){
-  const p=ROSTER[i],x=305+i*76,y=24,active=p.id===loadoutCharacterId,img=images[({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'})[p.id]];
-  choiceRects.push({x,y,w:58,h:58,action:'loadout:character:'+p.id,enabled:!p.test});
-  ctx.save();ctx.beginPath();ctx.arc(x+29,y+29,25,0,Math.PI*2);ctx.clip();rect(x+3,y+3,52,52,'#18243a');if(img?.complete&&img.naturalWidth)drawStoreBannerImage(img,x+4,y+3,50,52);ctx.restore();
-  ctx.beginPath();ctx.arc(x+29,y+29,active?28:26,0,Math.PI*2);ctx.strokeStyle=active?'#f5d897':'rgba(189,207,230,.62)';ctx.lineWidth=active?3:1.5;ctx.stroke();
+  const p=ROSTER[i],x=300+i*76,y=16,active=p.id===loadoutCharacterId,img=images[({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'})[p.id]];
+  choiceRects.push({x,y,w:68,h:68,action:'loadout:character:'+p.id,enabled:!p.test});
+  ctx.save();ctx.beginPath();ctx.arc(x+34,y+34,31,0,Math.PI*2);ctx.clip();rect(x+3,y+3,62,62,'#18243a');if(img?.complete&&img.naturalWidth)drawCharacterPortrait(img,p.id,x+3,y+3,62);ctx.restore();
+  ctx.beginPath();ctx.arc(x+34,y+34,active?34:32,0,Math.PI*2);ctx.strokeStyle=active?'#f5d897':'rgba(189,207,230,.62)';ctx.lineWidth=active?3:1.5;ctx.stroke();
  }
  addButton(1517,24,52,52,'loadout:back','×','',true,28);
  const tabs=[['details','DETAILS'],['weapons','WEAPONS'],['runes','RUNES'],['celestials','CELESTIALS']];
@@ -1577,7 +1577,7 @@ function drawLoadout(){
  // Right-side content panel, consistent across all tabs.
  rect(1058,112,512,744,'rgba(10,16,31,.76)','rgba(190,207,230,.42)',18);
  text(loadoutPage==='details'?'STATS & PROGRESSION':loadoutPage.toUpperCase(),1090,151,14,'#d9c797','850');
- text(model.name,1090,190,27,'#fff1d5','850');
+ if(loadoutPage!=='weapons')text(model.name,1090,190,27,'#fff1d5','850');
  if(loadoutPage==='details')drawLoadoutDetailsPanel(model,record,progress,cap);
  else if(loadoutPage==='weapons')drawLoadoutWeaponsPanel(model,record);
  else if(loadoutPage==='runes')drawLoadoutRunesPanel(record);
@@ -1605,8 +1605,8 @@ function drawLoadoutDetailsPanel(model,record,progress,cap){
 function drawLoadoutWeaponsPanel(model,record){
  const w=record.weapon,type=w.selected,level=w[type+'Level'],cap=weaponLevelCap(),exp=w[type+'Exp'],needed=requiredExp(level),potential=w[type+'Potential'],bonus=weaponPotentialMultiplier(type,potential,level)*100,owned=type==='standard'||w.premiumOwned,gate=ASCENSION_GATES.includes(level)&&!w[type+'Ascended'].includes(level);
  const weaponName=model.id==='soul'?(type==='premium'?'SOULBOUND':'ASHBLADE'):(type==='premium'?'PREMIUM SIGNATURE':'STANDARD SIGNATURE');
- text(weaponName,1312,238,17,'#e8d6af','850','center');
- const weaponArt=model.id==='soul'?images[type==='premium'?'soulWeaponPremium':'soulWeaponStandard']:null;if(weaponArt?.complete&&weaponArt.naturalWidth)drawStoreBannerImage(weaponArt,1115,258,400,210);
+ text(weaponName,1090,190,17,'#e8d6af','850');
+ const weaponArt=model.id==='soul'?images[type==='premium'?'soulWeaponPremium':'soulWeaponStandard']:null;if(weaponArt?.complete&&weaponArt.naturalWidth)drawStoreBannerImage(weaponArt,1090,211,445,260);
  text('POTENTIAL '+potential+' / 5     •     LEVEL '+level+' / '+cap,1090,490,14,'#e1e8f0','750');
  text(gate?'ASCENSION REQUIRED':level>=cap?'WEAPON LEVEL CAP REACHED':'XP  '+exp+' / '+needed,1090,516,13,'#b9c8d7','600');
  line(1090,529,445,exp/Math.max(1,needed),'#d9b96e','rgba(218,228,240,.18)',7);
@@ -1616,13 +1616,17 @@ function drawLoadoutWeaponsPanel(model,record){
  addButton(1090,600,214,48,'loadout:upgrade:weapon',upgradeLabel,'',owned&&(gate?itemInventory.gems>0:level<cap&&bookSelectionCount>0),14);
  addButton(1320,600,214,48,'loadout:weapon-switch','SWITCH','',w.premiumOwned,14);
  if(gate){
-  text('ASCENSION MATERIALS',1090,675,12,'#d9c797','750');rect(1090,684,445,151,'rgba(24,32,49,.78)','rgba(121,143,168,.45)',10);
-  if(images.gem?.complete&&images.gem.naturalWidth)drawStoreBannerImage(images.gem,1110,695,76,114);
-  text('GEM',1210,750,14,'#e4eaf0','750');text('×'+itemInventory.gems,1508,750,16,'#f0f3f7','800','right');
+  drawLoadoutMaterialCard(1243,684,139,151,'gem','GEM',itemInventory.gems);
  }else{
   text('ENCHANTED BOOKS',1090,675,12,'#d9c797','750');
   for(let i=0;i<3;i++)drawLoadoutBookCard(1090+i*150,684,139,151,type,['small','medium','large'][i],owned&&level<cap);
  }
+}
+function drawLoadoutMaterialCard(x,y,w,h,item,label,qty){
+ rect(x,y,w,h,'rgba(24,32,49,.78)','rgba(121,143,168,.45)',10);
+ const icon=images[item];if(icon?.complete&&icon.naturalWidth)drawStoreBannerImage(icon,x+43,y+6,w-86,69);
+ text(label,x+w/2,y+96,11,'#f3e5c9','800','center');
+ text('×'+qty,x+w/2,y+130,13,'#f0f3f7','750','center');
 }
 function drawLoadoutBookCard(x,y,w,h,type,size,enabled){
  const upper=size[0].toUpperCase()+size.slice(1),qty=itemInventory.books[size],selected=weaponBookSelection[size],xp=ITEM_XP[size],buttonY=y+103;
@@ -1798,6 +1802,11 @@ function drawStoreBannerImage(img,x,y,w,h){
  if(!img?.complete||!img.naturalWidth)return;
  const scale=Math.min(w/img.naturalWidth,h/img.naturalHeight),dw=img.naturalWidth*scale,dh=img.naturalHeight*scale;
  ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(img,x+(w-dw)/2,y+h-dh,dw,dh);ctx.restore();
+}
+function drawCharacterPortrait(img,id,x,y,size){
+ if(!img?.complete||!img.naturalWidth)return;
+ const crops={soul:[50,0,400],zero:[223,0,440],lily:[32,0,192],dawn:[23,0,210],logan:[220,0,447]},[sx,sy,side]=crops[id]||[0,0,Math.min(img.naturalWidth,img.naturalHeight)];
+ ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(img,sx,sy,Math.min(side,img.naturalWidth-sx),Math.min(side,img.naturalHeight-sy),x,y,size,size);ctx.restore();
 }
 function storeBannerButton(x,y,w,h,action,label,sub,enabled,primary=false){
  choiceRects.push({x,y,w,h,action,enabled});
@@ -2712,7 +2721,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)c
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 if(DEV_MODE){
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.36',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.37',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
  characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
  unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}})),
