@@ -10,12 +10,13 @@ For manual testing, switch to Dev Mode from the main menu or append `?dev=1` to 
 
 ## Banner UI
 
-- Present the character and premium weapon lotteries as two large illustrated banners side by side, with artwork as the visual focus.
-- On the 1600×900 game canvas, each banner uses an approximately 690×625 panel, starting near the top third of the screen. Keep the coin balance and Back control above the banners and the weekly rotation note below them.
-- Identify the banner with a compact **Character** or **Premium Weapon** tag. Do not add separate “limited-time” or “limited” subtitle text.
-- Show the available featured targets as compact portrait chips inside each banner. The chips are the target selection control; do not add a separate target-selection panel, heading, instruction, or persistent entry notice.
-- Opening the Store or selecting a target does not show an instructional notice. Show notices only for actionable errors or action confirmations, such as a completed draw summary or a Dev Mode coin grant.
-- Keep the single-draw and ten-draw actions at the bottom of each banner. The banner art and controls should read as one integrated lottery banner, not as a row of generic menu buttons.
+- Use a two-panel layout modeled on event-banner screens: a selectable banner list on the left and the selected banner's detail view on the right.
+- Show all current featured options in the left list: up to three character banners and their three paired premium weapon banners. Each row shows portrait art, the target name, and whether it is a Character or Premium Weapon banner.
+- On the 1600×900 game canvas, the left list is approximately 338×714 at x=28, y=116. The right detail panel is approximately 1186×714 at x=386, y=116. Keep the coin balance and Back control above both panels and the weekly rotation note below them.
+- Clicking a left-side row selects that banner as the corresponding lottery's target and updates the right detail panel. Character and weapon targets remain independent. Show the active row clearly; mark any other saved target for the other lottery type without making it the active detail view.
+- The right detail panel emphasizes the selected character or weapon artwork and name, then shows the relevant pity, odds, and single-draw / ten-draw controls. Draw controls are disabled until a target for that lottery type has been selected.
+- When there is no saved target, show an empty detail state that directs the player to choose one of the left-side banners. Do not add banner chips, a second target-selection panel, limited-time subtitles, or a persistent instruction bar.
+- Opening the Store or selecting a banner does not show a confirmation notice. Show notices only for actionable errors or action confirmations, such as a completed draw summary or a Dev Mode coin grant.
 
 Each banner offers a single draw for 100 coins and a ten-draw option for 1,000 coins. Ten draws are resolved in order, one ticket at a time, with the same pity and reward rules as individual draws. The ten-draw option has no discount.
 

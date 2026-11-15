@@ -1585,7 +1585,7 @@ function drawSettings(){
  addButton(385,390,830,92,'toggle-fullscreen',isFullscreen()?'EXIT FULLSCREEN':'ENTER FULLSCREEN',standalone?'Already fullscreen as a Home Screen app':'Use the full screen for Two-Tone',!standalone);
  text('Press Escape to leave fullscreen.',385,540,16,'#b8c9d9','550');
 }
-let lastStoreNotice='',storeReveal=null;
+let lastStoreNotice='',storeReveal=null,activeStoreBanner=null;
 const STORE_ITEM_SPRITES=Object.freeze({core:'core',gem:'gem','bottle:small':'enchantedBottleSmall','bottle:medium':'enchantedBottleMedium','bottle:large':'enchantedBottleLarge','book:small':'enchantedBookSmall','book:medium':'enchantedBookMedium','book:large':'enchantedBookLarge'});
 const STORE_REWARD_SPRITES=Object.freeze({'premium-soul':'soulWeaponPremium'});
 const STORE_REVEAL_TIMING=Object.freeze({cardEnterMs:1000,cardFlipMs:500});
@@ -1643,7 +1643,7 @@ function handleStoreAction(action){
  if(kind==='grant'&&DEV_MODE){const amount=Number(type);if(grantStoreCoins(amount))lastStoreNotice=`Dev mode: added ${amount.toLocaleString()} coins.`;else lastStoreNotice='Could not add coins.';
  }else if(kind==='target'){
   const rotation=getStoreRotation(),ids=type==='character'?rotation.featuredCharacters:rotation.featuredWeapons;
-  FeaturedLottery.setTarget(type,value,ids);lastStoreNotice='';
+  if(FeaturedLottery.setTarget(type,value,ids)){activeStoreBanner={type,id:value};lastStoreNotice=''}
  }else if(kind==='draw')drawStoreLottery(type,Number(value)||1);
 }
 const STORE_BANNER_PORTRAITS=Object.freeze({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'});
@@ -1666,49 +1666,72 @@ function storeBannerButton(x,y,w,h,action,label,sub,enabled,primary=false){
  text(label,x+w/2,y+25,18,enabled&&primary?'#352817':enabled?'#fff3dc':'#9ba9b9','850','center');
  text(sub,x+w/2,y+49,12,enabled&&primary?'#5b4729':'#c3d0dc','650','center');
 }
-function drawStoreLotteryCard(type,x,rotation,state){
- const character=type==='character',ids=character?rotation.featuredCharacters:rotation.featuredWeapons,selected=state[type].target;
- const pool=storeRewardPools(type,rotation),target=pool.featured.find(item=>item.id===selected),track=state[type],pity=type==='character'?(track.heightened?50:100):(track.heightened?25:50),untilMythic=Math.max(0,pity-track.sinceMythic),untilRare=Math.max(0,10-track.sinceRare);
- const previewId=selected||ids[0],model=ROSTER.find(item=>item.id===(character?previewId:previewId?.replace(/^premium-/,''))),hero=storeBannerImage(type,model);
- const targetName=character?model?.name:(model?.id==='soul'?'Soulbound':model?.name+' Premium Weapon');
- rect(x,150,690,625,'rgba(12,20,36,.98)','#7588a0',18);
- const colors=character?['#133a5b','#28768a','#b98d70']:['#352647','#654267','#bd8d55'];
- const banner=ctx.createLinearGradient(x+20,195,x+670,466);banner.addColorStop(0,colors[0]);banner.addColorStop(.56,colors[1]);banner.addColorStop(1,colors[2]);
- ctx.save();ctx.beginPath();ctx.roundRect(x+8,193,674,278,14);ctx.clip();rect(x+8,193,674,278,banner);
- const halo=ctx.createRadialGradient(x+500,330,4,x+500,330,250);halo.addColorStop(0,character?'rgba(164,237,255,.34)':'rgba(255,224,160,.34)');halo.addColorStop(1,'rgba(255,255,255,0)');rect(x+270,193,412,278,halo);
- ctx.strokeStyle=character?'rgba(210,245,255,.15)':'rgba(255,232,190,.15)';ctx.lineWidth=1;
- for(let i=0;i<8;i++){ctx.beginPath();ctx.arc(x+500,330,52+i*29,0,Math.PI*2);ctx.stroke()}
- for(let i=0;i<26;i++){const sx=x+25+(i*97%640),sy=202+(i*61%250),size=i%5===0?2.5:1.25;ctx.fillStyle=`rgba(255,255,255,${i%4===0?.65:.32})`;ctx.beginPath();ctx.arc(sx,sy,size,0,Math.PI*2);ctx.fill()}
- if(hero)drawStoreBannerImage(hero,x+335,198,340,270);
- ctx.restore();
- rect(x+23,211,150,28,character?'rgba(7,32,53,.66)':'rgba(34,22,42,.66)',character?'rgba(192,239,255,.35)':'rgba(255,231,188,.35)',14);
- text(character?'CHARACTER':'PREMIUM WEAPON',x+98,225,12,'#fff1d8','850','center');
- if(targetName)text(targetName,x+27,316,model?.name?.length>10?26:31,'#fff4de','900');
- // Compact in-banner selectors replace the row of large generic buttons.
- const chipY=482,gap=8,chipW=(642-gap*Math.max(0,ids.length-1))/Math.max(1,ids.length);
- for(let i=0;i<ids.length;i++){
-  const id=ids[i],featuredModel=ROSTER.find(item=>item.id===(character?id:id.replace(/^premium-/,''))),name=character?featuredModel?.name:(featuredModel?.id==='soul'?'Soulbound':featuredModel?.name+' Premium'),bx=x+24+i*(chipW+gap),by=chipY,isSelected=selected===id;
-  const chipFill=ctx.createLinearGradient(bx,by,bx,by+50);chipFill.addColorStop(0,isSelected?'rgba(225,193,128,.36)':'rgba(28,42,61,.9)');chipFill.addColorStop(1,isSelected?'rgba(148,111,62,.28)':'rgba(16,27,44,.94)');
-  rect(bx,by,chipW,50,chipFill,isSelected?'#f3d18c':'rgba(164,184,205,.48)',10);
-  const icon=storeBannerImage(type,featuredModel);if(icon){ctx.save();ctx.beginPath();ctx.arc(bx+24,by+25,17,0,Math.PI*2);ctx.clip();drawStoreBannerImage(icon,bx+7,by+8,34,34);ctx.restore()}
-  text(name||id,bx+47,by+25,chipW<210?12:13,isSelected?'#fff0cf':'#d3dfeb','800');
-  if(isSelected){ctx.beginPath();ctx.arc(bx+chipW-14,by+25,4,0,Math.PI*2);ctx.fillStyle='#f4d18d';ctx.fill()}
-  choiceRects.push({x:bx,y:by,w:chipW,h:50,action:`store:target:${type}:${id}`,enabled:!storeReveal});
+function storeBannerEntries(rotation){
+ const entries=[];
+ for(const id of rotation.featuredCharacters){const model=ROSTER.find(item=>item.id===id);if(model)entries.push({type:'character',id,name:model.name,model})}
+ for(const id of rotation.featuredWeapons){const model=ROSTER.find(item=>item.id===id.replace(/^premium-/,''));if(model)entries.push({type:'weapon',id,name:model.id==='soul'?'Soulbound':model.name+' Premium',model})}
+ return entries;
+}
+function drawStoreBannerSidebar(entries,state){
+ const x=28,y=116,w=338,h=714;
+ rect(x,y,w,h,'rgba(12,20,36,.97)','#7588a0',18);
+ text('BANNERS',x+22,y+32,18,'#f4dfb7','850');
+ text(`${entries.length} AVAILABLE`,x+w-20,y+32,11,'#9fb1c4','700','right');
+ entries.forEach((entry,index)=>{
+  const bx=x+14,by=y+54+index*105,bw=w-28,bh=95;
+  const active=activeStoreBanner?.type===entry.type&&activeStoreBanner?.id===entry.id;
+  const savedTarget=state[entry.type].target===entry.id;
+  const fill=ctx.createLinearGradient(bx,by,bx+bw,by+bh);
+  fill.addColorStop(0,active?'rgba(105,83,48,.86)':savedTarget?'rgba(44,58,77,.96)':'rgba(23,34,52,.92)');
+  fill.addColorStop(1,active?'rgba(50,45,42,.98)':'rgba(15,25,41,.98)');
+  rect(bx,by,bw,bh,fill,active?'#f0ce8b':savedTarget?'#8299b1':'rgba(126,148,171,.36)',12);
+  const art=storeBannerImage(entry.type,entry.model);if(art){ctx.save();ctx.beginPath();ctx.roundRect(bx+9,by+8,62,79,8);ctx.clip();drawStoreBannerImage(art,bx+9,by+8,62,79);ctx.restore()}
+  text(entry.type==='character'?'CHARACTER':'PREMIUM WEAPON',bx+84,by+31,10,active?'#f4d99c':'#9fb1c4','800');
+  text(entry.name,bx+84,by+59,16,'#f4f0e8','800');
+  if(savedTarget)text('✓',bx+bw-18,by+30,15,'#f2d391','900','center');
+  choiceRects.push({x:bx,y:by,w:bw,h:bh,action:`store:target:${entry.type}:${entry.id}`,enabled:!storeReveal});
+ });
+}
+function drawStoreBannerDetail(entry,state){
+ const x=386,y=116,w=1186,h=714;
+ rect(x,y,w,h,'rgba(12,20,36,.98)','#7588a0',18);
+ if(!entry){
+  const wash=ctx.createLinearGradient(x,y,x+w,y+h);wash.addColorStop(0,'rgba(27,56,83,.94)');wash.addColorStop(.55,'rgba(30,34,58,.96)');wash.addColorStop(1,'rgba(52,36,57,.96)');
+  rect(x+8,y+8,w-16,h-16,wash,null,14);
+  const glow=ctx.createRadialGradient(x+795,y+310,12,x+795,y+310,360);glow.addColorStop(0,'rgba(238,203,137,.22)');glow.addColorStop(1,'rgba(238,203,137,0)');rect(x+10,y+10,w-20,h-20,glow);
+  text('SELECT A BANNER',x+52,y+315,29,'#fff0cf','850');
+  text('Choose one of the featured options on the left.',x+54,y+353,16,'#c6d2df','550');
+  return;
  }
- const pityY=548,pityW=313;
- rect(x+24,pityY,pityW,60,'rgba(25,38,56,.94)','rgba(151,174,198,.45)',10);
- text('MYTHIC GUARANTEE',x+40,pityY+19,11,'#c5d5e5','750');
- text(`${untilMythic}`,x+292,pityY+32,24,track.heightened?'#f0d291':'#edf3fa','900','right');
- text(`${track.heightened?'HEIGHTENED':'STANDARD'} • ${pity} DRAW PITY`,x+40,pityY+43,10,'#aebfd0','650');
- rect(x+353,pityY,pityW,60,'rgba(25,38,56,.94)','rgba(151,174,198,.45)',10);
- text('RARE GUARANTEE',x+369,pityY+19,11,'#c5d5e5','750');
- text(`${untilRare}`,x+621,pityY+32,24,'#edf3fa','900','right');
- text('10 DRAW PITY',x+369,pityY+43,10,'#aebfd0','650');
- text(`MYTHIC ${track.heightened?'2%':'1%'}  •  RARE 10%  •  FEATURED MYTHIC 75%`,x+27,630,12,'#d4e0ed','650');
- if(track.heightened)text('HEIGHTENED STATE • OFF-FEATURE MYTHIC RECEIVED',x+27,651,11,'#f0d291','750');
- const canDraw=!!target&&!storeReveal;
- storeBannerButton(x+24,681,312,68,`store:draw:${type}:1`,'DRAW ×1','100 COINS',canDraw&&storeCoins>=100,true);
- storeBannerButton(x+354,681,312,68,`store:draw:${type}:10`,'DRAW ×10','1,000 COINS',canDraw&&storeCoins>=1000,false);
+ const character=entry.type==='character',track=state[entry.type],pity=entry.type==='character'?(track.heightened?50:100):(track.heightened?25:50);
+ const untilMythic=Math.max(0,pity-track.sinceMythic),untilRare=Math.max(0,10-track.sinceRare),hero=storeBannerImage(entry.type,entry.model);
+ const colors=character?['#102f51','#22677d','#bd9070']:['#30233f','#5b3e64','#b98b53'];
+ const banner=ctx.createLinearGradient(x+10,y+12,x+w,y+470);banner.addColorStop(0,colors[0]);banner.addColorStop(.58,colors[1]);banner.addColorStop(1,colors[2]);
+ ctx.save();ctx.beginPath();ctx.roundRect(x+8,y+8,w-16,466,14);ctx.clip();rect(x+8,y+8,w-16,466,banner);
+ const halo=ctx.createRadialGradient(x+890,y+245,4,x+890,y+245,420);halo.addColorStop(0,character?'rgba(164,237,255,.33)':'rgba(255,224,160,.34)');halo.addColorStop(1,'rgba(255,255,255,0)');rect(x+390,y+8,w-398,466,halo);
+ ctx.strokeStyle=character?'rgba(210,245,255,.13)':'rgba(255,232,190,.14)';ctx.lineWidth=1;
+ for(let i=0;i<9;i++){ctx.beginPath();ctx.arc(x+900,y+244,74+i*38,0,Math.PI*2);ctx.stroke()}
+ for(let i=0;i<34;i++){const sx=x+405+(i*103%750),sy=y+18+(i*67%440),size=i%6===0?2.7:1.25;ctx.fillStyle=`rgba(255,255,255,${i%4===0?.58:.25})`;ctx.beginPath();ctx.arc(sx,sy,size,0,Math.PI*2);ctx.fill()}
+ if(hero)drawStoreBannerImage(hero,x+770,y+16,390,444);
+ ctx.restore();
+ rect(x+36,y+38,character?142:188,30,character?'rgba(7,32,53,.72)':'rgba(34,22,42,.72)',character?'rgba(192,239,255,.45)':'rgba(255,231,188,.45)',14);
+ text(character?'CHARACTER':'PREMIUM WEAPON',x+(character?107:130),y+53,12,'#fff1d8','850','center');
+ text(entry.name,x+40,y+176,entry.name.length>20?31:42,'#fff4de','900');
+ text(character?'FEATURED CHARACTER':'SIGNATURE WEAPON',x+42,y+211,13,character?'#c2f3ff':'#ffe4b2','800');
+ const pityY=y+500;
+ rect(x+36,pityY,244,78,'rgba(17,30,48,.93)','rgba(169,191,212,.48)',11);
+ text('MYTHIC GUARANTEE',x+52,pityY+24,11,'#c5d5e5','750');
+ text(`${untilMythic}`,x+260,pityY+38,25,track.heightened?'#f0d291':'#edf3fa','900','right');
+ text(`${track.heightened?'HEIGHTENED':'STANDARD'} • ${pity} DRAW PITY`,x+52,pityY+59,10,'#aebfd0','650');
+ rect(x+294,pityY,224,78,'rgba(17,30,48,.93)','rgba(169,191,212,.48)',11);
+ text('RARE GUARANTEE',x+310,pityY+24,11,'#c5d5e5','750');
+ text(`${untilRare}`,x+498,pityY+38,25,'#edf3fa','900','right');
+ text('10 DRAW PITY',x+310,pityY+59,10,'#aebfd0','650');
+ text(`MYTHIC ${track.heightened?'2%':'1%'} • RARE 10% • FEATURED MYTHIC 75%`,x+38,y+608,12,'#d4e0ed','650');
+ if(track.heightened)text('HEIGHTENED • OFF-FEATURE MYTHIC RECEIVED',x+38,y+629,11,'#f0d291','750');
+ const canDraw=state[entry.type].target===entry.id&&!storeReveal;
+ storeBannerButton(x+38,y+645,242,58,`store:draw:${entry.type}:1`,'DRAW ×1','100 COINS',canDraw&&storeCoins>=100,true);
+ storeBannerButton(x+296,y+645,242,58,`store:draw:${entry.type}:10`,'DRAW ×10','1,000 COINS',canDraw&&storeCoins>=1000,false);
 }
 function drawStoreReveal(now){
  if(!storeReveal)return;
@@ -1771,11 +1794,15 @@ function drawStore(){
  text('FEATURED SUMMONS',800,72,35,'#ffedd1','900','center');
  if(DEV_MODE){rect(24,49,118,49,'rgba(83,52,35,.96)','#e2a86f',10);text('DEV MODE',83,80,14,'#ffdfa8','850','center');[100,500,1000,5000].forEach((amount,index)=>addButton(152+index*101,49,93,49,`store:grant:${amount}`,'+'+amount.toLocaleString(),'COINS',!storeReveal))}
  rect(1190,49,116,49,'rgba(25,37,58,.96)','#cfae6e',12);if(images.coin?.complete&&images.coin.naturalWidth)ctx.drawImage(images.coin,1194,51,44,44);text(storeCoins.toLocaleString(),1240,80,16,'#f4d99c','850','left');addButton(1320,48,170,52,'main-menu','BACK','');
- const rotation=getStoreRotation(),state=FeaturedLottery.getState();
- drawStoreLotteryCard('character',100,rotation,state);drawStoreLotteryCard('weapon',810,rotation,state);
- text('Banners rotate weekly at 12:00 AM Eastern.',800,824,14,'#c4d6e5','550','center');
+ const rotation=getStoreRotation(),state=FeaturedLottery.getState(),entries=storeBannerEntries(rotation);
+ const current=activeStoreBanner&&entries.find(entry=>entry.type===activeStoreBanner.type&&entry.id===activeStoreBanner.id&&state[entry.type].target===entry.id);
+ const saved=entries.find(entry=>state[entry.type].target===entry.id);
+ activeStoreBanner=current?{type:current.type,id:current.id}:saved?{type:saved.type,id:saved.id}:null;
+ const active=activeStoreBanner&&entries.find(entry=>entry.type===activeStoreBanner.type&&entry.id===activeStoreBanner.id);
+ drawStoreBannerSidebar(entries,state);drawStoreBannerDetail(active,state);
+ text('Banners rotate weekly at 12:00 AM Eastern.',800,856,14,'#c4d6e5','550','center');
  if(storeReveal)drawStoreReveal(performance.now());
- else if(lastStoreNotice){rect(390,123,820,40,'rgba(12,19,34,.94)','#687c93',10);text(lastStoreNotice,800,149,14,'#fff4e8','650','center')}
+ else if(lastStoreNotice){rect(390,837,820,36,'rgba(12,19,34,.94)','#687c93',10);text(lastStoreNotice,800,859,14,'#fff4e8','650','center')}
 }
 function drawItemInventory(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.74)');rect(105,55,1390,790,'rgba(13,20,39,.98)','#ccb88e',20);
@@ -2542,7 +2569,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)c
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 if(DEV_MODE){
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.25',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.26',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
  characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
  unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}})),
