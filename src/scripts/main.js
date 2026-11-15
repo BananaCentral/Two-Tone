@@ -133,7 +133,7 @@ function spriteAlphaBounds(img){
 }
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:false});
 const W=1600,H=900, TEAM_KEY='two-tone-demo-team-fundamental-1-v1';
-const PROGRESSION_KEY='two-tone-character-progress-v1',VITALS_KEY='two-tone-character-vitals-v1',LOADOUT_KEY='two-tone-character-loadouts-v1',ITEM_INVENTORY_KEY='two-tone-item-inventory-v1',PLAYER_RANK_KEY='two-tone-player-rank-v1',CHARACTER_ID_SCHEMA_KEY='two-tone-character-id-schema-v2';
+const PROGRESSION_KEY='two-tone-character-progress-v1',VITALS_KEY='two-tone-character-vitals-v1',LOADOUT_KEY='two-tone-character-loadouts-v1',ITEM_INVENTORY_KEY='two-tone-item-inventory-v1',STORE_COINS_KEY='two-tone-store-coins-v1',PLAYER_RANK_KEY='two-tone-player-rank-v1',CHARACTER_ID_SCHEMA_KEY='two-tone-character-id-schema-v2';
 function moveLegacyCharacterRecord(value){
  if(!value||typeof value!=='object'||Array.isArray(value))return value;
  if(value.soul===undefined&&value.zero!==undefined)value.soul=value.zero;
@@ -1173,6 +1173,10 @@ function validItemInventory(value){
 function loadItemInventory(){try{return normalizeItemInventory(JSON.parse(localStorage.getItem(ITEM_INVENTORY_KEY)||'null'))}catch(e){return defaultItemInventory()}}
 let itemInventory=loadItemInventory();
 function saveItemInventory(){try{localStorage.setItem(ITEM_INVENTORY_KEY,JSON.stringify(itemInventory));return true}catch(e){return false}}
+function loadStoreCoins(){try{const raw=localStorage.getItem(STORE_COINS_KEY);if(raw!==null){const n=Number(raw);return Number.isSafeInteger(n)&&n>=0?n:0}localStorage.setItem(STORE_COINS_KEY,'1000');return 1000}catch(e){return 1000}}
+let storeCoins=loadStoreCoins();
+function saveStoreCoins(){try{localStorage.setItem(STORE_COINS_KEY,String(storeCoins));return true}catch(e){return false}}
+function grantStoreCoins(amount){if(!Number.isSafeInteger(amount)||amount<=0||!Number.isSafeInteger(storeCoins+amount))return false;storeCoins+=amount;saveStoreCoins();return true}
 function grantItem(itemId,amount=1){
  if(!Number.isSafeInteger(amount)||amount<1)return false;
  const match=/^(bottle|book):(small|medium|large)$/.exec(itemId||'');
@@ -1189,19 +1193,19 @@ function consumeItem(itemId,amount=1){
  else return false;
  saveItemInventory();return true;
 }
-globalThis.TwoToneItems=Object.freeze({grant:grantItem,getInventory:()=>JSON.parse(JSON.stringify(itemInventory))});
-const SAVE_FILE_FORMAT='two-tone-save',SAVE_FILE_VERSION=3;
+globalThis.TwoToneItems=Object.freeze({grant:grantItem,getInventory:()=>JSON.parse(JSON.stringify(itemInventory)),grantCoins:grantStoreCoins,getCoins:()=>storeCoins});
+const SAVE_FILE_FORMAT='two-tone-save',SAVE_FILE_VERSION=4;
 function saveProgressFile(){
  try{
-  saveProgress();saveVitals();saveLoadouts();saveItemInventory();savePlayerRank();if(validTeam(draft))saveTeam();
-  const documentData={format:SAVE_FILE_FORMAT,version:SAVE_FILE_VERSION,savedAt:new Date().toISOString(),data:{playerRank,team:validTeam(draft)?[...draft]:loadTeam(),characterProgress,vitals:savedVitals,loadouts:characterLoadouts,itemInventory}};
+  saveProgress();saveVitals();saveLoadouts();saveItemInventory();saveStoreCoins();savePlayerRank();if(validTeam(draft))saveTeam();
+  const documentData={format:SAVE_FILE_FORMAT,version:SAVE_FILE_VERSION,savedAt:new Date().toISOString(),data:{playerRank,team:validTeam(draft)?[...draft]:loadTeam(),characterProgress,vitals:savedVitals,loadouts:characterLoadouts,itemInventory,storeCoins}};
   const blob=new Blob([JSON.stringify(documentData,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');
   link.href=url;link.download=`two-tone-save-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   say('Save file downloaded. Keep it in Files to load on this or another device.');return true;
  }catch(error){say('The save file could not be created. Check available storage and try again.');return false}
 }
 function normalizeSaveFile(value){
- if(!value||typeof value!=='object'||value.format!==SAVE_FILE_FORMAT||![1,2,SAVE_FILE_VERSION].includes(value.version)||!value.data||typeof value.data!=='object')return null;
+ if(!value||typeof value!=='object'||value.format!==SAVE_FILE_FORMAT||![1,2,3,SAVE_FILE_VERSION].includes(value.version)||!value.data||typeof value.data!=='object')return null;
  const data={...value.data};
  if(value.version===1){data.team=Array.isArray(data.team)?data.team.map(id=>id==='zero'?'soul':id):data.team;data.characterProgress=moveLegacyCharacterRecord({...data.characterProgress});data.vitals=moveLegacyCharacterRecord({...data.vitals});data.loadouts=moveLegacyCharacterRecord({...data.loadouts})}
  const rank=data.playerRank,cap=characterLevelCap(rank);
@@ -1218,16 +1222,18 @@ function normalizeSaveFile(value){
  }
  const inventory=data.itemInventory===undefined?defaultItemInventory():normalizeItemInventory(data.itemInventory);
  if(data.itemInventory!==undefined&&!validItemInventory(data.itemInventory))return null;
- return {playerRank:rank,team:[...data.team],characterProgress:progress,vitals,loadouts,itemInventory:inventory};
+ const coins=data.storeCoins===undefined?1000:data.storeCoins;
+ if(!Number.isSafeInteger(coins)||coins<0)return null;
+ return {playerRank:rank,team:[...data.team],characterProgress:progress,vitals,loadouts,itemInventory:inventory,storeCoins:coins};
 }
 function importSaveFile(value){
  const save=normalizeSaveFile(value);if(!save){say('This save file is invalid or from an unsupported version.');return false}
- let hasLocalProgress=false;try{hasLocalProgress=[TEAM_KEY,PROGRESSION_KEY,VITALS_KEY,LOADOUT_KEY,ITEM_INVENTORY_KEY].some(key=>localStorage.getItem(key)!==null)}catch(e){}
+ let hasLocalProgress=false;try{hasLocalProgress=[TEAM_KEY,PROGRESSION_KEY,VITALS_KEY,LOADOUT_KEY,ITEM_INVENTORY_KEY,STORE_COINS_KEY].some(key=>localStorage.getItem(key)!==null)}catch(e){}
  if(hasLocalProgress&&!window.confirm('Loading this file replaces the progress saved in this browser. Continue?'))return false;
- const entries=[[TEAM_KEY,JSON.stringify(save.team)],[PROGRESSION_KEY,JSON.stringify(save.characterProgress)],[VITALS_KEY,JSON.stringify(save.vitals)],[LOADOUT_KEY,JSON.stringify(save.loadouts)],[ITEM_INVENTORY_KEY,JSON.stringify(save.itemInventory)],[PLAYER_RANK_KEY,String(save.playerRank)]];
+ const entries=[[TEAM_KEY,JSON.stringify(save.team)],[PROGRESSION_KEY,JSON.stringify(save.characterProgress)],[VITALS_KEY,JSON.stringify(save.vitals)],[LOADOUT_KEY,JSON.stringify(save.loadouts)],[ITEM_INVENTORY_KEY,JSON.stringify(save.itemInventory)],[STORE_COINS_KEY,String(save.storeCoins)],[PLAYER_RANK_KEY,String(save.playerRank)]];
  const previous=entries.map(([key])=>{try{return localStorage.getItem(key)}catch(e){return null}});
  try{for(const [key,value] of entries)localStorage.setItem(key,value)}catch(error){entries.forEach(([key],index)=>{try{if(previous[index]===null)localStorage.removeItem(key);else localStorage.setItem(key,previous[index])}catch(e){}});say('Progress could not be restored because browser storage is unavailable.');return false}
- playerRank=save.playerRank;characterProgress=save.characterProgress;savedVitals=save.vitals;characterLoadouts=save.loadouts;itemInventory=save.itemInventory;draft=[...save.team];party=[];phase='menu';paused=false;activeId=null;actingEnemyId=null;fx=null;combatVisualEvents=[];enemies=[];gauges={};summons=[];ultimateQueue=[];ultimateExecuting=false;ultimateResume=null;turnTimeline.reset();battleToken++;cameraPreview=null;selectedAllyId=null;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;pendingVacancies=[];hint='';say('Progress loaded from save file.');return true;
+ playerRank=save.playerRank;characterProgress=save.characterProgress;savedVitals=save.vitals;characterLoadouts=save.loadouts;itemInventory=save.itemInventory;storeCoins=save.storeCoins;draft=[...save.team];party=[];phase='menu';paused=false;activeId=null;actingEnemyId=null;fx=null;combatVisualEvents=[];enemies=[];gauges={};summons=[];ultimateQueue=[];ultimateExecuting=false;ultimateResume=null;turnTimeline.reset();battleToken++;cameraPreview=null;selectedAllyId=null;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;pendingVacancies=[];hint='';say('Progress loaded from save file.');return true;
 }
 function requestSaveFileLoad(){const input=document.getElementById('save-file-picker');input.value='';input.click()}
 function weaponLevelCap(rank=playerRank){return characterLevelCap(rank)}
@@ -1523,7 +1529,7 @@ function drawMainMenu(){
   {label:'STORY',x:220,y:256,active:true,action:'open-story',detail:'BATTLE PROTOTYPE'},
   {label:'EVENTS',x:640,y:256},
   {label:'GAME MODE',x:1060,y:256},
-  {label:'STORE',x:220,y:472},
+  {label:'STORE',x:220,y:472,active:true,action:'open-store',detail:'FEATURED LOTTERIES • 100 COINS'},
   {label:'LOADOUT',x:640,y:472,active:true,action:'open-loadout',detail:'WEAPONS • RUNES • CELESTIALS'},
   {label:'PARTY',x:1060,y:472,active:true,action:'open-party',detail:'MANAGE CURRENT PARTY'},
  ];
@@ -1540,6 +1546,67 @@ function drawMainMenu(){
  addButton(640,676,320,76,'save-progress','SAVE','DOWNLOAD A SAVE FILE');
  addButton(1060,676,320,76,'open-challenges','CHALLENGES','REWARD TRACKER');
  text('Select a section to continue',800,786,17,'#d6dceb','550','center');
+}
+let lastStoreNotice='Select a featured target, then draw for 100 coins.';
+function getStoreRotation(){
+ const ids=ROSTER.filter(model=>!model.test).map(model=>model.id);
+ return FeaturedLottery.rotate(ids,new Date());
+}
+function storeRewardPools(type,rotation){
+ const models=ROSTER.filter(model=>!model.test),featuredIds=type==='character'?rotation.featuredCharacters:rotation.featuredWeapons;
+ const idFor=model=>type==='character'?model.id:'premium-'+model.id;
+ const make=model=>({id:idFor(model),name:type==='character'?model.name:model.name+' Premium Weapon'});
+ return {featured:models.filter(model=>featuredIds.includes(idFor(model))).map(make),offFeature:models.filter(model=>!featuredIds.includes(idFor(model))).map(make)};
+}
+function awardStoreReward(type,reward){
+ if(type==='character'){
+  const record=loadoutFor(reward.id);record.characterDuplicates=Math.min(4,record.characterDuplicates+1);saveLoadouts();return reward.name+' character reward.';
+ }
+ const id=reward.id.replace(/^premium-/,'');if(!ROSTER_IDS.has(id))return reward.name+' weapon reward.';
+ const weapon=loadoutFor(id).weapon;if(weapon.premiumOwned)weapon.premiumPotential=Math.min(5,weapon.premiumPotential+1);else weapon.premiumOwned=true;
+ saveLoadouts();return reward.name+(weapon.premiumPotential>1?' • Premium Potential '+weapon.premiumPotential:' • Premium acquired');
+}
+function drawStoreLottery(type){
+ if(!['character','weapon'].includes(type)||storeCoins<100){lastStoreNotice='You need 100 coins for a lottery ticket.';return false}
+ const rotation=getStoreRotation(),pools=storeRewardPools(type,rotation),track=FeaturedLottery.getState()[type];
+ if(!track.target){lastStoreNotice='Choose a featured target before drawing.';return false}
+ const outcome=FeaturedLottery.draw({type,wallet:storeCoins,pools});
+ if(!outcome.ok){lastStoreNotice=outcome.reason==='target-required'?'Choose a featured target before drawing.':'Lottery draw could not be completed.';return false}
+ storeCoins-=outcome.coinsSpent;saveStoreCoins();
+ const result=outcome.reward.inventoryItem?`${outcome.reward.quantity||1} ${outcome.reward.name}.`:awardStoreReward(type,outcome.reward);
+ lastStoreNotice=`${outcome.tier.toUpperCase()} • ${result}${outcome.featured?' • Featured target!':''}`;
+ return true;
+}
+function handleStoreAction(action){
+ const [,kind,type,value]=action.split(':');
+ if(kind==='target'){
+  const rotation=getStoreRotation(),ids=type==='character'?rotation.featuredCharacters:rotation.featuredWeapons;
+  FeaturedLottery.setTarget(type,value,ids);lastStoreNotice='Target selected. Draws cost 100 coins.';
+ }else if(kind==='draw')drawStoreLottery(type);
+}
+function drawStoreLotteryCard(type,x,rotation,state){
+ const character=type==='character',ids=character?rotation.featuredCharacters:rotation.featuredWeapons,selected=state[type].target;
+ const title=character?'FEATURED CHARACTER LOTTERY':'FEATURED PREMIUM WEAPON LOTTERY';
+ rect(x,185,690,590,'rgba(25,37,58,.96)','#718ba4',14);text(title,x+30,228,22,'#f3dfb9','850');
+ text('Select a featured target',x+30,264,16,'#c4d6e5','600');
+ for(let i=0;i<ids.length;i++){
+  const id=ids[i],model=ROSTER.find(item=>item.id===(character?id:id.replace(/^premium-/,''))),name=character?model?.name:(model?.name+' Premium Weapon'),bx=x+24+(i%3)*214,by=285+Math.floor(i/3)*88;
+  addButton(bx,by,198,74,`store:target:${type}:${id}`,name||id,selected===id?'SELECTED':'FEATURED',true);
+ }
+ const pool=storeRewardPools(type,rotation),target=pool.featured.find(item=>item.id===selected),track=state[type],pity=type==='character'?(track.heightened?50:100):(track.heightened?25:50),untilMythic=Math.max(0,pity-track.sinceMythic),untilRare=Math.max(0,10-track.sinceRare);
+ text('TARGET • '+(target?.name||'NONE SELECTED'),x+30,480,17,'#fff1d5','750');
+ text(`Mythic ${track.heightened?'2%':'1%'} • Featured mythic 75% / Off-feature 25%`,x+30,516,15,'#c4d6e5','550');
+ text(`Mythic guarantee: ${untilMythic} draw(s) • Rare guarantee: ${untilRare} draw(s)`,x+30,548,15,'#c4d6e5','550');
+ if(track.heightened)text('HEIGHTENED STATE • guaranteed featured mythic is closer',x+30,578,14,'#eacb87','750');
+ addButton(x+180,625,330,72,`store:draw:${type}`,'DRAW • 100 COINS','Balance: '+storeCoins+' coins',!!target&&storeCoins>=100);
+}
+function drawStore(){
+ drawBackground();rect(0,0,W,H,'rgba(5,9,22,.76)');text('STORE • FEATURED LOTTERIES',800,98,40,'#ffedd1','850','center');
+ text('COINS  '+storeCoins,1240,146,16,'#f4d99c','800');addButton(1320,52,170,52,'main-menu','MAIN MENU','');
+ const rotation=getStoreRotation(),state=FeaturedLottery.getState();
+ drawStoreLotteryCard('character',100,rotation,state);drawStoreLotteryCard('weapon',810,rotation,state);
+ text('Rotation changes weekly at 12:00 AM Eastern. Targets must be selected again after each rotation.',800,805,15,'#c4d6e5','550','center');
+ if(lastStoreNotice){rect(390,115,820,52,'rgba(12,19,34,.94)','#687c93',10);text(lastStoreNotice,800,147,15,'#fff4e8','650','center')}
 }
 function drawItemInventory(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.74)');rect(105,55,1390,790,'rgba(13,20,39,.98)','#ccb88e',20);
@@ -2271,12 +2338,12 @@ function drawSetup(){
 // Transient hint popovers belong to menus and setup screens. Combat has
 // dedicated turn, targeting, and action-resolution cues; overlaying another
 // message on the battlefield obscures character cards and action effects.
-function drawHint(t){if(hint&&t-hintAt<2300&&['startup','menu','partySetup','loadout','inventory','challenges','setup'].includes(phase)){rect(474,393,652,76,'rgba(15,21,39,.98)','#e6b98a',12);text(hint,800,431,20,'#fff4e8','700','center')}}
-function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='startup'){drawStartupMenu()}else if(phase==='menu'){drawMainMenu()}else if(phase==='partySetup'){drawPartySetup()}else if(phase==='loadout'){drawLoadout()}else if(phase==='inventory'){drawItemInventory()}else if(phase==='challenges'){drawChallenges()}else if(phase!=='setup'){
+function drawHint(t){if(hint&&t-hintAt<2300&&['startup','menu','partySetup','loadout','inventory','challenges','store','setup'].includes(phase)){rect(474,393,652,76,'rgba(15,21,39,.98)','#e6b98a',12);text(hint,800,431,20,'#fff4e8','700','center')}}
+function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='startup'){drawStartupMenu()}else if(phase==='menu'){drawMainMenu()}else if(phase==='partySetup'){drawPartySetup()}else if(phase==='loadout'){drawLoadout()}else if(phase==='inventory'){drawItemInventory()}else if(phase==='challenges'){drawChallenges()}else if(phase==='store'){drawStore()}else if(phase!=='setup'){
   drawCameraStage(t);drawFx(t);drawHud(t)
  }else{drawCameraStage(t);drawSetup()}drawHint(t);requestAnimationFrame(loop)}
-function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('roster-')){setEnemyRoster(cmd.slice(7));return}if(cmd.startsWith('loadout:')){handleLoadoutAction(cmd.slice(8));return}if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'){devPanelOpen=!devPanelOpen;return}if(cmd==='cancel-target'){cancelTargetSelection();return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(cameraPreview==='party'&&(phase==='player'||pendingTargetAction?.targetSide==='ally')){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(pendingTargetAction?.targetSide==='ally'&&pendingTargetAction.targetScope==='all'){if(!p||p.hp<=0){say('Choose a living party member to confirm the team skill.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;return executeCombatAction(actor,pending.action)}if(pendingTargetAction?.targetSide==='ally'){if(!p||p.hp<=0){say('Tune and Dawn’s Ultimate need a living ally.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;if(pending.action==='ultimate')return queueUltimate(pending.actorId,id);return executeCombatAction(actor,pending.action,null,id)}if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){beginTargetSelection('ultimate',cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){chargeUltimateForTest(cmd.slice(11));return}
- switch(cmd){case 'startup-start':phase='menu';hint='';break;case 'startup-load':requestSaveFileLoad();break;case 'open-inventory':phase='inventory';hint='';break;case 'open-challenges':phase='challenges';hint='';break;case 'save-progress':saveProgressFile();break;case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'support-heal':startSupportDemo('heal');break;case 'support-revive':startSupportDemo('revive');break;case 'confirm-support':confirmSupportDemo();break;case 'cancel-support':cancelSupportDemo();break;case 'camera-party':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':toggleWavePreset();break;case 'toggle-recovery':setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':testKO();break;case 'test-revive':testRevive();break;case 'skill':play('skill');break;case 'cap-test':cycleSpCapTest();break;case 'hud-status-test':toggleHudStatusDemo();break;case 'f05-advance':addActionAdvance(activeId,25);break;case 'f05-delay':addActionDelay(activeId,25);break;case 'f05-speed':setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':queueSummonForTest('independent');break;case 'f05-summon-controlled':queueSummonForTest('controlled');break;
+function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('roster-')){setEnemyRoster(cmd.slice(7));return}if(cmd.startsWith('loadout:')){handleLoadoutAction(cmd.slice(8));return}if(cmd.startsWith('store:')){handleStoreAction(cmd);return}if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'){devPanelOpen=!devPanelOpen;return}if(cmd==='cancel-target'){cancelTargetSelection();return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(cameraPreview==='party'&&(phase==='player'||pendingTargetAction?.targetSide==='ally')){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(pendingTargetAction?.targetSide==='ally'&&pendingTargetAction.targetScope==='all'){if(!p||p.hp<=0){say('Choose a living party member to confirm the team skill.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;return executeCombatAction(actor,pending.action)}if(pendingTargetAction?.targetSide==='ally'){if(!p||p.hp<=0){say('Tune and Dawn’s Ultimate need a living ally.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;if(pending.action==='ultimate')return queueUltimate(pending.actorId,id);return executeCombatAction(actor,pending.action,null,id)}if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){beginTargetSelection('ultimate',cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){chargeUltimateForTest(cmd.slice(11));return}
+ switch(cmd){case 'startup-start':phase='menu';hint='';break;case 'startup-load':requestSaveFileLoad();break;case 'open-inventory':phase='inventory';hint='';break;case 'open-challenges':phase='challenges';hint='';break;case 'open-store':phase='store';lastStoreNotice='Select a featured target, then draw for 100 coins.';break;case 'save-progress':saveProgressFile();break;case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'support-heal':startSupportDemo('heal');break;case 'support-revive':startSupportDemo('revive');break;case 'confirm-support':confirmSupportDemo();break;case 'cancel-support':cancelSupportDemo();break;case 'camera-party':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':toggleWavePreset();break;case 'toggle-recovery':setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':testKO();break;case 'test-revive':testRevive();break;case 'skill':play('skill');break;case 'cap-test':cycleSpCapTest();break;case 'hud-status-test':toggleHudStatusDemo();break;case 'f05-advance':addActionAdvance(activeId,25);break;case 'f05-delay':addActionDelay(activeId,25);break;case 'f05-speed':setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':queueSummonForTest('independent');break;case 'f05-summon-controlled':queueSummonForTest('controlled');break;
  case 'progress-test-level':{const a=active(),p=a&&progressFor(a.id);if(a&&p){const cost=Math.max(1,requiredExp(a.level)-p.exp),result=testGrantExp(a.id,cost);say(result?`TEST ONLY: level ${result.level}, ${cost} EXP injected.`:'Ascension required or level cap reached.');}break}
  case 'progress-test-ascend':{const a=active();if(a)say(testAscend(a.id)?`TEST ONLY: level ${a.level} ascension unlocked (no materials).`:'Not at a locked ascension gate.');break}
  case 'hp-test-flat':{const a=active();if(a)setHpBonusForTest(a.id,'debug-flat','flat',(a.hpFlatModifiers['debug-flat']||0)+20);break}
@@ -2302,7 +2369,7 @@ canvas.addEventListener('pointerdown',e=>{e.preventDefault();const r=canvas.getB
 window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)cancelTargetSelection();if(e.key==='1')play('basic');if(e.key==='2')play('skill');if(e.key==='3')play('ultimate');if(e.key.toLowerCase()==='m'&&phase==='player')cycleSpCapTest();if(['q','w','e','f'].includes(e.key.toLowerCase())&&phase==='player')setTargetingMode(({q:'single',w:'blast',e:'aoe',f:'five-hit'})[e.key.toLowerCase()]);if(e.key.toLowerCase()==='v'&&phase==='player'){cameraPreview=cameraPreview==='party'?null:'party';selectedAllyId=activeId}if(e.key.toLowerCase()==='t'&&phase==='player')cameraPreview=cameraPreview==='target'?null:'target';if(e.key.toLowerCase()==='r'&&phase!=='setup')replay()});window.addEventListener('contextmenu',e=>e.preventDefault());
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.22',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.23',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
  characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
  unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}})),

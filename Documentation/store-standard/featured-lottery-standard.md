@@ -4,6 +4,8 @@
 
 The Store offers featured character and premium weapon lotteries. Each lottery draw costs 100 coins and is purchased from the merchant. A draw delivers its reward immediately.
 
+The prototype wallet initializes with 1,000 coins so the lottery flow can be played before coin rewards from other game modes are defined. Coin balance is saved with player progress.
+
 ## Featured Rotation
 
 The Store may feature up to three character and signature premium weapon pairs at once. A player chooses one featured target for each lottery type they use. The character and weapon in each pair correspond to one another.
