@@ -10,7 +10,7 @@ For manual testing, append `?dev=1` to the site URL to show Store controls that 
 
 Each banner offers a single draw for 100 coins and a ten-draw option for 1,000 coins. Ten draws are resolved in order, one ticket at a time, with the same pity and reward rules as individual draws. The ten-draw option has no discount.
 
-For the reveal, each ticket rises into view showing its back over 1,000 ms, then waits for the player to click it. The card flips to reveal the reward over 500 ms. Keep the reward face visible for 1,500 ms before moving to the next ticket. Ten-draw repeats the same entrance, click, flip, and reward hold for every ticket; it does not shorten or skip the animation. The final reward summary remains until the player continues. These durations follow the 250 ms animation timing unit in the [Combat Action Resolution Standard](../combat-action-resolution-standard.md).
+For the reveal, each ticket rises into view showing its back over 1,000 ms, then waits for the player to tap or click it. The card flips to reveal the reward over 500 ms. Keep the reward face visible for as long as the player wants. In a ten-draw, tapping or clicking the revealed card brings out the next ticket; after the tenth reward, the next tap opens the summary. The summary remains open until the player presses **Done**, which is available immediately. These durations follow the 250 ms animation timing unit in the [Combat Action Resolution Standard](../combat-action-resolution-standard.md).
 
 ## Featured Rotation
 

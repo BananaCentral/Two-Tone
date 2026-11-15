@@ -1565,7 +1565,7 @@ function drawSettings(){
 let lastStoreNotice='Select a featured target, then draw for 100 coins.',storeReveal=null;
 const STORE_ITEM_SPRITES=Object.freeze({core:'core',gem:'gem','bottle:small':'enchantedBottleSmall','bottle:medium':'enchantedBottleMedium','bottle:large':'enchantedBottleLarge','book:small':'enchantedBookSmall','book:medium':'enchantedBookMedium','book:large':'enchantedBookLarge'});
 const STORE_REWARD_SPRITES=Object.freeze({'premium-soul':'soulWeaponPremium'});
-const STORE_REVEAL_TIMING=Object.freeze({cardEnterMs:1000,cardFlipMs:500,rewardHoldMs:1500});
+const STORE_REVEAL_TIMING=Object.freeze({cardEnterMs:1000,cardFlipMs:500});
 function getStoreRotation(){
  const ids=ROSTER.filter(model=>!model.test).map(model=>model.id);
  return FeaturedLottery.rotate(ids,new Date());
@@ -1612,6 +1612,7 @@ function finishStoreReveal(){
 function handleStoreAction(action){
  if(storeReveal){
   if(action==='store:reveal:flip'&&storeReveal.phase==='ready'){storeReveal.phase='flip';storeReveal.phaseStartedAt=performance.now()}
+  else if(action==='store:reveal:next'&&storeReveal.phase==='shown'&&storeReveal.rewards.length>1){if(storeReveal.index+1<storeReveal.rewards.length){storeReveal.index++;storeReveal.phase='enter'}else storeReveal.phase='summary';storeReveal.phaseStartedAt=performance.now()}
   else if(action==='store:reveal:close'&&(storeReveal.phase==='summary'||(storeReveal.phase==='shown'&&storeReveal.rewards.length===1)))finishStoreReveal();
   return;
  }
@@ -1649,7 +1650,6 @@ function drawStoreReveal(now){
  let phaseElapsed=now-reveal.phaseStartedAt;
  if(reveal.phase==='enter'&&phaseElapsed>=STORE_REVEAL_TIMING.cardEnterMs){reveal.phase='ready';reveal.phaseStartedAt=now;phaseElapsed=0}
  else if(reveal.phase==='flip'&&phaseElapsed>=STORE_REVEAL_TIMING.cardFlipMs){reveal.phase='shown';reveal.phaseStartedAt=now;phaseElapsed=0}
- else if(reveal.phase==='shown'&&batch&&phaseElapsed>=STORE_REVEAL_TIMING.rewardHoldMs){if(reveal.index+1<rewards.length){reveal.index++;reveal.phase='enter'}else reveal.phase='summary';reveal.phaseStartedAt=now;phaseElapsed=0}
  const summary=reveal.phase==='summary',current=rewards[reveal.index],color=current.tier==='mythic'?'#ffd778':current.tier==='rare'?'#d8a4ff':'#83dcff';
  const fade=Math.min(1,(now-reveal.startedAt)/.28),pulse=.5+.5*Math.sin(now*.007),spin=(now-reveal.startedAt)/1000*1.8;
  rect(0,0,W,H,`rgba(3,6,18,${.84*fade})`);
@@ -1665,7 +1665,7 @@ function drawStoreReveal(now){
  if(summary){
   text(`${rewards.length} REWARDS • ${rewards.length*FeaturedLottery.RULES.ticketCost} COINS`,800,262,12,'#e6d2aa','750','center');
   rewards.forEach((item,i)=>{const col=i%2,row=Math.floor(i/2),x=468+col*334,y=278+row*76,tierColor=item.tier==='mythic'?'#ffd778':item.tier==='rare'?'#d8a4ff':'#83dcff';rect(x,y,326,66,'rgba(35,48,69,.96)',tierColor,9);text(item.tier.toUpperCase(),x+12,y+24,12,tierColor,'850');text(item.reward.name||item.reward.id,x+105,y+23,15,'#fff3de','750');text(item.result+(item.featured?' • FEATURED':''),x+105,y+45,11,'#c2d0dd','550')});
-  addButton(648,668,304,38,'store:reveal:close','CONTINUE','RETURN TO BANNER');
+  addButton(648,668,304,38,'store:reveal:close','DONE','RETURN TO BANNER');
   return;
  }
  const entryProgress=reveal.phase==='enter'?Math.max(0,Math.min(1,phaseElapsed/STORE_REVEAL_TIMING.cardEnterMs)):1,entryEase=1-Math.pow(1-entryProgress,3),cardY=H+210+(445-(H+210))*entryEase;
@@ -1692,13 +1692,13 @@ function drawStoreReveal(now){
   text('✦',0,-15,58,'#f0d58e','900','center');
   text('TWO-TONE',0,93,19,'#fff1d1','900','center');
   text('FEATURED SUMMON',0,119,12,'#bed4e7','750','center');
-  text('CLICK TO TURN',0,150,11,'#e5ca91','700','center');
+  text('TAP OR CLICK TO TURN',0,150,11,'#e5ca91','700','center');
  }
  ctx.restore();
- const prompt=reveal.phase==='ready'?'CLICK THE CARD TO FLIP':reveal.phase==='flip'?'FLIPPING…':faceShown?(batch?'NEXT CARD COMING UP':'CLICK THE CARD TO RETURN'):'DRAWING YOUR REWARD';
+ const prompt=reveal.phase==='ready'?'TAP OR CLICK TO FLIP':reveal.phase==='flip'?'FLIPPING…':faceShown?(batch?'TAP OR CLICK FOR NEXT CARD':'TAP OR CLICK TO RETURN'):'DRAWING YOUR REWARD';
  text(prompt,800,665,16,'#fff0c9','850','center');
- if(reveal.phase==='ready'||(faceShown&&!batch))choiceRects.push({x:652,y:245,w:296,h:400,action:reveal.phase==='ready'?'store:reveal:flip':'store:reveal:close',enabled:true});
- if(faceShown&&batch)text(`NEXT CARD IN ${(Math.max(0,STORE_REVEAL_TIMING.rewardHoldMs-phaseElapsed)/1000).toFixed(1)}s`,800,692,13,'#c4d6e5','600','center');
+ if(reveal.phase==='ready'||faceShown)choiceRects.push({x:652,y:245,w:296,h:400,action:reveal.phase==='ready'?'store:reveal:flip':batch?'store:reveal:next':'store:reveal:close',enabled:true});
+ if(faceShown&&batch)text('TAP OR CLICK THE CARD WHEN READY',800,692,13,'#c4d6e5','600','center');
 }
 function drawStore(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.84)');
