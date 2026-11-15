@@ -2,6 +2,17 @@
 
 The main-menu **Loadout** opens the character equipment and ability progression screen.
 
+## Screen layout
+
+The Loadout uses one character-details view with a persistent four-part frame:
+
+- A portrait strip across the top switches the selected character without leaving the current tab.
+- A vertical navigation rail on the left opens **Details**, **Weapons**, **Runes**, and **Celestials**.
+- The selected character's battle artwork occupies the center. Soul's displayed battle sprite follows the currently equipped Standard or Premium signature weapon.
+- The right panel contains the active tab's information and controls. The close button returns to the main menu.
+
+Character level, combat stats, Enchanted Bottles, and character Ascension are grouped under **Details**. Weapon level, Potential, Enchanted Books, weapon Ascension, and equip state are grouped under **Weapons**. Rune slots and Core upgrades are grouped under **Runes**. Celestial upgrades are grouped under **Celestials**. Character selection and tab navigation remain available while using each panel. Dev-only preview controls remain hidden in Regular Mode.
+
 ## Signature weapons
 
 Each character has exactly two character-bound signature weapon options. Each option has its own weapon Level and XP progression. Weapon Level caps follow the character level caps defined by player Rank and use the Character XP curve.
