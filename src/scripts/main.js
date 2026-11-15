@@ -1583,11 +1583,22 @@ function drawStoreLottery(type,count=1){
  }
  storeCoins-=rewards.length*FeaturedLottery.RULES.ticketCost;saveStoreCoins();
  lastStoreNotice='Your ticket is being revealed…';
- storeReveal={type,rewards,startedAt:performance.now()};
+ const startedAt=performance.now();storeReveal={type,rewards,index:0,phase:'enter',phaseStartedAt:startedAt,startedAt};
  return true;
 }
+function finishStoreReveal(){
+ if(!storeReveal)return;
+ const rewards=storeReveal.rewards;
+ if(rewards.length===1){const item=rewards[0];lastStoreNotice=`${item.tier.toUpperCase()} • ${item.result}${item.featured?' • Featured target!':''}`}
+ else{const counts=rewards.reduce((all,item)=>(all[item.tier]=(all[item.tier]||0)+1,all),{});lastStoreNotice=`${rewards.length} draws: ${['mythic','rare','common'].filter(tier=>counts[tier]).map(tier=>`${counts[tier]} ${tier}`).join(', ')}.`}
+ storeReveal=null;
+}
 function handleStoreAction(action){
- if(storeReveal)return;
+ if(storeReveal){
+  if(action==='store:reveal:flip'&&storeReveal.phase==='ready'){storeReveal.phase='flip';storeReveal.phaseStartedAt=performance.now()}
+  else if(action==='store:reveal:close'&&(storeReveal.phase==='summary'||(storeReveal.phase==='shown'&&storeReveal.rewards.length===1)))finishStoreReveal();
+  return;
+ }
  const [,kind,type,value]=action.split(':');
  if(kind==='grant'&&DEV_MODE){const amount=Number(type);if(grantStoreCoins(amount))lastStoreNotice=`Dev mode: added ${amount.toLocaleString()} coins.`;else lastStoreNotice='Could not add coins.';
  }else if(kind==='target'){
@@ -1618,10 +1629,13 @@ function drawStoreLotteryCard(type,x,rotation,state){
 }
 function drawStoreReveal(now){
  if(!storeReveal)return;
- const reveal=storeReveal,rewards=reveal.rewards,elapsed=(now-reveal.startedAt)/1000,batch=rewards.length>1,stepDuration=1.25,sequenceDuration=batch?stepDuration*rewards.length:5.8,summaryDuration=batch?4.5:0;
- if(elapsed>=sequenceDuration+summaryDuration){const counts=rewards.reduce((all,item)=>(all[item.tier]=(all[item.tier]||0)+1,all),{});lastStoreNotice=`${rewards.length} draws: ${['mythic','rare','common'].filter(tier=>counts[tier]).map(tier=>`${counts[tier]} ${tier}`).join(', ')}.`;storeReveal=null;return}
- const summary=batch&&elapsed>=sequenceDuration,index=batch?Math.min(rewards.length-1,Math.floor(elapsed/stepDuration)):0,relative=batch?elapsed-index*stepDuration:elapsed,current=rewards[index],color=current.tier==='mythic'?'#ffd778':current.tier==='rare'?'#d8a4ff':'#83dcff';
- const fade=Math.min(1,elapsed/.28),pulse=.5+.5*Math.sin(elapsed*7),spin=elapsed*1.8;
+ const reveal=storeReveal,rewards=reveal.rewards,elapsed=(now-reveal.startedAt)/1000,batch=rewards.length>1,enterDuration=1.05,flipDuration=.62,rewardHold=1.5;
+ let phaseElapsed=(now-reveal.phaseStartedAt)/1000;
+ if(reveal.phase==='enter'&&phaseElapsed>=enterDuration){reveal.phase='ready';reveal.phaseStartedAt=now;phaseElapsed=0}
+ else if(reveal.phase==='flip'&&phaseElapsed>=flipDuration){reveal.phase='shown';reveal.phaseStartedAt=now;phaseElapsed=0}
+ else if(reveal.phase==='shown'&&batch&&phaseElapsed>=rewardHold){if(reveal.index+1<rewards.length){reveal.index++;reveal.phase='enter'}else reveal.phase='summary';reveal.phaseStartedAt=now;phaseElapsed=0}
+ const summary=reveal.phase==='summary',current=rewards[reveal.index],color=current.tier==='mythic'?'#ffd778':current.tier==='rare'?'#d8a4ff':'#83dcff';
+ const fade=Math.min(1,(now-reveal.startedAt)/.28),pulse=.5+.5*Math.sin(now*.007),spin=(now-reveal.startedAt)/1000*1.8;
  rect(0,0,W,H,`rgba(3,6,18,${.84*fade})`);
  const glow=ctx.createRadialGradient(800,455,28,800,455,470);glow.addColorStop(0,`rgba(104,163,222,${.20+pulse*.13})`);glow.addColorStop(1,'rgba(12,20,42,0)');rect(170,80,1260,760,glow);
  ctx.save();ctx.translate(800,450);ctx.rotate(spin*.22);ctx.strokeStyle=`rgba(191,225,255,${.16+pulse*.12})`;ctx.lineWidth=2;
@@ -1631,16 +1645,15 @@ function drawStoreReveal(now){
   ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle=i%3===0?color:'#dff6ff';ctx.translate(x,y);ctx.rotate(a+spin);ctx.fillRect(-3,-9,6,18);ctx.restore();
  }
  rect(448,192,704,525,'rgba(12,20,38,.96)',color,22);
- text(summary?'TEN DRAW RESULTS':batch?`DRAW ${index+1} OF ${rewards.length}`:'FEATURED LOTTERY',800,238,15,'#b9cbe0','800','center');
+ text(summary?'TEN DRAW RESULTS':batch?`DRAW ${reveal.index+1} OF ${rewards.length}`:'FEATURED LOTTERY',800,238,15,'#b9cbe0','800','center');
  if(summary){
   text(`${rewards.length} REWARDS • ${rewards.length*FeaturedLottery.RULES.ticketCost} COINS`,800,262,12,'#e6d2aa','750','center');
-  rewards.forEach((item,i)=>{const col=i%2,row=Math.floor(i/2),x=468+col*334,y=278+row*78,tierColor=item.tier==='mythic'?'#ffd778':item.tier==='rare'?'#d8a4ff':'#83dcff';rect(x,y,326,68,'rgba(35,48,69,.96)',tierColor,9);text(item.tier.toUpperCase(),x+12,y+25,12,tierColor,'850');text(item.reward.name||item.reward.id,x+105,y+24,15,'#fff3de','750');text(item.result+(item.featured?' • FEATURED':''),x+105,y+47,11,'#c2d0dd','550')});
-  rect(590,681,420,5,'rgba(150,178,209,.25)');rect(590,681,420,5,color);
+  rewards.forEach((item,i)=>{const col=i%2,row=Math.floor(i/2),x=468+col*334,y=278+row*76,tierColor=item.tier==='mythic'?'#ffd778':item.tier==='rare'?'#d8a4ff':'#83dcff';rect(x,y,326,66,'rgba(35,48,69,.96)',tierColor,9);text(item.tier.toUpperCase(),x+12,y+24,12,tierColor,'850');text(item.reward.name||item.reward.id,x+105,y+23,15,'#fff3de','750');text(item.result+(item.featured?' • FEATURED':''),x+105,y+45,11,'#c2d0dd','550')});
+  addButton(648,668,304,38,'store:reveal:close','CONTINUE','RETURN TO BANNER');
   return;
  }
- const entryDuration=batch ? .36 : 1.05,entryProgress=Math.max(0,Math.min(1,relative/entryDuration)),entryEase=1-Math.pow(1-entryProgress,3),cardY=H+210+(440-(H+210))*entryEase;
- const revealStart=batch ? .64 : 2.35,flipDuration=batch ? .28 : .62,revealStarted=relative>=revealStart,flipProgress=Math.max(0,Math.min(1,(relative-revealStart)/flipDuration));
- const flip=revealStarted?Math.max(.08,Math.abs(Math.cos(flipProgress*Math.PI))):Math.max(.12,Math.abs(Math.cos(relative*4.2))),faceShown=revealStarted&&flipProgress>=1;
+ const entryProgress=reveal.phase==='enter'?Math.max(0,Math.min(1,phaseElapsed/enterDuration)):1,entryEase=1-Math.pow(1-entryProgress,3),cardY=H+210+(440-(H+210))*entryEase;
+ const flipProgress=reveal.phase==='flip'?Math.max(0,Math.min(1,phaseElapsed/flipDuration)):0,flip=reveal.phase==='flip'?Math.max(.08,Math.abs(Math.cos(flipProgress*Math.PI))):1,faceShown=reveal.phase==='shown';
  ctx.save();ctx.translate(800,cardY);ctx.rotate((1-entryEase)*-.12);ctx.scale(flip,1);ctx.globalAlpha*=Math.min(1,entryProgress*2.2);
  const ticket=ctx.createLinearGradient(-172,-135,172,135);ticket.addColorStop(0,faceShown?'#fff5d9':'#d8ebfb');ticket.addColorStop(1,faceShown?color:'#82b6d5');
  rect(-175,-145,350,290,ticket,faceShown?color:'#f3e5c8',21);
@@ -1656,8 +1669,10 @@ function drawStoreReveal(now){
   text('TWO-TONE TICKET',0,82,15,'#1b3047','850','center');
  }
  ctx.restore();
- text(summary?'ALL REWARDS RECEIVED':faceShown?'REWARD RECEIVED':'DRAWING YOUR REWARD',800,665,16,'#fff0c9','850','center');
- const progress=batch?Math.min(1,(index+relative/stepDuration)/rewards.length):Math.min(1,elapsed/sequenceDuration);rect(590,681,420,5,'rgba(150,178,209,.25)');rect(590,681,420*progress,5,color);
+ const prompt=reveal.phase==='ready'?'CLICK THE CARD TO FLIP':reveal.phase==='flip'?'FLIPPING…':faceShown?(batch?'NEXT CARD COMING UP':'CLICK THE CARD TO RETURN'):'DRAWING YOUR REWARD';
+ text(prompt,800,665,16,'#fff0c9','850','center');
+ if(reveal.phase==='ready'||(faceShown&&!batch))choiceRects.push({x:625,y:295,w:350,h:290,action:reveal.phase==='ready'?'store:reveal:flip':'store:reveal:close',enabled:true});
+ if(faceShown&&batch)text(`NEXT CARD IN ${Math.max(0,rewardHold-phaseElapsed).toFixed(1)}s`,800,692,13,'#c4d6e5','600','center');
 }
 function drawStore(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.84)');
