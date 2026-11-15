@@ -1547,7 +1547,7 @@ function drawMainMenu(){
  addButton(1060,676,320,76,'open-challenges','CHALLENGES','REWARD TRACKER');
  text('Select a section to continue',800,786,17,'#d6dceb','550','center');
 }
-let lastStoreNotice='Select a featured target, then draw for 100 coins.';
+let lastStoreNotice='Select a featured target, then draw for 100 coins.',storeReveal=null;
 function getStoreRotation(){
  const ids=ROSTER.filter(model=>!model.test).map(model=>model.id);
  return FeaturedLottery.rotate(ids,new Date());
@@ -1574,10 +1574,12 @@ function drawStoreLottery(type){
  if(!outcome.ok){lastStoreNotice=outcome.reason==='target-required'?'Choose a featured target before drawing.':'Lottery draw could not be completed.';return false}
  storeCoins-=outcome.coinsSpent;saveStoreCoins();
  const result=outcome.reward.inventoryItem?`${outcome.reward.quantity||1} ${outcome.reward.name}.`:awardStoreReward(type,outcome.reward);
- lastStoreNotice=`${outcome.tier.toUpperCase()} • ${result}${outcome.featured?' • Featured target!':''}`;
+ lastStoreNotice='Your ticket is being revealed…';
+ storeReveal={type,tier:outcome.tier,reward:outcome.reward,featured:outcome.featured,result,startedAt:performance.now()};
  return true;
 }
 function handleStoreAction(action){
+ if(storeReveal)return;
  const [,kind,type,value]=action.split(':');
  if(kind==='target'){
   const rotation=getStoreRotation(),ids=type==='character'?rotation.featuredCharacters:rotation.featuredWeapons;
@@ -1587,26 +1589,66 @@ function handleStoreAction(action){
 function drawStoreLotteryCard(type,x,rotation,state){
  const character=type==='character',ids=character?rotation.featuredCharacters:rotation.featuredWeapons,selected=state[type].target;
  const title=character?'FEATURED CHARACTER LOTTERY':'FEATURED PREMIUM WEAPON LOTTERY';
- rect(x,185,690,590,'rgba(25,37,58,.96)','#718ba4',14);text(title,x+30,228,22,'#f3dfb9','850');
- text('Select a featured target',x+30,264,16,'#c4d6e5','600');
+ rect(x,185,690,590,'rgba(14,23,42,.97)','#637b98',18);
+ const banner=ctx.createLinearGradient(x,185,x+690,330);banner.addColorStop(0,character?'#153554':'#492345');banner.addColorStop(1,character?'#276878':'#754d34');rect(x+1,186,688,142,banner,null,17);
+ text(character?'✦':'⚔',x+52,267,58,character?'#bcf6ff':'#ffe3a4','900','center');
+ text(title,x+94,225,19,'#f8f4ea','850');text(character?'CHARACTER BANNER':'SIGNATURE WEAPON BANNER',x+94,257,13,'#d6e2ef','650');
+ text('100 COINS / DRAW',x+94,294,15,'#f6d89b','800');
+ text('FEATURED TARGETS',x+28,351,15,'#c4d6e5','750');
  for(let i=0;i<ids.length;i++){
-  const id=ids[i],model=ROSTER.find(item=>item.id===(character?id:id.replace(/^premium-/,''))),name=character?model?.name:(model?.name+' Premium Weapon'),bx=x+24+(i%3)*214,by=285+Math.floor(i/3)*88;
-  addButton(bx,by,198,74,`store:target:${type}:${id}`,name||id,selected===id?'SELECTED':'FEATURED',true);
+  const id=ids[i],model=ROSTER.find(item=>item.id===(character?id:id.replace(/^premium-/,''))),name=character?model?.name:(model?.name+' Premium Weapon'),bx=x+24+(i%3)*214,by=365;
+  addButton(bx,by,198,68,`store:target:${type}:${id}`,name||id,selected===id?'SELECTED':'CHOOSE TARGET',!storeReveal);
  }
  const pool=storeRewardPools(type,rotation),target=pool.featured.find(item=>item.id===selected),track=state[type],pity=type==='character'?(track.heightened?50:100):(track.heightened?25:50),untilMythic=Math.max(0,pity-track.sinceMythic),untilRare=Math.max(0,10-track.sinceRare);
- text('TARGET • '+(target?.name||'NONE SELECTED'),x+30,480,17,'#fff1d5','750');
- text(`Mythic ${track.heightened?'2%':'1%'} • Featured mythic 75% / Off-feature 25%`,x+30,516,15,'#c4d6e5','550');
- text(`Mythic guarantee: ${untilMythic} draw(s) • Rare guarantee: ${untilRare} draw(s)`,x+30,548,15,'#c4d6e5','550');
- if(track.heightened)text('HEIGHTENED STATE • guaranteed featured mythic is closer',x+30,578,14,'#eacb87','750');
- addButton(x+180,625,330,72,`store:draw:${type}`,'DRAW • 100 COINS','Balance: '+storeCoins+' coins',!!target&&storeCoins>=100);
+ text('TARGET • '+(target?.name||'NONE SELECTED'),x+30,472,17,'#fff1d5','750');
+ text(`Mythic ${track.heightened?'2%':'1%'} • Featured 75% / Off-feature 25%`,x+30,506,14,'#c4d6e5','550');
+ text(`MYTHIC GUARANTEE  ${untilMythic} draws   •   RARE GUARANTEE  ${untilRare} draws`,x+30,536,13,'#c4d6e5','650');
+ if(track.heightened)text('HEIGHTENED STATE • 2% mythic chance',x+30,564,14,'#eacb87','750');
+ addButton(x+180,656,330,72,`store:draw:${type}`,'DRAW TICKET','100 COINS • BALANCE '+storeCoins,!!target&&storeCoins>=100&&!storeReveal);
+}
+function drawStoreReveal(now){
+ if(!storeReveal)return;
+ const reveal=storeReveal,elapsed=(now-reveal.startedAt)/1000,duration=3.6;
+ if(elapsed>=duration){lastStoreNotice=`${reveal.tier.toUpperCase()} • ${reveal.result}${reveal.featured?' • Featured target!':''}`;storeReveal=null;return}
+ const color=reveal.tier==='mythic'?'#ffd778':reveal.tier==='rare'?'#d8a4ff':'#83dcff';
+ const fade=Math.min(1,elapsed/.28),pulse=.5+.5*Math.sin(elapsed*7),spin=elapsed*1.8;
+ rect(0,0,W,H,`rgba(3,6,18,${.84*fade})`);
+ const glow=ctx.createRadialGradient(800,455,28,800,455,470);glow.addColorStop(0,`rgba(104,163,222,${.20+pulse*.13})`);glow.addColorStop(1,'rgba(12,20,42,0)');rect(170,80,1260,760,glow);
+ ctx.save();ctx.translate(800,450);ctx.rotate(spin*.22);ctx.strokeStyle=`rgba(191,225,255,${.16+pulse*.12})`;ctx.lineWidth=2;
+ for(let i=0;i<30;i++){const a=i*Math.PI*2/30;ctx.beginPath();ctx.moveTo(Math.cos(a)*210,Math.sin(a)*210);ctx.lineTo(Math.cos(a)*410,Math.sin(a)*410);ctx.stroke()}
+ ctx.restore();
+ for(let i=0;i<24;i++){const a=i*Math.PI*2/24+spin*.7,r=145+((elapsed*95+i*37)%250),x=800+Math.cos(a)*r,y=450+Math.sin(a)*r,alpha=Math.max(0,1-Math.abs(r-260)/150)*fade;
+  ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle=i%3===0?color:'#dff6ff';ctx.translate(x,y);ctx.rotate(a+spin);ctx.fillRect(-3,-9,6,18);ctx.restore();
+ }
+ rect(448,192,704,525,'rgba(12,20,38,.96)',color,22);
+ text('FEATURED LOTTERY',800,238,15,'#b9cbe0','800','center');
+ const revealNow=elapsed>=1.75,flip=revealNow?Math.max(.04,Math.abs(Math.cos(Math.min(1,(elapsed-1.75)/.34)*Math.PI/2))):Math.max(.12,Math.abs(Math.cos(spin*1.35)));
+ ctx.save();ctx.translate(800,440);ctx.scale(flip,1);
+ const ticket=ctx.createLinearGradient(-172,-135,172,135);ticket.addColorStop(0,revealNow?'#fff5d9':'#d8ebfb');ticket.addColorStop(1,revealNow?color:'#82b6d5');
+ rect(-175,-145,350,290,ticket,revealNow?color:'#f3e5c8',21);
+ ctx.save();ctx.setLineDash([12,10]);ctx.strokeStyle='rgba(24,42,66,.55)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-145,-105);ctx.lineTo(145,-105);ctx.moveTo(-145,105);ctx.lineTo(145,105);ctx.stroke();ctx.restore();
+ if(revealNow){
+  const label=reveal.tier.toUpperCase();text(label,0,-59,24,reveal.tier==='common'?'#24506d':reveal.tier==='rare'?'#612f83':'#79520d','950','center');
+  text(reveal.tier==='mythic'?'✦':'✧',0,10,60,reveal.tier==='common'?'#24506d':reveal.tier==='rare'?'#612f83':'#79520d','900','center');
+  const rewardName=reveal.reward.name||reveal.reward.id;text(rewardName,0,66,18,'#1b3047','850','center');
+  text(reveal.result,0,94,12,'#253d55','650','center');
+ }else{
+  text('✧',0,18,78,'#244d70','900','center');
+  text('TICKET IN MOTION',0,79,16,'#1b3047','850','center');
+ }
+ ctx.restore();
+ text(revealNow?'REWARD RECEIVED':'DRAWING YOUR REWARD',800,665,16,'#fff0c9','850','center');
+ const progress=Math.min(1,elapsed/duration);rect(590,681,420,5,'rgba(150,178,209,.25)');rect(590,681,420*progress,5,color);
 }
 function drawStore(){
- drawBackground();rect(0,0,W,H,'rgba(5,9,22,.76)');text('STORE • FEATURED LOTTERIES',800,98,40,'#ffedd1','850','center');
- text('COINS  '+storeCoins,1240,146,16,'#f4d99c','800');addButton(1320,52,170,52,'main-menu','MAIN MENU','');
+ drawBackground();rect(0,0,W,H,'rgba(5,9,22,.84)');
+ text('FEATURED SUMMONS',800,72,35,'#ffedd1','900','center');text('Two limited banners • choose one target on each',800,108,15,'#c4d6e5','550','center');
+ rect(1190,49,116,49,'rgba(25,37,58,.96)','#cfae6e',12);text('◈  '+storeCoins,1248,80,17,'#f4d99c','850','center');addButton(1320,48,170,52,'main-menu','BACK','');
  const rotation=getStoreRotation(),state=FeaturedLottery.getState();
  drawStoreLotteryCard('character',100,rotation,state);drawStoreLotteryCard('weapon',810,rotation,state);
- text('Rotation changes weekly at 12:00 AM Eastern. Targets must be selected again after each rotation.',800,805,15,'#c4d6e5','550','center');
- if(lastStoreNotice){rect(390,115,820,52,'rgba(12,19,34,.94)','#687c93',10);text(lastStoreNotice,800,147,15,'#fff4e8','650','center')}
+ text('Banners rotate weekly at 12:00 AM Eastern. Select a new target after each rotation.',800,824,14,'#c4d6e5','550','center');
+ if(storeReveal)drawStoreReveal(performance.now());
+ else if(lastStoreNotice){rect(390,123,820,40,'rgba(12,19,34,.94)','#687c93',10);text(lastStoreNotice,800,149,14,'#fff4e8','650','center')}
 }
 function drawItemInventory(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.74)');rect(105,55,1390,790,'rgba(13,20,39,.98)','#ccb88e',20);
