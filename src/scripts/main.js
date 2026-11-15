@@ -147,7 +147,7 @@ const DEV_MODE=new URLSearchParams(location.search).get('dev')==='1';
 function toggleGameMode(){const url=new URL(location.href);if(DEV_MODE)url.searchParams.delete('dev');else url.searchParams.set('dev','1');location.assign(url.toString())}
 const W=1600,H=900;
 const TEAM_KEY=DEV_MODE?'two-tone-dev-team-fundamental-1-v1':'two-tone-demo-team-fundamental-1-v1';
-const PROGRESSION_KEY=DEV_MODE?'two-tone-dev-character-progress-v1':'two-tone-character-progress-v1',VITALS_KEY=DEV_MODE?'two-tone-dev-character-vitals-v1':'two-tone-character-vitals-v1',LOADOUT_KEY=DEV_MODE?'two-tone-dev-character-loadouts-v1':'two-tone-character-loadouts-v1',ITEM_INVENTORY_KEY=DEV_MODE?'two-tone-dev-item-inventory-v1':'two-tone-item-inventory-v1',STORE_COINS_KEY=DEV_MODE?'two-tone-dev-store-coins-v1':'two-tone-store-coins-v1',PLAYER_RANK_KEY=DEV_MODE?'two-tone-dev-player-rank-v1':'two-tone-player-rank-v1',CHARACTER_ID_SCHEMA_KEY=DEV_MODE?'two-tone-dev-character-id-schema-v2':'two-tone-character-id-schema-v2';
+const PROGRESSION_KEY=DEV_MODE?'two-tone-dev-character-progress-v1':'two-tone-character-progress-v1',VITALS_KEY=DEV_MODE?'two-tone-dev-character-vitals-v1':'two-tone-character-vitals-v1',LOADOUT_KEY=DEV_MODE?'two-tone-dev-character-loadouts-v1':'two-tone-character-loadouts-v1',ITEM_INVENTORY_KEY=DEV_MODE?'two-tone-dev-item-inventory-v1':'two-tone-item-inventory-v1',STORE_COINS_KEY=DEV_MODE?'two-tone-dev-store-coins-v1':'two-tone-store-coins-v1',DAILY_REWARD_KEY=DEV_MODE?'two-tone-dev-daily-reward-period-v1':'two-tone-daily-reward-period-v1',PLAYER_RANK_KEY=DEV_MODE?'two-tone-dev-player-rank-v1':'two-tone-player-rank-v1',CHARACTER_ID_SCHEMA_KEY=DEV_MODE?'two-tone-dev-character-id-schema-v2':'two-tone-character-id-schema-v2';
 const STARTING_STATE_MIGRATION_KEY='two-tone-regular-starting-state-v1';
 function moveLegacyCharacterRecord(value){
  if(!value||typeof value!=='object'||Array.isArray(value))return value;
@@ -1245,6 +1245,22 @@ function loadStoreCoins(){try{const raw=localStorage.getItem(STORE_COINS_KEY);if
 let storeCoins=loadStoreCoins();
 function saveStoreCoins(){try{localStorage.setItem(STORE_COINS_KEY,String(storeCoins));return true}catch(e){return false}}
 function grantStoreCoins(amount){if(!Number.isSafeInteger(amount)||amount<=0||!Number.isSafeInteger(storeCoins+amount))return false;storeCoins+=amount;saveStoreCoins();return true}
+function dailyRewardPeriodKey(now=new Date()){
+ const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now),part=key=>parts.find(value=>value.type===key)?.value;
+ return `${part('year')}-${part('month')}-${part('day')}`
+}
+function validDailyRewardPeriod(value){return typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)}
+function loadDailyRewardPeriod(){try{const value=localStorage.getItem(DAILY_REWARD_KEY);return validDailyRewardPeriod(value)?value:null}catch(e){return null}}
+let dailyRewardClaimedPeriod=loadDailyRewardPeriod();
+function saveDailyRewardPeriod(){try{if(dailyRewardClaimedPeriod)localStorage.setItem(DAILY_REWARD_KEY,dailyRewardClaimedPeriod);else localStorage.removeItem(DAILY_REWARD_KEY);return true}catch(e){return false}}
+function canClaimDailyReward(now=new Date()){return dailyRewardClaimedPeriod!==dailyRewardPeriodKey(now)}
+function claimDailyReward(){
+ const period=dailyRewardPeriodKey();if(period===dailyRewardClaimedPeriod){say('Daily coins are already claimed. The next claim is at 12 AM Eastern.');return false}
+ const oldCoins=storeCoins,oldPeriod=dailyRewardClaimedPeriod;if(!Number.isSafeInteger(oldCoins+100)){say('The daily reward could not be claimed.');return false}
+ storeCoins=oldCoins+100;if(!saveStoreCoins()){storeCoins=oldCoins;say('The daily reward could not be saved.');return false}
+ dailyRewardClaimedPeriod=period;if(!saveDailyRewardPeriod()){dailyRewardClaimedPeriod=oldPeriod;storeCoins=oldCoins;saveStoreCoins();say('The daily reward could not be saved.');return false}
+ say('Daily reward claimed: 100 coins.');return true
+}
 function grantItem(itemId,amount=1){
  if(!Number.isSafeInteger(amount)||amount<1)return false;
  const match=/^(bottle|book):(small|medium|large)$/.exec(itemId||'');
@@ -1267,18 +1283,19 @@ function takeRuneFromInventory(setId){const runes=itemInventory.runes[setId];if(
 function returnRuneToInventory(rune){if(!rune||!Object.hasOwn(RUNE_SET_DEFINITIONS,rune.setId)||!Array.isArray(itemInventory.runes[rune.setId]))return false;itemInventory.runes[rune.setId].push(normalizeRune(rune));saveItemInventory();return true}
 if(DEV_MODE)globalThis.TwoToneItems=Object.freeze({grant:grantItem,getInventory:()=>JSON.parse(JSON.stringify(itemInventory)),grantCoins:grantStoreCoins,getCoins:()=>storeCoins});
 FeaturedLottery.setRewardGrant(grantItem);
-const SAVE_FILE_FORMAT='two-tone-save',SAVE_FILE_VERSION=4;
+const SAVE_FILE_FORMAT='two-tone-save',SAVE_FILE_VERSION=5;
 function saveProgressFile(){
  try{
   saveProgress();saveVitals();saveLoadouts();saveItemInventory();saveStoreCoins();savePlayerRank();if(validTeam(draft))saveTeam();
-  const documentData={format:SAVE_FILE_FORMAT,version:SAVE_FILE_VERSION,savedAt:new Date().toISOString(),data:{playerRank,team:validTeam(draft)?[...draft]:loadTeam(),characterProgress,vitals:savedVitals,loadouts:characterLoadouts,itemInventory,storeCoins}};
+  saveDailyRewardPeriod();
+  const documentData={format:SAVE_FILE_FORMAT,version:SAVE_FILE_VERSION,savedAt:new Date().toISOString(),data:{playerRank,team:validTeam(draft)?[...draft]:loadTeam(),characterProgress,vitals:savedVitals,loadouts:characterLoadouts,itemInventory,storeCoins,dailyRewardClaimedPeriod}};
   const blob=new Blob([JSON.stringify(documentData,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');
   link.href=url;link.download=`two-tone-save-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   say('Save file downloaded. Keep it in Files to load on this or another device.');return true;
  }catch(error){say('The save file could not be created. Check available storage and try again.');return false}
 }
 function normalizeSaveFile(value){
- if(!value||typeof value!=='object'||value.format!==SAVE_FILE_FORMAT||![1,2,3,SAVE_FILE_VERSION].includes(value.version)||!value.data||typeof value.data!=='object')return null;
+ if(!value||typeof value!=='object'||value.format!==SAVE_FILE_FORMAT||![1,2,3,4,SAVE_FILE_VERSION].includes(value.version)||!value.data||typeof value.data!=='object')return null;
  const data={...value.data};
  if(value.version===1){data.team=Array.isArray(data.team)?data.team.map(id=>id==='zero'?'soul':id):data.team;data.characterProgress=moveLegacyCharacterRecord({...data.characterProgress});data.vitals=moveLegacyCharacterRecord({...data.vitals});data.loadouts=moveLegacyCharacterRecord({...data.loadouts})}
  const rank=data.playerRank,cap=characterLevelCap(rank);
@@ -1297,16 +1314,17 @@ function normalizeSaveFile(value){
  if(data.itemInventory!==undefined&&!validItemInventory(data.itemInventory))return null;
  const coins=data.storeCoins===undefined?0:data.storeCoins;
  if(!Number.isSafeInteger(coins)||coins<0)return null;
- return {playerRank:rank,team:[...data.team],characterProgress:progress,vitals,loadouts,itemInventory:inventory,storeCoins:coins};
+ const rewardPeriod=data.dailyRewardClaimedPeriod===undefined?null:data.dailyRewardClaimedPeriod;if(rewardPeriod!==null&&!validDailyRewardPeriod(rewardPeriod))return null;
+ return {playerRank:rank,team:[...data.team],characterProgress:progress,vitals,loadouts,itemInventory:inventory,storeCoins:coins,dailyRewardClaimedPeriod:rewardPeriod};
 }
 function importSaveFile(value){
  const save=normalizeSaveFile(value);if(!save){say('This save file is invalid or from an unsupported version.');return false}
- let hasLocalProgress=false;try{hasLocalProgress=[TEAM_KEY,PROGRESSION_KEY,VITALS_KEY,LOADOUT_KEY,ITEM_INVENTORY_KEY,STORE_COINS_KEY].some(key=>localStorage.getItem(key)!==null)}catch(e){}
+ let hasLocalProgress=false;try{hasLocalProgress=[TEAM_KEY,PROGRESSION_KEY,VITALS_KEY,LOADOUT_KEY,ITEM_INVENTORY_KEY,STORE_COINS_KEY,DAILY_REWARD_KEY].some(key=>localStorage.getItem(key)!==null)}catch(e){}
  if(hasLocalProgress&&!window.confirm('Loading this file replaces the progress saved in this browser. Continue?'))return false;
- const entries=[[TEAM_KEY,JSON.stringify(save.team)],[PROGRESSION_KEY,JSON.stringify(save.characterProgress)],[VITALS_KEY,JSON.stringify(save.vitals)],[LOADOUT_KEY,JSON.stringify(save.loadouts)],[ITEM_INVENTORY_KEY,JSON.stringify(save.itemInventory)],[STORE_COINS_KEY,String(save.storeCoins)],[PLAYER_RANK_KEY,String(save.playerRank)]];
+ const entries=[[TEAM_KEY,JSON.stringify(save.team)],[PROGRESSION_KEY,JSON.stringify(save.characterProgress)],[VITALS_KEY,JSON.stringify(save.vitals)],[LOADOUT_KEY,JSON.stringify(save.loadouts)],[ITEM_INVENTORY_KEY,JSON.stringify(save.itemInventory)],[STORE_COINS_KEY,String(save.storeCoins)],[DAILY_REWARD_KEY,save.dailyRewardClaimedPeriod||''],[PLAYER_RANK_KEY,String(save.playerRank)]];
  const previous=entries.map(([key])=>{try{return localStorage.getItem(key)}catch(e){return null}});
  try{for(const [key,value] of entries)localStorage.setItem(key,value)}catch(error){entries.forEach(([key],index)=>{try{if(previous[index]===null)localStorage.removeItem(key);else localStorage.setItem(key,previous[index])}catch(e){}});say('Progress could not be restored because browser storage is unavailable.');return false}
- playerRank=save.playerRank;characterProgress=save.characterProgress;savedVitals=save.vitals;characterLoadouts=save.loadouts;itemInventory=save.itemInventory;storeCoins=save.storeCoins;draft=[...save.team];party=[];phase='menu';paused=false;activeId=null;actingEnemyId=null;fx=null;combatVisualEvents=[];enemies=[];gauges={};summons=[];ultimateQueue=[];ultimateExecuting=false;ultimateResume=null;turnTimeline.reset();battleToken++;cameraPreview=null;selectedAllyId=null;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;pendingVacancies=[];hint='';say('Progress loaded from save file.');return true;
+ playerRank=save.playerRank;characterProgress=save.characterProgress;savedVitals=save.vitals;characterLoadouts=save.loadouts;itemInventory=save.itemInventory;storeCoins=save.storeCoins;dailyRewardClaimedPeriod=save.dailyRewardClaimedPeriod;draft=[...save.team];party=[];phase='menu';paused=false;activeId=null;actingEnemyId=null;fx=null;combatVisualEvents=[];enemies=[];gauges={};summons=[];ultimateQueue=[];ultimateExecuting=false;ultimateResume=null;turnTimeline.reset();battleToken++;cameraPreview=null;selectedAllyId=null;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;pendingVacancies=[];hint='';say('Progress loaded from save file.');return true;
 }
 function requestSaveFileLoad(){const input=document.getElementById('save-file-picker');input.value='';input.click()}
 function weaponLevelCap(rank=playerRank){return characterLevelCap(rank)}
@@ -1741,6 +1759,8 @@ function drawMainMenuIcon(kind,cx,cy,color){
   ctx.beginPath();ctx.moveTo(-18,-25);ctx.lineTo(10,-25);ctx.lineTo(20,-15);ctx.lineTo(20,23);ctx.lineTo(-18,23);ctx.closePath();ctx.stroke();line(10,-24,10,-14);line(-8,-12,9,-12);line(-8,-4,9,-4);line(0,2,0,16);line(-7,10,0,17);line(7,10,0,17);
  }else if(kind==='settings'){
   ctx.beginPath();for(let i=0;i<16;i++){const a=i*Math.PI/8,r=i%2?18:25,x=Math.cos(a)*r,y=Math.sin(a)*r;i?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath();ctx.stroke();ctx.beginPath();ctx.arc(0,0,8,0,Math.PI*2);ctx.stroke();
+ }else if(kind==='daily'){
+  ctx.beginPath();ctx.arc(0,0,23,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(0,0,17,0,Math.PI*2);ctx.stroke();text('¢',0,1,25,color.white,'800','center');
  }
  ctx.restore();
 }
@@ -1767,10 +1787,11 @@ function drawMainMenu(){
   {label:'PARTY',icon:'party',action:'open-party'},
   {label:'INVENTORY',icon:'items',action:'open-inventory'},
   {label:'CHALLENGES',icon:'challenges',action:'open-challenges'},
+  {label:'DAILY REWARD',icon:'daily',action:'claim-daily-reward',detail:canClaimDailyReward()?'CLAIM 100 COINS':'CLAIMED • RESET AT 12 AM ET'},
   {label:'SAVE',icon:'save',action:'save-progress'},
   {label:'SETTINGS',icon:'settings',action:'open-settings'}
  ];
- const x0=124,y0=91,cardW=318,cardH=226,gapX=20,gapY=16,positions=[[0,0],[1,0],[2,0],[3,0],[0,1],[1,1],[2,1],[3,1],[1,2],[2,2]];
+ const x0=124,y0=91,cardW=318,cardH=226,gapX=20,gapY=16,positions=[[0,0],[1,0],[2,0],[3,0],[0,1],[1,1],[2,1],[3,1],[.5,2],[1.5,2],[2.5,2]];
  items.forEach((item,index)=>{const [column,row]=positions[index];drawMainMenuTile(item,x0+column*(cardW+gapX),y0+row*(cardH+gapY),cardW,cardH)});
 }
 function drawSettings(){
@@ -2773,7 +2794,7 @@ function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='startup'){dra
   drawCameraStage(t);drawFx(t);drawHud(t)
  }else{drawCameraStage(t);drawSetup()}drawHint(t);requestAnimationFrame(loop)}
 function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('roster-')){if(DEV_MODE)setEnemyRoster(cmd.slice(7));return}if(cmd.startsWith('loadout:')){handleLoadoutAction(cmd.slice(8));return}if(cmd.startsWith('store:')){handleStoreAction(cmd);return}if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'&&DEV_MODE){devPanelOpen=!devPanelOpen;return}if(cmd==='cancel-target'){cancelTargetSelection();return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(cameraPreview==='party'&&(phase==='player'||pendingTargetAction?.targetSide==='ally')){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(pendingTargetAction?.targetSide==='ally'&&pendingTargetAction.targetScope==='all'){if(!p||p.hp<=0){say('Choose a living party member to confirm the team skill.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;return executeCombatAction(actor,pending.action)}if(pendingTargetAction?.targetSide==='ally'){if(!p||p.hp<=0){say('Tune and Dawn’s Ultimate need a living ally.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;if(pending.action==='ultimate')return queueUltimate(pending.actorId,id);return executeCombatAction(actor,pending.action,null,id)}if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){if(DEV_MODE)setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){beginTargetSelection('ultimate',cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){if(DEV_MODE)chargeUltimateForTest(cmd.slice(11));return}
- switch(cmd){case 'startup-start':phase='menu';hint='';break;case 'startup-load':requestSaveFileLoad();break;case 'toggle-game-mode':toggleGameMode();break;case 'open-inventory':phase='inventory';hint='';break;case 'open-challenges':phase='challenges';hint='';break;case 'open-settings':phase='settings';hint='';break;case 'open-store':phase='store';lastStoreNotice='';break;case 'save-progress':saveProgressFile();break;case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'toggle-fullscreen':toggleFullscreen();break;case 'support-heal':if(DEV_MODE)startSupportDemo('heal');break;case 'support-revive':if(DEV_MODE)startSupportDemo('revive');break;case 'confirm-support':if(DEV_MODE)confirmSupportDemo();break;case 'cancel-support':if(DEV_MODE)cancelSupportDemo();break;case 'camera-party':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':if(DEV_MODE)toggleWavePreset();break;case 'toggle-recovery':if(DEV_MODE)setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':if(DEV_MODE)testKO();break;case 'test-revive':if(DEV_MODE)testRevive();break;case 'skill':play('skill');break;case 'cap-test':if(DEV_MODE)cycleSpCapTest();break;case 'hud-status-test':if(DEV_MODE)toggleHudStatusDemo();break;case 'f05-advance':if(DEV_MODE)addActionAdvance(activeId,25);break;case 'f05-delay':if(DEV_MODE)addActionDelay(activeId,25);break;case 'f05-speed':if(DEV_MODE)setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':if(DEV_MODE)queueSummonForTest('independent');break;case 'f05-summon-controlled':if(DEV_MODE)queueSummonForTest('controlled');break;
+ switch(cmd){case 'startup-start':phase='menu';hint='';break;case 'startup-load':requestSaveFileLoad();break;case 'toggle-game-mode':toggleGameMode();break;case 'claim-daily-reward':claimDailyReward();break;case 'open-inventory':phase='inventory';hint='';break;case 'open-challenges':phase='challenges';hint='';break;case 'open-settings':phase='settings';hint='';break;case 'open-store':phase='store';lastStoreNotice='';break;case 'save-progress':saveProgressFile();break;case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'toggle-fullscreen':toggleFullscreen();break;case 'support-heal':if(DEV_MODE)startSupportDemo('heal');break;case 'support-revive':if(DEV_MODE)startSupportDemo('revive');break;case 'confirm-support':if(DEV_MODE)confirmSupportDemo();break;case 'cancel-support':if(DEV_MODE)cancelSupportDemo();break;case 'camera-party':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':if(DEV_MODE)toggleWavePreset();break;case 'toggle-recovery':if(DEV_MODE)setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':if(DEV_MODE)testKO();break;case 'test-revive':if(DEV_MODE)testRevive();break;case 'skill':play('skill');break;case 'cap-test':if(DEV_MODE)cycleSpCapTest();break;case 'hud-status-test':if(DEV_MODE)toggleHudStatusDemo();break;case 'f05-advance':if(DEV_MODE)addActionAdvance(activeId,25);break;case 'f05-delay':if(DEV_MODE)addActionDelay(activeId,25);break;case 'f05-speed':if(DEV_MODE)setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':if(DEV_MODE)queueSummonForTest('independent');break;case 'f05-summon-controlled':if(DEV_MODE)queueSummonForTest('controlled');break;
  case 'progress-test-level':{if(DEV_MODE){const a=active(),p=a&&progressFor(a.id);if(a&&p){const cost=Math.max(1,requiredExp(a.level)-p.exp),result=testGrantExp(a.id,cost);say(result?`TEST ONLY: level ${result.level}, ${cost} EXP injected.`:'Ascension required or level cap reached.');}}break}
  case 'progress-test-ascend':{if(DEV_MODE){const a=active();if(a)say(testAscend(a.id)?`TEST ONLY: level ${a.level} ascension unlocked (no materials).`:'Not at a locked ascension gate.');}break}
  case 'hp-test-flat':{if(DEV_MODE){const a=active();if(a)setHpBonusForTest(a.id,'debug-flat','flat',(a.hpFlatModifiers['debug-flat']||0)+20);}break}

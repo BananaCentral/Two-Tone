@@ -17,6 +17,7 @@ Show these sections in this order:
 4. Store
 5. Loadout
 6. Party
+7. Daily Reward
 
 The Game Mode section switches between Regular and Dev Mode. Regular is the default and starts new players with Soul and 0 coins. Dev Mode exposes development tools and uses a separate saved profile. See the [Game Mode Standard](../game-mode-standard.md).
 
@@ -24,8 +25,9 @@ The Game Mode section switches between Regular and Dev Mode. Regular is the defa
 
 - Use a dark, translucent phone-menu panel over the game background, with a grid of icon tiles.
 - Start the grid near the top of the panel. Do not place a title, profile card, Rank, UID, status bar, or other header content above it.
-- On the 1600×900 canvas, use four columns and three rows. Order the first row as Story, Events, Game Mode, Store; the second as Loadout, Party, Items, Challenges; center Save and Settings in the final row.
+- On the 1600×900 canvas, use four columns and three rows. Order the first row as Story, Events, Game Mode, Store; the second as Loadout, Party, Inventory, Challenges; center Daily Reward, Save, and Settings in the final row.
 - Give each tile one large, simple line icon, a clear section name, and at most one short supporting line. Keep tiles large enough for touch input.
+- The Daily Reward tile shows **Claim 100 Coins** while available and a concise claimed/reset state after claiming. It remains on the main menu.
 - Events remains a visibly inactive placeholder until implemented. Other tiles open their corresponding game sections directly.
 
 ## Startup Menu
@@ -38,7 +40,7 @@ The Game Mode section switches between Regular and Dev Mode. Regular is the defa
 ## Save Files
 
 - The main menu has a **Save** option that downloads a portable JSON save file.
-- Save files include the party, account Rank, character levels and EXP, ascensions, saved HP, and character loadouts.
+- Save files include the party, account Rank, character levels and EXP, ascensions, saved HP, character loadouts, coins, and Daily Reward claim state.
 - Save files have an explicit format name and version. Loading must validate the entire file before replacing local progress.
 - Local browser storage remains the active device's automatic save; file export lets the player carry or back up progress.
 

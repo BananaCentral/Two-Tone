@@ -4,7 +4,7 @@
 
 The Store offers featured character and premium weapon lotteries. Each lottery draw costs 100 coins and is purchased from the merchant. A draw delivers its reward immediately.
 
-New Regular and Dev Mode wallets start with 0 coins. Coin balance is saved in the active mode's profile.
+New Regular and Dev Mode wallets start with 0 coins. Coin balance is saved in the active mode's profile. Players can claim 100 free coins once per day from the main menu; see the [Daily Coin Reward Standard](../daily-reward-standard.md).
 
 For manual testing, switch to Dev Mode from the main menu or append `?dev=1` to the site URL. Dev Mode shows Store controls that grant 100, 500, 1,000, or 5,000 coins. These controls are hidden in Regular mode.
 
