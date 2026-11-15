@@ -1623,26 +1623,74 @@ function handleStoreAction(action){
   FeaturedLottery.setTarget(type,value,ids);lastStoreNotice='Target selected. Draws cost 100 coins.';
  }else if(kind==='draw')drawStoreLottery(type,Number(value)||1);
 }
+const STORE_BANNER_PORTRAITS=Object.freeze({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'});
+function storeBannerImage(type,model){
+ if(type==='weapon'&&model?.id==='soul')return images.soulWeaponPremium;
+ return images[STORE_BANNER_PORTRAITS[model?.id]];
+}
+function drawStoreBannerImage(img,x,y,w,h){
+ if(!img?.complete||!img.naturalWidth)return;
+ const scale=Math.min(w/img.naturalWidth,h/img.naturalHeight),dw=img.naturalWidth*scale,dh=img.naturalHeight*scale;
+ ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(img,x+(w-dw)/2,y+h-dh,dw,dh);ctx.restore();
+}
+function storeBannerButton(x,y,w,h,action,label,sub,enabled,primary=false){
+ choiceRects.push({x,y,w,h,action,enabled});
+ const gradient=ctx.createLinearGradient(x,y,x,y+h);
+ if(!enabled){gradient.addColorStop(0,'#303849');gradient.addColorStop(1,'#202a3a')}
+ else if(primary){gradient.addColorStop(0,'#f3dfb2');gradient.addColorStop(1,'#bc8f50')}
+ else{gradient.addColorStop(0,'#354a64');gradient.addColorStop(1,'#22334a')}
+ rect(x,y,w,h,gradient,enabled?(primary?'#ffe5ad':'#b8c6d5'):'#556174',12);
+ text(label,x+w/2,y+25,18,enabled&&primary?'#352817':enabled?'#fff3dc':'#9ba9b9','850','center');
+ text(sub,x+w/2,y+49,12,enabled&&primary?'#5b4729':'#c3d0dc','650','center');
+}
 function drawStoreLotteryCard(type,x,rotation,state){
  const character=type==='character',ids=character?rotation.featuredCharacters:rotation.featuredWeapons,selected=state[type].target;
- const title=character?'FEATURED CHARACTER LOTTERY':'FEATURED PREMIUM WEAPON LOTTERY';
- rect(x,185,690,590,'rgba(14,23,42,.97)','#637b98',18);
- const banner=ctx.createLinearGradient(x,185,x+690,330);banner.addColorStop(0,character?'#153554':'#492345');banner.addColorStop(1,character?'#276878':'#754d34');rect(x+1,186,688,142,banner,null,17);
- text(character?'✦':'⚔',x+52,267,58,character?'#bcf6ff':'#ffe3a4','900','center');
- text(title,x+94,225,19,'#f8f4ea','850');text(character?'CHARACTER BANNER':'SIGNATURE WEAPON BANNER',x+94,257,13,'#d6e2ef','650');
- text('100 COINS / DRAW',x+94,294,15,'#f6d89b','800');
- text('FEATURED TARGETS',x+28,351,15,'#c4d6e5','750');
- for(let i=0;i<ids.length;i++){
-  const id=ids[i],model=ROSTER.find(item=>item.id===(character?id:id.replace(/^premium-/,''))),name=character?model?.name:(model?.name+' Premium Weapon'),bx=x+24+(i%3)*214,by=365;
-  addButton(bx,by,198,68,`store:target:${type}:${id}`,name||id,selected===id?'SELECTED':'CHOOSE TARGET',!storeReveal);
- }
  const pool=storeRewardPools(type,rotation),target=pool.featured.find(item=>item.id===selected),track=state[type],pity=type==='character'?(track.heightened?50:100):(track.heightened?25:50),untilMythic=Math.max(0,pity-track.sinceMythic),untilRare=Math.max(0,10-track.sinceRare);
- text('TARGET • '+(target?.name||'NONE SELECTED'),x+30,472,17,'#fff1d5','750');
- text(`Mythic ${track.heightened?'2%':'1%'} • Featured 75% / Off-feature 25%`,x+30,506,14,'#c4d6e5','550');
- text(`MYTHIC GUARANTEE  ${untilMythic} draws   •   RARE GUARANTEE  ${untilRare} draws`,x+30,536,13,'#c4d6e5','650');
- if(track.heightened)text('HEIGHTENED STATE • 2% mythic chance',x+30,564,14,'#eacb87','750');
- addButton(x+28,656,300,72,`store:draw:${type}:1`,'DRAW ×1','100 COINS',!!target&&storeCoins>=100&&!storeReveal);
- addButton(x+362,656,300,72,`store:draw:${type}:10`,'DRAW ×10','1,000 COINS • '+storeCoins.toLocaleString()+' AVAILABLE',!!target&&storeCoins>=1000&&!storeReveal);
+ const previewId=selected||ids[0],model=ROSTER.find(item=>item.id===(character?previewId:previewId?.replace(/^premium-/,''))),hero=storeBannerImage(type,model);
+ const targetName=character?model?.name:(model?.id==='soul'?'Soulbound':model?.name+' Premium Weapon');
+ rect(x,185,690,590,'rgba(12,20,36,.98)','#7588a0',18);
+ const colors=character?['#133a5b','#28768a','#b98d70']:['#352647','#654267','#bd8d55'];
+ const banner=ctx.createLinearGradient(x+20,195,x+670,466);banner.addColorStop(0,colors[0]);banner.addColorStop(.56,colors[1]);banner.addColorStop(1,colors[2]);
+ ctx.save();ctx.beginPath();ctx.roundRect(x+8,193,674,278,14);ctx.clip();rect(x+8,193,674,278,banner);
+ const halo=ctx.createRadialGradient(x+500,330,4,x+500,330,250);halo.addColorStop(0,character?'rgba(164,237,255,.34)':'rgba(255,224,160,.34)');halo.addColorStop(1,'rgba(255,255,255,0)');rect(x+270,193,412,278,halo);
+ ctx.strokeStyle=character?'rgba(210,245,255,.15)':'rgba(255,232,190,.15)';ctx.lineWidth=1;
+ for(let i=0;i<8;i++){ctx.beginPath();ctx.arc(x+500,330,52+i*29,0,Math.PI*2);ctx.stroke()}
+ for(let i=0;i<26;i++){const sx=x+25+(i*97%640),sy=202+(i*61%250),size=i%5===0?2.5:1.25;ctx.fillStyle=`rgba(255,255,255,${i%4===0?.65:.32})`;ctx.beginPath();ctx.arc(sx,sy,size,0,Math.PI*2);ctx.fill()}
+ if(hero)drawStoreBannerImage(hero,x+335,198,340,270);
+ ctx.restore();
+ rect(x+23,211,196,28,character?'rgba(7,32,53,.66)':'rgba(34,22,42,.66)',character?'rgba(192,239,255,.35)':'rgba(255,231,188,.35)',14);
+ text(character?'CHARACTER EVENT':'WEAPON EVENT',x+121,225,12,'#fff1d8','850','center');
+ text(character?'FEATURED CHARACTER':'FEATURED SIGNATURE',x+27,273,14,'#d9edf5','750');
+ text(targetName||'SELECT A TARGET',x+27,316,model?.name?.length>10?26:31,'#fff4de','900');
+ text(character?'LIMITED-TIME MYTHIC CHARACTER':'PREMIUM SIGNATURE WEAPON',x+28,348,12,character?'#c2f3ff':'#ffe4b2','800');
+ rect(x+26,380,184,34,'rgba(5,15,28,.48)',character?'rgba(171,228,244,.4)':'rgba(248,216,160,.42)',17);
+ text('✦  UP-RATE FEATURED',x+118,397,12,'#fff0cf','850','center');
+ text(character?'Choose one featured character':'Choose the matching signature weapon',x+28,439,12,'rgba(255,255,255,.8)','550');
+ // Compact in-banner selectors replace the row of large generic buttons.
+ const chipY=482,gap=8,chipW=(642-gap*Math.max(0,ids.length-1))/Math.max(1,ids.length);
+ for(let i=0;i<ids.length;i++){
+  const id=ids[i],featuredModel=ROSTER.find(item=>item.id===(character?id:id.replace(/^premium-/,''))),name=character?featuredModel?.name:(featuredModel?.id==='soul'?'Soulbound':featuredModel?.name+' Premium'),bx=x+24+i*(chipW+gap),by=chipY,isSelected=selected===id;
+  const chipFill=ctx.createLinearGradient(bx,by,bx,by+50);chipFill.addColorStop(0,isSelected?'rgba(225,193,128,.36)':'rgba(28,42,61,.9)');chipFill.addColorStop(1,isSelected?'rgba(148,111,62,.28)':'rgba(16,27,44,.94)');
+  rect(bx,by,chipW,50,chipFill,isSelected?'#f3d18c':'rgba(164,184,205,.48)',10);
+  const icon=storeBannerImage(type,featuredModel);if(icon){ctx.save();ctx.beginPath();ctx.arc(bx+24,by+25,17,0,Math.PI*2);ctx.clip();drawStoreBannerImage(icon,bx+7,by+8,34,34);ctx.restore()}
+  text(name||id,bx+47,by+25,chipW<210?12:13,isSelected?'#fff0cf':'#d3dfeb','800');
+  if(isSelected){ctx.beginPath();ctx.arc(bx+chipW-14,by+25,4,0,Math.PI*2);ctx.fillStyle='#f4d18d';ctx.fill()}
+  choiceRects.push({x:bx,y:by,w:chipW,h:50,action:`store:target:${type}:${id}`,enabled:!storeReveal});
+ }
+ const pityY=548,pityW=313;
+ rect(x+24,pityY,pityW,60,'rgba(25,38,56,.94)','rgba(151,174,198,.45)',10);
+ text('MYTHIC GUARANTEE',x+40,pityY+19,11,'#c5d5e5','750');
+ text(`${untilMythic}`,x+292,pityY+32,24,track.heightened?'#f0d291':'#edf3fa','900','right');
+ text(`${track.heightened?'HEIGHTENED':'STANDARD'} • ${pity} DRAW PITY`,x+40,pityY+43,10,'#aebfd0','650');
+ rect(x+353,pityY,pityW,60,'rgba(25,38,56,.94)','rgba(151,174,198,.45)',10);
+ text('RARE GUARANTEE',x+369,pityY+19,11,'#c5d5e5','750');
+ text(`${untilRare}`,x+621,pityY+32,24,'#edf3fa','900','right');
+ text('10 DRAW PITY',x+369,pityY+43,10,'#aebfd0','650');
+ text(`MYTHIC ${track.heightened?'2%':'1%'}  •  RARE 10%  •  FEATURED MYTHIC 75%`,x+27,630,12,'#d4e0ed','650');
+ if(track.heightened)text('HEIGHTENED STATE • OFF-FEATURE MYTHIC RECEIVED',x+27,651,11,'#f0d291','750');
+ const canDraw=!!target&&!storeReveal;
+ storeBannerButton(x+24,681,312,68,`store:draw:${type}:1`,'DRAW ×1','100 COINS',canDraw&&storeCoins>=100,true);
+ storeBannerButton(x+354,681,312,68,`store:draw:${type}:10`,'DRAW ×10','1,000 COINS',canDraw&&storeCoins>=1000,false);
 }
 function drawStoreReveal(now){
  if(!storeReveal)return;
