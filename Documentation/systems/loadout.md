@@ -13,6 +13,8 @@ The Loadout uses one character-details view with a persistent four-part frame:
 
 Character level, combat stats, Enchanted Bottles, and character Ascension are grouped under **Details**. Weapon level, Potential, Enchanted Books, weapon Ascension, and equip state are grouped under **Weapons**. Rune slots and Core upgrades are grouped under **Runes**. Celestial upgrades are grouped under **Celestials**. Character selection and tab navigation remain available while using each panel. Dev-only preview controls remain hidden in Regular Mode.
 
+On the Weapons panel, **Upgrade** opens Enchanted Book choices while the weapon can gain Levels. At an uncompleted Ascension gate, that same control becomes **Ascend** and consumes one Gem. At the current level cap it is disabled. **Switch** equips the other signature weapon when the Premium weapon is owned. Premium Potential increases when a duplicate Premium weapon is awarded by the lottery.
+
 ## Signature weapons
 
 Each character has exactly two character-bound signature weapon options. Each option has its own weapon Level and XP progression. Weapon Level caps follow the character level caps defined by player Rank and use the Character XP curve.

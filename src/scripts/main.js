@@ -1174,7 +1174,7 @@ function normalizeLoadout(value,cap=characterLevelCap()){
  return base
 }
 function loadCharacterLoadouts(){let stored={};try{stored=JSON.parse(localStorage.getItem(LOADOUT_KEY)||'{}')||{}}catch(e){}return Object.fromEntries(ROSTER.map(model=>[model.id,normalizeLoadout(stored[model.id])]))}
-let characterLoadouts=loadCharacterLoadouts(),loadoutCharacterId='soul',selectedLoadoutRune=0,loadoutPage='characters',runeStatPicker=null;
+let characterLoadouts=loadCharacterLoadouts(),loadoutCharacterId='soul',selectedLoadoutRune=0,loadoutPage='characters',runeStatPicker=null,loadoutUpgradePicker=null;
 function loadoutFor(id=loadoutCharacterId){return characterLoadouts[id]||(characterLoadouts[id]=defaultLoadout())}
 function saveLoadouts(){try{localStorage.setItem(LOADOUT_KEY,JSON.stringify(characterLoadouts))}catch(e){}}
 function defaultItemInventory(){return {bottles:{small:0,medium:0,large:0},books:{small:0,medium:0,large:0},cores:0,gems:0}}
@@ -1346,12 +1346,19 @@ function loadoutStats(id){
  'Physical Attack':calculatePhysicalAttack(unit),'Magical Attack':calculateMagicalAttack(unit),
  'Physical Defense':calculatePhysicalDefense(unit),'Magical Defense':calculateMagicalDefense(unit),Speed:calculateSpeed(unit)}
 }
-function enterLoadout(){loadoutCharacterId='soul';selectedLoadoutRune=0;loadoutPage='details';runeStatPicker=null;phase='loadout';hint=''}
+function enterLoadout(){loadoutCharacterId='soul';selectedLoadoutRune=0;loadoutPage='details';runeStatPicker=null;loadoutUpgradePicker=null;phase='loadout';hint=''}
 function handleLoadoutAction(action){
  const [kind,arg]=action.split(':'),record=loadoutFor(),weapon=record.weapon,rune=record.runes[selectedLoadoutRune];
- if(kind==='back'){if(runeStatPicker){runeStatPicker=null;return}phase='menu';return}
- if(kind==='character'){if(ROSTER_IDS.has(arg)&&!roster(arg)?.test)loadoutCharacterId=arg;return}
- if(kind==='page'){if(['details','weapons','runes','celestials'].includes(arg))loadoutPage=arg;return}
+ if(kind==='back'){if(runeStatPicker){runeStatPicker=null;return}if(loadoutUpgradePicker){loadoutUpgradePicker=null;return}phase='menu';return}
+ if(kind==='character'){if(ROSTER_IDS.has(arg)&&!roster(arg)?.test){loadoutCharacterId=arg;loadoutUpgradePicker=null}return}
+ if(kind==='page'){if(['details','weapons','runes','celestials'].includes(arg)){loadoutPage=arg;loadoutUpgradePicker=null}return}
+ if(kind==='upgrade'&&arg==='weapon'){
+  const type=weapon.selected,level=weapon[type+'Level'],gate=ASCENSION_GATES.includes(level)&&!weapon[type+'Ascended'].includes(level);
+  if(gate){say(ascendWeaponWithGem(loadoutCharacterId,type)?'Weapon Ascension completed. One Gem was consumed.':'One Gem is required to Ascend this weapon.');loadoutUpgradePicker=null}
+  else if(level<weaponLevelCap())loadoutUpgradePicker=loadoutUpgradePicker==='weapon'?null:'weapon';
+  return;
+ }
+ if(kind==='weapon-switch'){if(weapon.premiumOwned){weapon.selected=weapon.selected==='premium'?'standard':'premium';saveLoadouts()}return}
  if(kind==='character-duplicate'&&DEV_MODE)record.characterDuplicates=Math.max(0,Math.min(4,record.characterDuplicates+Number(arg)));
  else if(kind==='weapon-standard')weapon.selected='standard';
  else if(kind==='weapon-premium'){if(weapon.premiumOwned)weapon.selected='premium'}
@@ -1373,7 +1380,7 @@ function handleLoadoutAction(action){
  }
  else if(kind==='celestial'){const [key,delta]=arg.split(',');if(Number(delta)===1){const level=upgradeCelestialWithCore(loadoutCharacterId,key);say(level?`${key} Celestial upgraded to Level ${level}.`:'A Core is required and the Celestial must be below Level 10.')}}
  else if(kind==='bottle'){const result=useCharacterBottle(loadoutCharacterId,arg);say(result?`${arg} Enchanted Bottle used. ${result.levelsGained?`Character reached Level ${result.level}.`:`${result.exp} XP remains toward the next level.`}`:'Bottle unavailable or character is at their level cap.')}
- else if(kind==='book'){const [type,size]=arg.split(',');const result=useWeaponBook(loadoutCharacterId,type,size);say(result?`${size[0].toUpperCase()+size.slice(1)} Enchanted Book used. ${result.levelsGained?`Weapon reached Level ${result.level}.`:`${result.exp} XP is stored at this level.`}`:'Book unavailable, weapon locked, or weapon is at its level cap.')}
+ else if(kind==='book'){const [type,size]=arg.split(',');const result=useWeaponBook(loadoutCharacterId,type,size);say(result?`${size[0].toUpperCase()+size.slice(1)} Enchanted Book used. ${result.levelsGained?`Weapon reached Level ${result.level}.`:`${result.exp} XP is stored at this level.`}`:'Book unavailable, weapon locked, or weapon is at its level cap.');if(result)loadoutUpgradePicker=null}
  else if(kind==='ascend-character'){say(ascendCharacterWithGem(loadoutCharacterId)?'Ascension completed. One Gem was consumed.':'One Gem is required at a valid Ascension gate.')}
  else if(kind==='ascend-weapon'){say(ascendWeaponWithGem(loadoutCharacterId,arg)?'Weapon Ascension completed. One Gem was consumed.':'One Gem is required at a valid weapon Ascension gate.')}
  saveLoadouts()
@@ -1593,13 +1600,18 @@ function drawLoadoutWeaponsPanel(model,record){
  const weaponArt=model.id==='soul'?images[type==='premium'?'soulWeaponPremium':'soulWeaponStandard']:null;if(weaponArt?.complete&&weaponArt.naturalWidth)drawStoreBannerImage(weaponArt,1214,272,230,186);
  text(owned?'+'+bonus.toFixed(2).replace(/0+$/,'').replace(/\.$/,'')+'% ALL STATS':'PREMIUM WEAPON NOT OWNED',1312,476,16,owned?'#f4d99c':'#aebed0','800','center');
  text('POTENTIAL '+potential+' / 5     •     LEVEL '+level+' / '+cap,1090,514,14,'#e1e8f0','750');
- text(level>=cap?'WEAPON LEVEL CAP REACHED':gate?'ASCENSION REQUIRED':'XP  '+exp+' / '+needed,1090,539,13,'#b9c8d7','600');
+ text(gate?'ASCENSION REQUIRED':level>=cap?'WEAPON LEVEL CAP REACHED':'XP  '+exp+' / '+needed,1090,539,13,'#b9c8d7','600');
  line(1090,551,445,exp/Math.max(1,needed),'#d9b96e','rgba(218,228,240,.18)',7);
  if(DEV_MODE&&owned){addButton(1090,571,56,38,'loadout:potential:'+type+',-1','−','',potential>1);addButton(1154,571,56,38,'loadout:potential:'+type+',1','+','',potential<5)}
- if(gate&&owned)addButton(1222,571,313,38,'loadout:ascend-weapon:'+type,'ASCEND • 1 GEM','GEMS ×'+itemInventory.gems,itemInventory.gems>0,13);
- addButton(1090,624,445,43,type==='standard'?'loadout:weapon-standard':'loadout:weapon-premium',owned?(type==='standard'?'EQUIPPED • STANDARD':'EQUIPPED • PREMIUM'):'PREMIUM • STORE LOCKED','Character-bound signature weapon',owned,13);
+ const upgradeLabel=gate?'ASCEND':level>=cap?'MAX LEVEL':'UPGRADE',upgradeSub=gate?'GEM ×'+itemInventory.gems:level>=cap?'Level cap reached':type==='premium'?'Level up • Duplicates raise Potential':'Level up with Enchanted Books';
+ addButton(1090,624,214,50,'loadout:upgrade:weapon',upgradeLabel,upgradeSub,owned&&(gate?itemInventory.gems>0:level<cap),14);
+ addButton(1320,624,214,50,'loadout:weapon-switch','SWITCH',w.premiumOwned?'Switch to '+(type==='standard'?'SOULBOUND':'ASHBLADE'):'Premium weapon is locked',w.premiumOwned,14);
  text('ENCHANTED BOOKS  •  S '+itemInventory.books.small+'   M '+itemInventory.books.medium+'   L '+itemInventory.books.large,1090,698,12,'#d9c797','750');
- for(let i=0;i<3;i++){const size=['small','medium','large'][i],label=['SMALL','MEDIUM','LARGE'][i],xp=['10 XP','100 XP','1,000 XP'][i];addButton(1090+i*150,711,139,56,'loadout:book:'+type+','+size,label+' BOOK',xp+' • ×'+itemInventory.books[size],owned&&itemInventory.books[size]>0&&level<cap,11)}
+ if(loadoutUpgradePicker==='weapon'){
+  for(let i=0;i<3;i++){const size=['small','medium','large'][i],label=['SMALL','MEDIUM','LARGE'][i],xp=['10 XP','100 XP','1,000 XP'][i];addButton(1090+i*150,711,139,56,'loadout:book:'+type+','+size,label+' BOOK',xp+' • ×'+itemInventory.books[size],owned&&itemInventory.books[size]>0&&level<cap,11)}
+  if(DEV_MODE&&owned){text('POTENTIAL '+potential+' / 5',1090,782,12,'#d9c797','750');addButton(1280,758,92,42,'loadout:potential:'+type+',-1','−','',potential>1);addButton(1384,758,92,42,'loadout:potential:'+type+',1','+','',potential<5)}
+  else text('Duplicate Premium weapon pulls increase Premium Potential.',1090,779,12,'#b9c8d7','550');
+ }else text(type==='premium'?'Upgrade levels here; duplicate Premium weapon pulls increase Potential.':'Select UPGRADE to level this weapon with Enchanted Books.',1090,754,12,'#b9c8d7','550');
  text(type==='premium'&&model.id==='soul'?'Restores 1 Skill Point after every 3 Enhance points.':'Weapon effect applies while this weapon is equipped.',1090,801,12,'#aebed0','550');
 }
 function drawLoadoutRunesPanel(record){
@@ -2680,7 +2692,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)c
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 if(DEV_MODE){
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.30',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.31',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
  characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
  unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}})),
