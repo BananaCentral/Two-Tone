@@ -2,12 +2,13 @@
 
 ## Purpose
 
-This standard defines Rune Set equipment and combat effects. Rune Sets are selected per character and provide one fixed effect to their wearer.
+This standard defines Rune Set equipment and combat effects. Rune Set effects are fixed and activate for a character only when all four equipped Runes belong to the same set.
 
 ## Set Equipment and Rune Levels
 
-- A character may equip one Rune Set at a time. Runes equipped on that character must belong to that set; effects from different sets cannot be combined on the same character.
-- Each character chooses their set independently. Different characters may equip different sets, including the same set.
+- A character has four Rune slots and may equip any owned Rune in each slot. Equipped Runes may come from different sets.
+- A set effect activates only when all four slots contain Runes from that same set. Mixed sets have no set effect; there are no partial set bonuses.
+- Each character's four slots are independent. Different characters may equip pieces from the same Rune sets.
 - A set effect applies to its wearer, except where its rule explicitly affects a target or targets.
 - Set effects keep the values listed below at every Rune level. Rune levels continue to increase the equipped Runes' main and substats as defined in the [Loadout standard](../systems/loadout.md).
 
@@ -52,8 +53,8 @@ All sprites are stored in `assets/` and registered in the application asset cata
 
 ## Implementation Status
 
-Rune Set selection is available per character in Loadout → Runes → Sets. Selecting a set replaces the character's previous set; each character stores their selection independently. The equipped set's effect is active in combat, and the selected set icon appears on its Loadout card. Set effects use fixed values at every Rune level.
+Rune equipment is available per character in Loadout → Runes. Each slot can equip a Rune from any set the player owns. Slot selection, Rune stats, and Rune levels persist independently per character. Set effects use fixed values at every Rune level.
 
-The player must equip four Rune pieces from the selected set to activate its set effect. A character cannot mix Rune Sets. Changing the selected set returns that character's equipped pieces to the Rune inventory. The four Rune stat slots remain under Loadout → Runes → Stats, where each equipped piece's stats can be customized.
+The set effect list shows the equipped count for each represented set and marks a bonus active only at four pieces. Mixed sets are allowed and grant no set effects. Selecting an occupied slot opens its main and substat controls, upgrade action, and Switch/Remove actions. Selecting an empty slot opens the owned Rune picker. Switching or removing a Rune returns it to inventory.
 
 Set cooldowns and durations are tracked per wearer for the current battle and reset when a new battle starts. Recycle and Amplify become ready again after the wearer's next two scheduled turns. United remains active through the wearer's next two scheduled turns. Runes are intended to come from Challenges; Challenge content and reward rules are not configured yet.

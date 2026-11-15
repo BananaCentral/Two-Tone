@@ -30,7 +30,7 @@ See the [Weapon Level Standard](../weapon-level-standard/weapon-level-standard.m
 
 ## Runes
 
-A character selects one Rune Set in the **Sets** view, then equips up to four owned pieces from that set in **Stats**. Four equipped pieces activate the set effect. Changing the selected set returns the character's equipped pieces to inventory. A piece must be owned to equip; each equipped piece can be leveled and its main and substats customized. Set effects are fixed at every Rune level and affect the wearer as defined in the [Rune Set Standard](../rune-standard/rune-standard.md).
+A character equips up to four owned Runes in independent slots. Slots may contain Runes from different sets; a set effect activates only when all four equipped pieces belong to that same set. Mixed sets have no set effect. Selecting an occupied slot opens its main and substat customization, level upgrade, Switch, and Remove actions. Selecting an empty slot opens the owned Rune picker. Set effects are fixed at every Rune level and affect the wearer as defined in the [Rune Set Standard](../rune-standard/rune-standard.md).
 
 Each rune has a level from 1 to 5, one main stat, and three substats. Within each rune, all four selected stats must be different. Main and substats may repeat across different runes.
 
@@ -75,4 +75,4 @@ Zero's Premium signature weapon restores 1 Skill Point when he uses his Ultimate
 
 ## Prototype boundaries
 
-The Loadout screen persists weapon Potential, Level and XP, Rune Set selection and Rune configuration, Celestial levels, and character Duplicate level locally. Potential upgrades do not charge resources because their coin costs have not been defined. Weapon XP comes from Enchanted Books. Premium weapons remain locked until Store acquisition is implemented. Rune Set combat effects and battle durations follow the [Rune Set Standard](../rune-standard/rune-standard.md). Weapon effects without character-specific definitions remain pending. Premium Potential 2–5 map to weapon Duplicates 1–4. Premium effects require an owned, equipped Premium weapon.
+The Loadout screen persists weapon Potential, Level and XP, per-slot Rune equipment and Rune configuration, Celestial levels, and character Duplicate level locally. Potential upgrades do not charge resources because their coin costs have not been defined. Weapon XP comes from Enchanted Books. Premium weapons remain locked until Store acquisition is implemented. Rune Set combat effects and battle durations follow the [Rune Set Standard](../rune-standard/rune-standard.md). Weapon effects without character-specific definitions remain pending. Premium Potential 2–5 map to weapon Duplicates 1–4. Premium effects require an owned, equipped Premium weapon.
