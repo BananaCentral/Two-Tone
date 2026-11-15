@@ -1645,33 +1645,43 @@ function drawStoreReveal(now){
   ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle=i%3===0?color:'#dff6ff';ctx.translate(x,y);ctx.rotate(a+spin);ctx.fillRect(-3,-9,6,18);ctx.restore();
  }
  rect(448,192,704,525,'rgba(12,20,38,.96)',color,22);
- text(summary?'TEN DRAW RESULTS':batch?`DRAW ${reveal.index+1} OF ${rewards.length}`:'FEATURED LOTTERY',800,238,15,'#b9cbe0','800','center');
+ text(summary?'TEN DRAW RESULTS':batch?`DRAW ${reveal.index+1} OF ${rewards.length}`:'FEATURED LOTTERY',800,summary?238:216,15,'#b9cbe0','800','center');
  if(summary){
   text(`${rewards.length} REWARDS • ${rewards.length*FeaturedLottery.RULES.ticketCost} COINS`,800,262,12,'#e6d2aa','750','center');
   rewards.forEach((item,i)=>{const col=i%2,row=Math.floor(i/2),x=468+col*334,y=278+row*76,tierColor=item.tier==='mythic'?'#ffd778':item.tier==='rare'?'#d8a4ff':'#83dcff';rect(x,y,326,66,'rgba(35,48,69,.96)',tierColor,9);text(item.tier.toUpperCase(),x+12,y+24,12,tierColor,'850');text(item.reward.name||item.reward.id,x+105,y+23,15,'#fff3de','750');text(item.result+(item.featured?' • FEATURED':''),x+105,y+45,11,'#c2d0dd','550')});
   addButton(648,668,304,38,'store:reveal:close','CONTINUE','RETURN TO BANNER');
   return;
  }
- const entryProgress=reveal.phase==='enter'?Math.max(0,Math.min(1,phaseElapsed/enterDuration)):1,entryEase=1-Math.pow(1-entryProgress,3),cardY=H+210+(440-(H+210))*entryEase;
+ const entryProgress=reveal.phase==='enter'?Math.max(0,Math.min(1,phaseElapsed/enterDuration)):1,entryEase=1-Math.pow(1-entryProgress,3),cardY=H+210+(445-(H+210))*entryEase;
  const flipProgress=reveal.phase==='flip'?Math.max(0,Math.min(1,phaseElapsed/flipDuration)):0,flip=reveal.phase==='flip'?Math.max(.08,Math.abs(Math.cos(flipProgress*Math.PI))):1,faceShown=reveal.phase==='shown';
  ctx.save();ctx.translate(800,cardY);ctx.rotate((1-entryEase)*-.12);ctx.scale(flip,1);ctx.globalAlpha*=Math.min(1,entryProgress*2.2);
- const ticket=ctx.createLinearGradient(-172,-135,172,135);ticket.addColorStop(0,faceShown?'#fff5d9':'#d8ebfb');ticket.addColorStop(1,faceShown?color:'#82b6d5');
- rect(-175,-145,350,290,ticket,faceShown?color:'#f3e5c8',21);
- ctx.save();ctx.setLineDash([12,10]);ctx.strokeStyle='rgba(24,42,66,.55)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-145,-105);ctx.lineTo(145,-105);ctx.moveTo(-145,105);ctx.lineTo(145,105);ctx.stroke();ctx.restore();
+ const ticket=ctx.createLinearGradient(-148,-200,148,200);
+ if(faceShown){ticket.addColorStop(0,'#fff8e7');ticket.addColorStop(.52,'#f2e5cc');ticket.addColorStop(1,'#d7c4a3')}
+ else{ticket.addColorStop(0,'#294a70');ticket.addColorStop(.52,'#172b4c');ticket.addColorStop(1,'#0e1c36')}
+ rect(-148,-200,296,400,ticket,faceShown?color:'#e5c782',24);
+ rect(-135,-187,270,374,'rgba(0,0,0,0)',faceShown?'rgba(126,91,44,.72)':'rgba(232,201,135,.88)',18);
+ rect(-126,-178,252,356,'rgba(0,0,0,0)',faceShown?'rgba(153,122,75,.48)':'rgba(114,165,208,.48)',14);
+ const diamond=(x,y,r,fill)=>{ctx.save();ctx.fillStyle=fill;ctx.beginPath();ctx.moveTo(x,y-r);ctx.lineTo(x+r,y);ctx.lineTo(x,y+r);ctx.lineTo(x-r,y);ctx.closePath();ctx.fill();ctx.restore()};
+ for(const x of [-111,111])for(const y of [-162,162])diamond(x,y,6,faceShown?color:'#f0d58e');
  if(faceShown){
-  const label=current.tier.toUpperCase();text(label,0,-59,24,current.tier==='common'?'#24506d':current.tier==='rare'?'#612f83':'#79520d','950','center');
-  const rewardSprite=images[STORE_ITEM_SPRITES[current.reward.inventoryItem]];if(rewardSprite?.complete&&rewardSprite.naturalWidth)ctx.drawImage(rewardSprite,-48,-48,96,96);else text(current.tier==='mythic'?'✦':'✧',0,10,60,current.tier==='common'?'#24506d':current.tier==='rare'?'#612f83':'#79520d','900','center');
-  const rewardName=current.reward.name||current.reward.id;text(rewardName,0,66,18,'#1b3047','850','center');
-  text(current.result,0,94,12,'#253d55','650','center');
+  text('✦  '+current.tier.toUpperCase()+'  ✦',0,-147,22,current.tier==='common'?'#45627c':current.tier==='rare'?'#79509a':'#9a6913','950','center');
+  ctx.save();ctx.strokeStyle=color;ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,-24,73,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='rgba(255,255,255,.65)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,-24,64,0,Math.PI*2);ctx.stroke();ctx.restore();
+  const rewardSprite=images[STORE_ITEM_SPRITES[current.reward.inventoryItem]];if(rewardSprite?.complete&&rewardSprite.naturalWidth)ctx.drawImage(rewardSprite,-58,-82,116,116);else text(current.tier==='mythic'?'✦':'✧',0,-24,70,current.tier==='common'?'#45627c':current.tier==='rare'?'#79509a':'#9a6913','900','center');
+  const rewardName=current.reward.name||current.reward.id;text(rewardName,0,78,17,'#1b3047','850','center');
+  text(current.result,0,108,11,'#344b61','650','center');
+  ctx.save();ctx.strokeStyle='rgba(129,96,49,.62)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-74,137);ctx.lineTo(74,137);ctx.stroke();ctx.restore();
+  text('TWO-TONE • SUMMON',0,158,11,'#6d5734','800','center');
  }else{
-  ctx.save();ctx.strokeStyle='rgba(36,77,112,.72)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,5,43,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(-62,5);ctx.lineTo(62,5);ctx.moveTo(0,-57);ctx.lineTo(0,67);ctx.stroke();ctx.restore();
-  text('✧',0,5,58,'#244d70','900','center');
-  text('TWO-TONE TICKET',0,82,15,'#1b3047','850','center');
+  ctx.save();ctx.strokeStyle='rgba(232,201,135,.86)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,-15,69,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='rgba(127,171,210,.68)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(0,-15,57,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(-82,-15);ctx.lineTo(82,-15);ctx.moveTo(0,-97);ctx.lineTo(0,67);ctx.stroke();ctx.restore();
+  text('✦',0,-15,58,'#f0d58e','900','center');
+  text('TWO-TONE',0,93,19,'#fff1d1','900','center');
+  text('FEATURED SUMMON',0,119,12,'#bed4e7','750','center');
+  text('CLICK TO TURN',0,150,11,'#e5ca91','700','center');
  }
  ctx.restore();
  const prompt=reveal.phase==='ready'?'CLICK THE CARD TO FLIP':reveal.phase==='flip'?'FLIPPING…':faceShown?(batch?'NEXT CARD COMING UP':'CLICK THE CARD TO RETURN'):'DRAWING YOUR REWARD';
  text(prompt,800,665,16,'#fff0c9','850','center');
- if(reveal.phase==='ready'||(faceShown&&!batch))choiceRects.push({x:625,y:295,w:350,h:290,action:reveal.phase==='ready'?'store:reveal:flip':'store:reveal:close',enabled:true});
+ if(reveal.phase==='ready'||(faceShown&&!batch))choiceRects.push({x:652,y:245,w:296,h:400,action:reveal.phase==='ready'?'store:reveal:flip':'store:reveal:close',enabled:true});
  if(faceShown&&batch)text(`NEXT CARD IN ${Math.max(0,rewardHold-phaseElapsed).toFixed(1)}s`,800,692,13,'#c4d6e5','600','center');
 }
 function drawStore(){
