@@ -1567,16 +1567,22 @@ function awardStoreReward(type,reward){
  const weapon=loadoutFor(id).weapon;if(weapon.premiumOwned)weapon.premiumPotential=Math.min(5,weapon.premiumPotential+1);else weapon.premiumOwned=true;
  saveLoadouts();return reward.name+(weapon.premiumPotential>1?' • Premium Potential '+weapon.premiumPotential:' • Premium acquired');
 }
-function drawStoreLottery(type){
- if(!['character','weapon'].includes(type)||storeCoins<100){lastStoreNotice='You need 100 coins for a lottery ticket.';return false}
+function drawStoreLottery(type,count=1){
+ if(!['character','weapon'].includes(type)||![1,10].includes(count)){lastStoreNotice='That lottery draw is unavailable.';return false}
+ const cost=FeaturedLottery.RULES.ticketCost*count;
+ if(storeCoins<cost){lastStoreNotice=`You need ${cost.toLocaleString()} coins for ${count} draw${count===1?'':'s'}.`;return false}
  const rotation=getStoreRotation(),pools=storeRewardPools(type,rotation),track=FeaturedLottery.getState()[type];
  if(!track.target){lastStoreNotice='Choose a featured target before drawing.';return false}
- const outcome=FeaturedLottery.draw({type,wallet:storeCoins,pools});
- if(!outcome.ok){lastStoreNotice=outcome.reason==='target-required'?'Choose a featured target before drawing.':'Lottery draw could not be completed.';return false}
- storeCoins-=outcome.coinsSpent;saveStoreCoins();
- const result=outcome.reward.inventoryItem?`${outcome.reward.quantity||1} ${outcome.reward.name}.`:awardStoreReward(type,outcome.reward);
+ const rewards=[];
+ for(let i=0;i<count;i++){
+  const outcome=FeaturedLottery.draw({type,wallet:storeCoins-i*FeaturedLottery.RULES.ticketCost,pools});
+  if(!outcome.ok){if(!rewards.length){lastStoreNotice=outcome.reason==='target-required'?'Choose a featured target before drawing.':'Lottery draw could not be completed.';return false}break}
+  const result=outcome.reward.inventoryItem?`${outcome.reward.quantity||1} ${outcome.reward.name}`:awardStoreReward(type,outcome.reward);
+  rewards.push({tier:outcome.tier,reward:outcome.reward,featured:outcome.featured,result});
+ }
+ storeCoins-=rewards.length*FeaturedLottery.RULES.ticketCost;saveStoreCoins();
  lastStoreNotice='Your ticket is being revealed…';
- storeReveal={type,tier:outcome.tier,reward:outcome.reward,featured:outcome.featured,result,startedAt:performance.now()};
+ storeReveal={type,rewards,startedAt:performance.now()};
  return true;
 }
 function handleStoreAction(action){
@@ -1586,7 +1592,7 @@ function handleStoreAction(action){
  }else if(kind==='target'){
   const rotation=getStoreRotation(),ids=type==='character'?rotation.featuredCharacters:rotation.featuredWeapons;
   FeaturedLottery.setTarget(type,value,ids);lastStoreNotice='Target selected. Draws cost 100 coins.';
- }else if(kind==='draw')drawStoreLottery(type);
+ }else if(kind==='draw')drawStoreLottery(type,Number(value)||1);
 }
 function drawStoreLotteryCard(type,x,rotation,state){
  const character=type==='character',ids=character?rotation.featuredCharacters:rotation.featuredWeapons,selected=state[type].target;
@@ -1606,13 +1612,14 @@ function drawStoreLotteryCard(type,x,rotation,state){
  text(`Mythic ${track.heightened?'2%':'1%'} • Featured 75% / Off-feature 25%`,x+30,506,14,'#c4d6e5','550');
  text(`MYTHIC GUARANTEE  ${untilMythic} draws   •   RARE GUARANTEE  ${untilRare} draws`,x+30,536,13,'#c4d6e5','650');
  if(track.heightened)text('HEIGHTENED STATE • 2% mythic chance',x+30,564,14,'#eacb87','750');
- addButton(x+180,656,330,72,`store:draw:${type}`,'DRAW TICKET','100 COINS • BALANCE '+storeCoins,!!target&&storeCoins>=100&&!storeReveal);
+ addButton(x+28,656,300,72,`store:draw:${type}:1`,'DRAW ×1','100 COINS',!!target&&storeCoins>=100&&!storeReveal);
+ addButton(x+362,656,300,72,`store:draw:${type}:10`,'DRAW ×10','1,000 COINS • '+storeCoins.toLocaleString()+' AVAILABLE',!!target&&storeCoins>=1000&&!storeReveal);
 }
 function drawStoreReveal(now){
  if(!storeReveal)return;
- const reveal=storeReveal,elapsed=(now-reveal.startedAt)/1000,duration=3.6;
- if(elapsed>=duration){lastStoreNotice=`${reveal.tier.toUpperCase()} • ${reveal.result}${reveal.featured?' • Featured target!':''}`;storeReveal=null;return}
- const color=reveal.tier==='mythic'?'#ffd778':reveal.tier==='rare'?'#d8a4ff':'#83dcff';
+ const reveal=storeReveal,rewards=reveal.rewards,elapsed=(now-reveal.startedAt)/1000,batch=rewards.length>1,stepDuration=.68,sequenceDuration=batch?stepDuration*rewards.length:3.6,summaryDuration=batch?4:0;
+ if(elapsed>=sequenceDuration+summaryDuration){const counts=rewards.reduce((all,item)=>(all[item.tier]=(all[item.tier]||0)+1,all),{});lastStoreNotice=`${rewards.length} draws: ${['mythic','rare','common'].filter(tier=>counts[tier]).map(tier=>`${counts[tier]} ${tier}`).join(', ')}.`;storeReveal=null;return}
+ const summary=batch&&elapsed>=sequenceDuration,index=batch?Math.min(rewards.length-1,Math.floor(elapsed/stepDuration)):0,relative=batch?elapsed-index*stepDuration:elapsed,current=rewards[index],color=current.tier==='mythic'?'#ffd778':current.tier==='rare'?'#d8a4ff':'#83dcff';
  const fade=Math.min(1,elapsed/.28),pulse=.5+.5*Math.sin(elapsed*7),spin=elapsed*1.8;
  rect(0,0,W,H,`rgba(3,6,18,${.84*fade})`);
  const glow=ctx.createRadialGradient(800,455,28,800,455,470);glow.addColorStop(0,`rgba(104,163,222,${.20+pulse*.13})`);glow.addColorStop(1,'rgba(12,20,42,0)');rect(170,80,1260,760,glow);
@@ -1623,24 +1630,31 @@ function drawStoreReveal(now){
   ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle=i%3===0?color:'#dff6ff';ctx.translate(x,y);ctx.rotate(a+spin);ctx.fillRect(-3,-9,6,18);ctx.restore();
  }
  rect(448,192,704,525,'rgba(12,20,38,.96)',color,22);
- text('FEATURED LOTTERY',800,238,15,'#b9cbe0','800','center');
- const revealNow=elapsed>=1.75,flip=revealNow?Math.max(.04,Math.abs(Math.cos(Math.min(1,(elapsed-1.75)/.34)*Math.PI/2))):Math.max(.12,Math.abs(Math.cos(spin*1.35)));
+ text(summary?'TEN DRAW RESULTS':batch?`DRAW ${index+1} OF ${rewards.length}`:'FEATURED LOTTERY',800,238,15,'#b9cbe0','800','center');
+ if(summary){
+  text(`${rewards.length} REWARDS • ${rewards.length*FeaturedLottery.RULES.ticketCost} COINS`,800,262,12,'#e6d2aa','750','center');
+  rewards.forEach((item,i)=>{const col=i%2,row=Math.floor(i/2),x=468+col*334,y=278+row*78,tierColor=item.tier==='mythic'?'#ffd778':item.tier==='rare'?'#d8a4ff':'#83dcff';rect(x,y,326,68,'rgba(35,48,69,.96)',tierColor,9);text(item.tier.toUpperCase(),x+12,y+25,12,tierColor,'850');text(item.reward.name||item.reward.id,x+105,y+24,15,'#fff3de','750');text(item.result+(item.featured?' • FEATURED':''),x+105,y+47,11,'#c2d0dd','550')});
+  rect(590,681,420,5,'rgba(150,178,209,.25)');rect(590,681,420,5,color);
+  return;
+ }
+ const revealNow=batch?relative>=.36:elapsed>=1.75;
+ const flip=revealNow?Math.max(.04,Math.abs(Math.cos(Math.min(1,(relative-(batch ? .36 : 1.75))/(batch ? .2 : .34))*Math.PI/2))):Math.max(.12,Math.abs(Math.cos(relative*1.35)));
  ctx.save();ctx.translate(800,440);ctx.scale(flip,1);
  const ticket=ctx.createLinearGradient(-172,-135,172,135);ticket.addColorStop(0,revealNow?'#fff5d9':'#d8ebfb');ticket.addColorStop(1,revealNow?color:'#82b6d5');
  rect(-175,-145,350,290,ticket,revealNow?color:'#f3e5c8',21);
  ctx.save();ctx.setLineDash([12,10]);ctx.strokeStyle='rgba(24,42,66,.55)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-145,-105);ctx.lineTo(145,-105);ctx.moveTo(-145,105);ctx.lineTo(145,105);ctx.stroke();ctx.restore();
  if(revealNow){
-  const label=reveal.tier.toUpperCase();text(label,0,-59,24,reveal.tier==='common'?'#24506d':reveal.tier==='rare'?'#612f83':'#79520d','950','center');
-  text(reveal.tier==='mythic'?'✦':'✧',0,10,60,reveal.tier==='common'?'#24506d':reveal.tier==='rare'?'#612f83':'#79520d','900','center');
-  const rewardName=reveal.reward.name||reveal.reward.id;text(rewardName,0,66,18,'#1b3047','850','center');
-  text(reveal.result,0,94,12,'#253d55','650','center');
+  const label=current.tier.toUpperCase();text(label,0,-59,24,current.tier==='common'?'#24506d':current.tier==='rare'?'#612f83':'#79520d','950','center');
+  text(current.tier==='mythic'?'✦':'✧',0,10,60,current.tier==='common'?'#24506d':current.tier==='rare'?'#612f83':'#79520d','900','center');
+  const rewardName=current.reward.name||current.reward.id;text(rewardName,0,66,18,'#1b3047','850','center');
+  text(current.result,0,94,12,'#253d55','650','center');
  }else{
   text('✧',0,18,78,'#244d70','900','center');
   text('TICKET IN MOTION',0,79,16,'#1b3047','850','center');
  }
  ctx.restore();
- text(revealNow?'REWARD RECEIVED':'DRAWING YOUR REWARD',800,665,16,'#fff0c9','850','center');
- const progress=Math.min(1,elapsed/duration);rect(590,681,420,5,'rgba(150,178,209,.25)');rect(590,681,420*progress,5,color);
+ text(summary?'ALL REWARDS RECEIVED':revealNow?'REWARD RECEIVED':'DRAWING YOUR REWARD',800,665,16,'#fff0c9','850','center');
+ const progress=batch?Math.min(1,(index+relative/stepDuration)/rewards.length):Math.min(1,elapsed/sequenceDuration);rect(590,681,420,5,'rgba(150,178,209,.25)');rect(590,681,420*progress,5,color);
 }
 function drawStore(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.84)');

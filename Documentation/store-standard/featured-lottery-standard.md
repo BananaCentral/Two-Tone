@@ -8,6 +8,8 @@ The prototype wallet initializes with 1,000 coins so the lottery flow can be pla
 
 For manual testing, append `?dev=1` to the site URL to show Store controls that grant 100, 500, 1,000, or 5,000 coins to the saved wallet. The controls are hidden during ordinary play.
 
+Each banner offers a single draw for 100 coins and a ten-draw option for 1,000 coins. Ten draws are resolved in order, one ticket at a time, with the same pity and reward rules as individual draws. The ten-draw option has no discount.
+
 ## Featured Rotation
 
 The Store may feature up to three character and signature premium weapon pairs at once. A player chooses one featured target for each lottery type they use. The character and weapon in each pair correspond to one another.
