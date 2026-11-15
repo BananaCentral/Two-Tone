@@ -1,5 +1,5 @@
 'use strict';
-const sources={arena:'/assets/embedded-image-01.png',area1Background:'/assets/area-1-meadow.jpg',soul:'/assets/soul-battle.png',lily:'/assets/lily-front.png',lilyFront:'/assets/lily-front.png',lilyBack:'/assets/lily-back.png',dawnBattle:'/assets/dawn-battle.png',dawnFront:'/assets/dawn-front.png',loganBattle:'/assets/logan.png',loganFront:'/assets/logan-front.png',loganPortrait:'/assets/logan-front.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',slimeLeaderBattle:'/assets/slime-leader.png',slimeLeaderArtwork:'/assets/slime-leader.png',slimeMonsterBattle:'/assets/slime-monster.png',slimeMonsterArtwork:'/assets/slime-monster.png',wolfBattle:'/assets/wolf.png',wolfArtwork:'/assets/wolf-artwork.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',soulFront:'/assets/soul-portrait.png',soulWeaponStandard:'/assets/soul-weapon-standard.jpg',soulWeaponPremium:'/assets/soul-weapon-premium.jpg',zeroFront:'/assets/zero.png',zeroBattle:'/assets/zero-battle.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png',enchantedBottleSmall:'/assets/enchanted-bottle-small.png',enchantedBottleMedium:'/assets/enchanted-bottle-medium.png',enchantedBottleLarge:'/assets/enchanted-bottle-large.png',enchantedBookSmall:'/assets/enchanted-book-small.png',enchantedBookMedium:'/assets/enchanted-book-medium.png',enchantedBookLarge:'/assets/enchanted-book-large.png',core:'/assets/core.png',gem:'/assets/gem.png',coin:'/assets/coins.png'};
+const sources={arena:'/assets/embedded-image-01.png',area1Background:'/assets/area-1-meadow.jpg',soul:'/assets/soul-battle-standard.png',soulBattleStandard:'/assets/soul-battle-standard.png',soulBattlePremium:'/assets/soul-battle-premium.png',lily:'/assets/lily-front.png',lilyFront:'/assets/lily-front.png',lilyBack:'/assets/lily-back.png',dawnBattle:'/assets/dawn-battle.png',dawnFront:'/assets/dawn-front.png',loganBattle:'/assets/logan.png',loganFront:'/assets/logan-front.png',loganPortrait:'/assets/logan-front.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',slimeLeaderBattle:'/assets/slime-leader.png',slimeLeaderArtwork:'/assets/slime-leader.png',slimeMonsterBattle:'/assets/slime-monster.png',slimeMonsterArtwork:'/assets/slime-monster.png',wolfBattle:'/assets/wolf.png',wolfArtwork:'/assets/wolf-artwork.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',soulFront:'/assets/soul-portrait.png',soulWeaponStandard:'/assets/soul-weapon-standard.png',soulWeaponPremium:'/assets/soul-weapon-premium.png',zeroFront:'/assets/zero.png',zeroBattle:'/assets/zero-battle.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png',enchantedBottleSmall:'/assets/enchanted-bottle-small.png',enchantedBottleMedium:'/assets/enchanted-bottle-medium.png',enchantedBottleLarge:'/assets/enchanted-bottle-large.png',enchantedBookSmall:'/assets/enchanted-book-small.png',enchantedBookMedium:'/assets/enchanted-book-medium.png',enchantedBookLarge:'/assets/enchanted-book-large.png',core:'/assets/core.png',gem:'/assets/gem.png',coin:'/assets/coins.png'};
 const BATTLE_AREAS=Object.freeze({
  'area-1':Object.freeze({name:'Area 1',background:'area1Background'})
 });
@@ -1248,6 +1248,7 @@ function weaponBonus(record,id=loadoutCharacterId){
  const w=record.weapon,type=w.selected==='premium'&&w.premiumOwned?'premium':'standard';
  return weaponPotentialMultiplier(type,type==='premium'?w.premiumPotential:w.standardPotential,w[type+'Level']);
 }
+function equippedSoulBattleSprite(){const weapon=loadoutFor('soul').weapon;return weapon.selected==='premium'&&weapon.premiumOwned?'soulBattlePremium':'soulBattleStandard'}
 function settleWeaponProgress(weapon,type,cap=weaponLevelCap()){
  const levelKey=type+'Level',expKey=type+'Exp',ascendedKey=type+'Ascended';let levelsGained=0;
  while(weapon[levelKey]<cap){
@@ -1391,10 +1392,11 @@ function drawLoadoutWeapons(){
  for(const c of cards){
   const level=w[c.type+'Level'],exp=w[c.type+'Exp'],needed=requiredExp(level),bonus=weaponPotentialMultiplier(c.type,c.potential,level)*100,atGate=ASCENSION_GATES.includes(level)&&!w[c.type+'Ascended'].includes(level);
   rect(c.x,205,630,470,'rgba(25,37,58,.94)',c.selected?'#edcf98':'#718ba4',14);
-  text(c.label,c.x+30,245,22,'#f3dfb9','850');
+  const soulWeaponName=model.id==='soul'?(c.type==='standard'?'ASHBLADE':'SOULBOUND'):null;
+  text(soulWeaponName?soulWeaponName+' • '+c.type.toUpperCase():c.label,c.x+30,245,22,'#f3dfb9','850');
   text(c.type==='standard'?'Included with '+model.name:'Acquired in the Store',c.x+30,278,15,'#c4d6e5','550');
   const weaponArt=model.id==='soul'?images[c.type==='premium'?'soulWeaponPremium':'soulWeaponStandard']:null;
-  if(weaponArt?.complete&&weaponArt.naturalWidth){rect(c.x+386,215,220,220,'#f8f7f3','#bda777',12);ctx.save();ctx.beginPath();ctx.roundRect(c.x+394,223,204,204,8);ctx.clip();ctx.drawImage(weaponArt,c.x+394,223,204,204);ctx.restore()}
+  if(weaponArt?.complete&&weaponArt.naturalWidth){ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(weaponArt,c.x+386,215,220,220);ctx.restore()}
   text('+'+bonus.toFixed(2).replace(/0+$/,'').replace(/\.$/,'')+'% to all six stats',c.x+30,340,26,'#f4d99c','800');
   text('POTENTIAL '+c.potential+' / 5   •   LEVEL '+level+' / '+cap,c.x+30,382,17,'#d6e2ef','750');
   text(atGate?'ASCENSION REQUIRED':level>=cap?'WEAPON LEVEL CAP REACHED':`XP  ${exp} / ${needed}  •  ${needed-exp} XP TO NEXT LEVEL`,c.x+30,414,15,'#c4d6e5','600');
@@ -1570,7 +1572,7 @@ function getStoreRotation(){
 function storeRewardPools(type,rotation){
  const models=ROSTER.filter(model=>!model.test),featuredIds=type==='character'?rotation.featuredCharacters:rotation.featuredWeapons;
  const idFor=model=>type==='character'?model.id:'premium-'+model.id;
- const make=model=>({id:idFor(model),name:type==='character'?model.name:model.name+' Premium Weapon'});
+ const make=model=>({id:idFor(model),name:type==='character'?model.name:model.id==='soul'?'Soulbound':model.name+' Premium Weapon'});
  return {featured:models.filter(model=>featuredIds.includes(idFor(model))).map(make),offFeature:models.filter(model=>!featuredIds.includes(idFor(model))).map(make)};
 }
 function awardStoreReward(type,reward){
@@ -1789,7 +1791,7 @@ function soulBasicTravel(t,pos){
  const targetFeet=target.y+target.h+12;
  return {...pos,x:lerp(pos.x,targetLeft,approach),baseY:lerp(pos.baseY,targetFeet,approach),w:pos.w*scale,h:pos.h*scale};
 }
-function soulBasicPaint(x,baseY,w,h,dt){
+function soulBasicPaint(x,baseY,w,h,dt,baseSprite='soul'){
  // Anchor images using their real painted-foot margins; never crop or rewrite Approved PNGs.
  const draw=(key,opacity=1)=>{const img=images[key];if(!img?.complete||!img.naturalWidth)return;
   const m=key==='soulBasicSlash'?{foot:485,scale:1.08,dx:-.04}:key==='soulBasicWindup'?{foot:500,scale:1,dx:0}:{foot:512,scale:1,dx:0};
@@ -1798,12 +1800,12 @@ function soulBasicPaint(x,baseY,w,h,dt){
   ctx.drawImage(img,x+(w-sw)/2+dxFor(m.dx,w),baseY-sh*m.foot/512,sw,sh);ctx.restore();
  };
  const mix=(before,after,a)=>{draw(before,1-a);draw(after,a)};
- if(dt<ANIMATION_STEP_MS)draw('soul');
- else if(dt<ANIMATION_STEP_MS*2)mix('soul','soulBasicWindup',(dt-ANIMATION_STEP_MS)/ANIMATION_STEP_MS);
+ if(dt<ANIMATION_STEP_MS)draw(baseSprite);
+ else if(dt<ANIMATION_STEP_MS*2)mix(baseSprite,'soulBasicWindup',(dt-ANIMATION_STEP_MS)/ANIMATION_STEP_MS);
  else if(dt<ANIMATION_STEP_MS*3)draw('soulBasicWindup');
  else if(dt<ANIMATION_STEP_MS*4)draw('soulBasicSlash');
- else if(dt<ANIMATION_STEP_MS*5)mix('soulBasicSlash','soul',(dt-ANIMATION_STEP_MS*4)/ANIMATION_STEP_MS);
- else draw('soul');
+ else if(dt<ANIMATION_STEP_MS*5)mix('soulBasicSlash',baseSprite,(dt-ANIMATION_STEP_MS*4)/ANIMATION_STEP_MS);
+ else draw(baseSprite);
 }
 function dxFor(relative,width){return relative*width}
 function cameraShot(t=performance.now()){
@@ -1934,15 +1936,15 @@ function drawUnit(p,pos,view,t,acting=false){
  ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.44,16,0,0,Math.PI*2);ctx.fillStyle='rgba(12,12,40,.45)';ctx.fill();
  if(acting||select){ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.51,22,0,0,Math.PI*2);ctx.lineWidth=4;ctx.strokeStyle=select?(allyTargeting||supportAnimating?'#55aaff':'#eaca94'):'#8be3fb';ctx.stroke()}
  if(p.hp<=0)ctx.globalAlpha=.37;
- const art=p.id==='soul'?(view==='party'||view==='ally-impact'?'soulFront':'soul'):p.id==='zero'?(view==='party'||view==='ally-impact'?'zeroFront':'zeroBattle'):p.id==='lily'?(view==='party'||view==='ally-impact'?'lilyFront':'lilyBack'):p.id==='dawn'?(view==='party'||view==='ally-impact'?'dawnFront':'dawnBattle'):p.id==='logan'?(view==='party'||view==='ally-impact'?'loganFront':'loganBattle'):null;
+ const art=p.id==='soul'?(view==='party'||view==='ally-impact'?'soulFront':equippedSoulBattleSprite()):p.id==='zero'?(view==='party'||view==='ally-impact'?'zeroFront':'zeroBattle'):p.id==='lily'?(view==='party'||view==='ally-impact'?'lilyFront':'lilyBack'):p.id==='dawn'?(view==='party'||view==='ally-impact'?'dawnFront':'dawnBattle'):p.id==='logan'?(view==='party'||view==='ally-impact'?'loganFront':'loganBattle'):null;
  const zb=view==='command'&&p.id==='soul'?soulBasicStage(t):null;
-  if(zb!==null)soulBasicPaint(x,baseY,w,h,zb);
+  if(zb!==null)soulBasicPaint(x,baseY,w,h,zb,art);
   else if(art&&images[art]?.complete&&images[art].naturalWidth){
   const img=images[art],fullArtwork=art==='soulFront'||art==='zeroFront'||art==='lilyFront'||art==='dawnFront'||art==='loganFront';ctx.imageSmoothingEnabled=fullArtwork;
   if(fullArtwork){
    // Ally targeting uses the same full-body front artwork across the entire party.
    ctx.drawImage(img,x,top,w,h);
-  }else if(art==='soul'||art==='zeroBattle'||art==='lilyBack'||art==='loganBattle'){
+  }else if(art==='soul'||art==='soulBattleStandard'||art==='soulBattlePremium'||art==='zeroBattle'||art==='lilyBack'||art==='loganBattle'){
    // Fit the visible cutout to the same enlarged battle-stage height across
    // playable characters, removing transparent source-image margins.
    const b=spriteAlphaBounds(img),scale=(h*1.12)/b.h,drawW=b.w*scale,drawH=b.h*scale;
