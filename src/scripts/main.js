@@ -2012,16 +2012,18 @@ function drawItemInventory(){
   ...[['Small Enchanted Bottle','10 Character XP',itemInventory.bottles.small,'enchantedBottleSmall'],['Medium Enchanted Bottle','100 Character XP',itemInventory.bottles.medium,'enchantedBottleMedium'],['Large Enchanted Bottle','1,000 Character XP',itemInventory.bottles.large,'enchantedBottleLarge'],['Small Enchanted Book','10 Weapon XP',itemInventory.books.small,'enchantedBookSmall'],['Medium Enchanted Book','100 Weapon XP',itemInventory.books.medium,'enchantedBookMedium'],['Large Enchanted Book','1,000 Weapon XP',itemInventory.books.large,'enchantedBookLarge'],['Core','Rune / Celestial upgrade',itemInventory.cores,'core'],['Gem','Character / weapon Ascension',itemInventory.gems,'gem']].map(([name,detail,count,image])=>({name,detail,count,image})),
   ...Object.entries(RUNE_SET_DEFINITIONS).map(([id,set])=>({name:set.name,detail:'Rune Set piece',count:ownedRuneCount(id),image:set.image}))
  ];
+ const ownedEntries=entries.filter(item=>item.count>0);
  const columns=5,cardW=244,cardH=155,gapX=18,gapY=13,x0=154,y0=151;
- entries.forEach((item,index)=>{
-  const row=Math.floor(index/columns),column=index%columns,rowCount=Math.min(columns,entries.length-row*columns),rowOffset=(columns-rowCount)*(cardW+gapX)/2;
-  const x=x0+rowOffset+column*(cardW+gapX),y=y0+row*(cardH+gapY),icon=images[item.image];
+ ownedEntries.forEach((item,index)=>{
+  const row=Math.floor(index/columns),column=index%columns;
+  const x=x0+column*(cardW+gapX),y=y0+row*(cardH+gapY),icon=images[item.image];
   rect(x,y,cardW,cardH,'rgba(25,37,58,.94)','#718ba4',12);
   if(icon?.complete&&icon.naturalWidth)drawStoreBannerImage(icon,x+84,y+8,76,64);
   text(item.name,x+cardW/2,y+91,14,'#f3e5c9','800','center');
   text(item.detail,x+cardW/2,y+113,12,'#c4d0dd','600','center');
   text('×'+item.count,x+cardW/2,y+138,14,'#f0f3f7','750','center');
  });
+ if(!ownedEntries.length)text('INVENTORY EMPTY',800,475,20,'#c4d0dd','700','center');
 }
 function drawChallenges(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.74)');rect(180,100,1240,700,'rgba(13,20,39,.98)','#ccb88e',20);
