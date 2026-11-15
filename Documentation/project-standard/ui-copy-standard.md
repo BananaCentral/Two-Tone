@@ -20,7 +20,7 @@ Use a short explanation when a player needs it to make a meaningful choice, unde
 
 ## Loadout examples
 
-- Show the active weapon bonus, such as **+31% ALL STATS**, immediately above its **Upgrade** and **Switch** controls.
+- Show the active weapon bonus, such as **+31% ALL STATS**, just above and centered on its **Upgrade**/**Ascend** control.
 - Label those buttons **Upgrade** and **Switch** without repeating their purpose below them.
 - Show only the selected weapon's name in its detail panel; **Switch** is the control for changing weapons.
 - Align the selected weapon name with its section heading, directly above the artwork. Keep section labels and character names from repeating in the same panel.
