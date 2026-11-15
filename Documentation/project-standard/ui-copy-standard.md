@@ -23,4 +23,4 @@ Use a short explanation when a player needs it to make a meaningful choice, unde
 - Show the active weapon bonus, such as **+31% ALL STATS**, immediately above its **Upgrade** and **Switch** controls.
 - Label those buttons **Upgrade** and **Switch** without repeating their purpose below them.
 - Show only the selected weapon's name in its detail panel; **Switch** is the control for changing weapons.
-- Enchanted Book choices may show the book size, XP amount, and owned quantity on the control. Do not repeat their effect in explanatory text below the choices.
+- Enchanted Book selectors show book size, XP amount, owned quantity, and selected quantity. **Upgrade** confirms the selection. At Ascension gates, replace book selectors with the required material and owned quantity.
