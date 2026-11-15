@@ -4,6 +4,8 @@
 
 Use interface text to name actions and show useful state. Do not add explanatory text just to fill space or repeat what the control, heading, icon, or displayed value already makes clear.
 
+Use the [UI Layout Standard](ui-layout-standard.md) for panel hierarchy, alignment, and spacing.
+
 ## Controls and panels
 
 - Give each control a short, direct label. Use the action name alone when its purpose is clear, such as **Upgrade** or **Switch**.

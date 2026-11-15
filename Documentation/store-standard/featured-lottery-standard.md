@@ -10,6 +10,8 @@ For manual testing, switch to Dev Mode from the main menu or append `?dev=1` to 
 
 ## Banner UI
 
+Follow the shared [UI Layout Standard](../project-standard/ui-layout-standard.md) for panel hierarchy, spacing, and alignment. The two-panel banner arrangement below defines the Store-specific layout.
+
 - Use a two-panel layout modeled on event-banner screens: a selectable banner list on the left and the selected banner's detail view on the right.
 - Show all current featured options in the left list: up to three character banners and their three paired premium weapon banners. Each row shows portrait art, the target name, and whether it is a Character or Premium Weapon banner.
 - On the 1600×900 game canvas, the left list is approximately 338×714 at x=28, y=116. The right detail panel is approximately 1186×714 at x=386, y=116. Keep the coin balance and Back control above both panels and the weekly rotation note below them.

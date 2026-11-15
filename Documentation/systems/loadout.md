@@ -4,7 +4,7 @@ The main-menu **Loadout** opens the character equipment and ability progression 
 
 ## Screen layout
 
-Follow the [UI Copy Standard](../project-standard/ui-copy-standard.md): show the useful stat or status, keep action labels concise, and omit redundant explanatory copy.
+Follow the [UI Copy Standard](../project-standard/ui-copy-standard.md) for concise labels, and the [UI Layout Standard](../project-standard/ui-layout-standard.md) for panel hierarchy, spacing, and alignment.
 
 The Loadout uses one character-details view with a persistent four-part frame:
 
