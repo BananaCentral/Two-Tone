@@ -4,9 +4,18 @@
 
 The Store offers featured character and premium weapon lotteries. Each lottery draw costs 100 coins and is purchased from the merchant. A draw delivers its reward immediately.
 
-The prototype wallet initializes with 1,000 coins so the lottery flow can be played before coin rewards from other game modes are defined. Coin balance is saved with player progress.
+New Regular and Dev Mode wallets start with 0 coins. Coin balance is saved in the active mode's profile.
 
-For manual testing, append `?dev=1` to the site URL to show Store controls that grant 100, 500, 1,000, or 5,000 coins to the saved wallet. The controls are hidden during ordinary play.
+For manual testing, switch to Dev Mode from the main menu or append `?dev=1` to the site URL. Dev Mode shows Store controls that grant 100, 500, 1,000, or 5,000 coins. These controls are hidden in Regular mode.
+
+## Banner UI
+
+- Present the character and premium weapon lotteries as two large illustrated banners side by side, with artwork as the visual focus.
+- On the 1600×900 game canvas, each banner uses an approximately 690×625 panel, starting near the top third of the screen. Keep the coin balance and Back control above the banners and the weekly rotation note below them.
+- Identify the banner with a compact **Character** or **Premium Weapon** tag. Do not add separate “limited-time” or “limited” subtitle text.
+- Show the available featured targets as compact portrait chips inside each banner. The chips are the target selection control; do not add a separate target-selection panel, heading, instruction, or persistent entry notice.
+- Opening the Store or selecting a target does not show an instructional notice. Show notices only for actionable errors or action confirmations, such as a completed draw summary or a Dev Mode coin grant.
+- Keep the single-draw and ten-draw actions at the bottom of each banner. The banner art and controls should read as one integrated lottery banner, not as a row of generic menu buttons.
 
 Each banner offers a single draw for 100 coins and a ten-draw option for 1,000 coins. Ten draws are resolved in order, one ticket at a time, with the same pity and reward rules as individual draws. The ten-draw option has no discount.
 
