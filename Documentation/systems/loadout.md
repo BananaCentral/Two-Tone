@@ -4,18 +4,22 @@ The main-menu **Loadout** opens the character equipment and ability progression 
 
 ## Signature weapons
 
-Each character has exactly two character-bound signature weapon options:
+Each character has exactly two character-bound signature weapon options. Each option has its own weapon Level and XP progression. Weapon Level caps follow the character level caps defined by player Rank and use the Character XP curve.
 
-- **Standard** is the default weapon and starts at Potential 1. Its stat bonus is 80%, increasing by 5 percentage points per potential, through 100% at Potential 5.
-- **Premium** is acquired through the Store. It starts at Potential 1 with a 100% stat bonus, increasing by 25 percentage points per potential, through 200% at Potential 5.
+- **Standard** is the default weapon and starts at Potential 1. Its Level 1 stat bonus is 31%, increasing by 5 percentage points per Potential. Weapon Level adds 1 percentage point per level, reaching 80% at Potential 1 and 100% at Potential 5 at weapon Level 50.
+- **Premium** is acquired through the Store. It starts at Potential 1 with a 51% Level 1 stat bonus, increasing by 25 percentage points per Potential. Weapon Level adds 1 percentage point per level, reaching 100% at Potential 1 and 200% at Potential 5 at weapon Level 50.
 
 A character can use only their own Standard or Premium signature weapon. The active weapon percentage applies to all six stats. Character-specific weapon effects are added when that character's weapon is defined.
+
+See the [Weapon Level Standard](../weapon-level-standard/weapon-level-standard.md) for caps, XP requirements, and the full Potential bonus table.
 
 ## Runes
 
 A character can equip up to four runes, all from one rune set. Rune-set names and their passive effects are character-specific and have not been defined yet.
 
 Each rune has a level from 1 to 5, one main stat, and three substats. Within each rune, all four selected stats must be different. Main and substats may repeat across different runes.
+
+One Core raises one Rune by one level. See the [Item Standard](../item-standard/item-standard.md).
 
 At rune level L, the main stat adds:
 
@@ -42,6 +46,8 @@ Each character has four Celestials, corresponding to Passive, Basic Attack, Skil
 
 Each Celestial level adds 10% of the ability's base multiplier. This is applied multiplicatively as `base multiplier × (1 + 0.10 × celestial level)`; Level 1 therefore gives the character a default +10% multiplier.
 
+One Core raises one Celestial by one level, up to its Level 10 cap. See the [Item Standard](../item-standard/item-standard.md).
+
 ## Character and weapon duplicates
 
 Character Duplicates are separate from weapon Potential and persist on each character's Loadout. Each playable character's Duplicate effects are listed in their Character Sheet.
@@ -54,4 +60,4 @@ Zero's Premium signature weapon restores 1 Skill Point when he uses his Ultimate
 
 ## Prototype boundaries
 
-The Loadout screen persists weapon potential, rune configuration, Celestial levels, and character Duplicate level locally. Its upgrade controls do not charge resources because upgrade costs have not been defined. Premium weapons remain locked until Store acquisition is implemented. Rune-set choices/passives and weapon effects without character-specific definitions remain pending. Premium Potential 2–5 map to weapon Duplicates 1–4. Premium effects require an owned, equipped Premium weapon.
+The Loadout screen persists weapon Potential, Level and XP, rune configuration, Celestial levels, and character Duplicate level locally. Potential upgrades do not charge resources because their coin costs have not been defined. Weapon XP comes from Experience Books. Premium weapons remain locked until Store acquisition is implemented. Rune-set choices/passives and weapon effects without character-specific definitions remain pending. Premium Potential 2–5 map to weapon Duplicates 1–4. Premium effects require an owned, equipped Premium weapon.

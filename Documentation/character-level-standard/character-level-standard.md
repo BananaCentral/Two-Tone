@@ -20,7 +20,7 @@ This standard defines character Levels and Character XP. All six primary statsâ€
 
 ## Character XP and Leveling
 
-- Battles do not grant Character XP. Other XP sources will be decided later.
+- Battles do not grant Character XP. Enchanted Bottles grant Character XP; see the [Item Standard](../item-standard/item-standard.md).
 - For a character at Level `L`, the XP needed for the next Level is:
 
   `L Ã— Base`, where `Base = 10 Ã— (1 + floor(L Ã· 5))`
@@ -36,9 +36,8 @@ This standard defines character Levels and Character XP. All six primary statsâ€
 
 - Each character must Ascend individually at Levels 10, 20, 30, and 40 to progress past that Level.
 - Ascension unlocks further leveling; it does not directly increase stats.
-- Ascension requirements will be decided later.
+- Each character Ascension consumes one Gem. See the [Item Standard](../item-standard/item-standard.md).
 
 ## Open Design Decisions
 
-- Sources of Character XP.
-- Ascension requirements.
+- Other sources of Character XP, if any.

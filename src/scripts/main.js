@@ -133,7 +133,7 @@ function spriteAlphaBounds(img){
 }
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:false});
 const W=1600,H=900, TEAM_KEY='two-tone-demo-team-fundamental-1-v1';
-const PROGRESSION_KEY='two-tone-character-progress-v1',VITALS_KEY='two-tone-character-vitals-v1',LOADOUT_KEY='two-tone-character-loadouts-v1',PLAYER_RANK_KEY='two-tone-player-rank-v1',CHARACTER_ID_SCHEMA_KEY='two-tone-character-id-schema-v2';
+const PROGRESSION_KEY='two-tone-character-progress-v1',VITALS_KEY='two-tone-character-vitals-v1',LOADOUT_KEY='two-tone-character-loadouts-v1',ITEM_INVENTORY_KEY='two-tone-item-inventory-v1',PLAYER_RANK_KEY='two-tone-player-rank-v1',CHARACTER_ID_SCHEMA_KEY='two-tone-character-id-schema-v2';
 function moveLegacyCharacterRecord(value){
  if(!value||typeof value!=='object'||Array.isArray(value))return value;
  if(value.soul===undefined&&value.zero!==undefined)value.soul=value.zero;
@@ -1120,19 +1120,29 @@ const RUNE_STAT_INFO={
  magicalDefense:{label:'Magical Defense',main:4},speed:{label:'Speed',main:20}
 };
 const CELESTIALS=[['passive','PASSIVE'],['basic','BASIC'],['skill','SKILL'],['ultimate','ULTIMATE']];
-function defaultLoadout(){return {characterDuplicates:0,weapon:{selected:'standard',standardPotential:1,premiumPotential:1,premiumOwned:false},runes:[null,null,null,null],celestials:{passive:1,basic:1,skill:1,ultimate:1}}}
+function defaultLoadout(){return {characterDuplicates:0,weapon:{selected:'standard',standardPotential:1,premiumPotential:1,premiumOwned:false,standardLevel:1,standardExp:0,standardAscended:[],premiumLevel:1,premiumExp:0,premiumAscended:[]},runes:[null,null,null,null],celestials:{passive:1,basic:1,skill:1,ultimate:1}}}
 function normalizeRune(value){
  if(!value||typeof value!=='object'||!RUNE_STATS.includes(value.main)||!Array.isArray(value.subs))return null;
  const subs=value.subs.filter((x,i,a)=>RUNE_STATS.includes(x)&&x!==value.main&&a.indexOf(x)===i).slice(0,3);
  return subs.length===3?{level:Number.isInteger(value.level)?Math.max(1,Math.min(5,value.level)):1,main:value.main,subs,setId:typeof value.setId==='string'?value.setId:null,criticalRateBonus:Number.isFinite(value.criticalRateBonus)?Math.max(0,value.criticalRateBonus):0,criticalDamageBonus:Number.isFinite(value.criticalDamageBonus)?Math.max(0,value.criticalDamageBonus):0}:null
 }
-function normalizeLoadout(value){
+function normalizeLoadout(value,cap=characterLevelCap()){
  const base=defaultLoadout();if(!value||typeof value!=='object')return base;
  base.characterDuplicates=Number.isInteger(value.characterDuplicates)?Math.max(0,Math.min(4,value.characterDuplicates)):0;
  const weapon=value.weapon&&typeof value.weapon==='object'?value.weapon:{};
  base.weapon.standardPotential=Number.isInteger(weapon.standardPotential)?Math.max(1,Math.min(5,weapon.standardPotential)):1;
  base.weapon.premiumPotential=Number.isInteger(weapon.premiumPotential)?Math.max(1,Math.min(5,weapon.premiumPotential)):1;
  base.weapon.premiumOwned=weapon.premiumOwned===true;
+ for(const type of ['standard','premium']){
+  const levelKey=type+'Level',expKey=type+'Exp',level=weapon[levelKey],exp=weapon[expKey];
+  const ascended=weapon[type+'Ascended'];base.weapon[type+'Ascended']=Array.isArray(ascended)?ASCENSION_GATES.filter(gate=>ascended.includes(gate)&&gate<=(Number.isInteger(level)?level:1)):[];
+  base.weapon[levelKey]=Number.isInteger(level)?Math.max(1,Math.min(cap,level)):1;
+  base.weapon[expKey]=Number.isSafeInteger(exp)&&exp>=0&&base.weapon[levelKey]<cap?exp:0;
+  while(base.weapon[levelKey]<cap&&(!ASCENSION_GATES.includes(base.weapon[levelKey])||base.weapon[type+'Ascended'].includes(base.weapon[levelKey]))&&base.weapon[expKey]>=requiredExp(base.weapon[levelKey])){
+   base.weapon[expKey]-=requiredExp(base.weapon[levelKey]);base.weapon[levelKey]++;
+  }
+  if(base.weapon[levelKey]>=cap)base.weapon[expKey]=0;
+ }
  base.weapon.selected=weapon.selected==='premium'&&base.weapon.premiumOwned?'premium':'standard';
  if(Array.isArray(value.runes))base.runes=Array.from({length:4},(_,i)=>normalizeRune(value.runes[i]));
  if(value.celestials&&typeof value.celestials==='object')for(const [key] of CELESTIALS){const n=value.celestials[key];base.celestials[key]=Number.isInteger(n)?Math.max(1,Math.min(10,n)):1}
@@ -1142,18 +1152,56 @@ function loadCharacterLoadouts(){let stored={};try{stored=JSON.parse(localStorag
 let characterLoadouts=loadCharacterLoadouts(),loadoutCharacterId='soul',selectedLoadoutRune=0,loadoutPage='characters',runeStatPicker=null;
 function loadoutFor(id=loadoutCharacterId){return characterLoadouts[id]||(characterLoadouts[id]=defaultLoadout())}
 function saveLoadouts(){try{localStorage.setItem(LOADOUT_KEY,JSON.stringify(characterLoadouts))}catch(e){}}
-const SAVE_FILE_FORMAT='two-tone-save',SAVE_FILE_VERSION=2;
+function defaultItemInventory(){return {bottles:{small:0,medium:0,large:0},books:{small:0,medium:0,large:0},cores:0,gems:0}}
+function normalizeItemInventory(value){
+ const base=defaultItemInventory();if(!value||typeof value!=='object'||Array.isArray(value))return base;
+ for(const [group] of [['bottles'],['books']])for(const size of ['small','medium','large']){
+  const count=value[group]?.[size];base[group][size]=Number.isSafeInteger(count)&&count>=0?count:0;
+ }
+ for(const id of ['cores','gems']){const count=value[id];base[id]=Number.isSafeInteger(count)&&count>=0?count:0}
+ return base;
+}
+function validItemInventory(value){
+ if(!value||typeof value!=='object'||Array.isArray(value))return false;
+ for(const key of ['cores','gems'])if(value[key]!==undefined&&(!Number.isSafeInteger(value[key])||value[key]<0))return false;
+ for(const group of ['bottles','books'])if(value[group]!==undefined){
+  if(!value[group]||typeof value[group]!=='object'||Array.isArray(value[group]))return false;
+  for(const size of ['small','medium','large'])if(value[group][size]!==undefined&&(!Number.isSafeInteger(value[group][size])||value[group][size]<0))return false;
+ }
+ return true;
+}
+function loadItemInventory(){try{return normalizeItemInventory(JSON.parse(localStorage.getItem(ITEM_INVENTORY_KEY)||'null'))}catch(e){return defaultItemInventory()}}
+let itemInventory=loadItemInventory();
+function saveItemInventory(){try{localStorage.setItem(ITEM_INVENTORY_KEY,JSON.stringify(itemInventory));return true}catch(e){return false}}
+function grantItem(itemId,amount=1){
+ if(!Number.isSafeInteger(amount)||amount<1)return false;
+ const match=/^(bottle|book):(small|medium|large)$/.exec(itemId||'');
+ if(match){const group=match[1]==='bottle'?'bottles':'books',next=itemInventory[group][match[2]]+amount;if(!Number.isSafeInteger(next))return false;itemInventory[group][match[2]]=next}
+ else if(['core','gem'].includes(itemId)){const key=itemId==='core'?'cores':'gems',next=itemInventory[key]+amount;if(!Number.isSafeInteger(next))return false;itemInventory[key]=next}
+ else return false;
+ saveItemInventory();return true;
+}
+function consumeItem(itemId,amount=1){
+ if(!Number.isSafeInteger(amount)||amount<1)return false;
+ const match=/^(bottle|book):(small|medium|large)$/.exec(itemId||'');
+ if(match){const group=match[1]==='bottle'?'bottles':'books';if(itemInventory[group][match[2]]<amount)return false;itemInventory[group][match[2]]-=amount}
+ else if(['core','gem'].includes(itemId)){const key=itemId==='core'?'cores':'gems';if(itemInventory[key]<amount)return false;itemInventory[key]-=amount}
+ else return false;
+ saveItemInventory();return true;
+}
+globalThis.TwoToneItems=Object.freeze({grant:grantItem,getInventory:()=>JSON.parse(JSON.stringify(itemInventory))});
+const SAVE_FILE_FORMAT='two-tone-save',SAVE_FILE_VERSION=3;
 function saveProgressFile(){
  try{
-  saveProgress();saveVitals();saveLoadouts();savePlayerRank();if(validTeam(draft))saveTeam();
-  const documentData={format:SAVE_FILE_FORMAT,version:SAVE_FILE_VERSION,savedAt:new Date().toISOString(),data:{playerRank,team:validTeam(draft)?[...draft]:loadTeam(),characterProgress,vitals:savedVitals,loadouts:characterLoadouts}};
+  saveProgress();saveVitals();saveLoadouts();saveItemInventory();savePlayerRank();if(validTeam(draft))saveTeam();
+  const documentData={format:SAVE_FILE_FORMAT,version:SAVE_FILE_VERSION,savedAt:new Date().toISOString(),data:{playerRank,team:validTeam(draft)?[...draft]:loadTeam(),characterProgress,vitals:savedVitals,loadouts:characterLoadouts,itemInventory}};
   const blob=new Blob([JSON.stringify(documentData,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');
   link.href=url;link.download=`two-tone-save-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   say('Save file downloaded. Keep it in Files to load on this or another device.');return true;
  }catch(error){say('The save file could not be created. Check available storage and try again.');return false}
 }
 function normalizeSaveFile(value){
- if(!value||typeof value!=='object'||value.format!==SAVE_FILE_FORMAT||![1,SAVE_FILE_VERSION].includes(value.version)||!value.data||typeof value.data!=='object')return null;
+ if(!value||typeof value!=='object'||value.format!==SAVE_FILE_FORMAT||![1,2,SAVE_FILE_VERSION].includes(value.version)||!value.data||typeof value.data!=='object')return null;
  const data={...value.data};
  if(value.version===1){data.team=Array.isArray(data.team)?data.team.map(id=>id==='zero'?'soul':id):data.team;data.characterProgress=moveLegacyCharacterRecord({...data.characterProgress});data.vitals=moveLegacyCharacterRecord({...data.vitals});data.loadouts=moveLegacyCharacterRecord({...data.loadouts})}
  const rank=data.playerRank,cap=characterLevelCap(rank);
@@ -1163,26 +1211,86 @@ function normalizeSaveFile(value){
  const vitals={};for(const model of ROSTER){const entry=data.vitals?.[model.id];if(entry===undefined)continue;if(!entry||typeof entry!=='object'||!Number.isFinite(entry.hp)||entry.hp<0||!Number.isFinite(entry.maxHp)||entry.maxHp<=0)return null;vitals[model.id]={hp:entry.hp,maxHp:entry.maxHp}}
  if(data.loadouts!==undefined&&(!data.loadouts||typeof data.loadouts!=='object'||Array.isArray(data.loadouts)))return null;
  const loadouts={};for(const model of ROSTER){const entry=data.loadouts?.[model.id];if(entry===undefined){loadouts[model.id]=defaultLoadout();continue}if(!entry||typeof entry!=='object'||!Number.isInteger(entry.characterDuplicates)||entry.characterDuplicates<0||entry.characterDuplicates>4)return null;
-  if(entry.weapon!==undefined&&(!entry.weapon||typeof entry.weapon!=='object'||!['standard','premium'].includes(entry.weapon.selected)||![entry.weapon.standardPotential,entry.weapon.premiumPotential].every(n=>Number.isInteger(n)&&n>=1&&n<=5)||typeof entry.weapon.premiumOwned!=='boolean'))return null;
+  if(entry.weapon!==undefined&&(!entry.weapon||typeof entry.weapon!=='object'||!['standard','premium'].includes(entry.weapon.selected)||![entry.weapon.standardPotential,entry.weapon.premiumPotential].every(n=>Number.isInteger(n)&&n>=1&&n<=5)||typeof entry.weapon.premiumOwned!=='boolean'||['standard','premium'].some(type=>(entry.weapon[type+'Level']!==undefined&&(!Number.isInteger(entry.weapon[type+'Level'])||entry.weapon[type+'Level']<1||entry.weapon[type+'Level']>cap))||(entry.weapon[type+'Exp']!==undefined&&(!Number.isSafeInteger(entry.weapon[type+'Exp'])||entry.weapon[type+'Exp']<0))||(entry.weapon[type+'Ascended']!==undefined&&(!Array.isArray(entry.weapon[type+'Ascended'])||entry.weapon[type+'Ascended'].some(gate=>!ASCENSION_GATES.includes(gate)))))))return null;
   if(entry.runes!==undefined&&(!Array.isArray(entry.runes)||entry.runes.length>4||entry.runes.some(rune=>rune!==null&&!normalizeRune(rune))))return null;
   if(entry.celestials!==undefined&&(!entry.celestials||typeof entry.celestials!=='object'||CELESTIALS.some(([key])=>!Number.isInteger(entry.celestials[key])||entry.celestials[key]<1||entry.celestials[key]>10)))return null;
-  loadouts[model.id]=normalizeLoadout(entry);
+  loadouts[model.id]=normalizeLoadout(entry,cap);
  }
- return {playerRank:rank,team:[...data.team],characterProgress:progress,vitals,loadouts};
+ const inventory=data.itemInventory===undefined?defaultItemInventory():normalizeItemInventory(data.itemInventory);
+ if(data.itemInventory!==undefined&&!validItemInventory(data.itemInventory))return null;
+ return {playerRank:rank,team:[...data.team],characterProgress:progress,vitals,loadouts,itemInventory:inventory};
 }
 function importSaveFile(value){
  const save=normalizeSaveFile(value);if(!save){say('This save file is invalid or from an unsupported version.');return false}
- let hasLocalProgress=false;try{hasLocalProgress=[TEAM_KEY,PROGRESSION_KEY,VITALS_KEY,LOADOUT_KEY].some(key=>localStorage.getItem(key)!==null)}catch(e){}
+ let hasLocalProgress=false;try{hasLocalProgress=[TEAM_KEY,PROGRESSION_KEY,VITALS_KEY,LOADOUT_KEY,ITEM_INVENTORY_KEY].some(key=>localStorage.getItem(key)!==null)}catch(e){}
  if(hasLocalProgress&&!window.confirm('Loading this file replaces the progress saved in this browser. Continue?'))return false;
- const entries=[[TEAM_KEY,JSON.stringify(save.team)],[PROGRESSION_KEY,JSON.stringify(save.characterProgress)],[VITALS_KEY,JSON.stringify(save.vitals)],[LOADOUT_KEY,JSON.stringify(save.loadouts)],[PLAYER_RANK_KEY,String(save.playerRank)]];
+ const entries=[[TEAM_KEY,JSON.stringify(save.team)],[PROGRESSION_KEY,JSON.stringify(save.characterProgress)],[VITALS_KEY,JSON.stringify(save.vitals)],[LOADOUT_KEY,JSON.stringify(save.loadouts)],[ITEM_INVENTORY_KEY,JSON.stringify(save.itemInventory)],[PLAYER_RANK_KEY,String(save.playerRank)]];
  const previous=entries.map(([key])=>{try{return localStorage.getItem(key)}catch(e){return null}});
  try{for(const [key,value] of entries)localStorage.setItem(key,value)}catch(error){entries.forEach(([key],index)=>{try{if(previous[index]===null)localStorage.removeItem(key);else localStorage.setItem(key,previous[index])}catch(e){}});say('Progress could not be restored because browser storage is unavailable.');return false}
- playerRank=save.playerRank;characterProgress=save.characterProgress;savedVitals=save.vitals;characterLoadouts=save.loadouts;draft=[...save.team];party=[];phase='menu';paused=false;activeId=null;actingEnemyId=null;fx=null;combatVisualEvents=[];enemies=[];gauges={};summons=[];ultimateQueue=[];ultimateExecuting=false;ultimateResume=null;turnTimeline.reset();battleToken++;cameraPreview=null;selectedAllyId=null;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;pendingVacancies=[];hint='';say('Progress loaded from save file.');return true;
+ playerRank=save.playerRank;characterProgress=save.characterProgress;savedVitals=save.vitals;characterLoadouts=save.loadouts;itemInventory=save.itemInventory;draft=[...save.team];party=[];phase='menu';paused=false;activeId=null;actingEnemyId=null;fx=null;combatVisualEvents=[];enemies=[];gauges={};summons=[];ultimateQueue=[];ultimateExecuting=false;ultimateResume=null;turnTimeline.reset();battleToken++;cameraPreview=null;selectedAllyId=null;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;pendingVacancies=[];hint='';say('Progress loaded from save file.');return true;
 }
 function requestSaveFileLoad(){const input=document.getElementById('save-file-picker');input.value='';input.click()}
-function weaponBonus(record){const w=record.weapon;return w.selected==='premium'&&w.premiumOwned?1+(w.premiumPotential-1)*.25:.8+(w.standardPotential-1)*.05}
+function weaponLevelCap(rank=playerRank){return characterLevelCap(rank)}
+function weaponPotentialMultiplier(type,potential,level){
+ if(!['standard','premium'].includes(type)||!Number.isInteger(potential)||potential<1||potential>5||!Number.isInteger(level)||level<1)return 0;
+ const levelOnePercent=type==='premium'?51+(potential-1)*25:31+(potential-1)*5;
+ return (levelOnePercent+level-1)/100;
+}
+function weaponProgress(record,type){const w=record.weapon;return {level:w[type+'Level'],exp:w[type+'Exp']}}
+function weaponBonus(record,id=loadoutCharacterId){
+ const w=record.weapon,type=w.selected==='premium'&&w.premiumOwned?'premium':'standard';
+ return weaponPotentialMultiplier(type,type==='premium'?w.premiumPotential:w.standardPotential,w[type+'Level']);
+}
+function settleWeaponProgress(weapon,type,cap=weaponLevelCap()){
+ const levelKey=type+'Level',expKey=type+'Exp',ascendedKey=type+'Ascended';let levelsGained=0;
+ while(weapon[levelKey]<cap){
+  if(ASCENSION_GATES.includes(weapon[levelKey])&&!weapon[ascendedKey].includes(weapon[levelKey]))break;
+  const needed=requiredExp(weapon[levelKey]);if(weapon[expKey]<needed)break;
+  weapon[expKey]-=needed;weapon[levelKey]++;levelsGained++;
+ }
+ if(weapon[levelKey]>=cap)weapon[expKey]=0;
+ return levelsGained;
+}
+function grantWeaponXp(id,type,amount){
+ if(!ROSTER_IDS.has(id)||!['standard','premium'].includes(type)||!Number.isSafeInteger(amount)||amount<=0)return false;
+ const record=loadoutFor(id),weapon=record.weapon,levelKey=type+'Level',expKey=type+'Exp',cap=weaponLevelCap();
+ if(type==='premium'&&!weapon.premiumOwned)return false;
+ if(weapon[levelKey]>=cap)return false;
+ const oldLevel=weapon[levelKey],exp=weapon[expKey]+amount;if(!Number.isSafeInteger(exp))return false;
+ weapon[expKey]=exp;const levelsGained=settleWeaponProgress(weapon,type,cap);saveLoadouts();
+ return {level:weapon[levelKey],exp:weapon[expKey],levelsGained,nextExp:requiredExp(weapon[levelKey])};
+}
+const ITEM_XP=Object.freeze({small:10,medium:100,large:1000});
+function useCharacterBottle(id,size){
+ const amount=ITEM_XP[size];if(!amount||!consumeItem('bottle:'+size))return false;
+ const result=grantCharacterXp(id,amount);if(!result){grantItem('bottle:'+size);return false}
+ return result;
+}
+function useWeaponBook(id,type,size){
+ const amount=ITEM_XP[size];if(!amount||!consumeItem('book:'+size))return false;
+ const result=grantWeaponXp(id,type,amount);if(!result){grantItem('book:'+size);return false}
+ return result;
+}
+function upgradeRuneWithCore(id,index){
+ const rune=loadoutFor(id).runes[index];if(!rune||rune.level>=5||!consumeItem('core'))return false;
+ rune.level++;saveLoadouts();return rune.level;
+}
+function upgradeCelestialWithCore(id,key){
+ const record=loadoutFor(id),level=record.celestials[key];if(!Number.isInteger(level)||level>=10||!consumeItem('core'))return false;
+ record.celestials[key]++;saveLoadouts();return record.celestials[key];
+}
+function ascendCharacterWithGem(id){
+ const progress=progressFor(id);if(!progress||!ASCENSION_GATES.includes(progress.level)||progress.ascended.includes(progress.level)||!consumeItem('gem'))return false;
+ if(testAscend(id))return true;grantItem('gem');return false;
+}
+function ascendWeaponWithGem(id,type){
+ if(!ROSTER_IDS.has(id)||!['standard','premium'].includes(type))return false;
+ const weapon=loadoutFor(id).weapon,level=weapon[type+'Level'],ascended=weapon[type+'Ascended'];
+ if(type==='premium'&&!weapon.premiumOwned||!ASCENSION_GATES.includes(level)||ascended.includes(level)||!consumeItem('gem'))return false;
+ ascended.push(level);settleWeaponProgress(weapon,type);saveLoadouts();return true;
+}
 function loadoutStatModifiers(id,characterLevel=1){
- const record=loadoutFor(id),bonus=weaponBonus(record),totals=Object.fromEntries(RUNE_STATS.map(k=>[k,0]));
+ const record=loadoutFor(id),bonus=weaponBonus(record,id),totals=Object.fromEntries(RUNE_STATS.map(k=>[k,0]));
  for(const rune of record.runes){if(!rune)continue;totals[rune.main]+=RUNE_STAT_INFO[rune.main].main*rune.level;for(const sub of rune.subs)totals[sub]+=RUNE_STAT_INFO[sub].main*.25*rune.level}
  const pct={signatureWeapon:bonus},criticalRateFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalRateBonus||0),0),criticalDamageFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalDamageBonus||0),0);
  return {hpFlatModifiers:{},hpPercentModifiers:pct,hpEquipmentFlatModifiers:{runes:totals.hp},
@@ -1218,7 +1326,7 @@ function handleLoadoutAction(action){
  else if(kind==='rune-select')selectedLoadoutRune=Math.max(0,Math.min(3,Number(arg)||0));
  else if(kind==='rune-equip'){const index=Math.max(0,Math.min(3,Number(arg)||0));record.runes[index]={level:1,main:'hp',subs:['physicalAttack','magicalAttack','physicalDefense'],setId:null};selectedLoadoutRune=index}
  else if(kind==='rune-remove')record.runes[selectedLoadoutRune]=null;
- else if(kind==='rune-level'&&rune)rune.level=Math.max(1,Math.min(5,rune.level+Number(arg)));
+ else if(kind==='rune-level'&&rune&&Number(arg)===1){const level=upgradeRuneWithCore(loadoutCharacterId,selectedLoadoutRune);say(level?`Rune upgraded to Level ${level}.`:'A Core is required and the Rune must be below Level 5.')}
  else if(kind==='rune-main'&&rune){runeStatPicker={slot:'main',subIndex:-1};return}
  else if(kind==='rune-sub'&&rune){const index=Number(arg);if(Number.isInteger(index)&&index>=0&&index<3){runeStatPicker={slot:'sub',subIndex:index};return}}
  else if(kind==='rune-picker-close'){runeStatPicker=null;return}
@@ -1230,7 +1338,11 @@ function handleLoadoutAction(action){
   }
   runeStatPicker=null;
  }
- else if(kind==='celestial'){const [key,delta]=arg.split(',');if(Object.hasOwn(record.celestials,key))record.celestials[key]=Math.max(1,Math.min(10,record.celestials[key]+Number(delta)))}
+ else if(kind==='celestial'){const [key,delta]=arg.split(',');if(Number(delta)===1){const level=upgradeCelestialWithCore(loadoutCharacterId,key);say(level?`${key} Celestial upgraded to Level ${level}.`:'A Core is required and the Celestial must be below Level 10.')}}
+ else if(kind==='bottle'){const result=useCharacterBottle(loadoutCharacterId,arg);say(result?`${arg} Enchanted Bottle used. ${result.levelsGained?`Character reached Level ${result.level}.`:`${result.exp} XP remains toward the next level.`}`:'Bottle unavailable or character is at their level cap.')}
+ else if(kind==='book'){const [type,size]=arg.split(',');const result=useWeaponBook(loadoutCharacterId,type,size);say(result?`${size} Experience Book used. ${result.levelsGained?`Weapon reached Level ${result.level}.`:`${result.exp} XP is stored at this level.`}`:'Book unavailable, weapon locked, or weapon is at its level cap.')}
+ else if(kind==='ascend-character'){say(ascendCharacterWithGem(loadoutCharacterId)?'Ascension completed. One Gem was consumed.':'One Gem is required at a valid Ascension gate.')}
+ else if(kind==='ascend-weapon'){say(ascendWeaponWithGem(loadoutCharacterId,arg)?'Weapon Ascension completed. One Gem was consumed.':'One Gem is required at a valid weapon Ascension gate.')}
  saveLoadouts()
 }
 function loadoutPanel(title,subtitle,backLabel='BACK'){
@@ -1265,25 +1377,30 @@ function drawLoadoutMenu(){
 }
 function drawLoadoutWeapons(){
  const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId),w=record.weapon;
- loadoutPanel(model.name+' • WEAPONS','Each character can use only their own Standard or Premium signature weapon.');
- const standardBonus=Math.round((.8+(w.standardPotential-1)*.05)*100),premiumBonus=Math.round((1+(w.premiumPotential-1)*.25)*100);
- const cards=[{x:145,label:'STANDARD SIGNATURE',selected:w.selected==='standard',bonus:standardBonus,potential:w.standardPotential,type:'standard'},
-              {x:825,label:'PREMIUM SIGNATURE',selected:w.selected==='premium',bonus:premiumBonus,potential:w.premiumPotential,type:'premium'}];
+ loadoutPanel(model.name+' • WEAPONS',`Each weapon levels independently. Experience Books: S ${itemInventory.books.small} • M ${itemInventory.books.medium} • L ${itemInventory.books.large}.`);
+ const cap=weaponLevelCap();
+ const cards=[{x:145,label:'STANDARD SIGNATURE',selected:w.selected==='standard',potential:w.standardPotential,type:'standard'},
+              {x:825,label:'PREMIUM SIGNATURE',selected:w.selected==='premium',potential:w.premiumPotential,type:'premium'}];
  for(const c of cards){
+  const level=w[c.type+'Level'],exp=w[c.type+'Exp'],needed=requiredExp(level),bonus=weaponPotentialMultiplier(c.type,c.potential,level)*100,atGate=ASCENSION_GATES.includes(level)&&!w[c.type+'Ascended'].includes(level);
   rect(c.x,205,630,470,'rgba(25,37,58,.94)',c.selected?'#edcf98':'#718ba4',14);
   text(c.label,c.x+30,245,22,'#f3dfb9','850');
   text(c.type==='standard'?'Included with '+model.name:'Acquired in the Store',c.x+30,278,15,'#c4d6e5','550');
-  text('+'+c.bonus+'% to all six stats',c.x+30,350,28,'#f4d99c','800');
-  text('POTENTIAL '+c.potential+' / 5',c.x+30,405,18,'#d6e2ef','750');
+  text('+'+bonus.toFixed(2).replace(/0+$/,'').replace(/\.$/,'')+'% to all six stats',c.x+30,340,26,'#f4d99c','800');
+  text('POTENTIAL '+c.potential+' / 5   •   LEVEL '+level+' / '+cap,c.x+30,382,17,'#d6e2ef','750');
+  text(atGate?'ASCENSION REQUIRED':level>=cap?'WEAPON LEVEL CAP REACHED':`XP  ${exp} / ${needed}  •  ${needed-exp} XP TO NEXT LEVEL`,c.x+30,414,15,'#c4d6e5','600');
   const usable=c.type==='standard'||w.premiumOwned;
-  addButton(c.x+30,438,570,64,c.type==='standard'?'loadout:weapon-standard':'loadout:weapon-premium',
+  addButton(c.x+30,442,570,58,c.type==='standard'?'loadout:weapon-standard':'loadout:weapon-premium',
     usable?(c.selected?'EQUIPPED':'EQUIP'): 'PREMIUM • STORE LOCKED',
     usable?'Signature weapon • character locked':'Premium weapon is not owned',usable);
   if(c.type==='standard'||w.premiumOwned){
-   addButton(c.x+180,528,90,54,'loadout:potential:'+c.type+',-1','−','',c.potential>1);
-   addButton(c.x+360,528,90,54,'loadout:potential:'+c.type+',1','+','',c.potential<5);
-   text('Each potential changes the stat bonus.',c.x+315,613,14,'#aebfd0','550','center');
+   addButton(c.x+180,515,90,50,'loadout:potential:'+c.type+',-1','−','',c.potential>1);
+   addButton(c.x+360,515,90,50,'loadout:potential:'+c.type+',1','+','',c.potential<5);
   }
+  if(atGate)addButton(c.x+145,570,340,34,'loadout:ascend-weapon:'+c.type,'ASCEND • 1 GEM','GEMS ×'+itemInventory.gems,itemInventory.gems>0&&(c.type==='standard'||w.premiumOwned));
+  addButton(c.x+26,610,178,48,'loadout:book:'+c.type+',small','SMALL BOOK','×'+itemInventory.books.small,itemInventory.books.small>0&&usable&&level<cap);
+  addButton(c.x+216,610,178,48,'loadout:book:'+c.type+',medium','MEDIUM BOOK','×'+itemInventory.books.medium,itemInventory.books.medium>0&&usable&&level<cap);
+  addButton(c.x+406,610,178,48,'loadout:book:'+c.type+',large','LARGE BOOK','×'+itemInventory.books.large,itemInventory.books.large>0&&usable&&level<cap);
  }
  rect(145,705,1310,95,'rgba(25,37,58,.94)','#536983',12);
  const zeroPremiumEffect=['Ultimate restores 1 Skill Point.','Duplicate 1: Basic applies 1 Bleed stack.','Duplicate 2: Ultimate costs 80 Energy.','Duplicate 3: Ignore 20% of enemy Physical Defense.','Duplicate 4: Double Cutthroat’s bonus stats.'];
@@ -1322,8 +1439,7 @@ function drawLoadoutRunes(){
    continue;
   }
   text('LEVEL '+rune.level+' / 5',x+250,y+32,15,'#f1dfbf','750','center');
-  addButton(x+306,y+12,44,42,'loadout:rune-level:-1','−','',rune.level>1);
-  addButton(x+356,y+12,44,42,'loadout:rune-level:1','+','',rune.level<5);
+  addButton(x+315,y+12,125,42,'loadout:rune-level:1','UPGRADE','CORE ×'+itemInventory.cores,rune.level<5&&itemInventory.cores>0);
   addButton(x+540,y+12,92,42,'loadout:rune-remove','UNEQUIP');
   const main=RUNE_STAT_INFO[rune.main];
   addButton(x+24,y+58,602,64,'loadout:rune-main','MAIN STAT • '+main.label,'+'+(main.main*rune.level)+' • SELECT TO CHANGE');
@@ -1336,15 +1452,14 @@ function drawLoadoutRunes(){
 }
 function drawLoadoutCelestials(){
  const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId);
- loadoutPanel(model.name+' • CELESTIALS','Four ability-specific upgrades. Each level adds 10% to that ability’s base multiplier.');
+ loadoutPanel(model.name+' • CELESTIALS',`Four ability upgrades. Each level adds 10% to its base multiplier. Cores: ${itemInventory.cores}.`);
  for(let i=0;i<CELESTIALS.length;i++){
   const [key,label]=CELESTIALS[i],x=165+(i%2)*650,y=195+Math.floor(i/2)*292,level=record.celestials[key];
   rect(x,y,600,258,'rgba(25,37,58,.94)','#718ba4',14);
   text(label.toUpperCase(),x+30,y+48,22,'#f3dfb9','850');
   text('LEVEL '+level+' / 10',x+30,y+100,20,'#d6e2ef','700');
   text('+'+(level*10)+'% base multiplier',x+30,y+145,17,'#f4d99c','750');
-  addButton(x+330,y+75,92,70,'loadout:celestial:'+key+',-1','−','',level>1);
-  addButton(x+445,y+75,92,70,'loadout:celestial:'+key+',1','+','',level<10);
+  addButton(x+390,y+75,150,70,'loadout:celestial:'+key+',1','UPGRADE','1 CORE',level<10&&itemInventory.cores>0);
  }
 }
 function drawLoadoutLevels(){
@@ -1357,8 +1472,13 @@ function drawLoadoutLevels(){
  text(progress.level>=cap?'Current level cap reached':atGate?'Ascension required at this level':'EXP  '+progress.exp+' / '+expNeeded,165,345,18,'#d6e2ef','700');
  text('Account rank '+playerRank+' sets the current level cap.',165,398,15,'#aebfd0','550');
  text('Ascensions completed: '+(progress.ascended.length?progress.ascended.join(', '):'none'),165,434,14,'#aebfd0','550');
+ if(atGate)addButton(165,448,250,42,'loadout:ascend-character','ASCEND • 1 GEM','GEMS ×'+itemInventory.gems,itemInventory.gems>0);
  text('Level scaling multiplies base stats by character level.',165,490,14,'#c4d6e5','550');
- text('EXP sources and ascension materials are not configured.',165,520,14,'#c4d6e5','550');
+ text('ENCHANTED BOTTLES  •  S '+itemInventory.bottles.small+'   M '+itemInventory.bottles.medium+'   L '+itemInventory.bottles.large,165,520,14,'#c4d6e5','650');
+ const canUseBottle=progress.level<cap;
+ addButton(165,536,165,38,'loadout:bottle:small','SMALL BOTTLE','10 XP • ×'+itemInventory.bottles.small,itemInventory.bottles.small>0&&canUseBottle);
+ addButton(340,536,165,38,'loadout:bottle:medium','MEDIUM BOTTLE','100 XP • ×'+itemInventory.bottles.medium,itemInventory.bottles.medium>0&&canUseBottle);
+ addButton(515,536,165,38,'loadout:bottle:large','LARGE BOTTLE','1,000 XP • ×'+itemInventory.bottles.large,itemInventory.bottles.large>0&&canUseBottle);
  text('CURRENT COMBAT STATS',165,580,17,'#f3dfb9','800');
  const statList=Object.entries(stats||{});
  for(let i=0;i<statList.length;i++){
@@ -1416,8 +1536,30 @@ function drawMainMenu(){
    text('COMING SOON',item.x+160,item.y+112,14,'#9ca9b9','650','center');
   }
  }
+ addButton(220,676,320,76,'open-inventory','ITEMS','VIEW AND USE MATERIALS');
  addButton(640,676,320,76,'save-progress','SAVE','DOWNLOAD A SAVE FILE');
+ addButton(1060,676,320,76,'open-challenges','CHALLENGES','REWARD TRACKER');
  text('Select a section to continue',800,786,17,'#d6dceb','550','center');
+}
+function drawItemInventory(){
+ drawBackground();rect(0,0,W,H,'rgba(5,9,22,.74)');rect(105,55,1390,790,'rgba(13,20,39,.98)','#ccb88e',20);
+ text('ITEM INVENTORY',155,112,40,'#ffedd1','850');addButton(1280,78,165,52,'main-menu','MAIN MENU','');
+ const sections=[
+  {x:155,y:165,title:'ENCHANTED BOTTLES • CHARACTER XP',items:[['Small',itemInventory.bottles.small,'10 XP'],['Medium',itemInventory.bottles.medium,'100 XP'],['Large',itemInventory.bottles.large,'1,000 XP']]},
+  {x:825,y:165,title:'EXPERIENCE BOOKS • WEAPON XP',items:[['Small',itemInventory.books.small,'10 XP'],['Medium',itemInventory.books.medium,'100 XP'],['Large',itemInventory.books.large,'1,000 XP']]},
+  {x:155,y:475,title:'CORES',items:[['Cores',itemInventory.cores,'Upgrade one Rune or Celestial by one level']]},
+  {x:825,y:475,title:'GEMS',items:[['Gems',itemInventory.gems,'One Gem per character or weapon Ascension']]},
+ ];
+ for(const section of sections){rect(section.x,section.y,620,255,'rgba(25,37,58,.94)','#718ba4',14);text(section.title,section.x+24,section.y+40,19,'#f3dfb9','850');
+  section.items.forEach((item,index)=>{const y=section.y+87+index*48;text(item[0],section.x+28,y,17,'#d6e2ef','650');text('×'+item[1],section.x+188,y,18,'#fff1d5','800');text(item[2],section.x+260,y,15,'#aebfd0','550')});
+ }
+ text('Use bottles, books, Cores, and Gems from the relevant Loadout screen.',800,790,16,'#c4d6e5','550','center');
+}
+function drawChallenges(){
+ drawBackground();rect(0,0,W,H,'rgba(5,9,22,.74)');rect(180,100,1240,700,'rgba(13,20,39,.98)','#ccb88e',20);
+ text('CHALLENGES',235,165,40,'#ffedd1','850');addButton(1200,125,165,52,'main-menu','MAIN MENU','');
+ text('Challenge rewards are not configured yet.',800,380,25,'#d6e2ef','700','center');
+ text('Challenge rewards can include Enchanted Bottles and Experience Books.',800,430,18,'#c4d6e5','550','center');
 }
 function drawPartySetup(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.72)');
@@ -2129,12 +2271,12 @@ function drawSetup(){
 // Transient hint popovers belong to menus and setup screens. Combat has
 // dedicated turn, targeting, and action-resolution cues; overlaying another
 // message on the battlefield obscures character cards and action effects.
-function drawHint(t){if(hint&&t-hintAt<2300&&['startup','menu','partySetup','loadout','setup'].includes(phase)){rect(474,393,652,76,'rgba(15,21,39,.98)','#e6b98a',12);text(hint,800,431,20,'#fff4e8','700','center')}}
-function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='startup'){drawStartupMenu()}else if(phase==='menu'){drawMainMenu()}else if(phase==='partySetup'){drawPartySetup()}else if(phase==='loadout'){drawLoadout()}else if(phase!=='setup'){
+function drawHint(t){if(hint&&t-hintAt<2300&&['startup','menu','partySetup','loadout','inventory','challenges','setup'].includes(phase)){rect(474,393,652,76,'rgba(15,21,39,.98)','#e6b98a',12);text(hint,800,431,20,'#fff4e8','700','center')}}
+function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='startup'){drawStartupMenu()}else if(phase==='menu'){drawMainMenu()}else if(phase==='partySetup'){drawPartySetup()}else if(phase==='loadout'){drawLoadout()}else if(phase==='inventory'){drawItemInventory()}else if(phase==='challenges'){drawChallenges()}else if(phase!=='setup'){
   drawCameraStage(t);drawFx(t);drawHud(t)
  }else{drawCameraStage(t);drawSetup()}drawHint(t);requestAnimationFrame(loop)}
 function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('roster-')){setEnemyRoster(cmd.slice(7));return}if(cmd.startsWith('loadout:')){handleLoadoutAction(cmd.slice(8));return}if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'){devPanelOpen=!devPanelOpen;return}if(cmd==='cancel-target'){cancelTargetSelection();return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(cameraPreview==='party'&&(phase==='player'||pendingTargetAction?.targetSide==='ally')){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(pendingTargetAction?.targetSide==='ally'&&pendingTargetAction.targetScope==='all'){if(!p||p.hp<=0){say('Choose a living party member to confirm the team skill.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;return executeCombatAction(actor,pending.action)}if(pendingTargetAction?.targetSide==='ally'){if(!p||p.hp<=0){say('Tune and Dawn’s Ultimate need a living ally.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;if(pending.action==='ultimate')return queueUltimate(pending.actorId,id);return executeCombatAction(actor,pending.action,null,id)}if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){beginTargetSelection('ultimate',cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){chargeUltimateForTest(cmd.slice(11));return}
- switch(cmd){case 'startup-start':phase='menu';hint='';break;case 'startup-load':requestSaveFileLoad();break;case 'save-progress':saveProgressFile();break;case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'support-heal':startSupportDemo('heal');break;case 'support-revive':startSupportDemo('revive');break;case 'confirm-support':confirmSupportDemo();break;case 'cancel-support':cancelSupportDemo();break;case 'camera-party':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':toggleWavePreset();break;case 'toggle-recovery':setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':testKO();break;case 'test-revive':testRevive();break;case 'skill':play('skill');break;case 'cap-test':cycleSpCapTest();break;case 'hud-status-test':toggleHudStatusDemo();break;case 'f05-advance':addActionAdvance(activeId,25);break;case 'f05-delay':addActionDelay(activeId,25);break;case 'f05-speed':setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':queueSummonForTest('independent');break;case 'f05-summon-controlled':queueSummonForTest('controlled');break;
+ switch(cmd){case 'startup-start':phase='menu';hint='';break;case 'startup-load':requestSaveFileLoad();break;case 'open-inventory':phase='inventory';hint='';break;case 'open-challenges':phase='challenges';hint='';break;case 'save-progress':saveProgressFile();break;case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'support-heal':startSupportDemo('heal');break;case 'support-revive':startSupportDemo('revive');break;case 'confirm-support':confirmSupportDemo();break;case 'cancel-support':cancelSupportDemo();break;case 'camera-party':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':toggleWavePreset();break;case 'toggle-recovery':setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':testKO();break;case 'test-revive':testRevive();break;case 'skill':play('skill');break;case 'cap-test':cycleSpCapTest();break;case 'hud-status-test':toggleHudStatusDemo();break;case 'f05-advance':addActionAdvance(activeId,25);break;case 'f05-delay':addActionDelay(activeId,25);break;case 'f05-speed':setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':queueSummonForTest('independent');break;case 'f05-summon-controlled':queueSummonForTest('controlled');break;
  case 'progress-test-level':{const a=active(),p=a&&progressFor(a.id);if(a&&p){const cost=Math.max(1,requiredExp(a.level)-p.exp),result=testGrantExp(a.id,cost);say(result?`TEST ONLY: level ${result.level}, ${cost} EXP injected.`:'Ascension required or level cap reached.');}break}
  case 'progress-test-ascend':{const a=active();if(a)say(testAscend(a.id)?`TEST ONLY: level ${a.level} ascension unlocked (no materials).`:'Not at a locked ascension gate.');break}
  case 'hp-test-flat':{const a=active();if(a)setHpBonusForTest(a.id,'debug-flat','flat',(a.hpFlatModifiers['debug-flat']||0)+20);break}
@@ -2160,7 +2302,7 @@ canvas.addEventListener('pointerdown',e=>{e.preventDefault();const r=canvas.getB
 window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)cancelTargetSelection();if(e.key==='1')play('basic');if(e.key==='2')play('skill');if(e.key==='3')play('ultimate');if(e.key.toLowerCase()==='m'&&phase==='player')cycleSpCapTest();if(['q','w','e','f'].includes(e.key.toLowerCase())&&phase==='player')setTargetingMode(({q:'single',w:'blast',e:'aoe',f:'five-hit'})[e.key.toLowerCase()]);if(e.key.toLowerCase()==='v'&&phase==='player'){cameraPreview=cameraPreview==='party'?null:'party';selectedAllyId=activeId}if(e.key.toLowerCase()==='t'&&phase==='player')cameraPreview=cameraPreview==='target'?null:'target';if(e.key.toLowerCase()==='r'&&phase!=='setup')replay()});window.addEventListener('contextmenu',e=>e.preventDefault());
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.18',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.22',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
  characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
  unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}})),
@@ -2170,6 +2312,7 @@ window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLeve
  unitMagicalDefense:party.map(p=>({id:p.id,level:p.level,baseMagicalDefense:p.baseMagicalDefense,magicalDefense:calculateMagicalDefense(p),flat:{...p.magicalDefenseFlatModifiers},percent:{...p.magicalDefensePercentModifiers}})),
  unitTrueDamageBasis:party.map(p=>({id:p.id,trueAttack:calculateTrueAttack(p),trueDefense:calculateTrueDefense(p),selfTrueDamageReduction:calculateTrueDamageReduction(p,p)}))});
 window.twoToneTest={testGrantExp,testAscend,setPlayerRankForTest,setHpBonusForTest,calculateMaxHp,calculateLevelScaledStat,calculatePhysicalAttack,calculateMagicalAttack,calculatePhysicalDefense,calculateMagicalDefense,calculateTrueAttack,calculateTrueDefense,calculateTrueDamageReduction,calculateDamageAfterDefense,calculatePhysicalDamageAfterDefense,calculateMagicalDamageAfterDefense,calculateTrueDamageAfterDefense,calculateTypedActionDamage,requiredExp,setTrainingRecoveryMode,roundHp,addActionAdvance,addActionDelay,setSpeedMultiplierForTest,queueSummonForTest,turnTimelineSnapshot:()=>turnTimeline.snapshot(),queueUltimate,chargeUltimateForTest,toggleHudStatusDemo,setHudStatusesForTest:(id,items)=>{const p=party.find(p=>p.id===id);if(!p||!Array.isArray(items)||items.length>80)return false;p.hudStatuses=items.map(e=>({kind:e.kind==='debuff'?'debuff':'buff',icon:String(e.icon||'✦').slice(0,2),turns:e.turns===null?null:(Number.isInteger(e.turns)&&e.turns>=0?e.turns:null)}));return true;},setSpCapTestSource,cycleSpCapTest,canQueueUltimate,debugKOForTest:(id)=>{if(['setup','intro','victory','defeat'].includes(phase))return false;const p=party.find(p=>p.id===id);if(!p||p.hp<=0)return false;p.hp=0;gauges[p.id]=0;saveVitals();cancelQueuedUltimatesOfDefeated();return true},startBattle,addUnit,removeUnit,enterSelection,enterPartySetup,saveParty,testKO,testRevive,play,replay,zeroSkillControl,setTargetingMode,startSupportDemo,confirmSupportDemo,cancelSupportDemo,eligibleAllyTarget:(id,kind)=>eligibleAllyTarget(party.find(p=>p.id===id),kind),setEnemyHpForTest:(id,hp)=>{if(phase!=='player'||attackInProgress)return false;const e=liveEnemies().find(e=>e.id===id);if(!e||!Number.isFinite(hp)||hp<1||hp>e.maxHp)return false;e.hp=hp;syncEnemyHp();return true},applyBleedForTest:(enemyId,sourceId,stacks=1,maxStacks=5)=>{const enemy=liveEnemies().find(unit=>unit.id===enemyId),source=party.find(unit=>unit.id===sourceId);return enemy&&source?applyBleed(enemy,source,stacks,maxStacks):false},setEnemyTarget,setWavePlanForTest,toggleWavePreset,setEnemyRoster,debugDefeatEnemy:(id)=>{const e=liveEnemies().find(e=>e.id===id);if(!e||phase==='setup'||phase==='victory'||phase==='defeat')return false;e.hp=0;resolveEnemyDefeat(e);return true;},selectEnemy:(id)=>setEnemyTarget(id),setCameraPreview:(view)=>{if(phase==='player'){cameraPreview=view;selectedAllyId=activeId}},cameraStatus:()=>cameraShot()};
+window.twoToneTest.grantWeaponXp=grantWeaponXp;window.twoToneTest.weaponLevelCap=weaponLevelCap;window.twoToneTest.weaponPotentialMultiplier=weaponPotentialMultiplier;
 window.zeroBasicAnimationDebug=()=>({durationMs:SOUL_BASIC_MS,elapsed:fx?.kind==='basic'&&fx.actor==='soul'?Math.max(0,performance.now()-fx.at):null,active:soulBasicStage(performance.now())!==null,assets:['soul','soulBasicWindup','soulBasicSlash'].map(id=>({id,loaded:!!images[id]?.complete&&!!images[id]?.naturalWidth}))});
 window.twoToneTest.applyTauntForTest=(targetId,sourceId,rate,turns)=>{const target=party.find(unit=>unit.id===targetId)||enemies.find(unit=>unit.id===targetId),source=party.find(unit=>unit.id===sourceId)||enemies.find(unit=>unit.id===sourceId);return target&&source?applyTaunt(target,source,rate,turns):false};
 window.twoToneTauntStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,activeRate:tauntRateOf(unit),effects:(unit.tauntEffects||[]).map(effect=>({...effect}))}));
