@@ -1485,7 +1485,7 @@ function drawLoadoutRunes(){
   text('RUNE SLOT '+(i+1),x+24,y+32,18,'#d6e2ef','850');
   addButton(x+450,y+12,82,42,'loadout:rune-select:'+i,'SELECT','',selected);
   if(!rune){
-   text(DEV_MODE?'Empty slot':'No rune equipped',x+30,y+104,18,'#aebfd0','550');
+   text('EMPTY',x+30,y+104,18,'#aebfd0','650');
    if(DEV_MODE)addButton(x+30,y+150,590,64,'loadout:rune-equip:'+i,'ADD RUNE • PREVIEW','Rune inventory and set bonuses are not configured');
    continue;
   }
@@ -1641,8 +1641,8 @@ function drawLoadoutRunesPanel(record){
  text('CORES ×'+itemInventory.cores,1090,191,12,'#b9c8d7','650');
  for(let i=0;i<4;i++){
   const y=218+i*151,rune=record.runes[i],active=i===selectedLoadoutRune;rect(1083,y,462,138,'rgba(27,39,59,.78)',active?'#d5ba7c':'rgba(148,169,194,.35)',12);
-  addButton(1094,y+9,95,37,'loadout:rune-select:'+i,'SLOT '+(i+1),rune?'LEVEL '+rune.level+'/5':'EMPTY',true,12);
-  if(!rune){if(DEV_MODE)addButton(1200,y+9,330,37,'loadout:rune-equip:'+i,'ADD RUNE • PREVIEW','',true,11);else text('No rune equipped',1210,y+33,13,'#aebed0','550');continue}
+  addButton(1094,y+9,95,37,'loadout:rune-select:'+i,'SLOT '+(i+1),rune?'LEVEL '+rune.level+'/5':'',true,12);
+  if(!rune){text('EMPTY',1210,y+33,13,'#aebed0','700');if(DEV_MODE)addButton(1200,y+59,330,37,'loadout:rune-equip:'+i,'ADD RUNE • PREVIEW','',true,11);continue}
   const main=RUNE_STAT_INFO[rune.main];addButton(1197,y+9,220,37,'loadout:rune-main',main.label.toUpperCase(),'+'+(main.main*rune.level)+' • MAIN STAT',true,11);
   addButton(1425,y+9,105,37,'loadout:rune-level:1','UPGRADE','CORE ×'+itemInventory.cores,rune.level<5&&itemInventory.cores>0,10);
   for(let j=0;j<3;j++){const info=RUNE_STAT_INFO[rune.subs[j]];addButton(1094+j*137,y+59,128,54,'loadout:rune-sub:'+j,info.label,'+'+(info.main*.25*rune.level),true,10)}
@@ -2743,7 +2743,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)c
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 if(DEV_MODE){
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.43',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.44',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
  characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
  unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}})),
