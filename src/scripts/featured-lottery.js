@@ -43,7 +43,7 @@
  function draw({type,wallet,pools}){
   const track=trackFor(type),featuredPool=pools?.featured||[],offFeaturePool=pools?.offFeature||[];
   const rarePool=pools?.rare||[{id:'core',name:'Core',inventoryItem:'core',quantity:1},{id:'gem',name:'Gem',inventoryItem:'gem',quantity:1}];
-  const commonPool=pools?.common||[type==='character'?{id:'large-enchanted-bottles',name:'Large Enchanted Bottles',inventoryItem:'bottle:large',quantity:5}:{id:'large-experience-books',name:'Large Experience Books',inventoryItem:'book:large',quantity:5}];
+  const commonPool=pools?.common||[type==='character'?{id:'large-enchanted-bottles',name:'Large Enchanted Bottles',inventoryItem:'bottle:large',quantity:5}:{id:'large-enchanted-books',name:'Large Enchanted Books',inventoryItem:'book:large',quantity:5}];
   if(!Number.isFinite(wallet)||wallet<RULES.ticketCost)return {ok:false,reason:'insufficient-coins'};
   if(!track.target||!featuredPool.some(item=>item.id===track.target))return {ok:false,reason:'target-required'};
   if(!offFeaturePool.length||!rarePool.length||!commonPool.length)return {ok:false,reason:'reward-pool-empty'};

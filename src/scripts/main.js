@@ -1,5 +1,5 @@
 'use strict';
-const sources={arena:'/assets/embedded-image-01.png',area1Background:'/assets/area-1-meadow.jpg',soul:'/assets/soul-battle.png',lily:'/assets/lily-front.png',lilyFront:'/assets/lily-front.png',lilyBack:'/assets/lily-back.png',dawnBattle:'/assets/dawn-battle.png',dawnFront:'/assets/dawn-front.png',loganBattle:'/assets/logan.png',loganFront:'/assets/logan-front.png',loganPortrait:'/assets/logan-front.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',slimeLeaderBattle:'/assets/slime-leader.png',slimeLeaderArtwork:'/assets/slime-leader.png',slimeMonsterBattle:'/assets/slime-monster.png',slimeMonsterArtwork:'/assets/slime-monster.png',wolfBattle:'/assets/wolf.png',wolfArtwork:'/assets/wolf-artwork.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',soulFront:'/assets/soul-portrait.png',zeroFront:'/assets/zero.png',zeroBattle:'/assets/zero-battle.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png'};
+const sources={arena:'/assets/embedded-image-01.png',area1Background:'/assets/area-1-meadow.jpg',soul:'/assets/soul-battle.png',lily:'/assets/lily-front.png',lilyFront:'/assets/lily-front.png',lilyBack:'/assets/lily-back.png',dawnBattle:'/assets/dawn-battle.png',dawnFront:'/assets/dawn-front.png',loganBattle:'/assets/logan.png',loganFront:'/assets/logan-front.png',loganPortrait:'/assets/logan-front.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',slimeLeaderBattle:'/assets/slime-leader.png',slimeLeaderArtwork:'/assets/slime-leader.png',slimeMonsterBattle:'/assets/slime-monster.png',slimeMonsterArtwork:'/assets/slime-monster.png',wolfBattle:'/assets/wolf.png',wolfArtwork:'/assets/wolf-artwork.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',soulFront:'/assets/soul-portrait.png',zeroFront:'/assets/zero.png',zeroBattle:'/assets/zero-battle.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png',enchantedBottleSmall:'/assets/enchanted-bottle-small.png',enchantedBottleMedium:'/assets/enchanted-bottle-medium.png',enchantedBottleLarge:'/assets/enchanted-bottle-large.png',enchantedBookSmall:'/assets/enchanted-book-small.png',enchantedBookMedium:'/assets/enchanted-book-medium.png',enchantedBookLarge:'/assets/enchanted-book-large.png',core:'/assets/core.png',gem:'/assets/gem.png',coin:'/assets/coins.png'};
 const BATTLE_AREAS=Object.freeze({
  'area-1':Object.freeze({name:'Area 1',background:'area1Background'})
 });
@@ -1111,7 +1111,7 @@ function shieldedHealthBar(x,y,w,h,hp,maxHp,shield,fill='#72e3ae',background='#3
  const extra=Math.min(w*.12,Math.max(3,w*shield/maxHp)),covered=Math.min(w*1.12,w*Math.max(0,hp/maxHp)+extra);
  ctx.save();ctx.fillStyle='rgba(178,187,196,.48)';ctx.beginPath();ctx.roundRect(x,y-4,covered,h+8,Math.min(7,(h+8)/2));ctx.fill();ctx.restore();
 }
-function addButton(x,y,w,h,action,label,sub='',enabled=true){choiceRects.push({x,y,w,h,action,enabled});rect(x,y,w,h,enabled?'#263754':'#1d2538',enabled?'#a5c9dc':'#526176',11);text(label,x+w/2,y+h/2-(sub?10:0),19,enabled?'#fff4e6':'#9eafc1','750','center');if(sub)text(sub,x+w/2,y+h/2+16,13,'#bacadb','500','center')}
+function addButton(x,y,w,h,action,label,sub='',enabled=true,labelSize=19){choiceRects.push({x,y,w,h,action,enabled});rect(x,y,w,h,enabled?'#263754':'#1d2538',enabled?'#a5c9dc':'#526176',11);text(label,x+w/2,y+h/2-(sub?10:0),labelSize,enabled?'#fff4e6':'#9eafc1','750','center');if(sub)text(sub,x+w/2,y+h/2+16,13,'#bacadb','500','center')}
 function drawBackground(){ctx.imageSmoothingEnabled=false;if(images.arena.complete&&images.arena.naturalWidth)ctx.drawImage(images.arena,0,0,W,H);else{rect(0,0,W,H,'#596f83');rect(0,480,W,420,'#a38f9e')}rect(0,0,W,165,'rgba(8,10,22,.24)');const shade=ctx.createLinearGradient(0,580,0,900);shade.addColorStop(0,'#17122500');shade.addColorStop(1,'#090d23dc');rect(0,560,W,340,shade)}
 
 const RUNE_STATS=['hp','physicalAttack','magicalAttack','physicalDefense','magicalDefense','speed'];
@@ -1347,7 +1347,7 @@ function handleLoadoutAction(action){
  }
  else if(kind==='celestial'){const [key,delta]=arg.split(',');if(Number(delta)===1){const level=upgradeCelestialWithCore(loadoutCharacterId,key);say(level?`${key} Celestial upgraded to Level ${level}.`:'A Core is required and the Celestial must be below Level 10.')}}
  else if(kind==='bottle'){const result=useCharacterBottle(loadoutCharacterId,arg);say(result?`${arg} Enchanted Bottle used. ${result.levelsGained?`Character reached Level ${result.level}.`:`${result.exp} XP remains toward the next level.`}`:'Bottle unavailable or character is at their level cap.')}
- else if(kind==='book'){const [type,size]=arg.split(',');const result=useWeaponBook(loadoutCharacterId,type,size);say(result?`${size} Experience Book used. ${result.levelsGained?`Weapon reached Level ${result.level}.`:`${result.exp} XP is stored at this level.`}`:'Book unavailable, weapon locked, or weapon is at its level cap.')}
+ else if(kind==='book'){const [type,size]=arg.split(',');const result=useWeaponBook(loadoutCharacterId,type,size);say(result?`${size[0].toUpperCase()+size.slice(1)} Enchanted Book used. ${result.levelsGained?`Weapon reached Level ${result.level}.`:`${result.exp} XP is stored at this level.`}`:'Book unavailable, weapon locked, or weapon is at its level cap.')}
  else if(kind==='ascend-character'){say(ascendCharacterWithGem(loadoutCharacterId)?'Ascension completed. One Gem was consumed.':'One Gem is required at a valid Ascension gate.')}
  else if(kind==='ascend-weapon'){say(ascendWeaponWithGem(loadoutCharacterId,arg)?'Weapon Ascension completed. One Gem was consumed.':'One Gem is required at a valid weapon Ascension gate.')}
  saveLoadouts()
@@ -1384,7 +1384,7 @@ function drawLoadoutMenu(){
 }
 function drawLoadoutWeapons(){
  const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId),w=record.weapon;
- loadoutPanel(model.name+' • WEAPONS',`Each weapon levels independently. Experience Books: S ${itemInventory.books.small} • M ${itemInventory.books.medium} • L ${itemInventory.books.large}.`);
+ loadoutPanel(model.name+' • WEAPONS',`Each weapon levels independently. Enchanted Books: S ${itemInventory.books.small} • M ${itemInventory.books.medium} • L ${itemInventory.books.large}.`);
  const cap=weaponLevelCap();
  const cards=[{x:145,label:'STANDARD SIGNATURE',selected:w.selected==='standard',potential:w.standardPotential,type:'standard'},
               {x:825,label:'PREMIUM SIGNATURE',selected:w.selected==='premium',potential:w.premiumPotential,type:'premium'}];
@@ -1405,9 +1405,9 @@ function drawLoadoutWeapons(){
    addButton(c.x+360,515,90,50,'loadout:potential:'+c.type+',1','+','',c.potential<5);
   }
   if(atGate)addButton(c.x+145,570,340,34,'loadout:ascend-weapon:'+c.type,'ASCEND • 1 GEM','GEMS ×'+itemInventory.gems,itemInventory.gems>0&&(c.type==='standard'||w.premiumOwned));
-  addButton(c.x+26,610,178,48,'loadout:book:'+c.type+',small','SMALL BOOK','×'+itemInventory.books.small,itemInventory.books.small>0&&usable&&level<cap);
-  addButton(c.x+216,610,178,48,'loadout:book:'+c.type+',medium','MEDIUM BOOK','×'+itemInventory.books.medium,itemInventory.books.medium>0&&usable&&level<cap);
-  addButton(c.x+406,610,178,48,'loadout:book:'+c.type+',large','LARGE BOOK','×'+itemInventory.books.large,itemInventory.books.large>0&&usable&&level<cap);
+  addButton(c.x+26,610,178,48,'loadout:book:'+c.type+',small','SMALL ENCHANTED BOOK','×'+itemInventory.books.small,itemInventory.books.small>0&&usable&&level<cap,14);
+  addButton(c.x+216,610,178,48,'loadout:book:'+c.type+',medium','MEDIUM ENCHANTED BOOK','×'+itemInventory.books.medium,itemInventory.books.medium>0&&usable&&level<cap,14);
+  addButton(c.x+406,610,178,48,'loadout:book:'+c.type+',large','LARGE ENCHANTED BOOK','×'+itemInventory.books.large,itemInventory.books.large>0&&usable&&level<cap,14);
  }
  rect(145,705,1310,95,'rgba(25,37,58,.94)','#536983',12);
  const zeroPremiumEffect=['Ultimate restores 1 Skill Point.','Duplicate 1: Basic applies 1 Bleed stack.','Duplicate 2: Ultimate costs 80 Energy.','Duplicate 3: Ignore 20% of enemy Physical Defense.','Duplicate 4: Double Cutthroat’s bonus stats.'];
@@ -1549,6 +1549,7 @@ function drawMainMenu(){
  text('Select a section to continue',800,786,17,'#d6dceb','550','center');
 }
 let lastStoreNotice='Select a featured target, then draw for 100 coins.',storeReveal=null;
+const STORE_ITEM_SPRITES=Object.freeze({core:'core',gem:'gem','bottle:small':'enchantedBottleSmall','bottle:medium':'enchantedBottleMedium','bottle:large':'enchantedBottleLarge','book:small':'enchantedBookSmall','book:medium':'enchantedBookMedium','book:large':'enchantedBookLarge'});
 function getStoreRotation(){
  const ids=ROSTER.filter(model=>!model.test).map(model=>model.id);
  return FeaturedLottery.rotate(ids,new Date());
@@ -1645,7 +1646,7 @@ function drawStoreReveal(now){
  ctx.save();ctx.setLineDash([12,10]);ctx.strokeStyle='rgba(24,42,66,.55)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-145,-105);ctx.lineTo(145,-105);ctx.moveTo(-145,105);ctx.lineTo(145,105);ctx.stroke();ctx.restore();
  if(revealNow){
   const label=current.tier.toUpperCase();text(label,0,-59,24,current.tier==='common'?'#24506d':current.tier==='rare'?'#612f83':'#79520d','950','center');
-  text(current.tier==='mythic'?'✦':'✧',0,10,60,current.tier==='common'?'#24506d':current.tier==='rare'?'#612f83':'#79520d','900','center');
+  const rewardSprite=images[STORE_ITEM_SPRITES[current.reward.inventoryItem]];if(rewardSprite?.complete&&rewardSprite.naturalWidth)ctx.drawImage(rewardSprite,-48,-48,96,96);else text(current.tier==='mythic'?'✦':'✧',0,10,60,current.tier==='common'?'#24506d':current.tier==='rare'?'#612f83':'#79520d','900','center');
   const rewardName=current.reward.name||current.reward.id;text(rewardName,0,66,18,'#1b3047','850','center');
   text(current.result,0,94,12,'#253d55','650','center');
  }else{
@@ -1660,7 +1661,7 @@ function drawStore(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.84)');
  text('FEATURED SUMMONS',800,72,35,'#ffedd1','900','center');text('Two limited banners • choose one target on each',800,108,15,'#c4d6e5','550','center');
  if(DEV_MODE){rect(24,49,118,49,'rgba(83,52,35,.96)','#e2a86f',10);text('DEV MODE',83,80,14,'#ffdfa8','850','center');[100,500,1000,5000].forEach((amount,index)=>addButton(152+index*101,49,93,49,`store:grant:${amount}`,'+'+amount.toLocaleString(),'COINS',!storeReveal))}
- rect(1190,49,116,49,'rgba(25,37,58,.96)','#cfae6e',12);text('◈  '+storeCoins,1248,80,17,'#f4d99c','850','center');addButton(1320,48,170,52,'main-menu','BACK','');
+ rect(1190,49,116,49,'rgba(25,37,58,.96)','#cfae6e',12);if(images.coin?.complete&&images.coin.naturalWidth)ctx.drawImage(images.coin,1194,51,44,44);text(storeCoins.toLocaleString(),1240,80,16,'#f4d99c','850','left');addButton(1320,48,170,52,'main-menu','BACK','');
  const rotation=getStoreRotation(),state=FeaturedLottery.getState();
  drawStoreLotteryCard('character',100,rotation,state);drawStoreLotteryCard('weapon',810,rotation,state);
  text('Banners rotate weekly at 12:00 AM Eastern. Select a new target after each rotation.',800,824,14,'#c4d6e5','550','center');
@@ -1671,21 +1672,21 @@ function drawItemInventory(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.74)');rect(105,55,1390,790,'rgba(13,20,39,.98)','#ccb88e',20);
  text('ITEM INVENTORY',155,112,40,'#ffedd1','850');addButton(1280,78,165,52,'main-menu','MAIN MENU','');
  const sections=[
-  {x:155,y:165,title:'ENCHANTED BOTTLES • CHARACTER XP',items:[['Small',itemInventory.bottles.small,'10 XP'],['Medium',itemInventory.bottles.medium,'100 XP'],['Large',itemInventory.bottles.large,'1,000 XP']]},
-  {x:825,y:165,title:'EXPERIENCE BOOKS • WEAPON XP',items:[['Small',itemInventory.books.small,'10 XP'],['Medium',itemInventory.books.medium,'100 XP'],['Large',itemInventory.books.large,'1,000 XP']]},
-  {x:155,y:475,title:'CORES',items:[['Cores',itemInventory.cores,'Upgrade one Rune or Celestial by one level']]},
-  {x:825,y:475,title:'GEMS',items:[['Gems',itemInventory.gems,'One Gem per character or weapon Ascension']]},
+  {x:155,y:165,title:'ENCHANTED BOTTLES • CHARACTER XP',group:'bottles',items:[['Small Enchanted Bottle',itemInventory.bottles.small,'10 XP'],['Medium Enchanted Bottle',itemInventory.bottles.medium,'100 XP'],['Large Enchanted Bottle',itemInventory.bottles.large,'1,000 XP']]},
+  {x:825,y:165,title:'ENCHANTED BOOKS • WEAPON XP',group:'books',items:[['Small Enchanted Book',itemInventory.books.small,'10 XP'],['Medium Enchanted Book',itemInventory.books.medium,'100 XP'],['Large Enchanted Book',itemInventory.books.large,'1,000 XP']]},
+  {x:155,y:475,title:'CORES',group:'core',items:[['Core',itemInventory.cores,'Rune / Celestial']]},
+  {x:825,y:475,title:'GEMS',group:'gem',items:[['Gem',itemInventory.gems,'Character / Weapon Ascension']]},
  ];
  for(const section of sections){rect(section.x,section.y,620,255,'rgba(25,37,58,.94)','#718ba4',14);text(section.title,section.x+24,section.y+40,19,'#f3dfb9','850');
-  section.items.forEach((item,index)=>{const y=section.y+87+index*48;text(item[0],section.x+28,y,17,'#d6e2ef','650');text('×'+item[1],section.x+188,y,18,'#fff1d5','800');text(item[2],section.x+260,y,15,'#aebfd0','550')});
+  section.items.forEach((item,index)=>{const y=section.y+87+index*48,iconKey=section.group==='bottles'?'enchantedBottle'+['Small','Medium','Large'][index]:section.group==='books'?'enchantedBook'+['Small','Medium','Large'][index]:section.group,icon=images[iconKey];if(icon?.complete&&icon.naturalWidth)ctx.drawImage(icon,section.x+20,y-22,44,44);text(item[0],section.x+76,y,16,'#d6e2ef','650');text('×'+item[1],section.x+390,y,18,'#fff1d5','800');text(item[2],section.x+485,y,14,'#aebfd0','550')});
  }
- text('Use bottles, books, Cores, and Gems from the relevant Loadout screen.',800,790,16,'#c4d6e5','550','center');
+ text('Use Enchanted Bottles, Enchanted Books, Cores, and Gems from the relevant Loadout screen.',800,790,16,'#c4d6e5','550','center');
 }
 function drawChallenges(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.74)');rect(180,100,1240,700,'rgba(13,20,39,.98)','#ccb88e',20);
  text('CHALLENGES',235,165,40,'#ffedd1','850');addButton(1200,125,165,52,'main-menu','MAIN MENU','');
  text('Challenge rewards are not configured yet.',800,380,25,'#d6e2ef','700','center');
- text('Challenge rewards can include Enchanted Bottles and Experience Books.',800,430,18,'#c4d6e5','550','center');
+ text('Challenge rewards can include Enchanted Bottles and Enchanted Books.',800,430,18,'#c4d6e5','550','center');
 }
 function drawPartySetup(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.72)');

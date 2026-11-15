@@ -18,7 +18,7 @@ Weapons use the character XP curve. At weapon Level `L`, the XP needed for the n
 
 `L × 10 × (1 + floor(L ÷ 5))`
 
-XP carries over after a level-up. At Ascension gates, weapon leveling pauses until that weapon Ascends; retained XP applies after Ascension. A weapon at its current Rank-based level cap cannot receive additional XP. Experience Books grant Weapon XP; see the [Item Standard](../item-standard/item-standard.md).
+XP carries over after a level-up. At Ascension gates, weapon leveling pauses until that weapon Ascends; retained XP applies after Ascension. A weapon at its current Rank-based level cap cannot receive additional XP. Enchanted Books grant Weapon XP; see the [Item Standard](../item-standard/item-standard.md).
 
 Weapons Ascend individually at Levels 10, 20, 30, and 40 to progress past each gate. Each weapon Ascension consumes one Gem and unlocks further leveling without directly increasing stats. Ascension can be completed only up to the player's current Rank-based weapon level cap.
 
