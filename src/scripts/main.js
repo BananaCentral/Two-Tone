@@ -1618,7 +1618,7 @@ function drawStoreLotteryCard(type,x,rotation,state){
 }
 function drawStoreReveal(now){
  if(!storeReveal)return;
- const reveal=storeReveal,rewards=reveal.rewards,elapsed=(now-reveal.startedAt)/1000,batch=rewards.length>1,stepDuration=.68,sequenceDuration=batch?stepDuration*rewards.length:3.6,summaryDuration=batch?4:0;
+ const reveal=storeReveal,rewards=reveal.rewards,elapsed=(now-reveal.startedAt)/1000,batch=rewards.length>1,stepDuration=1.05,sequenceDuration=batch?stepDuration*rewards.length:5.8,summaryDuration=batch?4.5:0;
  if(elapsed>=sequenceDuration+summaryDuration){const counts=rewards.reduce((all,item)=>(all[item.tier]=(all[item.tier]||0)+1,all),{});lastStoreNotice=`${rewards.length} draws: ${['mythic','rare','common'].filter(tier=>counts[tier]).map(tier=>`${counts[tier]} ${tier}`).join(', ')}.`;storeReveal=null;return}
  const summary=batch&&elapsed>=sequenceDuration,index=batch?Math.min(rewards.length-1,Math.floor(elapsed/stepDuration)):0,relative=batch?elapsed-index*stepDuration:elapsed,current=rewards[index],color=current.tier==='mythic'?'#ffd778':current.tier==='rare'?'#d8a4ff':'#83dcff';
  const fade=Math.min(1,elapsed/.28),pulse=.5+.5*Math.sin(elapsed*7),spin=elapsed*1.8;
@@ -1638,13 +1638,13 @@ function drawStoreReveal(now){
   rect(590,681,420,5,'rgba(150,178,209,.25)');rect(590,681,420,5,color);
   return;
  }
- const revealNow=batch?relative>=.36:elapsed>=1.75;
- const flip=revealNow?Math.max(.04,Math.abs(Math.cos(Math.min(1,(relative-(batch ? .36 : 1.75))/(batch ? .2 : .34))*Math.PI/2))):Math.max(.12,Math.abs(Math.cos(relative*1.35)));
+ const revealStart=batch ? .52 : 2.35,flipDuration=batch ? .28 : .62,revealStarted=relative>=revealStart,flipProgress=Math.max(0,Math.min(1,(relative-revealStart)/flipDuration));
+ const flip=revealStarted?Math.max(.08,Math.abs(Math.cos(flipProgress*Math.PI))):Math.max(.12,Math.abs(Math.cos(relative*4.2))),faceShown=revealStarted&&flipProgress>=1;
  ctx.save();ctx.translate(800,440);ctx.scale(flip,1);
- const ticket=ctx.createLinearGradient(-172,-135,172,135);ticket.addColorStop(0,revealNow?'#fff5d9':'#d8ebfb');ticket.addColorStop(1,revealNow?color:'#82b6d5');
- rect(-175,-145,350,290,ticket,revealNow?color:'#f3e5c8',21);
+ const ticket=ctx.createLinearGradient(-172,-135,172,135);ticket.addColorStop(0,faceShown?'#fff5d9':'#d8ebfb');ticket.addColorStop(1,faceShown?color:'#82b6d5');
+ rect(-175,-145,350,290,ticket,faceShown?color:'#f3e5c8',21);
  ctx.save();ctx.setLineDash([12,10]);ctx.strokeStyle='rgba(24,42,66,.55)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-145,-105);ctx.lineTo(145,-105);ctx.moveTo(-145,105);ctx.lineTo(145,105);ctx.stroke();ctx.restore();
- if(revealNow){
+ if(faceShown){
   const label=current.tier.toUpperCase();text(label,0,-59,24,current.tier==='common'?'#24506d':current.tier==='rare'?'#612f83':'#79520d','950','center');
   const rewardSprite=images[STORE_ITEM_SPRITES[current.reward.inventoryItem]];if(rewardSprite?.complete&&rewardSprite.naturalWidth)ctx.drawImage(rewardSprite,-48,-48,96,96);else text(current.tier==='mythic'?'✦':'✧',0,10,60,current.tier==='common'?'#24506d':current.tier==='rare'?'#612f83':'#79520d','900','center');
   const rewardName=current.reward.name||current.reward.id;text(rewardName,0,66,18,'#1b3047','850','center');
@@ -1654,7 +1654,7 @@ function drawStoreReveal(now){
   text('TICKET IN MOTION',0,79,16,'#1b3047','850','center');
  }
  ctx.restore();
- text(summary?'ALL REWARDS RECEIVED':revealNow?'REWARD RECEIVED':'DRAWING YOUR REWARD',800,665,16,'#fff0c9','850','center');
+ text(summary?'ALL REWARDS RECEIVED':faceShown?'REWARD RECEIVED':'DRAWING YOUR REWARD',800,665,16,'#fff0c9','850','center');
  const progress=batch?Math.min(1,(index+relative/stepDuration)/rewards.length):Math.min(1,elapsed/sequenceDuration);rect(590,681,420,5,'rgba(150,178,209,.25)');rect(590,681,420*progress,5,color);
 }
 function drawStore(){
