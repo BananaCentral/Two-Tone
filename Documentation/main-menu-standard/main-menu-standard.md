@@ -4,6 +4,8 @@
 
 The main menu is the player's primary way to navigate the game. It replaces overworld navigation.
 
+Use the [UI Copy Standard](../project-standard/ui-copy-standard.md) to keep menu labels concise and remove redundant helper text.
+
 ## Main Menu Sections
 
 Show these sections in this order:
