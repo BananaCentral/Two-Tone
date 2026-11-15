@@ -1,6 +1,6 @@
 # Two-Tone Item Standard
 
-Item inventory cards follow the shared [UI Layout Standard](../project-standard/ui-layout-standard.md): consistent item-card sizes, centered artwork, concise labels, and owned quantities.
+The player-facing item collection is named **Inventory**. It displays every item type, including Rune pieces, in one shared grid rather than category panels. Cards follow the shared [UI Layout Standard](../project-standard/ui-layout-standard.md): consistent sizes, centered artwork, concise labels, useful values, and owned quantities.
 
 ## Enchanted Bottles
 

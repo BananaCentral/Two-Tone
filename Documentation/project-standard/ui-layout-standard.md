@@ -25,7 +25,9 @@ Pair it with the [UI Copy Standard](ui-copy-standard.md) for concise labels and 
 
 ## Item Cards
 
-- Use a consistent card size for items that appear together. Align cards in a row with even gaps; each card carries its own icon, short name, useful value, and owned or selected quantity.
+- The **Inventory** screen presents every owned item type in one shared grid, including Rune pieces. Do not divide it into category panels or category-specific rows.
+- Use one consistent card size and even spacing throughout the Inventory grid. Each card carries its own icon, short name, useful value where relevant, and owned quantity. Center an incomplete final row.
+- Other item-card groups outside Inventory use a consistent card size within their panel and align cards in a row with even gaps.
 - When a panel contains one material, use one standard item card aligned to the row's left edge. Do not stretch a single material card to fill the row.
 - Keep a card's icon visually centered in its icon area. Place its name and count beneath it with consistent alignment.
 

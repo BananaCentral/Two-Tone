@@ -1763,7 +1763,7 @@ function drawMainMenu(){
   {label:'STORE',icon:'store',action:'open-store'},
   {label:'LOADOUT',icon:'loadout',action:'open-loadout'},
   {label:'PARTY',icon:'party',action:'open-party'},
-  {label:'ITEMS',icon:'items',action:'open-inventory'},
+  {label:'INVENTORY',icon:'items',action:'open-inventory'},
   {label:'CHALLENGES',icon:'challenges',action:'open-challenges'},
   {label:'SAVE',icon:'save',action:'save-progress'},
   {label:'SETTINGS',icon:'settings',action:'open-settings'}
@@ -2007,29 +2007,21 @@ function drawStore(){
 }
 function drawItemInventory(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.74)');rect(105,55,1390,790,'rgba(13,20,39,.98)','#ccb88e',20);
- text('ITEM INVENTORY',800,103,32,'#ffedd1','850','center');addButton(1280,78,165,52,'main-menu','MAIN MENU','');
- const sections=[
-  {x:155,y:157,title:'ENCHANTED BOTTLES',group:'bottles',items:[['SMALL',itemInventory.bottles.small,'10 XP'],['MEDIUM',itemInventory.bottles.medium,'100 XP'],['LARGE',itemInventory.bottles.large,'1,000 XP']]},
-  {x:825,y:157,title:'ENCHANTED BOOKS',group:'books',items:[['SMALL',itemInventory.books.small,'10 XP'],['MEDIUM',itemInventory.books.medium,'100 XP'],['LARGE',itemInventory.books.large,'1,000 XP']]},
-  {x:155,y:475,title:'CORES',group:'core',items:[['CORE',itemInventory.cores,'']]},
-  {x:825,y:475,title:'GEMS',group:'gem',items:[['GEM',itemInventory.gems,'']]},
+ text('INVENTORY',800,103,32,'#ffedd1','850','center');addButton(1280,78,165,52,'main-menu','MAIN MENU','');
+ const entries=[
+  ...[['Small Enchanted Bottle','10 Character XP',itemInventory.bottles.small,'enchantedBottleSmall'],['Medium Enchanted Bottle','100 Character XP',itemInventory.bottles.medium,'enchantedBottleMedium'],['Large Enchanted Bottle','1,000 Character XP',itemInventory.bottles.large,'enchantedBottleLarge'],['Small Enchanted Book','10 Weapon XP',itemInventory.books.small,'enchantedBookSmall'],['Medium Enchanted Book','100 Weapon XP',itemInventory.books.medium,'enchantedBookMedium'],['Large Enchanted Book','1,000 Weapon XP',itemInventory.books.large,'enchantedBookLarge'],['Core','Rune / Celestial upgrade',itemInventory.cores,'core'],['Gem','Character / weapon Ascension',itemInventory.gems,'gem']].map(([name,detail,count,image])=>({name,detail,count,image})),
+  ...Object.entries(RUNE_SET_DEFINITIONS).map(([id,set])=>({name:set.name,detail:'Rune Set piece',count:ownedRuneCount(id),image:set.image}))
  ];
- for(const section of sections){
-  text(section.title,section.x+310,section.y+19,17,'#f3dfb9','850','center');
-  rect(section.x,section.y+34,620,230,'rgba(25,37,58,.94)','#718ba4',14);
-  const cardW=section.items.length===1?170:180,gap=section.items.length===1?0:20,startX=section.x+20;
-  section.items.forEach((item,index)=>{
-   const x=startX+index*(cardW+gap),y=section.y+55,iconKey=section.group==='bottles'?'enchantedBottle'+['Small','Medium','Large'][index]:section.group==='books'?'enchantedBook'+['Small','Medium','Large'][index]:section.group,icon=images[iconKey];
-   rect(x,y,cardW,184,'rgba(18,27,44,.76)','rgba(121,143,168,.45)',10);
-   if(icon?.complete&&icon.naturalWidth)drawStoreBannerImage(icon,x+48,y+8,cardW-96,82);
-   text(item[0],x+cardW/2,y+113,14,'#f3e5c9','800','center');
-   if(item[2])text(item[2],x+cardW/2,y+136,13,'#c4d0dd','600','center');
-   text('×'+item[1],x+cardW/2,y+163,14,'#f0f3f7','750','center');
-  });
- }
- text('RUNES',155,752,14,'#f3dfb9','850');
- const runeKeys=Object.keys(RUNE_SET_DEFINITIONS),runeCardW=136,runeGap=10,runeStartX=155;
- runeKeys.forEach((key,index)=>{const set=RUNE_SET_DEFINITIONS[key],x=runeStartX+index*(runeCardW+runeGap),y=763;rect(x,y,runeCardW,72,'rgba(18,27,44,.76)','rgba(121,143,168,.45)',9);const icon=images[set.image];if(icon?.complete&&icon.naturalWidth){ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(icon,x+8,y+8,36,36);ctx.restore()}text(set.name,x+48,y+20,10,'#f3e5c9','750');text('×'+ownedRuneCount(key),x+48,y+48,12,'#f0f3f7','750')});
+ const columns=5,cardW=244,cardH=155,gapX=18,gapY=13,x0=154,y0=151;
+ entries.forEach((item,index)=>{
+  const row=Math.floor(index/columns),column=index%columns,rowCount=Math.min(columns,entries.length-row*columns),rowOffset=(columns-rowCount)*(cardW+gapX)/2;
+  const x=x0+rowOffset+column*(cardW+gapX),y=y0+row*(cardH+gapY),icon=images[item.image];
+  rect(x,y,cardW,cardH,'rgba(25,37,58,.94)','#718ba4',12);
+  if(icon?.complete&&icon.naturalWidth)drawStoreBannerImage(icon,x+84,y+8,76,64);
+  text(item.name,x+cardW/2,y+91,14,'#f3e5c9','800','center');
+  text(item.detail,x+cardW/2,y+113,12,'#c4d0dd','600','center');
+  text('×'+item.count,x+cardW/2,y+138,14,'#f0f3f7','750','center');
+ });
 }
 function drawChallenges(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.74)');rect(180,100,1240,700,'rgba(13,20,39,.98)','#ccb88e',20);
