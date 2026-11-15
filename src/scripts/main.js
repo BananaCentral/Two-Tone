@@ -1547,34 +1547,61 @@ function drawStartupMenu(){
  addButton(620,507,360,112,'startup-load','LOAD','IMPORT A SAVE FILE');
  text('Progress is saved in your browser. Export a file from SAVE to carry it between devices.',800,690,17,'#d6dceb','550','center');
 }
-function drawMainMenu(){
- drawBackground();rect(0,0,W,H,'rgba(5,9,22,.68)');
- text('TWO-TONE',800,112,58,'#f8f4ea','900','center');
- text('MAIN MENU',800,170,20,'#eacb87','800','center');
- rect(1293,63,190,66,'rgba(13,17,35,.94)','#eacb87',12);
- text('RANK',1388,82,13,'#bfc8d9','800','center');text(playerRank,1388,107,25,'#f7f3f8','850','center');
- const items=[
-  {label:'STORY',x:220,y:256,active:true,action:'open-story',detail:DEV_MODE?'BATTLE TESTS':'BEGIN YOUR JOURNEY'},
-  {label:'EVENTS',x:640,y:256},
-  {label:DEV_MODE?'DEV MODE':'REGULAR MODE',x:1060,y:256,active:true,action:'toggle-game-mode',detail:DEV_MODE?'SWITCH TO REGULAR MODE':'SWITCH TO DEV MODE'},
-  {label:'STORE',x:220,y:472,active:true,action:'open-store',detail:'FEATURED LOTTERIES • 100 COINS'},
-  {label:'LOADOUT',x:640,y:472,active:true,action:'open-loadout',detail:'WEAPONS • RUNES • CELESTIALS'},
-  {label:'PARTY',x:1060,y:472,active:true,action:'open-party',detail:'MANAGE CURRENT PARTY'},
- ];
- for(const item of items){
-  if(item.active){
-   addButton(item.x,item.y,320,166,item.action,item.label,item.detail);
-  }else{
-   rect(item.x,item.y,320,166,'rgba(20,29,47,.82)','rgba(129,164,191,.5)',13);
-   text(item.label,item.x+160,item.y+65,25,'#c2c9d3','800','center');
-   text('COMING SOON',item.x+160,item.y+112,14,'#9ca9b9','650','center');
-  }
+function drawMainMenuIcon(kind,cx,cy,color){
+ ctx.save();ctx.translate(cx,cy);ctx.strokeStyle=color;ctx.fillStyle='rgba(0,0,0,0)';ctx.lineWidth=2.6;ctx.lineCap='round';ctx.lineJoin='round';
+ const line=(x1,y1,x2,y2)=>{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()};
+ if(kind==='story'){
+  ctx.beginPath();ctx.moveTo(-25,-19);ctx.quadraticCurveTo(-9,-25,0,-14);ctx.quadraticCurveTo(9,-25,25,-19);ctx.lineTo(25,21);ctx.quadraticCurveTo(9,15,0,25);ctx.quadraticCurveTo(-9,15,-25,21);ctx.closePath();ctx.stroke();line(0,-14,0,25);line(-19,-11,-7,-9);line(7,-9,19,-11);
+ }else if(kind==='events'){
+  ctx.beginPath();ctx.roundRect(-23,-19,46,40,5);ctx.stroke();line(-23,-8,23,-8);line(-13,-25,-13,-14);line(13,-25,13,-14);ctx.beginPath();ctx.arc(-10,3,2,0,Math.PI*2);ctx.arc(2,3,2,0,Math.PI*2);ctx.arc(14,3,2,0,Math.PI*2);ctx.stroke();
+ }else if(kind==='mode'){
+  ctx.beginPath();ctx.roundRect(-27,-15,54,30,15);ctx.stroke();ctx.beginPath();ctx.arc(-11,0,10,0,Math.PI*2);ctx.stroke();line(9,-7,19,7);line(19,-7,9,7);
+ }else if(kind==='store'){
+  ctx.beginPath();ctx.moveTo(-25,-11);ctx.lineTo(-20,-23);ctx.lineTo(20,-23);ctx.lineTo(25,-11);ctx.lineTo(25,-7);ctx.quadraticCurveTo(17,0,10,-7);ctx.quadraticCurveTo(2,0,-5,-7);ctx.quadraticCurveTo(-13,0,-20,-7);ctx.quadraticCurveTo(-25,-8,-25,-11);ctx.stroke();ctx.beginPath();ctx.roundRect(-20,-5,40,28,3);ctx.stroke();ctx.beginPath();ctx.roundRect(-5,6,11,17,2);ctx.stroke();line(-14,3,-14,18);
+ }else if(kind==='loadout'){
+  line(-19,18,14,-19);ctx.beginPath();ctx.moveTo(14,-19);ctx.lineTo(25,-24);ctx.lineTo(20,-12);ctx.lineTo(-13,22);ctx.stroke();line(-23,13,-10,25);line(-17,7,-7,17);line(-7,22,-2,27);
+ }else if(kind==='party'){
+  for(const [x,y,r] of [[0,-12,9],[-19,-5,7],[19,-5,7]]){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke()}
+  ctx.beginPath();ctx.arc(0,23,18,Math.PI,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(-21,22,12,Math.PI,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(21,22,12,Math.PI,Math.PI*2);ctx.stroke();
+ }else if(kind==='items'){
+  ctx.beginPath();ctx.moveTo(-18,-14);ctx.lineTo(18,-14);ctx.lineTo(23,22);ctx.quadraticCurveTo(0,29,-23,22);ctx.closePath();ctx.stroke();ctx.beginPath();ctx.arc(0,-14,10,Math.PI,0);ctx.stroke();line(-9,1,9,1);line(-9,9,9,9);
+ }else if(kind==='challenges'){
+  ctx.beginPath();ctx.moveTo(-23,-20);ctx.lineTo(-14,-20);ctx.lineTo(-10,-2);ctx.quadraticCurveTo(0,9,10,-2);ctx.lineTo(14,-20);ctx.lineTo(23,-20);ctx.lineTo(17,2);ctx.quadraticCurveTo(0,22,-17,2);ctx.closePath();ctx.stroke();line(0,13,0,23);line(-12,24,12,24);ctx.beginPath();ctx.moveTo(0,-17);ctx.lineTo(3,-10);ctx.lineTo(11,-9);ctx.lineTo(5,-4);ctx.lineTo(7,4);ctx.lineTo(0,0);ctx.lineTo(-7,4);ctx.lineTo(-5,-4);ctx.lineTo(-11,-9);ctx.lineTo(-3,-10);ctx.closePath();ctx.stroke();
+ }else if(kind==='save'){
+  ctx.beginPath();ctx.moveTo(-18,-25);ctx.lineTo(10,-25);ctx.lineTo(20,-15);ctx.lineTo(20,23);ctx.lineTo(-18,23);ctx.closePath();ctx.stroke();line(10,-24,10,-14);line(-8,-12,9,-12);line(-8,-4,9,-4);line(0,2,0,16);line(-7,10,0,17);line(7,10,0,17);
+ }else if(kind==='settings'){
+  ctx.beginPath();for(let i=0;i<16;i++){const a=i*Math.PI/8,r=i%2?18:25,x=Math.cos(a)*r,y=Math.sin(a)*r;i?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath();ctx.stroke();ctx.beginPath();ctx.arc(0,0,8,0,Math.PI*2);ctx.stroke();
  }
- addButton(150,676,310,76,'open-inventory','ITEMS','VIEW AND USE MATERIALS');
- addButton(480,676,310,76,'save-progress','SAVE','DOWNLOAD A SAVE FILE');
- addButton(810,676,310,76,'open-challenges','CHALLENGES','REWARD TRACKER');
- addButton(1140,676,310,76,'open-settings','SETTINGS','DISPLAY OPTIONS');
- text('Select a section to continue',800,786,17,'#d6dceb','550','center');
+ ctx.restore();
+}
+function drawMainMenuTile(item,x,y,w,h){
+ const active=item.active!==false;
+ choiceRects.push({x,y,w,h,action:item.action,enabled:active});
+ const fill=ctx.createLinearGradient(x,y,x+w,y+h);fill.addColorStop(0,active?'rgba(30,39,55,.84)':'rgba(22,28,40,.74)');fill.addColorStop(1,active?'rgba(10,17,28,.92)':'rgba(11,15,23,.86)');
+ rect(x,y,w,h,fill,active?'rgba(216,219,224,.35)':'rgba(152,160,173,.22)',15);
+ if(active){ctx.save();ctx.strokeStyle='rgba(247,225,183,.14)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x+18,y+1);ctx.lineTo(x+w-18,y+1);ctx.stroke();ctx.restore()}
+ drawMainMenuIcon(item.icon,x+w/2,y+72,active?'#e6dcc5':'#8993a2');
+ text(item.label,x+w/2,y+145,19,active?'#f2eee7':'#bac0ca','800','center');
+ if(item.detail)text(item.detail,x+w/2,y+176,11,active?'#aeb8c7':'#8993a2','600','center');
+ if(!active){rect(x+w/2-56,y+h-30,112,18,'rgba(8,12,19,.78)','rgba(139,149,163,.3)',9);text('COMING SOON',x+w/2,y+h-21,9,'#9099a7','750','center')}
+}
+function drawMainMenu(){
+ drawBackground();rect(0,0,W,H,'rgba(4,7,13,.72)');
+ rect(78,52,1444,796,'rgba(7,11,19,.62)','rgba(224,225,225,.22)',22);
+ const items=[
+  {label:'STORY',icon:'story',action:'open-story',detail:DEV_MODE?'BATTLE TESTS':'BEGIN YOUR JOURNEY'},
+  {label:'EVENTS',icon:'events',active:false},
+  {label:DEV_MODE?'DEV MODE':'REGULAR MODE',icon:'mode',action:'toggle-game-mode',detail:DEV_MODE?'SWITCH TO REGULAR MODE':'SWITCH TO DEV MODE'},
+  {label:'STORE',icon:'store',action:'open-store',detail:'FEATURED LOTTERIES'},
+  {label:'LOADOUT',icon:'loadout',action:'open-loadout',detail:'WEAPONS • RUNES • CELESTIALS'},
+  {label:'PARTY',icon:'party',action:'open-party',detail:'MANAGE YOUR PARTY'},
+  {label:'ITEMS',icon:'items',action:'open-inventory',detail:'ITEM INVENTORY'},
+  {label:'CHALLENGES',icon:'challenges',action:'open-challenges',detail:'REWARD TRACKER'},
+  {label:'SAVE',icon:'save',action:'save-progress',detail:'EXPORT SAVE FILE'},
+  {label:'SETTINGS',icon:'settings',action:'open-settings',detail:'DISPLAY OPTIONS'}
+ ];
+ const x0=124,y0=91,cardW=318,cardH=226,gapX=20,gapY=16,positions=[[0,0],[1,0],[2,0],[3,0],[0,1],[1,1],[2,1],[3,1],[1,2],[2,2]];
+ items.forEach((item,index)=>{const [column,row]=positions[index];drawMainMenuTile(item,x0+column*(cardW+gapX),y0+row*(cardH+gapY),cardW,cardH)});
 }
 function drawSettings(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.76)');rect(250,130,1100,640,'rgba(13,20,39,.98)','#ccb88e',20);
@@ -2569,7 +2596,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)c
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 if(DEV_MODE){
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.27',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.28',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
  characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
  unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}})),

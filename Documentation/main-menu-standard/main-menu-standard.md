@@ -15,9 +15,15 @@ Show these sections in this order:
 5. Loadout
 6. Party
 
-The main menu displays the player's Rank, as defined in the Rank Standard.
-
 The Game Mode section switches between Regular and Dev Mode. Regular is the default and starts new players with Soul and 0 coins. Dev Mode exposes development tools and uses a separate saved profile. See the [Game Mode Standard](../game-mode-standard.md).
+
+## Phone Menu Layout
+
+- Use a dark, translucent phone-menu panel over the game background, with a grid of icon tiles.
+- Start the grid near the top of the panel. Do not place a title, profile card, Rank, UID, status bar, or other header content above it.
+- On the 1600×900 canvas, use four columns and three rows. Order the first row as Story, Events, Game Mode, Store; the second as Loadout, Party, Items, Challenges; center Save and Settings in the final row.
+- Give each tile one large, simple line icon, a clear section name, and at most one short supporting line. Keep tiles large enough for touch input.
+- Events remains a visibly inactive placeholder until implemented. Other tiles open their corresponding game sections directly.
 
 ## Startup Menu
 
