@@ -1510,7 +1510,7 @@ function drawLoadoutCelestials(){
   text(label.toUpperCase(),x+30,y+48,22,'#f3dfb9','850');
   text('LEVEL '+level+' / 10',x+30,y+100,20,'#d6e2ef','700');
   text('+'+(level*10)+'% base multiplier',x+30,y+145,17,'#f4d99c','750');
-  addButton(x+390,y+75,150,70,'loadout:celestial:'+key+',1','UPGRADE','1 CORE',level<10&&itemInventory.cores>0);
+  addButton(x+390,y+75,150,70,'loadout:celestial:'+key+',1','UPGRADE','',level<10&&itemInventory.cores>0);
  }
 }
 function drawLoadoutLevels(){
@@ -1577,7 +1577,6 @@ function drawLoadout(){
  rect(1058,112,512,744,'rgba(10,16,31,.76)','rgba(190,207,230,.42)',18);
  if(loadoutPage==='weapons')text('WEAPONS',1314,96,18,'#d9c797','850','center');
  else text(loadoutPage==='details'?'STATS & PROGRESSION':loadoutPage.toUpperCase(),1090,151,14,'#d9c797','850');
- if(loadoutPage!=='weapons')text(model.name,1090,190,27,'#fff1d5','850');
  if(loadoutPage==='details')drawLoadoutDetailsPanel(model,record,progress,cap);
  else if(loadoutPage==='weapons')drawLoadoutWeaponsPanel(model,record);
  else if(loadoutPage==='runes')drawLoadoutRunesPanel(record);
@@ -1656,7 +1655,7 @@ function drawLoadoutCelestialsPanel(record){
   const [key,label]=CELESTIALS[i],y=224+i*145,level=record.celestials[key];rect(1083,y,462,129,'rgba(27,39,59,.78)','#71869e',12);
   text(label.toUpperCase(),1104,y+34,16,'#f3dfb9','800');text('LEVEL '+level+' / 10',1104,y+63,13,'#d6e2ef','650');
   line(1104,y+79,260,level/10,'#d9b96e','rgba(218,228,240,.18)',7);text('+'+(level*10)+'% MULTIPLIER',1104,y+111,11,'#b9c8d7','650');
-  addButton(1390,y+35,133,56,'loadout:celestial:'+key+',1','UPGRADE','1 CORE',level<10&&itemInventory.cores>0,12);
+  addButton(1390,y+35,133,56,'loadout:celestial:'+key+',1','UPGRADE','',level<10&&itemInventory.cores>0,12);
  }
 }
 function drawStartupMenu(){
@@ -2744,7 +2743,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)c
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 if(DEV_MODE){
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.42',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.43',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
  characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
  unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}})),
