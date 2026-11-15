@@ -1618,7 +1618,7 @@ function drawStoreLotteryCard(type,x,rotation,state){
 }
 function drawStoreReveal(now){
  if(!storeReveal)return;
- const reveal=storeReveal,rewards=reveal.rewards,elapsed=(now-reveal.startedAt)/1000,batch=rewards.length>1,stepDuration=1.05,sequenceDuration=batch?stepDuration*rewards.length:5.8,summaryDuration=batch?4.5:0;
+ const reveal=storeReveal,rewards=reveal.rewards,elapsed=(now-reveal.startedAt)/1000,batch=rewards.length>1,stepDuration=1.25,sequenceDuration=batch?stepDuration*rewards.length:5.8,summaryDuration=batch?4.5:0;
  if(elapsed>=sequenceDuration+summaryDuration){const counts=rewards.reduce((all,item)=>(all[item.tier]=(all[item.tier]||0)+1,all),{});lastStoreNotice=`${rewards.length} draws: ${['mythic','rare','common'].filter(tier=>counts[tier]).map(tier=>`${counts[tier]} ${tier}`).join(', ')}.`;storeReveal=null;return}
  const summary=batch&&elapsed>=sequenceDuration,index=batch?Math.min(rewards.length-1,Math.floor(elapsed/stepDuration)):0,relative=batch?elapsed-index*stepDuration:elapsed,current=rewards[index],color=current.tier==='mythic'?'#ffd778':current.tier==='rare'?'#d8a4ff':'#83dcff';
  const fade=Math.min(1,elapsed/.28),pulse=.5+.5*Math.sin(elapsed*7),spin=elapsed*1.8;
@@ -1638,9 +1638,10 @@ function drawStoreReveal(now){
   rect(590,681,420,5,'rgba(150,178,209,.25)');rect(590,681,420,5,color);
   return;
  }
- const revealStart=batch ? .52 : 2.35,flipDuration=batch ? .28 : .62,revealStarted=relative>=revealStart,flipProgress=Math.max(0,Math.min(1,(relative-revealStart)/flipDuration));
+ const entryDuration=batch ? .36 : 1.05,entryProgress=Math.max(0,Math.min(1,relative/entryDuration)),entryEase=1-Math.pow(1-entryProgress,3),cardY=H+210+(440-(H+210))*entryEase;
+ const revealStart=batch ? .64 : 2.35,flipDuration=batch ? .28 : .62,revealStarted=relative>=revealStart,flipProgress=Math.max(0,Math.min(1,(relative-revealStart)/flipDuration));
  const flip=revealStarted?Math.max(.08,Math.abs(Math.cos(flipProgress*Math.PI))):Math.max(.12,Math.abs(Math.cos(relative*4.2))),faceShown=revealStarted&&flipProgress>=1;
- ctx.save();ctx.translate(800,440);ctx.scale(flip,1);
+ ctx.save();ctx.translate(800,cardY);ctx.rotate((1-entryEase)*-.12);ctx.scale(flip,1);ctx.globalAlpha*=Math.min(1,entryProgress*2.2);
  const ticket=ctx.createLinearGradient(-172,-135,172,135);ticket.addColorStop(0,faceShown?'#fff5d9':'#d8ebfb');ticket.addColorStop(1,faceShown?color:'#82b6d5');
  rect(-175,-145,350,290,ticket,faceShown?color:'#f3e5c8',21);
  ctx.save();ctx.setLineDash([12,10]);ctx.strokeStyle='rgba(24,42,66,.55)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-145,-105);ctx.lineTo(145,-105);ctx.moveTo(-145,105);ctx.lineTo(145,105);ctx.stroke();ctx.restore();
@@ -1650,8 +1651,9 @@ function drawStoreReveal(now){
   const rewardName=current.reward.name||current.reward.id;text(rewardName,0,66,18,'#1b3047','850','center');
   text(current.result,0,94,12,'#253d55','650','center');
  }else{
-  text('✧',0,18,78,'#244d70','900','center');
-  text('TICKET IN MOTION',0,79,16,'#1b3047','850','center');
+  ctx.save();ctx.strokeStyle='rgba(36,77,112,.72)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,5,43,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(-62,5);ctx.lineTo(62,5);ctx.moveTo(0,-57);ctx.lineTo(0,67);ctx.stroke();ctx.restore();
+  text('✧',0,5,58,'#244d70','900','center');
+  text('TWO-TONE TICKET',0,82,15,'#1b3047','850','center');
  }
  ctx.restore();
  text(summary?'ALL REWARDS RECEIVED':faceShown?'REWARD RECEIVED':'DRAWING YOUR REWARD',800,665,16,'#fff0c9','850','center');
