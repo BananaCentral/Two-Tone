@@ -23,6 +23,6 @@ Use a short explanation when a player needs it to make a meaningful choice, unde
 - Show the active weapon bonus, such as **+31% ALL STATS**, left-aligned just above its **Upgrade**/**Ascend** control.
 - Label those buttons **Upgrade** and **Switch** without repeating their purpose below them.
 - Show only the selected weapon's name in its detail panel; **Switch** is the control for changing weapons.
-- Align the selected weapon name with its section heading, directly above the artwork. Keep section labels and character names from repeating in the same panel.
+- Place the selected weapon name at the panel's left edge directly above its artwork. Center the larger section heading above the panel card.
 - Use cropped face portraits in character selectors instead of scaling full-body artwork into small circles.
 - Enchanted Book selectors show book size, XP amount, owned quantity, and selected quantity. **Upgrade** confirms the selection. At Ascension gates, replace book selectors with the required material and owned quantity.
