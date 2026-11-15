@@ -30,7 +30,7 @@ See the [Weapon Level Standard](../weapon-level-standard/weapon-level-standard.m
 
 ## Runes
 
-A character can equip up to four runes, all from one rune set. Rune-set names and their passive effects are character-specific and have not been defined yet.
+A character can equip up to four runes, all from one Rune Set. Each character selects their set independently; sets cannot be mixed on the same character. Set effects are fixed at every Rune level and affect the wearer as defined in the [Rune Set Standard](../rune-standard/rune-standard.md).
 
 Each rune has a level from 1 to 5, one main stat, and three substats. Within each rune, all four selected stats must be different. Main and substats may repeat across different runes.
 
@@ -75,4 +75,4 @@ Zero's Premium signature weapon restores 1 Skill Point when he uses his Ultimate
 
 ## Prototype boundaries
 
-The Loadout screen persists weapon Potential, Level and XP, rune configuration, Celestial levels, and character Duplicate level locally. Potential upgrades do not charge resources because their coin costs have not been defined. Weapon XP comes from Enchanted Books. Premium weapons remain locked until Store acquisition is implemented. Rune-set choices/passives and weapon effects without character-specific definitions remain pending. Premium Potential 2–5 map to weapon Duplicates 1–4. Premium effects require an owned, equipped Premium weapon.
+The Loadout screen persists weapon Potential, Level and XP, rune configuration, Celestial levels, and character Duplicate level locally. Potential upgrades do not charge resources because their coin costs have not been defined. Weapon XP comes from Enchanted Books. Premium weapons remain locked until Store acquisition is implemented. Rune Set selection and combat effects are standardized in the [Rune Set Standard](../rune-standard/rune-standard.md), but are not yet implemented. Weapon effects without character-specific definitions remain pending. Premium Potential 2–5 map to weapon Duplicates 1–4. Premium effects require an owned, equipped Premium weapon.

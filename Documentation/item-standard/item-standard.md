@@ -34,7 +34,7 @@ Character XP and Weapon XP use the progressions in the [Character Level Standard
 
 ## Cores
 
-A Core is a shared upgrade material that can raise the level of one Rune or one Celestial by one level. One Core is consumed per level increase. Cores can be obtained from Rare lottery drops, Events, Story, and Game Modes.
+A Core is a shared upgrade material that can raise the level of one Rune or one Celestial by one level. One Core is consumed per level increase. Cores can be obtained from Rare lottery drops, Events, Story, and Game Modes. Rune Set effects are defined in the [Rune Set Standard](../rune-standard/rune-standard.md).
 
 The soul-flame artwork represents a Core; the faceted crystal artwork represents a Gem.
 
