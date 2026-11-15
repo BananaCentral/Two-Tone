@@ -17,6 +17,8 @@ Show these sections in this order:
 
 The main menu displays the player's Rank, as defined in the Rank Standard.
 
+The Game Mode section switches between Regular and Dev Mode. Regular is the default and starts new players with Soul and 0 coins. Dev Mode exposes development tools and uses a separate saved profile. See the [Game Mode Standard](../game-mode-standard.md).
+
 ## Startup Menu
 
 - On launch, show a startup menu with **Start** and **Load** options.

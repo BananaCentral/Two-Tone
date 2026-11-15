@@ -132,9 +132,12 @@ function spriteAlphaBounds(img){
  visibleSpriteBounds.set(img,bounds);return bounds;
 }
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:false});
-const W=1600,H=900, TEAM_KEY='two-tone-demo-team-fundamental-1-v1';
-const PROGRESSION_KEY='two-tone-character-progress-v1',VITALS_KEY='two-tone-character-vitals-v1',LOADOUT_KEY='two-tone-character-loadouts-v1',ITEM_INVENTORY_KEY='two-tone-item-inventory-v1',STORE_COINS_KEY='two-tone-store-coins-v1',PLAYER_RANK_KEY='two-tone-player-rank-v1',CHARACTER_ID_SCHEMA_KEY='two-tone-character-id-schema-v2';
 const DEV_MODE=new URLSearchParams(location.search).get('dev')==='1';
+function toggleGameMode(){const url=new URL(location.href);if(DEV_MODE)url.searchParams.delete('dev');else url.searchParams.set('dev','1');location.assign(url.toString())}
+const W=1600,H=900;
+const TEAM_KEY=DEV_MODE?'two-tone-dev-team-fundamental-1-v1':'two-tone-demo-team-fundamental-1-v1';
+const PROGRESSION_KEY=DEV_MODE?'two-tone-dev-character-progress-v1':'two-tone-character-progress-v1',VITALS_KEY=DEV_MODE?'two-tone-dev-character-vitals-v1':'two-tone-character-vitals-v1',LOADOUT_KEY=DEV_MODE?'two-tone-dev-character-loadouts-v1':'two-tone-character-loadouts-v1',ITEM_INVENTORY_KEY=DEV_MODE?'two-tone-dev-item-inventory-v1':'two-tone-item-inventory-v1',STORE_COINS_KEY=DEV_MODE?'two-tone-dev-store-coins-v1':'two-tone-store-coins-v1',PLAYER_RANK_KEY=DEV_MODE?'two-tone-dev-player-rank-v1':'two-tone-player-rank-v1',CHARACTER_ID_SCHEMA_KEY=DEV_MODE?'two-tone-dev-character-id-schema-v2':'two-tone-character-id-schema-v2';
+const STARTING_STATE_MIGRATION_KEY='two-tone-regular-starting-state-v1';
 function moveLegacyCharacterRecord(value){
  if(!value||typeof value!=='object'||Array.isArray(value))return value;
  if(value.soul===undefined&&value.zero!==undefined)value.soul=value.zero;
@@ -153,6 +156,27 @@ function migrateLegacyCharacterIds(){
  }catch(e){}
 }
 migrateLegacyCharacterIds();
+function migrateRegularStartingState(){
+ if(DEV_MODE)return;
+ try{
+  if(localStorage.getItem(STARTING_STATE_MIGRATION_KEY)==='v1')return;
+  // Remove prototype test grants/previews from the old shared Regular profile.
+  localStorage.setItem(STORE_COINS_KEY,'0');
+  const saved=JSON.parse(localStorage.getItem(TEAM_KEY)||'null');
+  if(Array.isArray(saved)&&JSON.stringify(saved)===JSON.stringify(['soul','lily','dawn']))localStorage.setItem(TEAM_KEY,JSON.stringify(['soul']));
+  const loadouts=JSON.parse(localStorage.getItem(LOADOUT_KEY)||'null');
+  if(loadouts&&typeof loadouts==='object'&&!Array.isArray(loadouts)){
+   for(const record of Object.values(loadouts))if(record&&typeof record==='object'){
+    record.characterDuplicates=0;
+    if(record.weapon&&typeof record.weapon==='object'){record.weapon.standardPotential=1;record.weapon.premiumPotential=1}
+    if(Array.isArray(record.runes))record.runes=[null,null,null,null];
+   }
+   localStorage.setItem(LOADOUT_KEY,JSON.stringify(loadouts));
+  }
+  localStorage.setItem(STARTING_STATE_MIGRATION_KEY,'v1');
+ }catch(e){}
+}
+migrateRegularStartingState();
 const CHARACTER_MAX_LEVEL=50,ASCENSION_GATES=[10,20,30,40],MAX_PARTY_SIZE=4;
 // Rank progression is not implemented yet; this value is the account Rank hook.
 function loadPlayerRank(){try{const n=Number(localStorage.getItem(PLAYER_RANK_KEY));return Number.isInteger(n)&&n>=1&&n<=50?n:1}catch(e){return 1}}
@@ -531,7 +555,7 @@ const ENEMY_ARCHETYPES={
 // Any encounter may supply its own finite number of waves, each with 1–15 enemies.
 // Presets are only review scenarios; they are NOT a global wave-count limit.
 const WAVE_PRESETS={stress:[15,12,6],quick:[1,5,6],sizes:[1,5,6,12,15]};
-let currentBattleAreaId=DEFAULT_BATTLE_AREA_ID,wavePreset='stress',waveOverride=null,enemyRosterMode='mixed',wavePlan=[],waveIndex=-1,waveQueue=[],waveKills=0,
+let currentBattleAreaId=DEFAULT_BATTLE_AREA_ID,wavePreset=DEV_MODE?'stress':'quick',waveOverride=null,enemyRosterMode=DEV_MODE?'mixed':'slime',wavePlan=[],waveIndex=-1,waveQueue=[],waveKills=0,
     totalEnemyDefeats=0,encounterCleared=false,spawnHistory=[],enemies=[],selectedEnemyId=null,actingEnemyId=null;
 // Fundamental 3 target rules and Fundamental 2 v1.1 post-attack reinforcement boundary.
 // Soul Enhanced Basic uses Blast unless Premium Weapon Duplicate 3 changes it to AoE; Ultimate is AoE. The pattern toolbar,
@@ -936,14 +960,14 @@ function setEnemyRoster(mode){if(phase!=='setup'||!['slime','wolf','mixed','slim
 const savedTeam=loadTeam();
 let draft=[...savedTeam];
 function validTeam(ids){return Array.isArray(ids)&&ids.length>=1&&ids.length<=MAX_PARTY_SIZE&&ids.every(id=>ROSTER_IDS.has(id))&&new Set(ids).size===ids.length}
-function loadTeam(){try{const a=JSON.parse(localStorage.getItem(TEAM_KEY)||'null');if(Array.isArray(a)&&a.every(id=>ROSTER_IDS.has(id))&&new Set(a).size===a.length){const saved=a.slice(0,MAX_PARTY_SIZE);if(saved.length===2&&saved[0]==='soul'&&saved[1]==='lily')return [...saved,'dawn'];return saved}}catch(e){}return ['soul','lily','dawn']}
+function loadTeam(){try{const a=JSON.parse(localStorage.getItem(TEAM_KEY)||'null');if(Array.isArray(a)&&a.every(id=>ROSTER_IDS.has(id))&&new Set(a).size===a.length){const saved=a.slice(0,MAX_PARTY_SIZE);if(saved.length===2&&saved[0]==='soul'&&saved[1]==='lily')return [...saved,'dawn'];return saved}}catch(e){}return ['soul']}
 function saveTeam(){try{localStorage.setItem(TEAM_KEY,JSON.stringify(draft))}catch(e){}}
 function roster(id){return ROSTER.find(x=>x.id===id)}
 function alive(){return party.filter(x=>x.hp>0)}
 function active(){return party.find(x=>x.id===activeId)}
 function say(message){hint=message;hintAt=performance.now()}
 function schedule(fn,ms){const token=battleToken;setTimeout(()=>{if(token===battleToken)fn()},ms)}
-function enterSelection(mandatory=false){saveVitals();cameraPreview=null;selectedAllyId=null;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;pendingVacancies=[];cancelAllQueuedUltimates('reset');battleToken++;summons=[];turnTimeline.reset();phase='setup';paused=false;forceSelect=mandatory;draft=[...loadTeam()];activeId=null;log='';say(mandatory?'This encounter requires team confirmation.':'Review the saved party and battle test options.');}
+function enterSelection(mandatory=false){saveVitals();cameraPreview=null;selectedAllyId=null;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;pendingVacancies=[];cancelAllQueuedUltimates('reset');battleToken++;summons=[];turnTimeline.reset();phase='setup';paused=false;forceSelect=mandatory;draft=[...loadTeam()];activeId=null;log='';say(mandatory?'This encounter requires team confirmation.':DEV_MODE?'Review the party and battle test options.':'Review your party before battle.');}
 function enterPartySetup(){
  saveVitals();battleToken++;cancelAllQueuedUltimates('party-setup');turnTimeline.reset();
  phase='partySetup';paused=false;forceSelect=false;draft=[...loadTeam()];activeId=null;actingEnemyId=null;
@@ -1174,7 +1198,7 @@ function validItemInventory(value){
 function loadItemInventory(){try{return normalizeItemInventory(JSON.parse(localStorage.getItem(ITEM_INVENTORY_KEY)||'null'))}catch(e){return defaultItemInventory()}}
 let itemInventory=loadItemInventory();
 function saveItemInventory(){try{localStorage.setItem(ITEM_INVENTORY_KEY,JSON.stringify(itemInventory));return true}catch(e){return false}}
-function loadStoreCoins(){try{const raw=localStorage.getItem(STORE_COINS_KEY);if(raw!==null){const n=Number(raw);return Number.isSafeInteger(n)&&n>=0?n:0}localStorage.setItem(STORE_COINS_KEY,'1000');return 1000}catch(e){return 1000}}
+function loadStoreCoins(){try{const raw=localStorage.getItem(STORE_COINS_KEY);if(raw!==null){const n=Number(raw);return Number.isSafeInteger(n)&&n>=0?n:0}localStorage.setItem(STORE_COINS_KEY,'0');return 0}catch(e){return 0}}
 let storeCoins=loadStoreCoins();
 function saveStoreCoins(){try{localStorage.setItem(STORE_COINS_KEY,String(storeCoins));return true}catch(e){return false}}
 function grantStoreCoins(amount){if(!Number.isSafeInteger(amount)||amount<=0||!Number.isSafeInteger(storeCoins+amount))return false;storeCoins+=amount;saveStoreCoins();return true}
@@ -1194,7 +1218,8 @@ function consumeItem(itemId,amount=1){
  else return false;
  saveItemInventory();return true;
 }
-globalThis.TwoToneItems=Object.freeze({grant:grantItem,getInventory:()=>JSON.parse(JSON.stringify(itemInventory)),grantCoins:grantStoreCoins,getCoins:()=>storeCoins});
+if(DEV_MODE)globalThis.TwoToneItems=Object.freeze({grant:grantItem,getInventory:()=>JSON.parse(JSON.stringify(itemInventory)),grantCoins:grantStoreCoins,getCoins:()=>storeCoins});
+FeaturedLottery.setRewardGrant(grantItem);
 const SAVE_FILE_FORMAT='two-tone-save',SAVE_FILE_VERSION=4;
 function saveProgressFile(){
  try{
@@ -1223,7 +1248,7 @@ function normalizeSaveFile(value){
  }
  const inventory=data.itemInventory===undefined?defaultItemInventory():normalizeItemInventory(data.itemInventory);
  if(data.itemInventory!==undefined&&!validItemInventory(data.itemInventory))return null;
- const coins=data.storeCoins===undefined?1000:data.storeCoins;
+ const coins=data.storeCoins===undefined?0:data.storeCoins;
  if(!Number.isSafeInteger(coins)||coins<0)return null;
  return {playerRank:rank,team:[...data.team],characterProgress:progress,vitals,loadouts,itemInventory:inventory,storeCoins:coins};
 }
@@ -1327,12 +1352,12 @@ function handleLoadoutAction(action){
  if(kind==='back'){if(runeStatPicker){runeStatPicker=null;return}if(loadoutPage==='characters')phase='menu';else if(loadoutPage==='menu')loadoutPage='characters';else loadoutPage='menu';return}
  if(kind==='character'){if(ROSTER_IDS.has(arg)&&!roster(arg)?.test){loadoutCharacterId=arg;loadoutPage='menu'}return}
  if(kind==='page'){if(['weapons','runes','celestials','levels'].includes(arg))loadoutPage=arg;return}
- if(kind==='character-duplicate')record.characterDuplicates=Math.max(0,Math.min(4,record.characterDuplicates+Number(arg)));
+ if(kind==='character-duplicate'&&DEV_MODE)record.characterDuplicates=Math.max(0,Math.min(4,record.characterDuplicates+Number(arg)));
  else if(kind==='weapon-standard')weapon.selected='standard';
  else if(kind==='weapon-premium'){if(weapon.premiumOwned)weapon.selected='premium'}
- else if(kind==='potential'){const [type,delta]=arg.split(','),key=type==='premium'?'premiumPotential':'standardPotential';weapon[key]=Math.max(1,Math.min(5,weapon[key]+Number(delta)))}
+ else if(kind==='potential'&&DEV_MODE){const [type,delta]=arg.split(','),key=type==='premium'?'premiumPotential':'standardPotential';weapon[key]=Math.max(1,Math.min(5,weapon[key]+Number(delta)))}
  else if(kind==='rune-select')selectedLoadoutRune=Math.max(0,Math.min(3,Number(arg)||0));
- else if(kind==='rune-equip'){const index=Math.max(0,Math.min(3,Number(arg)||0));record.runes[index]={level:1,main:'hp',subs:['physicalAttack','magicalAttack','physicalDefense'],setId:null};selectedLoadoutRune=index}
+ else if(kind==='rune-equip'&&DEV_MODE){const index=Math.max(0,Math.min(3,Number(arg)||0));record.runes[index]={level:1,main:'hp',subs:['physicalAttack','magicalAttack','physicalDefense'],setId:null};selectedLoadoutRune=index}
  else if(kind==='rune-remove')record.runes[selectedLoadoutRune]=null;
  else if(kind==='rune-level'&&rune&&Number(arg)===1){const level=upgradeRuneWithCore(loadoutCharacterId,selectedLoadoutRune);say(level?`Rune upgraded to Level ${level}.`:'A Core is required and the Rune must be below Level 5.')}
  else if(kind==='rune-main'&&rune){runeStatPicker={slot:'main',subIndex:-1};return}
@@ -1405,8 +1430,7 @@ function drawLoadoutWeapons(){
     usable?(c.selected?'EQUIPPED':'EQUIP'): 'PREMIUM • STORE LOCKED',
     usable?'Signature weapon • character locked':'Premium weapon is not owned',usable);
   if(c.type==='standard'||w.premiumOwned){
-   addButton(c.x+180,515,90,50,'loadout:potential:'+c.type+',-1','−','',c.potential>1);
-   addButton(c.x+360,515,90,50,'loadout:potential:'+c.type+',1','+','',c.potential<5);
+   if(DEV_MODE){addButton(c.x+180,515,90,50,'loadout:potential:'+c.type+',-1','−','',c.potential>1);addButton(c.x+360,515,90,50,'loadout:potential:'+c.type+',1','+','',c.potential<5)}
   }
   if(atGate)addButton(c.x+145,570,340,34,'loadout:ascend-weapon:'+c.type,'ASCEND • 1 GEM','GEMS ×'+itemInventory.gems,itemInventory.gems>0&&(c.type==='standard'||w.premiumOwned));
   addButton(c.x+26,610,178,48,'loadout:book:'+c.type+',small','SMALL ENCHANTED BOOK','×'+itemInventory.books.small,itemInventory.books.small>0&&usable&&level<cap,14);
@@ -1445,8 +1469,8 @@ function drawLoadoutRunes(){
   text('RUNE SLOT '+(i+1),x+24,y+32,18,'#d6e2ef','850');
   addButton(x+450,y+12,82,42,'loadout:rune-select:'+i,'SELECT','',selected);
   if(!rune){
-   text('Empty slot',x+30,y+104,18,'#aebfd0','550');
-   addButton(x+30,y+150,590,64,'loadout:rune-equip:'+i,'ADD RUNE • PREVIEW','Rune inventory and set bonuses are not configured');
+   text(DEV_MODE?'Empty slot':'No rune equipped',x+30,y+104,18,'#aebfd0','550');
+   if(DEV_MODE)addButton(x+30,y+150,590,64,'loadout:rune-equip:'+i,'ADD RUNE • PREVIEW','Rune inventory and set bonuses are not configured');
    continue;
   }
   text('LEVEL '+rune.level+' / 5',x+250,y+32,15,'#f1dfbf','750','center');
@@ -1497,14 +1521,13 @@ function drawLoadoutLevels(){
   text(name+'  '+(value===null?'—':Math.round(value)),x,y,14,'#d6dceb','650');
  }
  rect(790,190,680,450,'rgba(25,37,58,.94)','#718ba4',14);
- text('CHARACTER DUPLICATES',830,240,21,'#f3dfb9','850');
- text('Duplicate preview: '+record.characterDuplicates+' / 4',830,295,19,'#d6e2ef','700');
- addButton(830,335,95,58,'loadout:character-duplicate:-1','−','',record.characterDuplicates>0);
- addButton(940,335,95,58,'loadout:character-duplicate:1','+','',record.characterDuplicates<4);
+ text(DEV_MODE?'CHARACTER DUPLICATES • TEST':'CHARACTER DUPLICATES',830,240,21,'#f3dfb9','850');
+ text(`${DEV_MODE?'PREVIEW':'OWNED'}  ${record.characterDuplicates} / 4`,830,295,19,'#d6e2ef','700');
+ if(DEV_MODE){addButton(830,335,95,58,'loadout:character-duplicate:-1','−','',record.characterDuplicates>0);addButton(940,335,95,58,'loadout:character-duplicate:1','+','',record.characterDuplicates<4)}
  const zeroDuplicates=['Ultimate delays all enemies by 20%.','Basic multiplier +100%.','Ultimate multiplier +100%.','First Strike multipliers +100%, including its first-hit bonus.'];
  const soulDuplicates=['Follow Up capacity increases by 2.','Follow Up multiplier doubles.','Ultimate multiplier doubles.','Each Enhance stack adds +200% Basic damage.'];
  const duplicateSet=model.id==='zero'?zeroDuplicates:model.id==='soul'?soulDuplicates:null;
- text(record.characterDuplicates&&duplicateSet?`DUPLICATE ${record.characterDuplicates} • ${duplicateSet[record.characterDuplicates-1]}`:'Duplicate effects currently preview without resource costs.',830,430,14,'#aebfd0','550');
+ text(record.characterDuplicates&&duplicateSet?`DUPLICATE ${record.characterDuplicates} • ${duplicateSet[record.characterDuplicates-1]}`:DEV_MODE?'Duplicate effects preview without resource costs.':'No duplicate effects unlocked.',830,430,14,'#aebfd0','550');
  text('Levels affect all six base combat stats.',830,490,16,'#d6e2ef','650');
  text('Current loadout bonuses are included in the stat values.',830,525,14,'#aebfd0','550');
 }
@@ -1531,9 +1554,9 @@ function drawMainMenu(){
  rect(1293,63,190,66,'rgba(13,17,35,.94)','#eacb87',12);
  text('RANK',1388,82,13,'#bfc8d9','800','center');text(playerRank,1388,107,25,'#f7f3f8','850','center');
  const items=[
-  {label:'STORY',x:220,y:256,active:true,action:'open-story',detail:'BATTLE PROTOTYPE'},
+  {label:'STORY',x:220,y:256,active:true,action:'open-story',detail:DEV_MODE?'BATTLE TESTS':'BEGIN YOUR JOURNEY'},
   {label:'EVENTS',x:640,y:256},
-  {label:'GAME MODE',x:1060,y:256},
+  {label:DEV_MODE?'DEV MODE':'REGULAR MODE',x:1060,y:256,active:true,action:'toggle-game-mode',detail:DEV_MODE?'SWITCH TO REGULAR MODE':'SWITCH TO DEV MODE'},
   {label:'STORE',x:220,y:472,active:true,action:'open-store',detail:'FEATURED LOTTERIES • 100 COINS'},
   {label:'LOADOUT',x:640,y:472,active:true,action:'open-loadout',detail:'WEAPONS • RUNES • CELESTIALS'},
   {label:'PARTY',x:1060,y:472,active:true,action:'open-party',detail:'MANAGE CURRENT PARTY'},
@@ -2264,7 +2287,7 @@ function drawAllyUltimate(p,x,y,sz){
  const queued=isUltPending(p.id),ready=canQueueUltimate(p),ko=p.hp<=0,selected=pendingTargetAction?.action==='ultimate'&&pendingTargetAction.actorId===p.id;
  // Keep a 44+-CSS-pixel-equivalent hit area in the portrait itself at phone scale.
  const hit=Math.min(106,sz-4);
- choiceRects.push({x:x+sz-hit-1,y:y+sz-hit-1,w:hit,h:hit,action:'queue-ult:'+p.id,enabled:ready});
+ if(DEV_MODE)choiceRects.push({x:x+sz-hit-1,y:y+sz-hit-1,w:hit,h:hit,action:'queue-ult:'+p.id,enabled:ready});
  ctx.save();ctx.beginPath();ctx.rect(x,y,sz,sz);ctx.clip();
  if(ready){ctx.shadowColor='#ffdd93';ctx.shadowBlur=18;}
  hudCircle(cx,cy,radius,'#11233b',selected?'#55aaff':ready?'#ffdfa0':queued?'#e9b77d':'#90a6bc',selected?4:ready?4:2.5);
@@ -2403,10 +2426,10 @@ function drawHud(t){
   text('SELECT AN ALLY',1035,55,20,'#f7e7ca','800');
  }
  // Separate compact upper-right utility controls.
- hudButton(1366,25,74,55,'dev-panel-toggle','DEV',true,devPanelOpen);
+ if(DEV_MODE)hudButton(1366,25,74,55,'dev-panel-toggle','DEV',true,devPanelOpen);
  hudButton(1481,25,74,55,'pause',paused?'PLAY':'PAUSE',phase==='player'||paused);
  // Invisible 104x104 touch hit regions respect iPhone's minimum target dimension.
- choiceRects.push({x:1348,y:7,w:106,h:100,action:'dev-panel-toggle',enabled:true});
+ if(DEV_MODE)choiceRects.push({x:1348,y:7,w:106,h:100,action:'dev-panel-toggle',enabled:true});
  choiceRects.push({x:1463,y:7,w:106,h:100,action:'pause',enabled:phase==='player'||paused});
  // Show a cue only while target selection is pending. The active card and
  // action buttons already identify whose turn it is and which actions exist.
@@ -2446,10 +2469,10 @@ function drawHud(t){
  ctx.restore();
  if(ultimateQueue.length){const names=ultimateQueue.map(q=>party.find(p=>p.id===q.actorId)?.name||q.actorId).join(' → ');rect(965,769,287,38,'rgba(28,35,49,.82)','rgba(219,195,130,.53)',10);text(`ULT QUEUE ${names.slice(0,23)}`,978,788,14,'#f3e3bc','750')}
  if(phase==='resolve'&&log){rect(420,615,760,44,'rgba(9,17,31,.92)','rgba(177,203,226,.62)',11);text(log.length>76?log.slice(0,75)+'…':log,800,637,17,'#eff6ff','750','center')}
- if(devPanelOpen&&!['victory','defeat'].includes(phase))drawDeveloperPanel();
+ if(DEV_MODE&&devPanelOpen&&!['victory','defeat'].includes(phase))drawDeveloperPanel();
  if(paused)drawPause();if(phase==='victory'||phase==='defeat')drawResult();
 }
-function drawPause(){rect(0,0,W,H,'rgba(2,5,15,.68)');rect(366,220,868,443,'#101729f4','#e4cda4',18);text('PAUSED • PARTY LOCKED',800,293,39,'#fff3e9','800','center');text('Testing controls below are NOT approved gameplay mechanics.',800,351,22,'#d6dceb','600','center');addButton(465,420,230,90,'test-ko','DEBUG: K.O.','Knock out non-active ally');addButton(714,420,230,90,'test-revive','DEBUG: REVIVE','Restore same party slot');addButton(964,420,180,90,'unpause','RESUME','');addButton(630,559,220,66,'restart','RESTART BATTLE','');addButton(868,559,210,66,'main-menu','MAIN MENU','')}
+function drawPause(){rect(0,0,W,H,'rgba(2,5,15,.68)');rect(366,220,868,443,'#101729f4','#e4cda4',18);text('PAUSED • PARTY LOCKED',800,293,39,'#fff3e9','800','center');if(DEV_MODE){text('TEST CONTROLS • DEVELOPMENT ONLY',800,351,20,'#d6dceb','600','center');addButton(465,420,230,90,'test-ko','DEBUG: K.O.','Knock out non-active ally');addButton(714,420,230,90,'test-revive','DEBUG: REVIVE','Restore same party slot');addButton(964,420,180,90,'unpause','RESUME','')}else{text('Battle paused.',800,365,20,'#d6dceb','600','center');addButton(714,420,230,90,'unpause','RESUME','')}addButton(630,559,220,66,'restart','RESTART BATTLE','');addButton(868,559,210,66,'main-menu','MAIN MENU','')}
 function drawResult(){
  rect(0,0,W,H,'rgba(3,7,15,.72)');
  rect(310,215,980,460,'rgba(13,21,38,.98)',color.gold,20);
@@ -2473,13 +2496,18 @@ function drawSetup(){
   text(p?p.name:'EMPTY',x+w/2,y+58,20,p?'#f6eefa':'#8494a9','800','center');
   if(p)text(p.test?'TEST PLACEHOLDER':'LEVEL '+progressFor(p.id).level,x+w/2,y+96,14,p.test?'#e5ca99':'#c4d6e5','600','center');
  }
- text('BATTLE TEST OPTIONS',240,467,19,'#bad4e9','800');
- text('TEST WAVES: '+(waveOverride||WAVE_PRESETS[wavePreset]).join(' + ')+'  UP TO 5 ACTIVE',240,510,17,'#d2ddec','650');
- addButton(240,542,250,58,'toggle-waves','CHANGE WAVES','');
- text('ENEMY ROSTER — MIXED ADDS A LEADER AND FINAL-WAVE BOSS',240,626,17,'#d2ddec','650');
- for(const [i,mode,label] of [['slime','SLIME'],['wolf','WOLF'],['mixed','MIXED'],['slime-leader','SLIME LEADER'],['slime-monster','SLIME MONSTER']].entries())addButton(240+i*160,655,154,52,'roster-'+mode,label,enemyRosterMode===mode?'SELECTED':'');
- text('TRAINING RECOVERY: '+(trainingRecoveryMode==='restore'?'RESTORE FULL HP':'PRESERVE HP')+'  TEST ONLY',538,510,16,'#d2ddec','650');
- addButton(538,542,470,58,'toggle-recovery','TOGGLE HP RECOVERY MODE',trainingRecoveryMode==='restore'?'CURRENT: RESTORE':'CURRENT: PRESERVE');
+ if(DEV_MODE){
+  text('BATTLE TEST OPTIONS',240,467,19,'#bad4e9','800');
+  text('TEST WAVES: '+(waveOverride||WAVE_PRESETS[wavePreset]).join(' + ')+'  UP TO 5 ACTIVE',240,510,17,'#d2ddec','650');
+  addButton(240,542,250,58,'toggle-waves','CHANGE WAVES','');
+  text('ENEMY ROSTER — MIXED ADDS A LEADER AND FINAL-WAVE BOSS',240,626,17,'#d2ddec','650');
+  for(const [i,mode,label] of [['slime','SLIME'],['wolf','WOLF'],['mixed','MIXED'],['slime-leader','SLIME LEADER'],['slime-monster','SLIME MONSTER']].entries())addButton(240+i*160,655,154,52,'roster-'+mode,label,enemyRosterMode===mode?'SELECTED':'');
+  text('TRAINING RECOVERY: '+(trainingRecoveryMode==='restore'?'RESTORE FULL HP':'PRESERVE HP')+'  TEST ONLY',538,510,16,'#d2ddec','650');
+  addButton(538,542,470,58,'toggle-recovery','TOGGLE HP RECOVERY MODE',trainingRecoveryMode==='restore'?'CURRENT: RESTORE':'CURRENT: PRESERVE');
+ }else{
+  text('READY FOR BATTLE',240,467,19,'#bad4e9','800');
+  text('Your saved party is ready. Battle settings are handled automatically.',240,510,18,'#d2ddec','600');
+ }
  addButton(1039,733,313,79,'start','START BATTLE','Current party',validTeam(draft));
 }
 // Transient hint popovers belong to menus and setup screens. Combat has
@@ -2489,12 +2517,12 @@ function drawHint(t){if(hint&&t-hintAt<2300&&['startup','menu','partySetup','loa
 function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='startup'){drawStartupMenu()}else if(phase==='menu'){drawMainMenu()}else if(phase==='partySetup'){drawPartySetup()}else if(phase==='loadout'){drawLoadout()}else if(phase==='inventory'){drawItemInventory()}else if(phase==='challenges'){drawChallenges()}else if(phase==='settings'){drawSettings()}else if(phase==='store'){drawStore()}else if(phase!=='setup'){
   drawCameraStage(t);drawFx(t);drawHud(t)
  }else{drawCameraStage(t);drawSetup()}drawHint(t);requestAnimationFrame(loop)}
-function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('roster-')){setEnemyRoster(cmd.slice(7));return}if(cmd.startsWith('loadout:')){handleLoadoutAction(cmd.slice(8));return}if(cmd.startsWith('store:')){handleStoreAction(cmd);return}if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'){devPanelOpen=!devPanelOpen;return}if(cmd==='cancel-target'){cancelTargetSelection();return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(cameraPreview==='party'&&(phase==='player'||pendingTargetAction?.targetSide==='ally')){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(pendingTargetAction?.targetSide==='ally'&&pendingTargetAction.targetScope==='all'){if(!p||p.hp<=0){say('Choose a living party member to confirm the team skill.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;return executeCombatAction(actor,pending.action)}if(pendingTargetAction?.targetSide==='ally'){if(!p||p.hp<=0){say('Tune and Dawn’s Ultimate need a living ally.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;if(pending.action==='ultimate')return queueUltimate(pending.actorId,id);return executeCombatAction(actor,pending.action,null,id)}if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){beginTargetSelection('ultimate',cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){chargeUltimateForTest(cmd.slice(11));return}
- switch(cmd){case 'startup-start':phase='menu';hint='';break;case 'startup-load':requestSaveFileLoad();break;case 'open-inventory':phase='inventory';hint='';break;case 'open-challenges':phase='challenges';hint='';break;case 'open-settings':phase='settings';hint='';break;case 'open-store':phase='store';lastStoreNotice='Select a featured target, then draw for 100 coins.';break;case 'save-progress':saveProgressFile();break;case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'toggle-fullscreen':toggleFullscreen();break;case 'support-heal':startSupportDemo('heal');break;case 'support-revive':startSupportDemo('revive');break;case 'confirm-support':confirmSupportDemo();break;case 'cancel-support':cancelSupportDemo();break;case 'camera-party':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':toggleWavePreset();break;case 'toggle-recovery':setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':testKO();break;case 'test-revive':testRevive();break;case 'skill':play('skill');break;case 'cap-test':cycleSpCapTest();break;case 'hud-status-test':toggleHudStatusDemo();break;case 'f05-advance':addActionAdvance(activeId,25);break;case 'f05-delay':addActionDelay(activeId,25);break;case 'f05-speed':setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':queueSummonForTest('independent');break;case 'f05-summon-controlled':queueSummonForTest('controlled');break;
- case 'progress-test-level':{const a=active(),p=a&&progressFor(a.id);if(a&&p){const cost=Math.max(1,requiredExp(a.level)-p.exp),result=testGrantExp(a.id,cost);say(result?`TEST ONLY: level ${result.level}, ${cost} EXP injected.`:'Ascension required or level cap reached.');}break}
- case 'progress-test-ascend':{const a=active();if(a)say(testAscend(a.id)?`TEST ONLY: level ${a.level} ascension unlocked (no materials).`:'Not at a locked ascension gate.');break}
- case 'hp-test-flat':{const a=active();if(a)setHpBonusForTest(a.id,'debug-flat','flat',(a.hpFlatModifiers['debug-flat']||0)+20);break}
- case 'hp-test-percent':{const a=active();if(a)setHpBonusForTest(a.id,'debug-percent','percent',(a.hpPercentModifiers['debug-percent']||0)+.2);break}default:zeroSkillArmed=false;play(cmd)}return}}
+function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('roster-')){if(DEV_MODE)setEnemyRoster(cmd.slice(7));return}if(cmd.startsWith('loadout:')){handleLoadoutAction(cmd.slice(8));return}if(cmd.startsWith('store:')){handleStoreAction(cmd);return}if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'&&DEV_MODE){devPanelOpen=!devPanelOpen;return}if(cmd==='cancel-target'){cancelTargetSelection();return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(cameraPreview==='party'&&(phase==='player'||pendingTargetAction?.targetSide==='ally')){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(pendingTargetAction?.targetSide==='ally'&&pendingTargetAction.targetScope==='all'){if(!p||p.hp<=0){say('Choose a living party member to confirm the team skill.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;return executeCombatAction(actor,pending.action)}if(pendingTargetAction?.targetSide==='ally'){if(!p||p.hp<=0){say('Tune and Dawn’s Ultimate need a living ally.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;if(pending.action==='ultimate')return queueUltimate(pending.actorId,id);return executeCombatAction(actor,pending.action,null,id)}if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){if(DEV_MODE)setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){if(DEV_MODE)beginTargetSelection('ultimate',cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){if(DEV_MODE)chargeUltimateForTest(cmd.slice(11));return}
+ switch(cmd){case 'startup-start':phase='menu';hint='';break;case 'startup-load':requestSaveFileLoad();break;case 'toggle-game-mode':toggleGameMode();break;case 'open-inventory':phase='inventory';hint='';break;case 'open-challenges':phase='challenges';hint='';break;case 'open-settings':phase='settings';hint='';break;case 'open-store':phase='store';lastStoreNotice='Select a featured target, then draw for 100 coins.';break;case 'save-progress':saveProgressFile();break;case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'toggle-fullscreen':toggleFullscreen();break;case 'support-heal':if(DEV_MODE)startSupportDemo('heal');break;case 'support-revive':if(DEV_MODE)startSupportDemo('revive');break;case 'confirm-support':if(DEV_MODE)confirmSupportDemo();break;case 'cancel-support':if(DEV_MODE)cancelSupportDemo();break;case 'camera-party':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':if(DEV_MODE)toggleWavePreset();break;case 'toggle-recovery':if(DEV_MODE)setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':if(DEV_MODE)testKO();break;case 'test-revive':if(DEV_MODE)testRevive();break;case 'skill':play('skill');break;case 'cap-test':if(DEV_MODE)cycleSpCapTest();break;case 'hud-status-test':if(DEV_MODE)toggleHudStatusDemo();break;case 'f05-advance':if(DEV_MODE)addActionAdvance(activeId,25);break;case 'f05-delay':if(DEV_MODE)addActionDelay(activeId,25);break;case 'f05-speed':if(DEV_MODE)setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':if(DEV_MODE)queueSummonForTest('independent');break;case 'f05-summon-controlled':if(DEV_MODE)queueSummonForTest('controlled');break;
+ case 'progress-test-level':{if(DEV_MODE){const a=active(),p=a&&progressFor(a.id);if(a&&p){const cost=Math.max(1,requiredExp(a.level)-p.exp),result=testGrantExp(a.id,cost);say(result?`TEST ONLY: level ${result.level}, ${cost} EXP injected.`:'Ascension required or level cap reached.');}}break}
+ case 'progress-test-ascend':{if(DEV_MODE){const a=active();if(a)say(testAscend(a.id)?`TEST ONLY: level ${a.level} ascension unlocked (no materials).`:'Not at a locked ascension gate.');}break}
+ case 'hp-test-flat':{if(DEV_MODE){const a=active();if(a)setHpBonusForTest(a.id,'debug-flat','flat',(a.hpFlatModifiers['debug-flat']||0)+20);}break}
+ case 'hp-test-percent':{if(DEV_MODE){const a=active();if(a)setHpBonusForTest(a.id,'debug-percent','percent',(a.hpPercentModifiers['debug-percent']||0)+.2);}break}default:zeroSkillArmed=false;play(cmd)}return}}
 const screenElement=document.getElementById('screen');
 function isFullscreen(){return document.fullscreenElement===screenElement||document.webkitFullscreenElement===screenElement}
 function isStandaloneApp(){return navigator.standalone===true||window.matchMedia?.('(display-mode: standalone)').matches||window.matchMedia?.('(display-mode: fullscreen)').matches}
@@ -2511,10 +2539,11 @@ async function toggleFullscreen(){
 }
 const saveFileInput=document.getElementById('save-file-picker');saveFileInput.addEventListener('change',async()=>{const file=saveFileInput.files?.[0];if(!file)return;if(file.size>2_000_000){say('This save file is too large to load.');saveFileInput.value='';return}try{importSaveFile(JSON.parse(await file.text()))}catch(error){say('This file could not be read as a Two-Tone save.')}finally{saveFileInput.value=''}});
 canvas.addEventListener('pointerdown',e=>{e.preventDefault();const r=canvas.getBoundingClientRect();choose((e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height)},{passive:false});
-window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)cancelTargetSelection();if(e.key==='1')play('basic');if(e.key==='2')play('skill');if(e.key==='3')play('ultimate');if(e.key.toLowerCase()==='m'&&phase==='player')cycleSpCapTest();if(['q','w','e','f'].includes(e.key.toLowerCase())&&phase==='player')setTargetingMode(({q:'single',w:'blast',e:'aoe',f:'five-hit'})[e.key.toLowerCase()]);if(e.key.toLowerCase()==='v'&&phase==='player'){cameraPreview=cameraPreview==='party'?null:'party';selectedAllyId=activeId}if(e.key.toLowerCase()==='t'&&phase==='player')cameraPreview=cameraPreview==='target'?null:'target';if(e.key.toLowerCase()==='r'&&phase!=='setup')replay()});window.addEventListener('contextmenu',e=>e.preventDefault());
+window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)cancelTargetSelection();if(e.key==='1')play('basic');if(e.key==='2')play('skill');if(e.key==='3')play('ultimate');if(DEV_MODE&&e.key.toLowerCase()==='m'&&phase==='player')cycleSpCapTest();if(DEV_MODE&&['q','w','e','f'].includes(e.key.toLowerCase())&&phase==='player')setTargetingMode(({q:'single',w:'blast',e:'aoe',f:'five-hit'})[e.key.toLowerCase()]);if(DEV_MODE&&e.key.toLowerCase()==='v'&&phase==='player'){cameraPreview=cameraPreview==='party'?null:'party';selectedAllyId=activeId}if(DEV_MODE&&e.key.toLowerCase()==='t'&&phase==='player')cameraPreview=cameraPreview==='target'?null:'target';if(DEV_MODE&&e.key.toLowerCase()==='r'&&phase!=='setup')replay()});window.addEventListener('contextmenu',e=>e.preventDefault());
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
+if(DEV_MODE){
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.23',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.0.24',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
  characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
  unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}})),
@@ -2528,4 +2557,5 @@ window.twoToneTest.grantWeaponXp=grantWeaponXp;window.twoToneTest.weaponLevelCap
 window.zeroBasicAnimationDebug=()=>({durationMs:SOUL_BASIC_MS,elapsed:fx?.kind==='basic'&&fx.actor==='soul'?Math.max(0,performance.now()-fx.at):null,active:soulBasicStage(performance.now())!==null,assets:['soul','soulBasicWindup','soulBasicSlash'].map(id=>({id,loaded:!!images[id]?.complete&&!!images[id]?.naturalWidth}))});
 window.twoToneTest.applyTauntForTest=(targetId,sourceId,rate,turns)=>{const target=party.find(unit=>unit.id===targetId)||enemies.find(unit=>unit.id===targetId),source=party.find(unit=>unit.id===sourceId)||enemies.find(unit=>unit.id===sourceId);return target&&source?applyTaunt(target,source,rate,turns):false};
 window.twoToneTauntStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,activeRate:tauntRateOf(unit),effects:(unit.tauntEffects||[]).map(effect=>({...effect}))}));
+}
 requestAnimationFrame(loop);
