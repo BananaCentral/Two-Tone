@@ -54,21 +54,21 @@
       "basic": { "damageType": "magical", "multiplier": 1, "target": "random" },
       "passives": [{ "type": "everyNthBasic", "id": "slimy", "every": 3, "damageBonus": 0.25, "target": "aoe" }]
     },
-    "slimeLeader": {
-      "name": "Slime Leader",
+    "goblin": {
+      "name": "Goblin",
       "level": 1,
       "barrierPercent": 0.2,
-      "stats": { "hp": 200, "physicalAttack": 0, "magicalAttack": 40, "physicalDefense": 8, "magicalDefense": 16, "speed": 40 },
-      "basic": { "damageType": "magical", "multiplier": 1, "target": "blast" },
-      "passives": [{ "type": "residue", "maxStacks": 5 }]
+      "stats": { "hp": 200, "physicalAttack": 40, "magicalAttack": 0, "physicalDefense": 12, "magicalDefense": 4, "speed": 40 },
+      "basic": { "damageType": "physical", "multiplier": 1, "target": "blast" },
+      "passives": [{ "type": "pursuit", "actionAdvance": 20 }]
     },
-    "slimeMonster": {
-      "name": "Slime Monster",
+    "bear": {
+      "name": "Bear",
       "level": 1,
       "barrierPercent": 0.2,
-      "stats": { "hp": 300, "physicalAttack": 0, "magicalAttack": 60, "physicalDefense": 12, "magicalDefense": 24, "speed": 60 },
-      "basic": { "damageType": "magical", "multiplier": 1, "target": "aoe" },
-      "passives": [{ "type": "lethalImpact", "defenseIgnore": 0.25 }]
+      "stats": { "hp": 450, "physicalAttack": 90, "magicalAttack": 0, "physicalDefense": 6, "magicalDefense": 6, "speed": 60 },
+      "basic": { "damageType": "true", "multiplier": 1, "target": "aoe" },
+      "passives": [{ "type": "sharpClaws", "defenseIgnore": 0.25 }]
     }
   },
   "teams": {

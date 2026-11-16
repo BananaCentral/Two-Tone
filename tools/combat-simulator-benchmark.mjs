@@ -4,20 +4,20 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { simulateBatch } from './combat-simulator.mjs';
 
-const DEFAULT_CONFIG=fileURLToPath(new URL('../Documentation/combat-simulator/example-logan-party-vs-slime-boss.json',import.meta.url));
+const DEFAULT_CONFIG=fileURLToPath(new URL('../Documentation/combat-simulator/example-logan-party-vs-bear-boss.json',import.meta.url));
 function clone(value){return JSON.parse(JSON.stringify(value))}
 function buildSuite(source){
  const suite=[];
- const boss=source.archetypes.slimeMonster;
+ const boss=source.archetypes.bear;
  if(boss){
-  const base=clone(source);base.teams.enemies=[{id:'benchmark-boss',archetype:'slimeMonster',slot:2}];
+  const base=clone(source);base.teams.enemies=[{id:'benchmark-boss',archetype:'bear',slot:2}];
   suite.push({name:'Boss • 1 health bar',config:base});
-  for(const bars of [2,3]){const config=clone(base);config.name=`${bars}-bar Slime Monster`;config.archetypes.slimeMonster.stats.hp=boss.stats.hp*bars;suite.push({name:`Boss • ${bars} health bars`,config})}
-  if(source.archetypes.slimeLeader){const config=clone(base);config.teams.enemies=[{id:'benchmark-boss',archetype:'slimeMonster',slot:2},{id:'leader-1',archetype:'slimeLeader',slot:1},{id:'leader-2',archetype:'slimeLeader',slot:3}];suite.push({name:'Boss with two Elite adds',config})}
+  for(const bars of [2,3]){const config=clone(base);config.name=`${bars}-bar Bear`;config.archetypes.bear.stats.hp=boss.stats.hp*bars;suite.push({name:`Boss • ${bars} health bars`,config})}
+  if(source.archetypes.goblin){const config=clone(base);config.teams.enemies=[{id:'benchmark-boss',archetype:'bear',slot:2},{id:'goblin-1',archetype:'goblin',slot:1},{id:'goblin-2',archetype:'goblin',slot:3}];suite.push({name:'Boss with two Elite adds',config})}
  }
  if(source.archetypes.slime){const config=clone(source);config.teams.enemies=Array.from({length:5},(_,slot)=>({id:`slime-${slot+1}`,archetype:'slime',slot}));suite.push({name:'Wave • five Slimes',config})}
- if(source.archetypes.slimeLeader){const config=clone(source);config.teams.enemies=Array.from({length:3},(_,slot)=>({id:`leader-${slot+1}`,archetype:'slimeLeader',slot}));suite.push({name:'Wave • three Slime Leaders',config})}
- if(!suite.length)throw new Error('The benchmark config needs slimeMonster, slime, or slimeLeader archetypes.');
+ if(source.archetypes.goblin){const config=clone(source);config.teams.enemies=Array.from({length:3},(_,slot)=>({id:`goblin-${slot+1}`,archetype:'goblin',slot}));suite.push({name:'Wave • three Goblins',config})}
+ if(!suite.length)throw new Error('The benchmark config needs bear, slime, or goblin archetypes.');
  return suite;
 }
 function parseArgs(args){const options={config:DEFAULT_CONFIG,runs:1000,seed:1,json:false};for(let i=0;i<args.length;i++){if(args[i]==='--config')options.config=path.resolve(args[++i]);else if(args[i]==='--runs')options.runs=Number(args[++i]);else if(args[i]==='--seed')options.seed=Number(args[++i]);else if(args[i]==='--json')options.json=true;else if(args[i]==='--help'||args[i]==='-h')options.help=true;else throw new Error(`Unknown option: ${args[i]}`)}return options}

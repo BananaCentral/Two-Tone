@@ -33,8 +33,8 @@ This standard defines how combat actions and passive effects receive readable, c
 | Dawn | Skill / Tune | Teal note symbols and rings on the selected ally |
 | Dawn | Ultimate | Gold advance rings and energy trail on the selected ally |
 | Slime | Basic | Green acid globules on affected allies |
-| Slime Leader | Basic / blast | Bright green globules and an expanding target ring on each ally in the blast |
-| Slime Monster | Basic / AoE | Wide green shockwave with slime motes across the allied formation |
+| Goblin | Basic / blast | Fast gold motion streaks on each ally in the blast |
+| Bear | Basic / AoE | Broad claw strokes and a pale impact ring across the allied formation |
 | Wolf | Basic | Three red claw strokes on affected allies |
 | Combat system | Lifesteal | Green recovery ring and `LIFESTEAL +N` on the source |
 | Combat system | Bleed | Red stack ring on application and a damage / remaining-stack cue on each tick |

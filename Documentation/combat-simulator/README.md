@@ -16,7 +16,7 @@ The default runs 100 battles with a reproducible seed using the Soul vs Slime ex
 node tools/combat-simulator.mjs --config path/to/scenario.json --runs 1000 --seed 42
 ```
 
-`Documentation/combat-simulator/example-soul-lily-vs-slimes.json` is a Level 1 Soul and Lily team scenario against five Slimes. `Documentation/combat-simulator/example-logan-party-vs-slime-boss.json` includes Soul, Lily, Dawn, and Logan against the Slime Monster boss.
+`Documentation/combat-simulator/example-soul-lily-vs-slimes.json` is a Level 1 Soul and Lily team scenario against five Slimes. `Documentation/combat-simulator/example-logan-party-vs-bear-boss.json` includes Soul, Lily, Dawn, and Logan against the Bear boss.
 
 `Documentation/combat-simulator/example-zero-vs-slime.json` provides a single-target Zero baseline. His current base multipliers are 0.5× Basic, 1.0× First Strike (1.5× the first time he damages a given enemy), and 1.0× Ultimate. Zero scenarios support Cutthroat Critical bonuses, per-enemy First Strike scaling, Physical Blast Basic attacks with Energy gain and shared Skill Point recovery, Ultimate self-advance and enemy delay, and configured character and Premium weapon duplicates.
 
@@ -30,7 +30,7 @@ node tools/combat-simulator-benchmark.mjs --runs 1000 --seed 404
 
 Run the mechanic-coverage regressions with `node --test tests/combat-simulator.test.mjs`.
 
-The suite compares a one-bar boss, two- and three-bar boss HP benchmarks, a boss with two Elite adds, five Slimes, and three Slime Leaders. Pass `--config path/to/full-party.json` to use another party and its enemy archetypes. `--json` emits the full reports. Every result includes a 95% confidence interval for win rate so small batches do not look more certain than they are.
+The suite compares a one-bar boss, two- and three-bar boss HP benchmarks, a boss with two Elite adds, five Slimes, and three Goblins. Pass `--config path/to/full-party.json` to use another party and its enemy archetypes. `--json` emits the full reports. Every result includes a 95% confidence interval for win rate so small batches do not look more certain than they are.
 
 Add a `role` to each character archetype (`mainDps`, `subDps`, `support`, `sustain`, or a project-specific label) to group its results by intended job. Per-character reports separate direct damage, Bleed, Follow-up, Ricochet, and summon damage; they also report Tune damage added, Shield granted, received, and absorbed, HP spent, Lifesteal healing, survival, Skill Point spend and generation, Tune use, action advances, and taunt redirects. These metrics describe what each kit contributes. Do not rank supports by damage alone.
 
@@ -70,8 +70,8 @@ Supported Skill and Passive effect types:
 - `exposed`: applies Lily's defense-reduction mark after her Skill, Ultimate, and Hauntling attacks. Each stack scales the target's damage reduction by 0.9; Lily Duplicate 2 can maintain two stacks for three turns.
 - `resourceful`: Dawn's passive adds 2 to the shared Skill Point cap and starts the party with 2 extra Skill Points.
 - `tune`: models Dawn's single-ally Skill, enhanced next Basic, Skill Point recovery, stat and defense effects, Premium weapon duplicates, and her support Ultimate. The simulator targets Soul with Tune when present; otherwise it targets the living ally with the strongest Basic. It advances only that selected ally for Tune and Ultimate.
-- `residue`: the Slime Leader's blast applies a two-turn stack to each ally it damages. Each stack lowers that ally's defenses and damage dealt by 5%, to a maximum of five stacks.
-- `lethalImpact`: the Slime Monster ignores 25% of both defenses on its AoE magical attack.
+- `pursuit`: after each Basic Attack, the Goblin advances its next action by 20%.
+- `sharpClaws`: the Bear ignores 25% of both defenses when calculating its AoE True damage.
 - `lifesteal`: heals the damage source for its configured fraction of final actual HP damage. It applies to allies and enemies, including simulated direct and follow-up damage. Shields absorb damage before Lifesteal is calculated.
 - `bleed`: an optional ally passive that applies a Bleed stack when its attacks hit living enemies. The enemy ticks all stacks for 2% of its Max HP per stack at the start of its scheduled turn, then loses one stack. Five stacks is the default cap; `maxStacks` and `stacksPerHit` can be configured. Bleed is true damage, bypasses Barrier and defense, cannot crit, and is attributed to its applier (including Lifesteal). Shields absorb Bleed before HP.
 - Logan's Basic Attack and Ultimate apply Bleed directly; those stacks tick and are credited to Logan using the same Bleed rules.
@@ -84,7 +84,7 @@ Lily's Ultimate creates an independent Hauntling after its initial AoE. It acts 
 
 Soul's `characterDuplicates` field (0–4) enables his four character Duplicate effects. With a Premium weapon, potential levels 2–5 correspond to weapon duplicates 1–4. Soul's Premium weapon refunds one shared Skill Point per three Enhance points spent, starting at Potential 1. The simulator models this effect, Soul's configured character and weapon duplicates (including Duplicate 2's critical bonuses), and configured Celestial levels. Dawn's `characterDuplicates` and Premium weapon potential model her Tune upgrades; weapon potentials 2–5 map to Premium Duplicates 1–4. Zero's character duplicates model Ultimate enemy delay, Basic and Ultimate damage, and First Strike multipliers; Premium Potentials 1–5 model the Ultimate Skill Point refund and weapon Duplicates 1–4.
 
-The [Dawn team example](example-dawn-party-vs-slime.json) demonstrates her Resourceful passive, Tune, and support Ultimate alongside Soul and Lily. It also defines the Slime Leader and Slime Monster archetypes so their stats and attack/passive behavior can be selected in a scenario.
+The [Dawn team example](example-dawn-party-vs-slime.json) demonstrates her Resourceful passive, Tune, and support Ultimate alongside Soul and Lily. It also defines the Goblin and Bear archetypes so their stats and attack/passive behavior can be selected in a scenario.
 
 ## Output
 

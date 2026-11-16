@@ -54,7 +54,7 @@ function validateConfig(config) {
       const taunt=instance.taunt??archetype.taunt;
       assert(taunt===undefined||(taunt&&Number.isFinite(taunt.rate)&&taunt.rate>=0&&taunt.rate<=1&&Number.isInteger(taunt.turns)&&taunt.turns>0),'Taunt needs a rate from 0 to 1 and a positive integer duration.');
       assert(archetype.basic && Number.isFinite(archetype.basic.multiplier) && ['physical', 'magical', 'true'].includes(archetype.basic.damageType), 'Archetype ' + instance.archetype + ' needs a typed Basic Attack.');
-      assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage', 'exposed', 'resourceful', 'residue', 'lethalImpact', 'bleed', 'cutthroat'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
+      assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage', 'exposed', 'resourceful', 'residue', 'lethalImpact', 'pursuit', 'sharpClaws', 'bleed', 'cutthroat'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
       for (const passive of archetype.passives || []) {
         if (passive.type === 'everyNthBasic') assert(Number.isInteger(passive.every) && passive.every > 0, 'everyNthBasic needs a positive integer interval.');
         if (passive.type === 'followUp') assert(Number.isFinite(passive.multiplier) && passive.multiplier >= 0, 'followUp needs a non-negative multiplier.');
@@ -228,8 +228,8 @@ function defenseValue(unit, type) {
 function damageFor(attacker, target, type, multiplier) {
   const attack = attackValue(attacker, type);
   if (attack <= 0) return 0;
-  const lethalImpact=attacker.passives.find(passive=>passive.type==='lethalImpact')?.defenseIgnore||0;
-  const ignore=Math.min(1,Math.max(0,(attacker.tune?.defenseIgnore||0)+(attacker.defenseIgnoreBonus||0)+lethalImpact)),resistance=Math.max(0,1-(target.residueStacks||0)*(target.residueResistanceReductionPerStack??.05)),physicalDefense=target.stats.physicalDefense*resistance*(1-ignore),magicalDefense=target.stats.magicalDefense*resistance*(1-ignore);
+  const defenseIgnorePassive=attacker.passives.find(passive=>passive.type==='lethalImpact'||passive.type==='sharpClaws')?.defenseIgnore||0;
+  const ignore=Math.min(1,Math.max(0,(attacker.tune?.defenseIgnore||0)+(attacker.defenseIgnoreBonus||0)+defenseIgnorePassive)),resistance=Math.max(0,1-(target.residueStacks||0)*(target.residueResistanceReductionPerStack??.05)),physicalDefense=target.stats.physicalDefense*resistance*(1-ignore),magicalDefense=target.stats.magicalDefense*resistance*(1-ignore);
   let reduction;
   if (type === 'true') {
     const physicalAttack=attackValue(attacker,'physical'),magicalAttack=attackValue(attacker,'magical');
@@ -513,6 +513,7 @@ function resolveEnemyAction(state, actor) {
     }
   }
   const hits = runAttack(state, actor, targets, basic, { targetMode, multiplier });
+  const pursuit=actor.passives.find(passive=>passive.type==='pursuit');if(pursuit){const advance=pursuit.actionAdvance??20;advanceTurn(state,actor,advance);actor.turnsAdvanced+=advance/100}
   applyResidue(actor,hits.map(hit=>hit.target));
   if (rampage && hits.some(hit => hit.damage > 0)) rampage.stacks = Math.min(rampage.maxStacks, (rampage.stacks || 0) + 1);
 }

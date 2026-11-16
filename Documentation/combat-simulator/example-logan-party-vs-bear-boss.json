@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "name": "Soul, Lily, Dawn, and Logan vs Slime Monster",
+  "name": "Soul, Lily, Dawn, and Logan vs Bear",
   "settings": {
     "initialSkillPoints": 3,
     "skillPointCap": 5,
@@ -192,50 +192,50 @@
         }
       ]
     },
-    "slimeLeader": {
-      "name": "Slime Leader",
+    "goblin": {
+      "name": "Goblin",
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
         "hp": 200,
-        "physicalAttack": 0,
-        "magicalAttack": 40,
-        "physicalDefense": 8,
-        "magicalDefense": 16,
+        "physicalAttack": 40,
+        "magicalAttack": 0,
+        "physicalDefense": 12,
+        "magicalDefense": 4,
         "speed": 40
       },
       "basic": {
-        "damageType": "magical",
+        "damageType": "physical",
         "multiplier": 1,
         "target": "blast"
       },
       "passives": [
         {
-          "type": "residue",
-          "maxStacks": 5
+          "type": "pursuit",
+          "actionAdvance": 20
         }
       ]
     },
-    "slimeMonster": {
-      "name": "Slime Monster",
+    "bear": {
+      "name": "Bear",
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
-        "hp": 300,
-        "physicalAttack": 0,
-        "magicalAttack": 60,
-        "physicalDefense": 12,
-        "magicalDefense": 24,
+        "hp": 450,
+        "physicalAttack": 90,
+        "magicalAttack": 0,
+        "physicalDefense": 6,
+        "magicalDefense": 6,
         "speed": 60
       },
       "basic": {
-        "damageType": "magical",
+        "damageType": "true",
         "multiplier": 1,
         "target": "aoe"
       },
       "passives": [
         {
-          "type": "lethalImpact",
+          "type": "sharpClaws",
           "defenseIgnore": 0.25
         }
       ]
@@ -308,7 +308,7 @@
     "enemies": [
       {
         "id": "slime-boss-1",
-        "archetype": "slimeMonster",
+        "archetype": "bear",
         "slot": 2
       }
     ]

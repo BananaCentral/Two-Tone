@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { simulateBatch } from '../tools/combat-simulator.mjs';
 import { buildSuite } from '../tools/combat-simulator-benchmark.mjs';
 
-const examplePath=fileURLToPath(new URL('../Documentation/combat-simulator/example-logan-party-vs-slime-boss.json',import.meta.url));
+const examplePath=fileURLToPath(new URL('../Documentation/combat-simulator/example-logan-party-vs-bear-boss.json',import.meta.url));
 function example(){return JSON.parse(fs.readFileSync(examplePath,'utf8'))}
 
 test('batches are reproducible with the same config and seed',()=>{
@@ -54,8 +54,8 @@ test('benchmark suite covers boss, mixed, and multi-target scenarios',()=>{
  const suite=buildSuite(example());
  assert.deepEqual(suite.map(scenario=>scenario.name),[
   'Boss • 1 health bar','Boss • 2 health bars','Boss • 3 health bars',
-  'Boss with two Elite adds','Wave • five Slimes','Wave • three Slime Leaders'
+  'Boss with two Elite adds','Wave • five Slimes','Wave • three Goblins'
  ]);
  assert.ok(suite.every(scenario=>scenario.config.teams.allies.length===4));
- assert.equal(suite.find(scenario=>scenario.name==='Boss with two Elite adds').config.teams.enemies.filter(unit=>unit.archetype==='slimeLeader').length,2);
+ assert.equal(suite.find(scenario=>scenario.name==='Boss with two Elite adds').config.teams.enemies.filter(unit=>unit.archetype==='goblin').length,2);
 });
