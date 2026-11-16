@@ -4,7 +4,7 @@ Battle-stage artwork uses the side-facing `assets/dawn-battle.png`; her HUD and 
 
 ## Identity and base stats
 
-Character ID: `dawn`. Dawn starts at Level 1 with base HP 50, Physical Attack 0, Magical Attack 40, Physical Defense 2, Magical Defense 6, and Speed 30. Stats use the shared character-level and loadout formulas.
+Character ID: `dawn`. Dawn starts at Level 1 with base HP 50, Physical Attack 0, Magical Attack 40, Physical Defense 2, Magical Defense 4, and Speed 20. Stats use the shared character-level and loadout formulas.
 
 ## Passive: Resourceful
 
