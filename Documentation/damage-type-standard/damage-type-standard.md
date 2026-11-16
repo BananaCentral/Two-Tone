@@ -8,9 +8,11 @@ This standard defines which attack and defense stats apply to Physical, Magical,
 
 - Physical damage uses Physical Attack.
 - Magical damage uses Magical Attack.
-- True damage uses both attack stats at 50% value each:
+- True damage adds the full value of both attack stats:
 
-  `True Attack = (Physical Attack × 0.5) + (Magical Attack × 0.5)`
+  `True Attack = Physical Attack + Magical Attack`
+
+- Attack bonuses to either stat contribute their full value to True Attack.
 
 - Each action determines how much of its applicable attack basis it uses to calculate damage before Defense.
 

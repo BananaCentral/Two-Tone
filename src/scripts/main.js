@@ -234,7 +234,7 @@ function calculateMagicalDefense(unit){
 }
 function calculateTrueAttack(unit){
  const physical=calculatePhysicalAttack(unit),magical=calculateMagicalAttack(unit);
- return physical===null||magical===null?null:(physical+magical)*.5;
+ return physical===null||magical===null?null:physical+magical;
 }
 function calculateTrueDefense(unit){
  const physical=calculatePhysicalDefense(unit),magical=calculateMagicalDefense(unit);
