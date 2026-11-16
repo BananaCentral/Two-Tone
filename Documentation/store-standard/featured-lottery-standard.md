@@ -28,7 +28,7 @@ For the reveal, each ticket rises into view showing its back over 1,000 ms, then
 
 The Store may feature up to three character and signature premium weapon pairs at once. A player chooses one featured target for each lottery type they use. The character and weapon in each pair correspond to one another.
 
-Featured selections rotate weekly at 12:00 AM in the `America/New_York` time zone. The character rotation must show every available character before showing a character again. The paired signature weapons follow the character rotation. When a rotation changes, players must select a new target from the current lineup. Pity progress and heightened state are preserved.
+Featured selections rotate weekly at 12:00 AM Monday in the `America/New_York` time zone. Show three distinct character banners and their three paired premium weapon banners whenever at least three characters are available. The rotation must show every available character before showing that character again. If fewer than three characters remain in a cycle, use those remaining characters to finish it, then fill the lineup's open slots from the start of the next cycle without duplicating a character in that lineup. The paired signature weapons follow the character rotation. When a rotation changes, players must select a new target from the current lineup. Pity progress and heightened state are preserved.
 
 ## Reward Tiers
 

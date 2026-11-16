@@ -22,7 +22,6 @@
  function setTarget(type,targetId,featuredIds){if(typeof targetId!=='string'||!featuredIds?.includes(targetId))return false;trackFor(type).target=targetId;save();return true}
  function rotate(featuredCharacterIds,now=new Date()){
   if(!Array.isArray(featuredCharacterIds)||!featuredCharacterIds.length)return null;
-  const start=new Date(now);start.setUTCHours(0,0,0,0);
   // Rotation is weekly from Monday 00:00 America/New_York; Intl handles DST.
   const localParts=new Intl.DateTimeFormat('en-US',{timeZone:RULES.rotationTimeZone,weekday:'short',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now);
   const part=key=>localParts.find(item=>item.type===key)?.value;
@@ -32,11 +31,18 @@
   const weekKey=localDate.toISOString().slice(0,10);
   if(state.rotationStart!==weekKey){
    state.rotationStart=weekKey;state.character.target=null;state.weapon.target=null;
-   if(state.seenCharacters.length>=featuredCharacterIds.length)state.seenCharacters=[];
-   state.currentFeatured=featuredCharacterIds.filter(id=>!state.seenCharacters.includes(id)).slice(0,3);
-   // Keep the final rotation group short rather than repeating anyone early.
+   state.seenCharacters=state.seenCharacters.filter(id=>featuredCharacterIds.includes(id));
+   const bannerCount=Math.min(3,featuredCharacterIds.length);
+   state.currentFeatured=featuredCharacterIds.filter(id=>!state.seenCharacters.includes(id)).slice(0,bannerCount);
    for(const id of state.currentFeatured)if(!state.seenCharacters.includes(id))state.seenCharacters.push(id);
-   if(state.seenCharacters.length>=featuredCharacterIds.length)state.rotationIndex++;
+   if(state.seenCharacters.length>=featuredCharacterIds.length){
+    state.seenCharacters=[];state.rotationIndex++;
+    while(state.currentFeatured.length<bannerCount){
+     const next=featuredCharacterIds.find(id=>!state.currentFeatured.includes(id)&&!state.seenCharacters.includes(id));
+     if(!next)break;
+     state.currentFeatured.push(next);state.seenCharacters.push(next);
+    }
+   }
   }
   const featured=state.currentFeatured.filter(id=>featuredCharacterIds.includes(id));
   return {featuredCharacters:featured,featuredWeapons:featured.map(id=>`premium-${id}`),targetRequired:!state.character.target||!featured.includes(state.character.target)||!state.weapon.target||!featured.map(id=>`premium-${id}`).includes(state.weapon.target)}
