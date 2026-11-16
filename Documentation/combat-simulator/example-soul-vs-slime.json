@@ -92,8 +92,8 @@
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
-        "hp": 100,
-        "physicalAttack": 40,
+        "hp": 50,
+        "physicalAttack": 30,
         "magicalAttack": 0,
         "physicalDefense": 2,
         "magicalDefense": 2,

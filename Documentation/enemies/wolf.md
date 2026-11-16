@@ -10,8 +10,8 @@
 
 | Stat | Base value |
 |---|---:|
-| HP | 100 |
-| Physical Attack | 40 |
+| HP | 50 |
+| Physical Attack | 30 |
 | Magical Attack | 0 |
 | Physical Defense | 2 |
 | Magical Defense | 2 |
