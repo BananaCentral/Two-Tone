@@ -4,7 +4,7 @@ Zero is a playable Physical damage dealer. The front-facing full-body artwork in
 
 ## Identity and base stats
 
-Character ID: `zero`. Zero starts at Level 1. His base stats are HP 50, Physical Attack 40, Magical Attack 0, Physical Defense 2, Magical Defense 2, and Speed 40. Stats use the shared character-level and loadout formulas.
+Character ID: `zero`. Zero starts at Level 1. His base stats are HP 50, Physical Attack 40, Magical Attack 0, Physical Defense 2, Magical Defense 2, and Speed 30. Stats use the shared character-level and loadout formulas.
 
 ## Passive: Cutthroat
 
