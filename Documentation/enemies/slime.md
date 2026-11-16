@@ -10,12 +10,12 @@
 
 | Stat | Base value |
 |---|---:|
-| HP | 100 |
+| HP | 150 |
 | Physical Attack | 0 |
 | Magical Attack | 20 |
-| Physical Defense | 4 |
-| Magical Defense | 8 |
-| Speed | 20 |
+| Physical Defense | 2 |
+| Magical Defense | 6 |
+| Speed | 10 |
 
 ## Level Scaling
 

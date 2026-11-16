@@ -37,7 +37,7 @@
       "name": "Slime",
       "level": 1,
       "barrierPercent": 0.2,
-      "stats": { "hp": 100, "physicalAttack": 0, "magicalAttack": 20, "physicalDefense": 4, "magicalDefense": 8, "speed": 20 },
+      "stats": { "hp": 150, "physicalAttack": 0, "magicalAttack": 20, "physicalDefense": 2, "magicalDefense": 6, "speed": 10 },
       "basic": { "damageType": "magical", "multiplier": 1, "target": "random" },
       "passives": [{ "type": "everyNthBasic", "id": "slimy", "every": 3, "damageBonus": 0.25, "target": "aoe" }]
     }

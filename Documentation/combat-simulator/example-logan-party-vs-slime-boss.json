@@ -170,12 +170,12 @@
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
-        "hp": 100,
+        "hp": 150,
         "physicalAttack": 0,
         "magicalAttack": 20,
-        "physicalDefense": 4,
-        "magicalDefense": 8,
-        "speed": 20
+        "physicalDefense": 2,
+        "magicalDefense": 6,
+        "speed": 10
       },
       "basic": {
         "damageType": "magical",

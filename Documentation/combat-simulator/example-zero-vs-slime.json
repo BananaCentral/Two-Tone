@@ -24,7 +24,7 @@
       "name": "Slime",
       "role": "enemy",
       "level": 1,
-      "stats": { "hp": 50, "physicalAttack": 20, "magicalAttack": 0, "physicalDefense": 2, "magicalDefense": 2, "speed": 20 },
+      "stats": { "hp": 150, "physicalAttack": 0, "magicalAttack": 20, "physicalDefense": 2, "magicalDefense": 6, "speed": 10 },
       "basic": { "damageType": "physical", "multiplier": 1, "target": "single" },
       "passives": []
     }
