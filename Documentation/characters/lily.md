@@ -4,7 +4,7 @@ Battle-stage artwork uses the northeast-facing `assets/lily-back.png` under the 
 
 ## Identity and base stats
 
-Character ID: `lily`. Lily starts at Level 1. Her base stats are HP 100, Physical Attack 0, Magical Attack 30, Physical Defense 4, Magical Defense 4, and Speed 30. Stats use the shared character-level and loadout formulas.
+Character ID: `lily`. Lily starts at Level 1. Her base stats are HP 100, Physical Attack 0, Magical Attack 20, Physical Defense 4, Magical Defense 4, and Speed 20. Stats use the shared character-level and loadout formulas.
 
 ## Passive: Exposed
 

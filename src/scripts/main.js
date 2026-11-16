@@ -198,7 +198,7 @@ let playerRank=loadPlayerRank();
 const ROSTER=[
  {id:'soul',name:'SOUL',label:'Character',hp:100,basePhysicalAttack:10,baseMagicalAttack:10,basePhysicalDefense:4,baseMagicalDefense:4,speed:20,lifesteal:0,art:'soul',test:false},
  {id:'zero',name:'ZERO',label:'Character',hp:50,basePhysicalAttack:40,baseMagicalAttack:0,basePhysicalDefense:2,baseMagicalDefense:2,speed:40,lifesteal:0,art:'zeroBattle',test:false,passive:{id:'cutthroat',criticalRateBonus:.1,criticalDamageBonus:.25}},
- {id:'lily',name:'LILY',label:'Character',hp:100,basePhysicalAttack:0,baseMagicalAttack:30,basePhysicalDefense:4,baseMagicalDefense:4,speed:30,lifesteal:0,art:'lily',test:false},
+ {id:'lily',name:'LILY',label:'Character',hp:100,basePhysicalAttack:0,baseMagicalAttack:20,basePhysicalDefense:4,baseMagicalDefense:4,speed:20,lifesteal:0,art:'lily',test:false},
  {id:'dawn',name:'DAWN',label:'Character',hp:50,basePhysicalAttack:0,baseMagicalAttack:40,basePhysicalDefense:2,baseMagicalDefense:6,speed:30,lifesteal:0,art:'dawn',test:false},
  {id:'logan',name:'LOGAN',label:'Character',hp:200,basePhysicalAttack:10,baseMagicalAttack:0,basePhysicalDefense:6,baseMagicalDefense:6,speed:10,lifesteal:0,art:'logan',test:false},
 ];
