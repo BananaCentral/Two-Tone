@@ -29,21 +29,30 @@
   const localDate=new Date(Date.UTC(Number(part('year')),Number(part('month'))-1,Number(part('day'))));
   localDate.setUTCDate(localDate.getUTCDate()-((day+6)%7));
   const weekKey=localDate.toISOString().slice(0,10);
+  if(!Array.isArray(state.currentFeatured))state.currentFeatured=[];
+  const bannerCount=Math.min(3,featuredCharacterIds.length);let changed=false;
   if(state.rotationStart!==weekKey){
+   changed=true;
    state.rotationStart=weekKey;state.character.target=null;state.weapon.target=null;
    state.seenCharacters=state.seenCharacters.filter(id=>featuredCharacterIds.includes(id));
-   const bannerCount=Math.min(3,featuredCharacterIds.length);
    state.currentFeatured=featuredCharacterIds.filter(id=>!state.seenCharacters.includes(id)).slice(0,bannerCount);
    for(const id of state.currentFeatured)if(!state.seenCharacters.includes(id))state.seenCharacters.push(id);
    if(state.seenCharacters.length>=featuredCharacterIds.length){
     state.seenCharacters=[];state.rotationIndex++;
-    while(state.currentFeatured.length<bannerCount){
-     const next=featuredCharacterIds.find(id=>!state.currentFeatured.includes(id)&&!state.seenCharacters.includes(id));
-     if(!next)break;
-     state.currentFeatured.push(next);state.seenCharacters.push(next);
-    }
    }
   }
+  state.seenCharacters=state.seenCharacters.filter((id,index,all)=>featuredCharacterIds.includes(id)&&all.indexOf(id)===index);
+  state.currentFeatured=state.currentFeatured.filter((id,index,all)=>featuredCharacterIds.includes(id)&&all.indexOf(id)===index);
+  if(!changed)for(const id of state.currentFeatured)if(!state.seenCharacters.includes(id)){state.seenCharacters.push(id);changed=true}
+  if(state.currentFeatured.length<bannerCount){
+   if(state.seenCharacters.length>=featuredCharacterIds.length)state.seenCharacters=[];
+   while(state.currentFeatured.length<bannerCount){
+    const next=featuredCharacterIds.find(id=>!state.currentFeatured.includes(id)&&!state.seenCharacters.includes(id));
+    if(!next){if(state.seenCharacters.length>=featuredCharacterIds.length){state.seenCharacters=[];continue}break}
+    state.currentFeatured.push(next);state.seenCharacters.push(next);changed=true;
+   }
+  }
+  if(changed)save();
   const featured=state.currentFeatured.filter(id=>featuredCharacterIds.includes(id));
   return {featuredCharacters:featured,featuredWeapons:featured.map(id=>`premium-${id}`),targetRequired:!state.character.target||!featured.includes(state.character.target)||!state.weapon.target||!featured.map(id=>`premium-${id}`).includes(state.weapon.target)}
  }
