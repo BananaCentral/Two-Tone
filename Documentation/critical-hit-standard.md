@@ -2,7 +2,7 @@
 
 ## Hidden Stats
 
-Critical Rate and Critical Damage are hidden combat stats. They are not part of the six displayed primary stats and must not be added to the character or enemy stat cards.
+Critical Rate, Critical Damage, and Stealth are hidden combat stats. They are not part of the six displayed primary stats and must not be added to the character or enemy stat cards. Stealth behavior follows the [Stealth Standard](stealth-standard.md).
 
 - **Critical Rate** is the probability that one damage instance becomes a Critical Hit.
 - **Critical Damage** is the bonus damage multiplier applied when that hit is critical.
@@ -13,7 +13,7 @@ Critical Rate and Critical Damage are hidden combat stats. They are not part of 
 
 ## Damage Resolution
 
-- Roll Critical Rate independently for each positive damage instance after attack and defense have determined base damage.
+- Roll Critical Rate independently for each positive damage instance after attack and defense have determined base damage. Resolve the target's Stealth dodge first; a dodged hit does not roll Critical Rate.
 - Apply Critical Damage to that post-defense damage before barrier damage is calculated. A critical therefore increases both HP damage and barrier damage.
 - Multi-hit attacks roll separately for each hit and target. AoE attacks roll separately for each target.
 - Follow-ups, Ricochet damage, summons, and enemy attacks use the attacker's hidden Critical Rate and Critical Damage like other damage instances.

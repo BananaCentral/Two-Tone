@@ -4,7 +4,7 @@ Resolve battle actions in visible phases so players can follow the acting charac
 
 ## Phase order
 
-1. Show the acting character's ability and resolve its primary hit or hits. All targets of the same AoE are one primary phase.
+1. Show the acting character's ability and resolve its primary hit or hits, including each target's Stealth roll. All targets of the same AoE are one primary phase.
 2. Resolve ability-triggered effects caused by those hits, such as Lily's Ricochet. Show each effect after the primary phase.
 3. Resolve ally follow-ups caused by the action, such as Soul's Follow-up, after ability-triggered effects.
 4. Begin the next scheduled action after the previous action's visible resolution phases have been presented.

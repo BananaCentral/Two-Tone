@@ -36,6 +36,7 @@ This standard defines how combat actions and passive effects receive readable, c
 | Goblin | Basic / blast | Fast gold motion streaks on each ally in the blast |
 | Bear | Basic / AoE | Broad claw strokes and a pale impact ring across the allied formation |
 | Wolf | Basic | Three red claw strokes on affected allies |
+| Combat system | Stealth dodge | Brief pale-blue evasion ring and `DODGE` cue on the target |
 | Combat system | Lifesteal | Green recovery ring and `LIFESTEAL +N` on the source |
 | Combat system | Bleed | Red stack ring on application and a damage / remaining-stack cue on each tick |
 | Combat system | Taunt | Cyan ring and chance label when applied; `TAUNT REDIRECT` when it changes a target |
@@ -47,7 +48,7 @@ The character and enemy visual registries are implemented in `src/scripts/main.j
 - Visual effects are presentation only. They must not modify damage, Energy, Skill Points, target selection, turn order, durations, or mark state.
 - Apply mechanics through the combat action resolver. Emit visual events from the same action or status trigger that applies the mechanic, using the actual affected target IDs.
 - The rendering layer reads the effect identity and target IDs; it does not infer or recalculate gameplay outcomes.
-- Hidden critical stats remain represented by the existing critical damage feedback and critical label.
+- Hidden critical stats remain represented by the existing critical damage feedback and critical label. Hidden Stealth uses only the target-side `DODGE` cue; never display its numeric chance.
 - Ally-targeting selection uses the same selection state as the support resolver. The ring is an input affordance, not a second targeting rule.
 
 ## Adding an effect
