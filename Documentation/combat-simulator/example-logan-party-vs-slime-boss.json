@@ -248,8 +248,8 @@
         "hp": 200,
         "physicalAttack": 10,
         "magicalAttack": 0,
-        "physicalDefense": 6,
-        "magicalDefense": 6,
+        "physicalDefense": 4,
+        "magicalDefense": 4,
         "speed": 10
       },
       "basic": {
@@ -264,7 +264,7 @@
         "energyGain": 20
       },
       "ultimate": {
-        "damageType": "magical",
+        "damageType": "physical",
         "multiplier": 1,
         "target": "aoe",
         "energyCost": 100

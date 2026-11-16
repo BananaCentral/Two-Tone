@@ -4,7 +4,7 @@
 
 | HP | Physical Attack | Magical Attack | Physical Defense | Magical Defense | Speed |
 |---:|---:|---:|---:|---:|---:|
-| 200 | 10 | 0 | 6 | 6 | 10 |
+| 200 | 10 | 0 | 4 | 4 | 10 |
 
 ## Kit
 
@@ -14,7 +14,7 @@
 
 **Skill — Blood Shield:** Costs 1 Skill Point and consumes 25% of Logan's current HP. Logan and each living ally on the field receive a Shield equal to the HP consumed; this full amount is applied to each ally, not divided among them. It restores 20 Energy and Taunts each enemy for 25% over 2 turns. Character Duplicate 2 doubles the Shield applied to each ally. Premium Weapon Duplicate 2 changes the Taunt to 50% over 3 turns. Shields are additive and do not expire; see [Shield Standard](../shield-standard.md).
 
-**Ultimate — Red Tide:** Costs 100 Energy and deals AoE Magical damage at a 1.0 multiplier, applying 1 Bleed stack to each target. Character Duplicate 3 applies 2 stacks and restores 1 Skill Point. Premium Weapon Duplicate 3 raises the multiplier to 2.0.
+**Ultimate — Red Tide:** Costs 100 Energy and deals AoE Physical damage to all enemies at a 1.0 multiplier, applying 1 Bleed stack to each target. Character Duplicate 3 applies 2 stacks and restores 1 Skill Point. Premium Weapon Duplicate 3 raises the multiplier to 2.0.
 
 ## Weapon Effects
 
