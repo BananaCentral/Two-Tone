@@ -236,6 +236,31 @@
         }
       ]
     },
+    "geode": {
+      "name": "Geode",
+      "level": 1,
+      "barrierPercent": 0.2,
+      "stats": {
+        "hp": 250,
+        "physicalAttack": 20,
+        "magicalAttack": 0,
+        "physicalDefense": 16,
+        "magicalDefense": 8,
+        "speed": 10
+      },
+      "basic": {
+        "damageType": "physical",
+        "multiplier": 1,
+        "target": "aoe"
+      },
+      "passives": [
+        {
+          "type": "momentum",
+          "damageBonus": 0.2,
+          "maxStacks": 10
+        }
+      ]
+    },
     "bear": {
       "name": "Bear",
       "level": 1,

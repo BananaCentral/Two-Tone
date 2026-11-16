@@ -5,7 +5,7 @@ Enemy Critical Rate, Critical Damage, Stealth, and Lifesteal are hidden combat v
 ## Battle Sprite Shape and Grounding
 
 - Each enemy archetype defines `battleAspectRatio` as `width:height`, for example `1:1` or `1:2`. Width and height are positive whole numbers.
-- Resolve sprites from their canonical archetype IDs: `goblin` uses the tall `assets/goblin.png`; `bear` uses `assets/bear.png`; `hawk` uses the square `assets/hawk.png`.
+- Resolve sprites from their canonical archetype IDs: `goblin` uses the tall `assets/goblin.png`; `geode` uses the tall `assets/geode.png`; `bear` uses `assets/bear.png`; `hawk` uses the square `assets/hawk.png`.
 - The battle sprite asset should match its declared aspect ratio. If no ratio is defined, the renderer uses the asset's native pixel dimensions.
 - Ignore fully transparent pixels when positioning and targeting the sprite. Crop to the visible alpha bounds for rendering so transparent canvas padding cannot lift the visible artwork off the ground.
 - Preserve the declared canvas aspect ratio without stretching. Center the visible sprite horizontally and align its visible bottom edge to the formation slot's ground baseline. Formation slot dimensions control available space; they do not change the sprite's aspect ratio.

@@ -56,11 +56,12 @@ function validateConfig(config) {
       const taunt=instance.taunt??archetype.taunt;
       assert(taunt===undefined||(taunt&&Number.isFinite(taunt.rate)&&taunt.rate>=0&&taunt.rate<=1&&Number.isInteger(taunt.turns)&&taunt.turns>0),'Taunt needs a rate from 0 to 1 and a positive integer duration.');
       assert(archetype.basic && Number.isFinite(archetype.basic.multiplier) && ['physical', 'magical', 'true'].includes(archetype.basic.damageType), 'Archetype ' + instance.archetype + ' needs a typed Basic Attack.');
-      assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage', 'exposed', 'resourceful', 'residue', 'lethalImpact', 'pursuit', 'sharpClaws', 'bleed', 'cutthroat'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
+      assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage', 'momentum', 'exposed', 'resourceful', 'residue', 'lethalImpact', 'pursuit', 'sharpClaws', 'bleed', 'cutthroat'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
       for (const passive of archetype.passives || []) {
         if (passive.type === 'everyNthBasic') assert(Number.isInteger(passive.every) && passive.every > 0, 'everyNthBasic needs a positive integer interval.');
         if (passive.type === 'followUp') assert(Number.isFinite(passive.multiplier) && passive.multiplier >= 0, 'followUp needs a non-negative multiplier.');
         if (passive.type === 'rampage') assert(Number.isFinite(passive.damageBonus) && passive.damageBonus >= 0 && Number.isInteger(passive.maxStacks) && passive.maxStacks >= 0, 'rampage needs a non-negative damageBonus and a non-negative integer maxStacks.');
+        if (passive.type === 'momentum') assert(Number.isFinite(passive.damageBonus) && passive.damageBonus >= 0 && Number.isInteger(passive.maxStacks) && passive.maxStacks >= 0, 'momentum needs a non-negative damageBonus and a non-negative integer maxStacks.');
         if (passive.type === 'bleed') assert(Number.isInteger(passive.stacksPerHit??1)&&(passive.stacksPerHit??1)>0&&Number.isInteger(passive.maxStacks??5)&&(passive.maxStacks??5)>0,'bleed needs positive integer stacksPerHit and maxStacks.');
       }
       assert(!archetype.skill || ['enhanceBasic', 'ricochet', 'tune', 'bloodShield', 'firstStrike'].includes(archetype.skill.type), 'Unsupported skill type in ' + instance.archetype + '.');
@@ -510,6 +511,8 @@ function resolveEnemyAction(state, actor) {
   let multiplier = basic.multiplier*(actor.debuffs||[]).reduce((value,debuff)=>value*(debuff.damageMultiplier??1),1);
   const rampage = actor.passives.find(passive => passive.type === 'rampage');
   if (rampage) multiplier *= 1 + rampage.damageBonus * (rampage.stacks || 0);
+  const momentum = actor.passives.find(passive => passive.type === 'momentum');
+  if (momentum) multiplier *= 1 + momentum.damageBonus * (momentum.stacks || 0);
   for (const passive of actor.passives) {
     if (passive.type !== 'everyNthBasic') continue;
     passive.attackCount++;
@@ -522,6 +525,7 @@ function resolveEnemyAction(state, actor) {
   const pursuit=actor.passives.find(passive=>passive.type==='pursuit');if(pursuit){const advance=pursuit.actionAdvance??20;advanceTurn(state,actor,advance);actor.turnsAdvanced+=advance/100}
   applyResidue(actor,landedTargets(hits));
   if (rampage && hits.some(hit => hit.damage > 0)) rampage.stacks = Math.min(rampage.maxStacks, (rampage.stacks || 0) + 1);
+  if (momentum) momentum.stacks = Math.min(momentum.maxStacks, (momentum.stacks || 0) + 1);
 }
 function simulateBattle(config, seed = 1, maxActionsOverride = null) {
   validateConfig(config);

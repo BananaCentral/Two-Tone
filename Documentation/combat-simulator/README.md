@@ -30,7 +30,7 @@ node tools/combat-simulator-benchmark.mjs --runs 1000 --seed 404
 
 Run the mechanic-coverage regressions with `node --test tests/combat-simulator.test.mjs`.
 
-The suite compares a one-bar boss, two- and three-bar boss HP benchmarks, a boss with two Elite adds, five Slimes, three Goblins, and three Hawks. Pass `--config path/to/full-party.json` to use another party and its enemy archetypes. `--json` emits the full reports. Every result includes a 95% confidence interval for win rate so small batches do not look more certain than they are.
+The suite compares a one-bar boss, two- and three-bar boss HP benchmarks, a boss with two Elite adds, five Slimes, three Goblins, three Hawks, and three Geodes. Pass `--config path/to/full-party.json` to use another party and its enemy archetypes. `--json` emits the full reports. Every result includes a 95% confidence interval for win rate so small batches do not look more certain than they are.
 
 Add a `role` to each character archetype (`mainDps`, `subDps`, `support`, `sustain`, or a project-specific label) to group its results by intended job. Per-character reports separate direct damage, Bleed, Follow-up, Ricochet, and summon damage; they also report Tune damage added, Shield granted, received, and absorbed, HP spent, Lifesteal healing, survival, Skill Point spend and generation, Tune use, action advances, and taunt redirects. These metrics describe what each kit contributes. Do not rank supports by damage alone.
 
@@ -68,6 +68,7 @@ Supported Skill and Passive effect types:
 - `followUp`: triggers once for each unique damaging action from another ally while charges remain. The source actor cannot trigger its own Follow Up. Each follow-up uses its own unit's stats; damage is shared evenly among surviving targets hit by the source action.
 - `everyNthBasic`: on each Nth Basic by that unit, changes its target mode and applies its damage bonus. The counter is per unit.
 - `rampage`: each successful Basic Attack increases later Basic Attack damage by `damageBonus`, up to `maxStacks`. A successful attack adds one stack after resolving, so the first Basic uses base damage; a stack cap of 4 with a 25% bonus reaches +100% damage.
+- `momentum`: after each enemy Basic Attack action, increases later Basic Attack damage by `damageBonus` per stack, up to `maxStacks`. It adds a stack after resolving the attack; Geode uses a 20% bonus and a 10-stack cap, so its first attack uses base Physical Attack and the tenth stack yields +200% Physical Attack for later attacks.
 - `ricochet`: models Lily's AoE Skill, one shared Skill Point cost, Energy gain, and two-turn marks. A damaging source action that hits a marked enemy triggers 10% additional True damage on all living Ricochet-marked enemies once per source action. Lily Duplicate 4 adds a second half-strength trigger.
 - `exposed`: applies Lily's defense-reduction mark after her Skill, Ultimate, and Hauntling attacks. Each stack scales the target's damage reduction by 0.9; Lily Duplicate 2 can maintain two stacks for three turns.
 - `resourceful`: Dawn's passive adds 2 to the shared Skill Point cap and starts the party with 2 extra Skill Points.
