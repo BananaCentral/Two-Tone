@@ -13,8 +13,8 @@ Battle-stage artwork uses `assets/soul-battle.png` under the shared Character Ba
 | Stat | Base value |
 |---|---:|
 | HP | 100 |
-| Physical Attack | 20 |
-| Magical Attack | 20 |
+| Physical Attack | 10 |
+| Magical Attack | 10 |
 | Physical Defense | 4 |
 | Magical Defense | 4 |
 | Speed | 20 |
