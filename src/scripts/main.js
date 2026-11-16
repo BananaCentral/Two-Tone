@@ -147,7 +147,7 @@ const DEV_MODE=new URLSearchParams(location.search).get('dev')==='1';
 function toggleGameMode(){const url=new URL(location.href);if(DEV_MODE)url.searchParams.delete('dev');else url.searchParams.set('dev','1');location.assign(url.toString())}
 const W=1600,H=900;
 const TEAM_KEY=DEV_MODE?'two-tone-dev-team-fundamental-1-v1':'two-tone-demo-team-fundamental-1-v1';
-const PROGRESSION_KEY=DEV_MODE?'two-tone-dev-character-progress-v1':'two-tone-character-progress-v1',VITALS_KEY=DEV_MODE?'two-tone-dev-character-vitals-v1':'two-tone-character-vitals-v1',LOADOUT_KEY=DEV_MODE?'two-tone-dev-character-loadouts-v1':'two-tone-character-loadouts-v1',ITEM_INVENTORY_KEY=DEV_MODE?'two-tone-dev-item-inventory-v1':'two-tone-item-inventory-v1',STORE_COINS_KEY=DEV_MODE?'two-tone-dev-store-coins-v1':'two-tone-store-coins-v1',DAILY_REWARD_KEY=DEV_MODE?'two-tone-dev-daily-reward-period-v1':'two-tone-daily-reward-period-v1',PLAYER_RANK_KEY=DEV_MODE?'two-tone-dev-player-rank-v1':'two-tone-player-rank-v1',CHARACTER_ID_SCHEMA_KEY=DEV_MODE?'two-tone-dev-character-id-schema-v2':'two-tone-character-id-schema-v2';
+const PROGRESSION_KEY=DEV_MODE?'two-tone-dev-character-progress-v1':'two-tone-character-progress-v1',VITALS_KEY=DEV_MODE?'two-tone-dev-character-vitals-v1':'two-tone-character-vitals-v1',LOADOUT_KEY=DEV_MODE?'two-tone-dev-character-loadouts-v1':'two-tone-character-loadouts-v1',ITEM_INVENTORY_KEY=DEV_MODE?'two-tone-dev-item-inventory-v1':'two-tone-item-inventory-v1',STORE_COINS_KEY=DEV_MODE?'two-tone-dev-store-coins-v1':'two-tone-store-coins-v1',DAILY_REWARD_KEY=DEV_MODE?'two-tone-dev-daily-reward-period-v1':'two-tone-daily-reward-period-v1',PLAYER_RANK_KEY=DEV_MODE?'two-tone-dev-player-rank-v1':'two-tone-player-rank-v1',OWNED_CHARACTERS_KEY=DEV_MODE?'two-tone-dev-owned-characters-v1':'two-tone-owned-characters-v1',CHARACTER_ID_SCHEMA_KEY=DEV_MODE?'two-tone-dev-character-id-schema-v2':'two-tone-character-id-schema-v2';
 const STARTING_STATE_MIGRATION_KEY='two-tone-regular-starting-state-v1';
 function moveLegacyCharacterRecord(value){
  if(!value||typeof value!=='object'||Array.isArray(value))return value;
@@ -203,6 +203,13 @@ const ROSTER=[
  {id:'logan',name:'LOGAN',label:'Character',hp:200,basePhysicalAttack:10,baseMagicalAttack:0,basePhysicalDefense:4,baseMagicalDefense:4,speed:10,stealth:0,lifesteal:0,art:'logan',test:false},
 ];
 const ROSTER_IDS=new Set(ROSTER.map(u=>u.id));
+function normalizeOwnedCharacterIds(value){if(!Array.isArray(value)||value.some(id=>!ROSTER_IDS.has(id))||new Set(value).size!==value.length)return null;const ids=new Set(value);ids.add('soul');return [...ROSTER_IDS].filter(id=>ids.has(id))}
+function inferLegacyOwnedCharacters(loadouts){const ids=new Set(['soul']);for(const model of ROSTER){const duplicates=loadouts?.[model.id]?.characterDuplicates;if(model.id!=='soul'&&Number.isInteger(duplicates)&&duplicates>0&&duplicates<=4)ids.add(model.id)}return [...ids]}
+function initializeOwnedCharacters(){if(DEV_MODE)return new Set(ROSTER.map(model=>model.id));try{const raw=localStorage.getItem(OWNED_CHARACTERS_KEY);if(raw!==null){const parsed=normalizeOwnedCharacterIds(JSON.parse(raw));if(parsed){localStorage.setItem(OWNED_CHARACTERS_KEY,JSON.stringify(parsed));return new Set(parsed)}}const legacyLoadouts=JSON.parse(localStorage.getItem(LOADOUT_KEY)||'{}'),inferred=inferLegacyOwnedCharacters(legacyLoadouts);localStorage.setItem(OWNED_CHARACTERS_KEY,JSON.stringify(inferred));return new Set(inferred)}catch(e){return new Set(['soul'])}}
+let ownedCharacterIds=initializeOwnedCharacters();
+function isCharacterOwned(id){return DEV_MODE||ownedCharacterIds.has(id)}
+function saveOwnedCharacters(){if(!DEV_MODE)try{localStorage.setItem(OWNED_CHARACTERS_KEY,JSON.stringify([...ownedCharacterIds]))}catch(e){}}
+function availableCharacters(){return ROSTER.filter(model=>isCharacterOwned(model.id))}
 function roundHp(value){return Math.floor(value+0.5)}
 function calculateLevelScaledStat(base,level,flat={},percent={},equipmentFlat={}){
  if(!Number.isFinite(base)||base<0||!Number.isInteger(level)||level<1||level>CHARACTER_MAX_LEVEL)return null;
@@ -1004,9 +1011,9 @@ function setEnemyRoster(mode){if(phase!=='setup'||!['slime','wolf','hawk','mixed
 
 const savedTeam=loadTeam();
 let draft=[...savedTeam];
-function validTeam(ids){return Array.isArray(ids)&&ids.length>=1&&ids.length<=MAX_PARTY_SIZE&&ids.every(id=>ROSTER_IDS.has(id))&&new Set(ids).size===ids.length}
-function loadTeam(){try{const a=JSON.parse(localStorage.getItem(TEAM_KEY)||'null');if(Array.isArray(a)&&a.every(id=>ROSTER_IDS.has(id))&&new Set(a).size===a.length){const saved=a.slice(0,MAX_PARTY_SIZE);if(saved.length===2&&saved[0]==='soul'&&saved[1]==='lily')return [...saved,'dawn'];return saved}}catch(e){}return ['soul']}
-function saveTeam(){try{localStorage.setItem(TEAM_KEY,JSON.stringify(draft))}catch(e){}}
+function validTeam(ids,ownedIds=ownedCharacterIds){return Array.isArray(ids)&&ids.length>=1&&ids.length<=MAX_PARTY_SIZE&&ids.every(id=>ROSTER_IDS.has(id)&&ownedIds.has(id))&&new Set(ids).size===ids.length}
+function loadTeam(){try{const a=JSON.parse(localStorage.getItem(TEAM_KEY)||'null');if(validTeam(a))return a.slice(0,MAX_PARTY_SIZE)}catch(e){}return ['soul']}
+function saveTeam(){if(!validTeam(draft))return false;try{localStorage.setItem(TEAM_KEY,JSON.stringify(draft));return true}catch(e){return false}}
 function roster(id){return ROSTER.find(x=>x.id===id)}
 function alive(){return party.filter(x=>x.hp>0)}
 function active(){return party.find(x=>x.id===activeId)}
@@ -1025,7 +1032,7 @@ function enterMainMenu(){
  phase='menu';paused=false;activeId=null;actingEnemyId=null;cameraPreview=null;
  selectedAllyId=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;fx=null;hint='';
 }
-function addUnit(id){if(phase!=='partySetup')return;if(draft.includes(id)){say('Already in the party.');return}if(draft.length>=MAX_PARTY_SIZE){say('A party can contain no more than four characters.');return}draft.push(id);}
+function addUnit(id){if(phase!=='partySetup')return;if(!isCharacterOwned(id)){say('This character is not owned.');return}if(draft.includes(id)){say('Already in the party.');return}if(draft.length>=MAX_PARTY_SIZE){say('A party can contain no more than four characters.');return}draft.push(id);}
 function removeUnit(index){if(phase!=='partySetup')return;if(draft.length<=1){say('A party must contain at least one character.');return}draft.splice(index,1);}
 function startBattle(areaId=DEFAULT_BATTLE_AREA_ID){
  if(!BATTLE_AREAS[areaId]){say('Unknown battle area.');return false}
@@ -1295,23 +1302,23 @@ function takeRuneFromInventory(setId){const runes=itemInventory.runes[setId];if(
 function returnRuneToInventory(rune){if(!rune||!Object.hasOwn(RUNE_SET_DEFINITIONS,rune.setId)||!Array.isArray(itemInventory.runes[rune.setId]))return false;itemInventory.runes[rune.setId].push(normalizeRune(rune));saveItemInventory();return true}
 if(DEV_MODE)globalThis.TwoToneItems=Object.freeze({grant:grantItem,getInventory:()=>JSON.parse(JSON.stringify(itemInventory)),grantCoins:grantStoreCoins,getCoins:()=>storeCoins});
 FeaturedLottery.setRewardGrant(grantItem);
-const SAVE_FILE_FORMAT='two-tone-save',SAVE_FILE_VERSION=5;
+const SAVE_FILE_FORMAT='two-tone-save',SAVE_FILE_VERSION=6;
 function saveProgressFile(){
  try{
   saveProgress();saveVitals();saveLoadouts();saveItemInventory();saveStoreCoins();savePlayerRank();if(validTeam(draft))saveTeam();
   saveDailyRewardPeriod();
-  const documentData={format:SAVE_FILE_FORMAT,version:SAVE_FILE_VERSION,savedAt:new Date().toISOString(),data:{playerRank,team:validTeam(draft)?[...draft]:loadTeam(),characterProgress,vitals:savedVitals,loadouts:characterLoadouts,itemInventory,storeCoins,dailyRewardClaimedPeriod}};
+  const documentData={format:SAVE_FILE_FORMAT,version:SAVE_FILE_VERSION,savedAt:new Date().toISOString(),data:{gameMode:DEV_MODE?'dev':'regular',playerRank,team:validTeam(draft)?[...draft]:loadTeam(),ownedCharacters:DEV_MODE?inferLegacyOwnedCharacters(characterLoadouts):[...ownedCharacterIds],characterProgress,vitals:savedVitals,loadouts:characterLoadouts,itemInventory,storeCoins,dailyRewardClaimedPeriod}};
   const blob=new Blob([JSON.stringify(documentData,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');
   link.href=url;link.download=`two-tone-save-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   say('Save file downloaded. Keep it in Files to load on this or another device.');return true;
  }catch(error){say('The save file could not be created. Check available storage and try again.');return false}
 }
 function normalizeSaveFile(value){
- if(!value||typeof value!=='object'||value.format!==SAVE_FILE_FORMAT||![1,2,3,4,SAVE_FILE_VERSION].includes(value.version)||!value.data||typeof value.data!=='object')return null;
+ if(!value||typeof value!=='object'||value.format!==SAVE_FILE_FORMAT||![1,2,3,4,5,SAVE_FILE_VERSION].includes(value.version)||!value.data||typeof value.data!=='object')return null;
  const data={...value.data};
  if(value.version===1){data.team=Array.isArray(data.team)?data.team.map(id=>id==='zero'?'soul':id):data.team;data.characterProgress=moveLegacyCharacterRecord({...data.characterProgress});data.vitals=moveLegacyCharacterRecord({...data.vitals});data.loadouts=moveLegacyCharacterRecord({...data.loadouts})}
  const rank=data.playerRank,cap=characterLevelCap(rank);
- if(!cap||!validTeam(data.team)||!data.characterProgress||typeof data.characterProgress!=='object')return null;
+ if(!cap||!Array.isArray(data.team)||!data.characterProgress||typeof data.characterProgress!=='object')return null;
  const progress={};for(const model of ROSTER){const entry=data.characterProgress[model.id]??defaultProgress();if(!validateProgress(entry,cap))return null;progress[model.id]={level:entry.level,exp:entry.exp,ascended:[...entry.ascended]}}
  if(data.vitals!==undefined&&(!data.vitals||typeof data.vitals!=='object'||Array.isArray(data.vitals)))return null;
  const vitals={};for(const model of ROSTER){const entry=data.vitals?.[model.id];if(entry===undefined)continue;if(!entry||typeof entry!=='object'||!Number.isFinite(entry.hp)||entry.hp<0||!Number.isFinite(entry.maxHp)||entry.maxHp<=0)return null;vitals[model.id]={hp:entry.hp,maxHp:entry.maxHp}}
@@ -1322,21 +1329,27 @@ function normalizeSaveFile(value){
   if(entry.celestials!==undefined&&(!entry.celestials||typeof entry.celestials!=='object'||CELESTIALS.some(([key])=>!Number.isInteger(entry.celestials[key])||entry.celestials[key]<1||entry.celestials[key]>10)))return null;
   loadouts[model.id]=normalizeLoadout(entry,cap);
  }
+ if(value.version===SAVE_FILE_VERSION&&!Array.isArray(data.ownedCharacters))return null;
+ const importedFromDev=data.gameMode==='dev',normalizedOwned=DEV_MODE?ROSTER.map(model=>model.id):importedFromDev?inferLegacyOwnedCharacters(loadouts):data.ownedCharacters===undefined?inferLegacyOwnedCharacters(loadouts):normalizeOwnedCharacterIds(data.ownedCharacters);
+ if(!normalizedOwned)return null;
+ const ownership=new Set(normalizedOwned),strictTeam=value.version===SAVE_FILE_VERSION&&!importedFromDev&&!DEV_MODE,team=strictTeam?[...data.team]:data.team.filter(id=>ownership.has(id));
+ if(!team.length)team.push('soul');
+ if(!validTeam(team,ownership))return null;
  const inventory=data.itemInventory===undefined?defaultItemInventory():normalizeItemInventory(data.itemInventory);
  if(data.itemInventory!==undefined&&!validItemInventory(data.itemInventory))return null;
  const coins=data.storeCoins===undefined?0:data.storeCoins;
  if(!Number.isSafeInteger(coins)||coins<0)return null;
  const rewardPeriod=data.dailyRewardClaimedPeriod===undefined?null:data.dailyRewardClaimedPeriod;if(rewardPeriod!==null&&!validDailyRewardPeriod(rewardPeriod))return null;
- return {playerRank:rank,team:[...data.team],characterProgress:progress,vitals,loadouts,itemInventory:inventory,storeCoins:coins,dailyRewardClaimedPeriod:rewardPeriod};
+ return {playerRank:rank,team,ownedCharacters:normalizedOwned,characterProgress:progress,vitals,loadouts,itemInventory:inventory,storeCoins:coins,dailyRewardClaimedPeriod:rewardPeriod};
 }
 function importSaveFile(value){
  const save=normalizeSaveFile(value);if(!save){say('This save file is invalid or from an unsupported version.');return false}
- let hasLocalProgress=false;try{hasLocalProgress=[TEAM_KEY,PROGRESSION_KEY,VITALS_KEY,LOADOUT_KEY,ITEM_INVENTORY_KEY,STORE_COINS_KEY,DAILY_REWARD_KEY].some(key=>localStorage.getItem(key)!==null)}catch(e){}
+ let hasLocalProgress=false;try{hasLocalProgress=[TEAM_KEY,OWNED_CHARACTERS_KEY,PROGRESSION_KEY,VITALS_KEY,LOADOUT_KEY,ITEM_INVENTORY_KEY,STORE_COINS_KEY,DAILY_REWARD_KEY].some(key=>localStorage.getItem(key)!==null)}catch(e){}
  if(hasLocalProgress&&!window.confirm('Loading this file replaces the progress saved in this browser. Continue?'))return false;
- const entries=[[TEAM_KEY,JSON.stringify(save.team)],[PROGRESSION_KEY,JSON.stringify(save.characterProgress)],[VITALS_KEY,JSON.stringify(save.vitals)],[LOADOUT_KEY,JSON.stringify(save.loadouts)],[ITEM_INVENTORY_KEY,JSON.stringify(save.itemInventory)],[STORE_COINS_KEY,String(save.storeCoins)],[DAILY_REWARD_KEY,save.dailyRewardClaimedPeriod||''],[PLAYER_RANK_KEY,String(save.playerRank)]];
+ const entries=[[TEAM_KEY,JSON.stringify(save.team)],[OWNED_CHARACTERS_KEY,JSON.stringify(save.ownedCharacters)],[PROGRESSION_KEY,JSON.stringify(save.characterProgress)],[VITALS_KEY,JSON.stringify(save.vitals)],[LOADOUT_KEY,JSON.stringify(save.loadouts)],[ITEM_INVENTORY_KEY,JSON.stringify(save.itemInventory)],[STORE_COINS_KEY,String(save.storeCoins)],[DAILY_REWARD_KEY,save.dailyRewardClaimedPeriod||''],[PLAYER_RANK_KEY,String(save.playerRank)]];
  const previous=entries.map(([key])=>{try{return localStorage.getItem(key)}catch(e){return null}});
  try{for(const [key,value] of entries)localStorage.setItem(key,value)}catch(error){entries.forEach(([key],index)=>{try{if(previous[index]===null)localStorage.removeItem(key);else localStorage.setItem(key,previous[index])}catch(e){}});say('Progress could not be restored because browser storage is unavailable.');return false}
- playerRank=save.playerRank;characterProgress=save.characterProgress;savedVitals=save.vitals;characterLoadouts=save.loadouts;itemInventory=save.itemInventory;storeCoins=save.storeCoins;dailyRewardClaimedPeriod=save.dailyRewardClaimedPeriod;draft=[...save.team];party=[];phase='menu';paused=false;activeId=null;actingEnemyId=null;fx=null;combatVisualEvents=[];enemies=[];gauges={};summons=[];ultimateQueue=[];ultimateExecuting=false;ultimateResume=null;turnTimeline.reset();battleToken++;cameraPreview=null;selectedAllyId=null;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;pendingVacancies=[];hint='';say('Progress loaded from save file.');return true;
+ playerRank=save.playerRank;ownedCharacterIds=new Set(save.ownedCharacters);characterProgress=save.characterProgress;savedVitals=save.vitals;characterLoadouts=save.loadouts;itemInventory=save.itemInventory;storeCoins=save.storeCoins;dailyRewardClaimedPeriod=save.dailyRewardClaimedPeriod;draft=[...save.team];party=[];phase='menu';paused=false;activeId=null;actingEnemyId=null;fx=null;combatVisualEvents=[];enemies=[];gauges={};summons=[];ultimateQueue=[];ultimateExecuting=false;ultimateResume=null;turnTimeline.reset();battleToken++;cameraPreview=null;selectedAllyId=null;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;pendingVacancies=[];hint='';say('Progress loaded from save file.');return true;
 }
 function requestSaveFileLoad(){const input=document.getElementById('save-file-picker');if(!input){say('The save file picker is unavailable. Refresh and try again.');return false}input.value='';try{if(typeof input.showPicker==='function')input.showPicker();else input.click();return true}catch(error){try{input.click();return true}catch(fallbackError){say('This browser could not open the save file picker. Try opening Two-Tone in Safari or Chrome.');return false}}}
 function readSaveFileText(file){if(typeof file.text==='function')return file.text();return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result??''));reader.onerror=()=>reject(reader.error||new Error('The save file could not be read.'));reader.readAsText(file)})}
@@ -1428,7 +1441,7 @@ function enterLoadout(){loadoutCharacterId='soul';selectedLoadoutRune=0;loadoutP
 function handleLoadoutAction(action){
  const [kind,arg]=action.split(':'),record=loadoutFor(),weapon=record.weapon,rune=record.runes[selectedLoadoutRune];
  if(kind==='back'){if(runeStatPicker){runeStatPicker=null;return}phase='menu';return}
- if(kind==='character'){if(ROSTER_IDS.has(arg)&&!roster(arg)?.test){loadoutCharacterId=arg;weaponBookSelection={small:0,medium:0,large:0}}return}
+ if(kind==='character'){if(ROSTER_IDS.has(arg)&&isCharacterOwned(arg)&&!roster(arg)?.test){loadoutCharacterId=arg;weaponBookSelection={small:0,medium:0,large:0}}return}
  if(kind==='page'){if(['details','weapons','runes','celestials'].includes(arg)){loadoutPage=arg;if(arg==='runes')runePanelMode='slots';runeStatPicker=null;weaponBookSelection={small:0,medium:0,large:0}}return}
  if(kind==='rune-view'&&['slots','inventory','detail'].includes(arg)){runePanelMode=arg;runeStatPicker=null;return}
  if(kind==='upgrade'&&arg==='weapon'){
@@ -1482,8 +1495,8 @@ function loadoutPanel(title,subtitle,backLabel='BACK'){
 function loadoutCharacter(){return roster(loadoutCharacterId)}
 function drawLoadoutCharacters(){
  loadoutPanel('LOADOUT','Choose a character to open their equipment and progression menus.','MAIN MENU');
- for(let i=0;i<ROSTER.length;i++){
-  const p=ROSTER[i],y=190+i*125,active=loadoutCharacterId===p.id;
+ const characters=availableCharacters();for(let i=0;i<characters.length;i++){
+  const p=characters[i],y=190+i*125,active=loadoutCharacterId===p.id;
   rect(150,y,1300,118,'rgba(25,37,58,.94)',active?'#edcf98':'#718ba4',14);
   addButton(174,y+20,1252,78,'loadout:character:'+p.id,p.name,p.test?'PLACEHOLDER • NO LOADOUT':'LEVEL '+(progressFor(p.id)?.level||1),!p.test);
  }
@@ -1609,8 +1622,8 @@ function drawLoadout(){
  for(let i=0;i<70;i++){const x=(i*193+61)%W,y=(i*317+37)%H,r=i%7===0?2:1;rect(x,y,r,r,'rgba(220,232,255,'+(i%3===0?'.52':'.25')+')')}
  text('CHARACTER DETAILS',42,42,14,'#d7c69f','800');text(model.name,42,72,25,'#fff1d5','850');
  // Character selector stays available across every loadout tab.
- for(let i=0;i<ROSTER.length;i++){
-  const p=ROSTER[i],x=300+i*76,y=16,active=p.id===loadoutCharacterId,img=images[({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'})[p.id]];
+ const characters=availableCharacters();for(let i=0;i<characters.length;i++){
+  const p=characters[i],x=300+i*76,y=16,active=p.id===loadoutCharacterId,img=images[({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'})[p.id]];
   choiceRects.push({x,y,w:68,h:68,action:'loadout:character:'+p.id,enabled:!p.test});
   ctx.save();ctx.beginPath();ctx.arc(x+34,y+34,31,0,Math.PI*2);ctx.clip();rect(x+3,y+3,62,62,'#18243a');if(img?.complete&&img.naturalWidth)drawCharacterPortrait(img,p.id,x+3,y+3,62);ctx.restore();
   ctx.beginPath();ctx.arc(x+34,y+34,active?34:32,0,Math.PI*2);ctx.strokeStyle=active?'#f5d897':'rgba(189,207,230,.62)';ctx.lineWidth=active?3:1.5;ctx.stroke();
@@ -1833,7 +1846,9 @@ function storeRewardPools(type,rotation){
 }
 function awardStoreReward(type,reward){
  if(type==='character'){
-  const record=loadoutFor(reward.id);record.characterDuplicates=Math.min(4,record.characterDuplicates+1);saveLoadouts();return reward.name+' character reward.';
+  if(!ROSTER_IDS.has(reward.id))return reward.name+' character reward.';
+  if(!isCharacterOwned(reward.id)){ownedCharacterIds.add(reward.id);saveOwnedCharacters();return reward.name+' acquired.'}
+  const record=loadoutFor(reward.id);record.characterDuplicates=Math.min(4,record.characterDuplicates+1);saveLoadouts();return reward.name+' character duplicate.';
  }
  const id=reward.id.replace(/^premium-/,'');if(!ROSTER_IDS.has(id))return reward.name+' weapon reward.';
  const weapon=loadoutFor(id).weapon;if(weapon.premiumOwned)weapon.premiumPotential=Math.min(5,weapon.premiumPotential+1);else weapon.premiumOwned=true;
@@ -2088,8 +2103,8 @@ function drawPartySetup(){
   }
  }
  text('AVAILABLE CHARACTERS',208,493,20,'#bad4e9','800');
- for(let i=0;i<ROSTER.length;i++){
-   const p=ROSTER[i],x=172+i*247,y=520,w=230,h=132,selected=draft.includes(p.id);
+ const characters=availableCharacters();for(let i=0;i<characters.length;i++){
+   const p=characters[i],x=172+i*247,y=520,w=230,h=132,selected=draft.includes(p.id);
   rect(x,y,w,h,selected?'rgba(35,59,76,.92)':'rgba(29,41,67,.94)',selected?'#8fbcad':'#7e97b0',11);
   const portrait=images[({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'})[p.id]];
   if(portrait?.complete&&portrait.naturalWidth)drawCharacterPortrait(portrait,p.id,x+12,y+24,66);

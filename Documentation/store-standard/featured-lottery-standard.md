@@ -44,7 +44,7 @@ Within a tier, every item in that tier's reward pool has an equal chance. Tier c
 
 Common lottery rewards include bundles of five Large Enchanted Bottles in character lotteries and five Large Enchanted Books in premium weapon lotteries. Rare lottery rewards include Cores and Gems. See the [Item Standard](../item-standard/item-standard.md) for item effects and other acquisition sources.
 
-For a mythic reward, there is a 75% chance to receive the player's selected featured target and a 25% chance to receive an off-feature reward of the same type. Character lotteries award off-feature characters; premium weapon lotteries award off-feature premium weapons.
+For a mythic reward, there is a 75% chance to receive the player's selected featured target and a 25% chance to receive an off-feature reward of the same type. Character lotteries award off-feature characters; premium weapon lotteries award off-feature premium weapons. In Regular Mode, the first character reward for an unowned character unlocks that character; subsequent copies add character duplicates. Soul is the only character owned at the start. Dev Mode keeps the full roster available for testing.
 
 ## Pity Counters
 

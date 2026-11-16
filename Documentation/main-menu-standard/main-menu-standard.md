@@ -40,7 +40,7 @@ The Game Mode section switches between Regular and Dev Mode. Regular is the defa
 ## Save Files
 
 - The main menu has a **Save** option that downloads a portable JSON save file.
-- Save files include the party, account Rank, character levels and EXP, ascensions, saved HP, character loadouts, coins, and Daily Reward claim state.
+- Save files include the party, owned character roster, account Rank, character levels and EXP, ascensions, saved HP, character loadouts, coins, and Daily Reward claim state.
 - Save files have an explicit format name and version. Loading must validate the entire file before replacing local progress.
 - Local browser storage remains the active device's automatic save; file export lets the player carry or back up progress.
 
