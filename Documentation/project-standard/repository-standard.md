@@ -22,3 +22,8 @@
 - Create a commit only after the user approves the general addition.
 - Commit the completed addition to `prototype`, including only changes related to that addition.
 - Do not push commits to GitHub; the user handles pushes manually.
+
+## Player Accounts and Saved Data
+
+- Follow [the account and player data standard](../account-and-player-data-standard.md) for player identity, Dev Mode authorization, profile persistence, and save-file behavior.
+- Follow [the account and player data setup](../account-and-player-data-setup.md) when configuring authentication and database services.

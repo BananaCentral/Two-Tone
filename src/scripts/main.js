@@ -143,51 +143,12 @@ function spriteAlphaBounds(img){
  visibleSpriteBounds.set(img,bounds);return bounds;
 }
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:false});
-const DEV_MODE=new URLSearchParams(location.search).get('dev')==='1';
-function toggleGameMode(){const url=new URL(location.href);if(DEV_MODE)url.searchParams.delete('dev');else url.searchParams.set('dev','1');location.assign(url.toString())}
+// Dev Mode is disabled in the public client. It must be enabled by an
+// authenticated server-side developer role, never by a URL parameter.
+const DEV_MODE=false;
 const W=1600,H=900;
 const TEAM_KEY=DEV_MODE?'two-tone-dev-team-fundamental-1-v1':'two-tone-demo-team-fundamental-1-v1';
-const PROGRESSION_KEY=DEV_MODE?'two-tone-dev-character-progress-v1':'two-tone-character-progress-v1',VITALS_KEY=DEV_MODE?'two-tone-dev-character-vitals-v1':'two-tone-character-vitals-v1',LOADOUT_KEY=DEV_MODE?'two-tone-dev-character-loadouts-v1':'two-tone-character-loadouts-v1',ITEM_INVENTORY_KEY=DEV_MODE?'two-tone-dev-item-inventory-v1':'two-tone-item-inventory-v1',STORE_COINS_KEY=DEV_MODE?'two-tone-dev-store-coins-v1':'two-tone-store-coins-v1',DAILY_REWARD_KEY=DEV_MODE?'two-tone-dev-daily-reward-period-v1':'two-tone-daily-reward-period-v1',PLAYER_RANK_KEY=DEV_MODE?'two-tone-dev-player-rank-v1':'two-tone-player-rank-v1',OWNED_CHARACTERS_KEY=DEV_MODE?'two-tone-dev-owned-characters-v1':'two-tone-owned-characters-v1',CHARACTER_ID_SCHEMA_KEY=DEV_MODE?'two-tone-dev-character-id-schema-v2':'two-tone-character-id-schema-v2';
-const STARTING_STATE_MIGRATION_KEY='two-tone-regular-starting-state-v1';
-function moveLegacyCharacterRecord(value){
- if(!value||typeof value!=='object'||Array.isArray(value))return value;
- if(value.soul===undefined&&value.zero!==undefined)value.soul=value.zero;
- delete value.zero;return value;
-}
-function migrateLegacyCharacterIds(){
- try{
-  if(localStorage.getItem(CHARACTER_ID_SCHEMA_KEY)==='soul-zero-v2')return;
-  const team=JSON.parse(localStorage.getItem(TEAM_KEY)||'null');
-  if(Array.isArray(team)){const migrated=team.map(id=>id==='zero'?'soul':id);localStorage.setItem(TEAM_KEY,JSON.stringify(migrated))}
-  for(const key of [PROGRESSION_KEY,VITALS_KEY,LOADOUT_KEY]){
-   const raw=localStorage.getItem(key);if(raw===null)continue;
-   const data=moveLegacyCharacterRecord(JSON.parse(raw));localStorage.setItem(key,JSON.stringify(data));
-  }
-  localStorage.setItem(CHARACTER_ID_SCHEMA_KEY,'soul-zero-v2');
- }catch(e){}
-}
-migrateLegacyCharacterIds();
-function migrateRegularStartingState(){
- if(DEV_MODE)return;
- try{
-  if(localStorage.getItem(STARTING_STATE_MIGRATION_KEY)==='v1')return;
-  // Remove prototype test grants/previews from the old shared Regular profile.
-  localStorage.setItem(STORE_COINS_KEY,'0');
-  const saved=JSON.parse(localStorage.getItem(TEAM_KEY)||'null');
-  if(Array.isArray(saved)&&JSON.stringify(saved)===JSON.stringify(['soul','lily','dawn']))localStorage.setItem(TEAM_KEY,JSON.stringify(['soul']));
-  const loadouts=JSON.parse(localStorage.getItem(LOADOUT_KEY)||'null');
-  if(loadouts&&typeof loadouts==='object'&&!Array.isArray(loadouts)){
-   for(const record of Object.values(loadouts))if(record&&typeof record==='object'){
-    record.characterDuplicates=0;
-    if(record.weapon&&typeof record.weapon==='object'){record.weapon.standardPotential=1;record.weapon.premiumPotential=1}
-    if(Array.isArray(record.runes))record.runes=[null,null,null,null];
-   }
-   localStorage.setItem(LOADOUT_KEY,JSON.stringify(loadouts));
-  }
-  localStorage.setItem(STARTING_STATE_MIGRATION_KEY,'v1');
- }catch(e){}
-}
-migrateRegularStartingState();
+const PROGRESSION_KEY=DEV_MODE?'two-tone-dev-character-progress-v1':'two-tone-character-progress-v1',VITALS_KEY=DEV_MODE?'two-tone-dev-character-vitals-v1':'two-tone-character-vitals-v1',LOADOUT_KEY=DEV_MODE?'two-tone-dev-character-loadouts-v1':'two-tone-character-loadouts-v1',ITEM_INVENTORY_KEY=DEV_MODE?'two-tone-dev-item-inventory-v1':'two-tone-item-inventory-v1',STORE_COINS_KEY=DEV_MODE?'two-tone-dev-store-coins-v1':'two-tone-store-coins-v1',DAILY_REWARD_KEY=DEV_MODE?'two-tone-dev-daily-reward-period-v1':'two-tone-daily-reward-period-v1',PLAYER_RANK_KEY=DEV_MODE?'two-tone-dev-player-rank-v1':'two-tone-player-rank-v1',OWNED_CHARACTERS_KEY=DEV_MODE?'two-tone-dev-owned-characters-v1':'two-tone-owned-characters-v1';
 const CHARACTER_MAX_LEVEL=50,ASCENSION_GATES=[10,20,30,40],MAX_PARTY_SIZE=4;
 // Rank progression is not implemented yet; this value is the account Rank hook.
 function loadPlayerRank(){try{const n=Number(localStorage.getItem(PLAYER_RANK_KEY));return Number.isInteger(n)&&n>=1&&n<=50?n:1}catch(e){return 1}}
@@ -204,8 +165,7 @@ const ROSTER=[
 ];
 const ROSTER_IDS=new Set(ROSTER.map(u=>u.id));
 function normalizeOwnedCharacterIds(value){if(!Array.isArray(value)||value.some(id=>!ROSTER_IDS.has(id))||new Set(value).size!==value.length)return null;const ids=new Set(value);ids.add('soul');return [...ROSTER_IDS].filter(id=>ids.has(id))}
-function inferLegacyOwnedCharacters(loadouts){const ids=new Set(['soul']);for(const model of ROSTER){const duplicates=loadouts?.[model.id]?.characterDuplicates;if(model.id!=='soul'&&Number.isInteger(duplicates)&&duplicates>0&&duplicates<=4)ids.add(model.id)}return [...ids]}
-function initializeOwnedCharacters(){if(DEV_MODE)return new Set(ROSTER.map(model=>model.id));try{const raw=localStorage.getItem(OWNED_CHARACTERS_KEY);if(raw!==null){const parsed=normalizeOwnedCharacterIds(JSON.parse(raw));if(parsed){localStorage.setItem(OWNED_CHARACTERS_KEY,JSON.stringify(parsed));return new Set(parsed)}}const legacyLoadouts=JSON.parse(localStorage.getItem(LOADOUT_KEY)||'{}'),inferred=inferLegacyOwnedCharacters(legacyLoadouts);localStorage.setItem(OWNED_CHARACTERS_KEY,JSON.stringify(inferred));return new Set(inferred)}catch(e){return new Set(['soul'])}}
+function initializeOwnedCharacters(){if(DEV_MODE)return new Set(ROSTER.map(model=>model.id));try{const raw=localStorage.getItem(OWNED_CHARACTERS_KEY);if(raw!==null){const parsed=normalizeOwnedCharacterIds(JSON.parse(raw));if(parsed)return new Set(parsed)}}catch(e){}return new Set(['soul'])}
 let ownedCharacterIds=initializeOwnedCharacters();
 function isCharacterOwned(id){return DEV_MODE||ownedCharacterIds.has(id)}
 function saveOwnedCharacters(){if(!DEV_MODE)try{localStorage.setItem(OWNED_CHARACTERS_KEY,JSON.stringify([...ownedCharacterIds]))}catch(e){}}
@@ -416,9 +376,11 @@ function setHpBonusForTest(id,source,kind,value){
 }
 function loadVitals(){try{const x=JSON.parse(localStorage.getItem(VITALS_KEY)||'{}');return x&&typeof x==='object'?x:{}}catch(e){return {}}}
 let savedVitals=loadVitals();
+let vitalsSyncTimer=null;
 function saveVitals(){
  for(const p of party){if(!p||!ROSTER_IDS.has(p.id))continue;savedVitals[p.id]={hp:p.hp,maxHp:p.maxHp}}
  try{localStorage.setItem(VITALS_KEY,JSON.stringify(savedVitals))}catch(e){}
+ clearTimeout(vitalsSyncTimer);vitalsSyncTimer=setTimeout(()=>window.TwoToneAccount?.action('set-vitals',{vitals:savedVitals}).catch(()=>{}),500);
 }
 // Training mode assignments exercise both approved game-mode recovery policies;
 // actual named game modes have not been designed or assigned a policy.
@@ -1025,7 +987,11 @@ function enterPartySetup(){
  phase='partySetup';paused=false;forceSelect=false;draft=[...loadTeam()];activeId=null;actingEnemyId=null;
  cameraPreview=null;selectedAllyId=null;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;fx=null;hint='';
 }
-function saveParty(){if(phase!=='partySetup'||!validTeam(draft))return false;saveTeam();phase='menu';hint='';return true}
+async function saveParty(){
+ if(phase!=='partySetup'||!validTeam(draft))return false;
+ try{await window.TwoToneAccount.action('set-team',{team:[...draft]});phase='menu';hint='';return true}
+ catch(error){say('Party changes could not be saved.');return false}
+}
 function enterMainMenu(){
  saveVitals();
  battleToken++;cancelAllQueuedUltimates('main-menu');turnTimeline.reset();
@@ -1235,6 +1201,7 @@ function normalizeLoadout(value,cap=characterLevelCap()){
 }
 function loadCharacterLoadouts(){let stored={};try{stored=JSON.parse(localStorage.getItem(LOADOUT_KEY)||'{}')||{}}catch(e){}return Object.fromEntries(ROSTER.map(model=>[model.id,normalizeLoadout(stored[model.id])]))}
 let characterLoadouts=loadCharacterLoadouts(),loadoutCharacterId='soul',selectedLoadoutRune=0,loadoutPage='characters',runePanelMode='slots',runeStatPicker=null,weaponBookSelection={small:0,medium:0,large:0};
+let loadoutActionPending=false;
 function loadoutFor(id=loadoutCharacterId){return characterLoadouts[id]||(characterLoadouts[id]=defaultLoadout())}
 function saveLoadouts(){try{localStorage.setItem(LOADOUT_KEY,JSON.stringify(characterLoadouts))}catch(e){}}
 function defaultItemInventory(){return {bottles:{small:0,medium:0,large:0},books:{small:0,medium:0,large:0},cores:0,gems:0,runes:Object.fromEntries(Object.keys(RUNE_SET_DEFINITIONS).map(id=>[id,[]]))}}
@@ -1273,12 +1240,9 @@ function loadDailyRewardPeriod(){try{const value=localStorage.getItem(DAILY_REWA
 let dailyRewardClaimedPeriod=loadDailyRewardPeriod();
 function saveDailyRewardPeriod(){try{if(dailyRewardClaimedPeriod)localStorage.setItem(DAILY_REWARD_KEY,dailyRewardClaimedPeriod);else localStorage.removeItem(DAILY_REWARD_KEY);return true}catch(e){return false}}
 function canClaimDailyReward(now=new Date()){return dailyRewardClaimedPeriod!==dailyRewardPeriodKey(now)}
-function claimDailyReward(){
- const period=dailyRewardPeriodKey();if(period===dailyRewardClaimedPeriod){say('Daily coins are already claimed. The next claim is at 12 AM Eastern.');return false}
- const oldCoins=storeCoins,oldPeriod=dailyRewardClaimedPeriod;if(!Number.isSafeInteger(oldCoins+100)){say('The daily reward could not be claimed.');return false}
- storeCoins=oldCoins+100;if(!saveStoreCoins()){storeCoins=oldCoins;say('The daily reward could not be saved.');return false}
- dailyRewardClaimedPeriod=period;if(!saveDailyRewardPeriod()){dailyRewardClaimedPeriod=oldPeriod;storeCoins=oldCoins;saveStoreCoins();say('The daily reward could not be saved.');return false}
- say('Daily reward claimed: 100 coins.');return true
+async function claimDailyReward(){
+ try{await window.TwoToneAccount.action('claim-daily');say('Daily reward claimed: 100 coins.');return true}
+ catch(error){say(error.message==='already_claimed'?'Daily coins are already claimed. The next claim is at 12 AM Eastern.':'The daily reward could not be claimed.');return false}
 }
 function grantItem(itemId,amount=1){
  if(!Number.isSafeInteger(amount)||amount<1)return false;
@@ -1301,58 +1265,21 @@ function consumeItem(itemId,amount=1){
 function takeRuneFromInventory(setId){const runes=itemInventory.runes[setId];if(!Array.isArray(runes)||!runes.length)return null;const rune=runes.pop();saveItemInventory();return rune}
 function returnRuneToInventory(rune){if(!rune||!Object.hasOwn(RUNE_SET_DEFINITIONS,rune.setId)||!Array.isArray(itemInventory.runes[rune.setId]))return false;itemInventory.runes[rune.setId].push(normalizeRune(rune));saveItemInventory();return true}
 if(DEV_MODE)globalThis.TwoToneItems=Object.freeze({grant:grantItem,getInventory:()=>JSON.parse(JSON.stringify(itemInventory)),grantCoins:grantStoreCoins,getCoins:()=>storeCoins});
-FeaturedLottery.setRewardGrant(grantItem);
-const SAVE_FILE_FORMAT='two-tone-save',SAVE_FILE_VERSION=6;
-function saveProgressFile(){
- try{
-  saveProgress();saveVitals();saveLoadouts();saveItemInventory();saveStoreCoins();savePlayerRank();if(validTeam(draft))saveTeam();
-  saveDailyRewardPeriod();
-  const documentData={format:SAVE_FILE_FORMAT,version:SAVE_FILE_VERSION,savedAt:new Date().toISOString(),data:{gameMode:DEV_MODE?'dev':'regular',playerRank,team:validTeam(draft)?[...draft]:loadTeam(),ownedCharacters:DEV_MODE?inferLegacyOwnedCharacters(characterLoadouts):[...ownedCharacterIds],characterProgress,vitals:savedVitals,loadouts:characterLoadouts,itemInventory,storeCoins,dailyRewardClaimedPeriod}};
-  const blob=new Blob([JSON.stringify(documentData,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');
-  link.href=url;link.download=`two-tone-save-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
-  say('Save file downloaded. Keep it in Files to load on this or another device.');return true;
- }catch(error){say('The save file could not be created. Check available storage and try again.');return false}
-}
-function normalizeSaveFile(value){
- if(!value||typeof value!=='object'||value.format!==SAVE_FILE_FORMAT||![1,2,3,4,5,SAVE_FILE_VERSION].includes(value.version)||!value.data||typeof value.data!=='object')return null;
- const data={...value.data};
- if(value.version===1){data.team=Array.isArray(data.team)?data.team.map(id=>id==='zero'?'soul':id):data.team;data.characterProgress=moveLegacyCharacterRecord({...data.characterProgress});data.vitals=moveLegacyCharacterRecord({...data.vitals});data.loadouts=moveLegacyCharacterRecord({...data.loadouts})}
- const rank=data.playerRank,cap=characterLevelCap(rank);
- if(!cap||!Array.isArray(data.team)||!data.characterProgress||typeof data.characterProgress!=='object')return null;
- const progress={};for(const model of ROSTER){const entry=data.characterProgress[model.id]??defaultProgress();if(!validateProgress(entry,cap))return null;progress[model.id]={level:entry.level,exp:entry.exp,ascended:[...entry.ascended]}}
- if(data.vitals!==undefined&&(!data.vitals||typeof data.vitals!=='object'||Array.isArray(data.vitals)))return null;
- const vitals={};for(const model of ROSTER){const entry=data.vitals?.[model.id];if(entry===undefined)continue;if(!entry||typeof entry!=='object'||!Number.isFinite(entry.hp)||entry.hp<0||!Number.isFinite(entry.maxHp)||entry.maxHp<=0)return null;vitals[model.id]={hp:entry.hp,maxHp:entry.maxHp}}
- if(data.loadouts!==undefined&&(!data.loadouts||typeof data.loadouts!=='object'||Array.isArray(data.loadouts)))return null;
- const loadouts={};for(const model of ROSTER){const entry=data.loadouts?.[model.id];if(entry===undefined){loadouts[model.id]=defaultLoadout();continue}if(!entry||typeof entry!=='object'||!Number.isInteger(entry.characterDuplicates)||entry.characterDuplicates<0||entry.characterDuplicates>4)return null;
-  if(entry.weapon!==undefined&&(!entry.weapon||typeof entry.weapon!=='object'||!['standard','premium'].includes(entry.weapon.selected)||![entry.weapon.standardPotential,entry.weapon.premiumPotential].every(n=>Number.isInteger(n)&&n>=1&&n<=5)||typeof entry.weapon.premiumOwned!=='boolean'||['standard','premium'].some(type=>(entry.weapon[type+'Level']!==undefined&&(!Number.isInteger(entry.weapon[type+'Level'])||entry.weapon[type+'Level']<1||entry.weapon[type+'Level']>cap))||(entry.weapon[type+'Exp']!==undefined&&(!Number.isSafeInteger(entry.weapon[type+'Exp'])||entry.weapon[type+'Exp']<0))||(entry.weapon[type+'Ascended']!==undefined&&(!Array.isArray(entry.weapon[type+'Ascended'])||entry.weapon[type+'Ascended'].some(gate=>!ASCENSION_GATES.includes(gate)))))))return null;
-  if(entry.runes!==undefined&&(!Array.isArray(entry.runes)||entry.runes.length>4||entry.runes.some(rune=>rune!==null&&!normalizeRune(rune))))return null;
-  if(entry.celestials!==undefined&&(!entry.celestials||typeof entry.celestials!=='object'||CELESTIALS.some(([key])=>!Number.isInteger(entry.celestials[key])||entry.celestials[key]<1||entry.celestials[key]>10)))return null;
-  loadouts[model.id]=normalizeLoadout(entry,cap);
- }
- if(value.version===SAVE_FILE_VERSION&&!Array.isArray(data.ownedCharacters))return null;
- const importedFromDev=data.gameMode==='dev',normalizedOwned=DEV_MODE?ROSTER.map(model=>model.id):importedFromDev?inferLegacyOwnedCharacters(loadouts):data.ownedCharacters===undefined?inferLegacyOwnedCharacters(loadouts):normalizeOwnedCharacterIds(data.ownedCharacters);
- if(!normalizedOwned)return null;
- const ownership=new Set(normalizedOwned),strictTeam=value.version===SAVE_FILE_VERSION&&!importedFromDev&&!DEV_MODE,team=strictTeam?[...data.team]:data.team.filter(id=>ownership.has(id));
- if(!team.length)team.push('soul');
- if(!validTeam(team,ownership))return null;
- const inventory=data.itemInventory===undefined?defaultItemInventory():normalizeItemInventory(data.itemInventory);
- if(data.itemInventory!==undefined&&!validItemInventory(data.itemInventory))return null;
- const coins=data.storeCoins===undefined?0:data.storeCoins;
- if(!Number.isSafeInteger(coins)||coins<0)return null;
- const rewardPeriod=data.dailyRewardClaimedPeriod===undefined?null:data.dailyRewardClaimedPeriod;if(rewardPeriod!==null&&!validDailyRewardPeriod(rewardPeriod))return null;
- return {playerRank:rank,team,ownedCharacters:normalizedOwned,characterProgress:progress,vitals,loadouts,itemInventory:inventory,storeCoins:coins,dailyRewardClaimedPeriod:rewardPeriod};
-}
-function importSaveFile(value){
- const save=normalizeSaveFile(value);if(!save){say('This save file is invalid or from an unsupported version.');return false}
- let hasLocalProgress=false;try{hasLocalProgress=[TEAM_KEY,OWNED_CHARACTERS_KEY,PROGRESSION_KEY,VITALS_KEY,LOADOUT_KEY,ITEM_INVENTORY_KEY,STORE_COINS_KEY,DAILY_REWARD_KEY].some(key=>localStorage.getItem(key)!==null)}catch(e){}
- if(hasLocalProgress&&!window.confirm('Loading this file replaces the progress saved in this browser. Continue?'))return false;
- const entries=[[TEAM_KEY,JSON.stringify(save.team)],[OWNED_CHARACTERS_KEY,JSON.stringify(save.ownedCharacters)],[PROGRESSION_KEY,JSON.stringify(save.characterProgress)],[VITALS_KEY,JSON.stringify(save.vitals)],[LOADOUT_KEY,JSON.stringify(save.loadouts)],[ITEM_INVENTORY_KEY,JSON.stringify(save.itemInventory)],[STORE_COINS_KEY,String(save.storeCoins)],[DAILY_REWARD_KEY,save.dailyRewardClaimedPeriod||''],[PLAYER_RANK_KEY,String(save.playerRank)]];
- const previous=entries.map(([key])=>{try{return localStorage.getItem(key)}catch(e){return null}});
- try{for(const [key,value] of entries)localStorage.setItem(key,value)}catch(error){entries.forEach(([key],index)=>{try{if(previous[index]===null)localStorage.removeItem(key);else localStorage.setItem(key,previous[index])}catch(e){}});say('Progress could not be restored because browser storage is unavailable.');return false}
- playerRank=save.playerRank;ownedCharacterIds=new Set(save.ownedCharacters);characterProgress=save.characterProgress;savedVitals=save.vitals;characterLoadouts=save.loadouts;itemInventory=save.itemInventory;storeCoins=save.storeCoins;dailyRewardClaimedPeriod=save.dailyRewardClaimedPeriod;draft=[...save.team];party=[];phase='menu';paused=false;activeId=null;actingEnemyId=null;fx=null;combatVisualEvents=[];enemies=[];gauges={};summons=[];ultimateQueue=[];ultimateExecuting=false;ultimateResume=null;turnTimeline.reset();battleToken++;cameraPreview=null;selectedAllyId=null;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;pendingVacancies=[];hint='';say('Progress loaded from save file.');return true;
-}
-function requestSaveFileLoad(){const input=document.getElementById('save-file-picker');if(!input){say('The save file picker is unavailable. Refresh and try again.');return false}input.value='';try{if(typeof input.showPicker==='function')input.showPicker();else input.click();return true}catch(error){try{input.click();return true}catch(fallbackError){say('This browser could not open the save file picker. Try opening Two-Tone in Safari or Chrome.');return false}}}
-function readSaveFileText(file){if(typeof file.text==='function')return file.text();return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result??''));reader.onerror=()=>reject(reader.error||new Error('The save file could not be read.'));reader.readAsText(file)})}
+if(DEV_MODE)FeaturedLottery.setRewardGrant(grantItem);
+window.twoToneApplyProfile=profile=>{
+ if(!profile||!Number.isSafeInteger(profile.coins)||profile.coins<0)return false;
+ storeCoins=profile.coins;saveStoreCoins();
+ dailyRewardClaimedPeriod=profile.dailyRewardClaimedPeriod||null;saveDailyRewardPeriod();
+ if(Number.isInteger(profile.playerRank)&&profile.playerRank>=1&&profile.playerRank<=50){playerRank=profile.playerRank;savePlayerRank()}
+ if(profile.characterProgress&&typeof profile.characterProgress==='object'){characterProgress=profile.characterProgress;saveProgress()}
+ if(profile.vitals&&typeof profile.vitals==='object'){savedVitals=profile.vitals;try{localStorage.setItem(VITALS_KEY,JSON.stringify(savedVitals))}catch(e){}}
+ if(Array.isArray(profile.team)&&validTeam(profile.team,new Set(profile.ownedCharacters||['soul']))){try{localStorage.setItem(TEAM_KEY,JSON.stringify(profile.team))}catch(e){}if(phase!=='partySetup')draft=[...profile.team]}
+ if(Array.isArray(profile.ownedCharacters)){ownedCharacterIds=new Set(normalizeOwnedCharacterIds(profile.ownedCharacters)||['soul']);saveOwnedCharacters()}
+ if(profile.itemInventory&&validItemInventory(profile.itemInventory)){itemInventory=normalizeItemInventory(profile.itemInventory);saveItemInventory()}
+ if(profile.loadouts&&typeof profile.loadouts==='object'){characterLoadouts=Object.fromEntries(ROSTER.map(model=>[model.id,normalizeLoadout(profile.loadouts[model.id]) ]));saveLoadouts()}
+ if(profile.lottery)FeaturedLottery.hydrate(profile.lottery);
+ return true;
+};
 function weaponLevelCap(rank=playerRank){return characterLevelCap(rank)}
 function weaponPotentialMultiplier(type,potential,level){
  if(!['standard','premium'].includes(type)||!Number.isInteger(potential)||potential<1||potential>5||!Number.isInteger(level)||level<1)return 0;
@@ -1438,7 +1365,7 @@ function loadoutStats(id){
  'Physical Defense':calculatePhysicalDefense(unit),'Magical Defense':calculateMagicalDefense(unit),Speed:calculateSpeed(unit)}
 }
 function enterLoadout(){loadoutCharacterId='soul';selectedLoadoutRune=0;loadoutPage='details';runePanelMode='slots';runeStatPicker=null;weaponBookSelection={small:0,medium:0,large:0};phase='loadout';hint=''}
-function handleLoadoutAction(action){
+async function handleLoadoutAction(action){
  const [kind,arg]=action.split(':'),record=loadoutFor(),weapon=record.weapon,rune=record.runes[selectedLoadoutRune];
  if(kind==='back'){if(runeStatPicker){runeStatPicker=null;return}phase='menu';return}
  if(kind==='character'){if(ROSTER_IDS.has(arg)&&isCharacterOwned(arg)&&!roster(arg)?.test){loadoutCharacterId=arg;weaponBookSelection={small:0,medium:0,large:0}}return}
@@ -1446,11 +1373,19 @@ function handleLoadoutAction(action){
  if(kind==='rune-view'&&['slots','inventory','detail'].includes(arg)){runePanelMode=arg;runeStatPicker=null;return}
  if(kind==='upgrade'&&arg==='weapon'){
   const type=weapon.selected,level=weapon[type+'Level'],gate=ASCENSION_GATES.includes(level)&&!weapon[type+'Ascended'].includes(level);
-  if(gate){say(ascendWeaponWithGem(loadoutCharacterId,type)?'Weapon Ascension completed. One Gem was consumed.':'One Gem is required to Ascend this weapon.')}
+  if(gate){
+   if(loadoutActionPending)return;loadoutActionPending=true;
+   try{await window.TwoToneAccount.action('ascend',{kind:'weapon',id:loadoutCharacterId,weaponType:type});say('Weapon Ascension completed.')}
+   catch(error){say(error.message==='gem_required'?'One Gem is required to Ascend this weapon.':'Weapon Ascension could not be completed.')}
+   finally{loadoutActionPending=false}return
+  }
   else if(level<weaponLevelCap()){
    let used=0;const remaining={...weaponBookSelection};
    for(const size of ['small','medium','large'])for(let i=0;i<weaponBookSelection[size];i++){
-    const result=useWeaponBook(loadoutCharacterId,type,size);if(!result)break;remaining[size]--;used++;
+    if(loadoutActionPending)return;loadoutActionPending=true;
+    try{await window.TwoToneAccount.action('use-xp-item',{itemType:'book',id:loadoutCharacterId,weaponType:type,size});remaining[size]--;used++}
+    catch(error){loadoutActionPending=false;break}
+    finally{loadoutActionPending=false}
    }
    weaponBookSelection=remaining;if(used)say(`${used} Enchanted Book${used===1?'':'s'} used.`);
   }
@@ -1459,32 +1394,35 @@ function handleLoadoutAction(action){
  if(kind==='book-select'){
   const [size,delta]=arg.split(',');if(['small','medium','large'].includes(size)){weaponBookSelection[size]=Math.max(0,Math.min(itemInventory.books[size],weaponBookSelection[size]+Number(delta)||0))}return;
  }
- if(kind==='weapon-switch'){if(weapon.premiumOwned){weapon.selected=weapon.selected==='premium'?'standard':'premium';weaponBookSelection={small:0,medium:0,large:0};saveLoadouts()}return}
+ if(kind==='weapon-switch'){
+  if(weapon.premiumOwned&&!loadoutActionPending){loadoutActionPending=true;try{await window.TwoToneAccount.action('set-weapon',{id:loadoutCharacterId,type:weapon.selected==='premium'?'standard':'premium'});weaponBookSelection={small:0,medium:0,large:0}}catch(e){say('Weapon selection could not be saved.')}finally{loadoutActionPending=false}}return
+ }
  if(kind==='character-duplicate'&&DEV_MODE)record.characterDuplicates=Math.max(0,Math.min(4,record.characterDuplicates+Number(arg)));
- else if(kind==='weapon-standard'){weapon.selected='standard';weaponBookSelection={small:0,medium:0,large:0}}
- else if(kind==='weapon-premium'){if(weapon.premiumOwned){weapon.selected='premium';weaponBookSelection={small:0,medium:0,large:0}}}
+ else if(kind==='weapon-standard'||kind==='weapon-premium'){
+  const type=kind==='weapon-standard'?'standard':'premium';if((type==='standard'||weapon.premiumOwned)&&!loadoutActionPending){loadoutActionPending=true;try{await window.TwoToneAccount.action('set-weapon',{id:loadoutCharacterId,type});weaponBookSelection={small:0,medium:0,large:0}}catch(e){say('Weapon selection could not be saved.')}finally{loadoutActionPending=false}}return
+ }
  else if(kind==='potential'&&DEV_MODE){const [type,delta]=arg.split(','),key=type==='premium'?'premiumPotential':'standardPotential';weapon[key]=Math.max(1,Math.min(5,weapon[key]+Number(delta)))}
  else if(kind==='rune-select'){selectedLoadoutRune=Math.max(0,Math.min(3,Number(arg)||0));runePanelMode=record.runes[selectedLoadoutRune]?'detail':'inventory';runeStatPicker=null}
- else if(kind==='rune-equip'){const [slot,setId]=arg.split(','),index=Math.max(0,Math.min(3,Number(slot)||0)),rune=Object.hasOwn(RUNE_SET_DEFINITIONS,setId)?takeRuneFromInventory(setId):null;if(rune){if(record.runes[index])returnRuneToInventory(record.runes[index]);record.runes[index]=rune;selectedLoadoutRune=index;runePanelMode='slots';saveLoadouts()}else say('No Rune from that set is available.')}
- else if(kind==='rune-remove'&&record.runes[selectedLoadoutRune]){returnRuneToInventory(record.runes[selectedLoadoutRune]);record.runes[selectedLoadoutRune]=null;runePanelMode='slots';saveLoadouts()}
+ else if(kind==='rune-equip'){
+  const [slot,setId]=arg.split(','),index=Math.max(0,Math.min(3,Number(slot)||0));if(loadoutActionPending)return;loadoutActionPending=true;
+  try{await window.TwoToneAccount.action('equip-rune',{id:loadoutCharacterId,setId,slot:index});selectedLoadoutRune=index;runePanelMode='slots'}catch(e){say('No Rune from that set is available.')}finally{loadoutActionPending=false}return
+ }
+ else if(kind==='rune-remove'&&record.runes[selectedLoadoutRune]){
+  if(loadoutActionPending)return;loadoutActionPending=true;try{await window.TwoToneAccount.action('remove-rune',{id:loadoutCharacterId,slot:selectedLoadoutRune});runePanelMode='slots'}catch(e){say('Rune could not be removed.')}finally{loadoutActionPending=false}return
+ }
  else if(kind==='rune-switch'&&record.runes[selectedLoadoutRune])runePanelMode='inventory';
- else if(kind==='rune-level'&&rune&&Number(arg)===1){const level=upgradeRuneWithCore(loadoutCharacterId,selectedLoadoutRune);say(level?`Rune upgraded to Level ${level}.`:'A Core is required and the Rune must be below Level 5.')}
+ else if(kind==='rune-level'&&rune&&Number(arg)===1){if(loadoutActionPending)return;loadoutActionPending=true;try{await window.TwoToneAccount.action('upgrade-core',{kind:'rune',id:loadoutCharacterId,index:selectedLoadoutRune});say('Rune upgraded.')}catch(e){say('A Core is required and the Rune must be below Level 5.')}finally{loadoutActionPending=false}return}
  else if(kind==='rune-main'&&rune){runeStatPicker={slot:'main',subIndex:-1};return}
  else if(kind==='rune-sub'&&rune){const index=Number(arg);if(Number.isInteger(index)&&index>=0&&index<3){runeStatPicker={slot:'sub',subIndex:index};return}}
  else if(kind==='rune-picker-close'){runeStatPicker=null;return}
  else if(kind==='rune-stat-choice'&&rune&&runeStatPicker){
   const [slot,key]=arg.split(',');
-  if(slot===runeStatPicker.slot&&RUNE_STATS.includes(key)){
-   if(slot==='main'&&key!==rune.main){rune.main=key;rune.subs=RUNE_STATS.filter(x=>x!==key).slice(0,3)}
-   else{const index=runeStatPicker.subIndex,available=key!==rune.main&&!rune.subs.some((v,i)=>i!==index&&v===key);if(available)rune.subs[index]=key}
-  }
-  runeStatPicker=null;
+  if(slot===runeStatPicker.slot&&RUNE_STATS.includes(key)&&!loadoutActionPending){loadoutActionPending=true;try{await window.TwoToneAccount.action('set-rune-stat',{id:loadoutCharacterId,slot:selectedLoadoutRune,kind:slot,subIndex:runeStatPicker.subIndex,stat:key});runeStatPicker=null}catch(e){say('Rune stat could not be changed.')}finally{loadoutActionPending=false}}return
  }
- else if(kind==='celestial'){const [key,delta]=arg.split(',');if(Number(delta)===1){const level=upgradeCelestialWithCore(loadoutCharacterId,key);say(level?`${key} Celestial upgraded to Level ${level}.`:'A Core is required and the Celestial must be below Level 10.')}}
- else if(kind==='bottle'){const result=useCharacterBottle(loadoutCharacterId,arg);say(result?`${arg} Enchanted Bottle used. ${result.levelsGained?`Character reached Level ${result.level}.`:`${result.exp} XP remains toward the next level.`}`:'Bottle unavailable or character is at their level cap.')}
- else if(kind==='book'){const [type,size]=arg.split(',');const result=useWeaponBook(loadoutCharacterId,type,size);say(result?`${size[0].toUpperCase()+size.slice(1)} Enchanted Book used. ${result.levelsGained?`Weapon reached Level ${result.level}.`:`${result.exp} XP is stored at this level.`}`:'Book unavailable, weapon locked, or weapon is at its level cap.')}
- else if(kind==='ascend-character'){say(ascendCharacterWithGem(loadoutCharacterId)?'Ascension completed. One Gem was consumed.':'One Gem is required at a valid Ascension gate.')}
- else if(kind==='ascend-weapon'){say(ascendWeaponWithGem(loadoutCharacterId,arg)?'Weapon Ascension completed. One Gem was consumed.':'One Gem is required at a valid weapon Ascension gate.')}
+ else if(kind==='celestial'){const [key,delta]=arg.split(',');if(Number(delta)===1&&!loadoutActionPending){loadoutActionPending=true;try{await window.TwoToneAccount.action('upgrade-core',{kind:'celestial',id:loadoutCharacterId,key});say(`${key} Celestial upgraded.`)}catch(e){say('A Core is required and the Celestial must be below Level 10.')}finally{loadoutActionPending=false}}return}
+ else if(kind==='bottle'){if(loadoutActionPending)return;loadoutActionPending=true;try{await window.TwoToneAccount.action('use-xp-item',{itemType:'bottle',id:loadoutCharacterId,size:arg});say(`${arg[0].toUpperCase()+arg.slice(1)} Enchanted Bottle used.`)}catch(e){say('Bottle unavailable or character is at their level cap.')}finally{loadoutActionPending=false}return}
+ else if(kind==='book'){const [type,size]=arg.split(',');if(loadoutActionPending)return;loadoutActionPending=true;try{await window.TwoToneAccount.action('use-xp-item',{itemType:'book',id:loadoutCharacterId,weaponType:type,size});say(`${size[0].toUpperCase()+size.slice(1)} Enchanted Book used.`)}catch(e){say('Book unavailable, weapon locked, or weapon is at its level cap.')}finally{loadoutActionPending=false}return}
+ else if(kind==='ascend-character'||kind==='ascend-weapon'){if(loadoutActionPending)return;loadoutActionPending=true;try{await window.TwoToneAccount.action('ascend',{kind:kind==='ascend-character'?'character':'weapon',id:loadoutCharacterId,weaponType:arg});say('Ascension completed.')}catch(e){say('One Gem is required at a valid Ascension gate.')}finally{loadoutActionPending=false}return}
  saveLoadouts()
 }
 function loadoutPanel(title,subtitle,backLabel='BACK'){
@@ -1758,8 +1696,7 @@ function drawStartupMenu(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.72)');
  text('TWO-TONE',800,208,64,'#f8f4ea','900','center');
  text('YOUR ADVENTURE, YOUR PROGRESS',800,272,19,'#eacb87','800','center');
- addButton(620,365,360,112,'startup-start','START','');
- addButton(620,507,360,112,'startup-load','LOAD','');
+ addButton(620,420,360,112,'startup-start','START','');
 }
 function drawMainMenuIcon(kind,cx,cy,color){
  ctx.save();ctx.translate(cx,cy);ctx.strokeStyle=color;ctx.fillStyle='rgba(0,0,0,0)';ctx.lineWidth=2.6;ctx.lineCap='round';ctx.lineJoin='round';
@@ -1807,30 +1744,31 @@ function drawMainMenu(){
  const items=[
   {label:'STORY',icon:'story',action:'open-story'},
   {label:'EVENTS',icon:'events',active:false},
-  {label:'GAME MODE',icon:'mode',action:'toggle-game-mode',detail:DEV_MODE?'DEV MODE':'REGULAR'},
   {label:'STORE',icon:'store',action:'open-store'},
   {label:'LOADOUT',icon:'loadout',action:'open-loadout'},
   {label:'PARTY',icon:'party',action:'open-party'},
   {label:'INVENTORY',icon:'items',action:'open-inventory'},
   {label:'CHALLENGES',icon:'challenges',action:'open-challenges'},
   {label:'DAILY REWARD',icon:'daily',action:'claim-daily-reward',detail:canClaimDailyReward()?'CLAIM 100 COINS':'CLAIMED • RESET AT 12 AM ET'},
-  {label:'SAVE',icon:'save',action:'save-progress'},
   {label:'SETTINGS',icon:'settings',action:'open-settings'}
  ];
- const x0=124,y0=91,cardW=318,cardH=226,gapX=20,gapY=16,positions=[[0,0],[1,0],[2,0],[3,0],[0,1],[1,1],[2,1],[3,1],[.5,2],[1.5,2],[2.5,2]];
+ const x0=124,y0=91,cardW=318,cardH=226,gapX=20,gapY=16,positions=[[.5,0],[1.5,0],[2.5,0],[.5,1],[1.5,1],[2.5,1],[.5,2],[1.5,2],[2.5,2]];
  items.forEach((item,index)=>{const [column,row]=positions[index];drawMainMenuTile(item,x0+column*(cardW+gapX),y0+row*(cardH+gapY),cardW,cardH)});
 }
 function drawSettings(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.76)');rect(250,130,1100,640,'rgba(13,20,39,.98)','#ccb88e',20);
  text('SETTINGS',800,244,30,'#ffedd1','850','center');addButton(1130,168,170,54,'main-menu','MAIN MENU','');
- rect(330,300,940,300,'rgba(25,37,58,.94)','#718ba4',16);
+ rect(330,300,940,360,'rgba(25,37,58,.94)','#718ba4',16);
  text('DISPLAY',800,280,18,'#f3dfb9','850','center');
  const standalone=isStandaloneApp();
  text('FULLSCREEN',375,382,18,'#edf3fa','700');
  if(standalone)text('Unavailable in the installed app',375,411,14,'#aebed0','550');
  addButton(905,365,320,64,'toggle-fullscreen',isFullscreen()?'EXIT FULLSCREEN':'ENTER FULLSCREEN','',!standalone);
+ text('ACCOUNT',375,506,18,'#edf3fa','700');
+ addButton(905,475,150,64,'account-sign-out','SIGN OUT','');
+ addButton(1075,475,150,64,'account-delete','DELETE ACCOUNT','');
 }
-let lastStoreNotice='',storeReveal=null,activeStoreBanner=null;
+let lastStoreNotice='',storeReveal=null,activeStoreBanner=null,storeActionPending=false;
 const STORE_ITEM_SPRITES=Object.freeze({core:'core',gem:'gem','bottle:small':'enchantedBottleSmall','bottle:medium':'enchantedBottleMedium','bottle:large':'enchantedBottleLarge','book:small':'enchantedBookSmall','book:medium':'enchantedBookMedium','book:large':'enchantedBookLarge'});
 const STORE_REWARD_SPRITES=Object.freeze({'premium-soul':'soulWeaponPremium'});
 const STORE_REVEAL_TIMING=Object.freeze({cardEnterMs:1000,cardFlipMs:500});
@@ -1854,20 +1792,15 @@ function awardStoreReward(type,reward){
  const weapon=loadoutFor(id).weapon;if(weapon.premiumOwned)weapon.premiumPotential=Math.min(5,weapon.premiumPotential+1);else weapon.premiumOwned=true;
  saveLoadouts();return reward.name+(weapon.premiumPotential>1?' • Premium Potential '+weapon.premiumPotential:' • Premium acquired');
 }
-function drawStoreLottery(type,count=1){
+async function drawStoreLottery(type,count=1){
+ if(storeActionPending)return false;
  if(!['character','weapon'].includes(type)||![1,10].includes(count)){lastStoreNotice='That lottery draw is unavailable.';return false}
- const cost=FeaturedLottery.RULES.ticketCost*count;
- if(storeCoins<cost){lastStoreNotice=`You need ${cost.toLocaleString()} coins for ${count} draw${count===1?'':'s'}.`;return false}
- const rotation=getStoreRotation(),pools=storeRewardPools(type,rotation),track=FeaturedLottery.getState()[type];
- if(!track.target){lastStoreNotice='This banner has no available target.';return false}
- const rewards=[];
- for(let i=0;i<count;i++){
-  const outcome=FeaturedLottery.draw({type,wallet:storeCoins-i*FeaturedLottery.RULES.ticketCost,pools});
-  if(!outcome.ok){if(!rewards.length){lastStoreNotice=outcome.reason==='target-required'?'This banner has no available target.':'Lottery draw could not be completed.';return false}break}
-  const result=outcome.reward.inventoryItem?`${outcome.reward.quantity||1} ${outcome.reward.name}`:awardStoreReward(type,outcome.reward);
-  rewards.push({tier:outcome.tier,reward:outcome.reward,featured:outcome.featured,result});
- }
- storeCoins-=rewards.length*FeaturedLottery.RULES.ticketCost;saveStoreCoins();
+ let result;
+ storeActionPending=true;
+ try{result=await window.TwoToneAccount.action('draw',{type,count})}
+ catch(error){lastStoreNotice=error.message==='insufficient_coins'?`You need ${(100*count).toLocaleString()} coins for ${count} draw${count===1?'':'s'}.`:error.message==='target_required'?'Choose a banner target first.':'Lottery draw could not be completed.';return false}
+ finally{storeActionPending=false}
+ const rewards=result.rewards;
  lastStoreNotice='Your ticket is being revealed…';
  const startedAt=performance.now();storeReveal={type,rewards,index:0,phase:'enter',phaseStartedAt:startedAt,startedAt};
  return true;
@@ -1890,7 +1823,7 @@ function handleStoreAction(action){
  if(kind==='grant'&&DEV_MODE){const amount=Number(type);if(grantStoreCoins(amount))lastStoreNotice=`Dev mode: added ${amount.toLocaleString()} coins.`;else lastStoreNotice='Could not add coins.';
  }else if(kind==='target'){
   const rotation=getStoreRotation(),ids=type==='character'?rotation.featuredCharacters:rotation.featuredWeapons;
-  if(FeaturedLottery.setTarget(type,value,ids)){activeStoreBanner={type,id:value};lastStoreNotice=''}
+  if(ids.includes(value))window.TwoToneAccount.action('set-target',{type,target:value}).then(()=>{activeStoreBanner={type,id:value};lastStoreNotice=''}).catch(error=>{lastStoreNotice=error.message==='target_unavailable'?'The banner has changed. Choose a current target.':'Target could not be selected.'});
  }else if(kind==='draw')drawStoreLottery(type,Number(value)||1);
 }
 const STORE_BANNER_PORTRAITS=Object.freeze({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'});
@@ -1982,8 +1915,8 @@ function drawStoreBannerDetail(entry,state){
  text(`MYTHIC ${track.heightened?'2%':'1%'} • RARE 10% • FEATURED MYTHIC 75%`,x+38,y+608,12,'#d4e0ed','650');
  if(track.heightened)text('HEIGHTENED • OFF-FEATURE MYTHIC RECEIVED',x+38,y+629,11,'#f0d291','750');
  const canDraw=state[entry.type].target===entry.id&&!storeReveal;
- storeBannerButton(x+38,y+645,242,58,`store:draw:${entry.type}:1`,'DRAW ×1','100 COINS',canDraw&&storeCoins>=100,true);
- storeBannerButton(x+296,y+645,242,58,`store:draw:${entry.type}:10`,'DRAW ×10','1,000 COINS',canDraw&&storeCoins>=1000,false);
+ storeBannerButton(x+38,y+645,242,58,`store:draw:${entry.type}:1`,'DRAW ×1','100 COINS',!storeActionPending&&canDraw&&storeCoins>=100,true);
+ storeBannerButton(x+296,y+645,242,58,`store:draw:${entry.type}:10`,'DRAW ×10','1,000 COINS',!storeActionPending&&canDraw&&storeCoins>=1000,false);
 }
 function drawStoreReveal(now){
  if(!storeReveal)return;
@@ -2824,7 +2757,7 @@ function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='startup'){dra
   drawCameraStage(t);drawFx(t);drawHud(t)
  }else{drawCameraStage(t);drawSetup()}drawHint(t);requestAnimationFrame(loop)}
 function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('roster-')){if(DEV_MODE)setEnemyRoster(cmd.slice(7));return}if(cmd.startsWith('loadout:')){handleLoadoutAction(cmd.slice(8));return}if(cmd.startsWith('store:')){handleStoreAction(cmd);return}if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'&&DEV_MODE){devPanelOpen=!devPanelOpen;return}if(cmd==='cancel-target'){cancelTargetSelection();return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(cameraPreview==='party'&&(phase==='player'||pendingTargetAction?.targetSide==='ally')){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(pendingTargetAction?.targetSide==='ally'&&pendingTargetAction.targetScope==='all'){if(!p||p.hp<=0){say('Choose a living party member to confirm the team skill.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;return executeCombatAction(actor,pending.action)}if(pendingTargetAction?.targetSide==='ally'){if(!p||p.hp<=0){say('Tune and Dawn’s Ultimate need a living ally.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;if(pending.action==='ultimate')return queueUltimate(pending.actorId,id);return executeCombatAction(actor,pending.action,null,id)}if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){if(DEV_MODE)setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){beginTargetSelection('ultimate',cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){if(DEV_MODE)chargeUltimateForTest(cmd.slice(11));return}
- switch(cmd){case 'startup-start':phase='menu';hint='';break;case 'startup-load':requestSaveFileLoad();break;case 'toggle-game-mode':toggleGameMode();break;case 'claim-daily-reward':claimDailyReward();break;case 'open-inventory':phase='inventory';hint='';break;case 'open-challenges':phase='challenges';hint='';break;case 'open-settings':phase='settings';hint='';break;case 'open-store':phase='store';lastStoreNotice='';break;case 'save-progress':saveProgressFile();break;case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'toggle-fullscreen':toggleFullscreen();break;case 'support-heal':if(DEV_MODE)startSupportDemo('heal');break;case 'support-revive':if(DEV_MODE)startSupportDemo('revive');break;case 'confirm-support':if(DEV_MODE)confirmSupportDemo();break;case 'cancel-support':if(DEV_MODE)cancelSupportDemo();break;case 'camera-party':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':if(DEV_MODE)toggleWavePreset();break;case 'toggle-recovery':if(DEV_MODE)setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':if(DEV_MODE)testKO();break;case 'test-revive':if(DEV_MODE)testRevive();break;case 'skill':play('skill');break;case 'cap-test':if(DEV_MODE)cycleSpCapTest();break;case 'hud-status-test':if(DEV_MODE)toggleHudStatusDemo();break;case 'f05-advance':if(DEV_MODE)addActionAdvance(activeId,25);break;case 'f05-delay':if(DEV_MODE)addActionDelay(activeId,25);break;case 'f05-speed':if(DEV_MODE)setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':if(DEV_MODE)queueSummonForTest('independent');break;case 'f05-summon-controlled':if(DEV_MODE)queueSummonForTest('controlled');break;
+ switch(cmd){case 'startup-start':phase='menu';hint='';break;case 'claim-daily-reward':claimDailyReward();break;case 'open-inventory':phase='inventory';hint='';break;case 'open-challenges':phase='challenges';hint='';break;case 'open-settings':phase='settings';hint='';break;case 'account-sign-out':window.TwoToneAccount?.signOut?.();break;case 'account-delete':window.TwoToneAccount?.deleteAccount?.();break;case 'open-store':phase='store';lastStoreNotice='';break;case 'open-story':enterSelection();break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'toggle-fullscreen':toggleFullscreen();break;case 'support-heal':if(DEV_MODE)startSupportDemo('heal');break;case 'support-revive':if(DEV_MODE)startSupportDemo('revive');break;case 'confirm-support':if(DEV_MODE)confirmSupportDemo();break;case 'cancel-support':if(DEV_MODE)cancelSupportDemo();break;case 'camera-party':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':if(DEV_MODE)toggleWavePreset();break;case 'toggle-recovery':if(DEV_MODE)setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':if(DEV_MODE)testKO();break;case 'test-revive':if(DEV_MODE)testRevive();break;case 'skill':play('skill');break;case 'cap-test':if(DEV_MODE)cycleSpCapTest();break;case 'hud-status-test':if(DEV_MODE)toggleHudStatusDemo();break;case 'f05-advance':if(DEV_MODE)addActionAdvance(activeId,25);break;case 'f05-delay':if(DEV_MODE)addActionDelay(activeId,25);break;case 'f05-speed':if(DEV_MODE)setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':if(DEV_MODE)queueSummonForTest('independent');break;case 'f05-summon-controlled':if(DEV_MODE)queueSummonForTest('controlled');break;
  case 'progress-test-level':{if(DEV_MODE){const a=active(),p=a&&progressFor(a.id);if(a&&p){const cost=Math.max(1,requiredExp(a.level)-p.exp),result=testGrantExp(a.id,cost);say(result?`TEST ONLY: level ${result.level}, ${cost} EXP injected.`:'Ascension required or level cap reached.');}}break}
  case 'progress-test-ascend':{if(DEV_MODE){const a=active();if(a)say(testAscend(a.id)?`TEST ONLY: level ${a.level} ascension unlocked (no materials).`:'Not at a locked ascension gate.');}break}
  case 'hp-test-flat':{if(DEV_MODE){const a=active();if(a)setHpBonusForTest(a.id,'debug-flat','flat',(a.hpFlatModifiers['debug-flat']||0)+20);}break}
@@ -2843,7 +2776,6 @@ async function toggleFullscreen(){
   else say('This browser blocks page fullscreen. Try opening Two-Tone as a Home Screen app.');
  }catch(error){if(isIPhoneBrowser())say('On iPhone: Share → Add to Home Screen, then open Two-Tone from its icon.');else say('Fullscreen was blocked by the browser. Try opening Two-Tone as a Home Screen app.')}
 }
-const saveFileInput=document.getElementById('save-file-picker');saveFileInput.addEventListener('change',async()=>{const file=saveFileInput.files?.[0];if(!file)return;if(file.size>2_000_000){say('This save file is too large to load.');saveFileInput.value='';return}try{importSaveFile(JSON.parse(await readSaveFileText(file)))}catch(error){say('This file could not be read as a Two-Tone save.')}finally{saveFileInput.value=''}});
 canvas.addEventListener('pointerdown',e=>{e.preventDefault();const r=canvas.getBoundingClientRect();choose((e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height)},{passive:false});
 window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)cancelTargetSelection();if(e.key==='1')play('basic');if(e.key==='2')play('skill');if(e.key==='3')play('ultimate');if(DEV_MODE&&e.key.toLowerCase()==='m'&&phase==='player')cycleSpCapTest();if(DEV_MODE&&['q','w','e','f'].includes(e.key.toLowerCase())&&phase==='player')setTargetingMode(({q:'single',w:'blast',e:'aoe',f:'five-hit'})[e.key.toLowerCase()]);if(DEV_MODE&&e.key.toLowerCase()==='v'&&phase==='player'){cameraPreview=cameraPreview==='party'?null:'party';selectedAllyId=activeId}if(DEV_MODE&&e.key.toLowerCase()==='t'&&phase==='player')cameraPreview=cameraPreview==='target'?null:'target';if(DEV_MODE&&e.key.toLowerCase()==='r'&&phase!=='setup')replay()});window.addEventListener('contextmenu',e=>e.preventDefault());
 // Read-only instrumentation and explicitly labeled testing helpers for verification.

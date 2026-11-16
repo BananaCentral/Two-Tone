@@ -10,6 +10,6 @@
 
 ## Saved State
 
-- Coin balance and the last claimed period are saved separately for Regular Mode and Dev Mode.
-- Save files include the last claimed period so loading a save preserves the claim state.
+- Coin balance and the last claimed period are stored in the authenticated server profile.
+- Each account can claim once per Eastern Time calendar day, regardless of device.
 - The reward adds 100 coins to the player's current wallet and can be spent in the Store.

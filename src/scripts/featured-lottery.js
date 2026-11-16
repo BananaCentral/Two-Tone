@@ -3,7 +3,7 @@
 // Stateful rules engine for featured Store lotteries. Reward pools and the
 // wallet are supplied by the game so this module does not invent game content.
 (function attachFeaturedLottery(global) {
- const DEV_MODE=new URLSearchParams(global.location?.search||'').get('dev')==='1';
+ const DEV_MODE=false;
  const STORAGE_KEY=DEV_MODE?'two-tone-dev-featured-lottery-v1':'two-tone-featured-lottery-v1';
  const RULES=Object.freeze({
   ticketCost:100,baseMythicChance:.01,heightenedMythicChance:.02,rareChance:.10,
@@ -18,6 +18,7 @@
  function load(){try{const value=JSON.parse(global.localStorage.getItem(STORAGE_KEY)||'null');if(value?.version===1&&validTrack(value.character)&&validTrack(value.weapon)&&Array.isArray(value.seenCharacters))return value}catch(error){}return freshState()}
  let state=load();
  function save(){try{global.localStorage.setItem(STORAGE_KEY,JSON.stringify(state));return true}catch(error){return false}}
+ function hydrate(value){if(value?.version!==1||!validTrack(value.character)||!validTrack(value.weapon)||!Array.isArray(value.seenCharacters))return false;state=structuredClone(value);save();return true}
  function trackFor(type){if(type==='character')return state.character;if(type==='weapon')return state.weapon;throw new TypeError('Lottery type must be character or weapon.')}
  function setTarget(type,targetId,featuredIds){if(typeof targetId!=='string'||!featuredIds?.includes(targetId))return false;trackFor(type).target=targetId;save();return true}
  function rotate(featuredCharacterIds,now=new Date()){
@@ -82,5 +83,7 @@
   if(reward.inventoryItem&&grantRewardItem&&!grantRewardItem(reward.inventoryItem,reward.quantity||1))return {ok:false,reason:'inventory-grant-failed'};
   save();return {ok:true,type,tier,reward,featured,coinsSpent:RULES.ticketCost,state:structuredClone(state)};
  }
- global.FeaturedLottery=Object.freeze({RULES,draw,setTarget,rotate,getState:()=>structuredClone(state),setRewardGrant(fn){grantRewardItem=typeof fn==='function'?fn:null},resetForImport(){state=freshState();save()}});
+ const api={RULES,rotate,hydrate,getState:()=>structuredClone(state)};
+ if(DEV_MODE)Object.assign(api,{draw,setTarget,setRewardGrant(fn){grantRewardItem=typeof fn==='function'?fn:null},resetForImport(){state=freshState();save()}});
+ global.FeaturedLottery=Object.freeze(api);
 })(globalThis);

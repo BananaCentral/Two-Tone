@@ -4,9 +4,9 @@
 
 The Store offers featured character and premium weapon lotteries. Each lottery draw costs 100 coins and is purchased from the merchant. A draw delivers its reward immediately.
 
-New Regular and Dev Mode wallets start with 0 coins. Coin balance is saved in the active mode's profile. Players can claim 100 free coins once per day from the main menu; see the [Daily Coin Reward Standard](../daily-reward-standard.md).
+New player accounts start with 0 coins. The server stores each account's balance. Players can claim 100 free coins once per day from the main menu; see the [Daily Coin Reward Standard](../daily-reward-standard.md).
 
-For manual testing, switch to Dev Mode from the main menu or append `?dev=1` to the site URL. Dev Mode shows Store controls that grant 100, 500, 1,000, or 5,000 coins. These controls are hidden in Regular mode.
+Players cannot enter Dev Mode or grant themselves coins from the Store UI. Developer tools require a server-authorized developer account and are unavailable in the public player client.
 
 ## Banner UI
 
@@ -18,7 +18,7 @@ Follow the shared [UI Layout Standard](../project-standard/ui-layout-standard.md
 - Clicking a left-side row selects that banner as the corresponding lottery's target and updates the right detail panel. Character and weapon targets remain independent. Show the active row clearly; mark any other saved target for the other lottery type without making it the active detail view.
 - The right detail panel emphasizes the selected character or weapon artwork and name, then shows the relevant pity, odds, and single-draw / ten-draw controls. Draw controls are disabled until a target for that lottery type has been selected.
 - When there is no saved target, show an empty detail state that directs the player to choose one of the left-side banners. Do not add banner chips, a second target-selection panel, limited-time subtitles, or a persistent instruction bar.
-- Opening the Store or selecting a banner does not show a confirmation notice. Show notices only for actionable errors or action confirmations, such as a completed draw summary or a Dev Mode coin grant.
+- Opening the Store or selecting a banner does not show a confirmation notice. Show notices only for actionable errors or action confirmations, such as a completed draw summary.
 
 Each banner offers a single draw for 100 coins and a ten-draw option for 1,000 coins. Ten draws are resolved in order, one ticket at a time, with the same pity and reward rules as individual draws. The ten-draw option has no discount.
 
@@ -44,7 +44,7 @@ Within a tier, every item in that tier's reward pool has an equal chance. Tier c
 
 Common lottery rewards include bundles of five Large Enchanted Bottles in character lotteries and five Large Enchanted Books in premium weapon lotteries. Rare lottery rewards include Cores and Gems. See the [Item Standard](../item-standard/item-standard.md) for item effects and other acquisition sources.
 
-For a mythic reward, there is a 75% chance to receive the player's selected featured target and a 25% chance to receive an off-feature reward of the same type. Character lotteries award off-feature characters; premium weapon lotteries award off-feature premium weapons. In Regular Mode, the first character reward for an unowned character unlocks that character; subsequent copies add character duplicates. Soul is the only character owned at the start. Dev Mode keeps the full roster available for testing.
+For a mythic reward, there is a 75% chance to receive the player's selected featured target and a 25% chance to receive an off-feature reward of the same type. Character lotteries award off-feature characters; premium weapon lotteries award off-feature premium weapons. The first character reward for an unowned character unlocks that character; subsequent copies add character duplicates. Soul is the only character owned at the start.
 
 ## Pity Counters
 
