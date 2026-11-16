@@ -7,6 +7,13 @@
 - Level: 1
 - Health bars: 1
 
+## Tags
+
+- Area: One
+- Type: Boss
+- Strengths: Defensive, Strong, Physical Attacker
+- Weaknesses: Physically Fragile, Magically Fragile
+
 ## Base Stats
 
 | Stat | Base value |

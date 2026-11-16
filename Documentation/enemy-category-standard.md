@@ -34,6 +34,8 @@ Category classifies an enemy's encounter role. It does not itself define stat mu
 - The current Slime training encounter is explicitly Level 1. The current enemy runtime uses authored archetype stats directly. No enemy level-scaling or progression standard is defined; do not infer a Level 50 Slime by multiplying its stats by 50.
 - Enemy archetypes define HP, Attack, Defense, and Speed. Enemy Barrier and Broken State rules are defined in the [Turn Order Standard](turn-order-standard/turn-order-standard.md).
 
+Enemy archetypes also carry descriptive area, type, strengths, and weaknesses metadata. The type tag must match the validated enemy category. These tags are internal metadata and do not render in the UI or affect combat by themselves; see the [Enemy Tags Standard](enemy-tags-standard.md).
+
 ## Current roster
 
 Slime, Wolf, and Hawk are Common enemies, Goblin and Geode are Elite, and Bear is a Boss. Every wave instance receives the validated category and health-bar count from its enemy archetype. The default Mixed training encounter cycles through Common Slime, Wolf, and Hawk enemies, includes a Goblin in its first wave, a Bear in its final wave, and may include a Geode among the final-wave Elites. The roster can be set to Slime, Wolf, Hawk, Mixed, Goblin, Geode, or Bear in Battle Test Options. Hawk waves contain only Common Hawks. Goblin and Geode waves include at most five of their selected Elite enemy, with remaining slots filled by Common Slimes. Bear waves include one Boss, with remaining slots filled by Common Slimes.

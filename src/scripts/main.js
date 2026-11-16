@@ -549,6 +549,7 @@ let phase='startup',paused=false,turn=0,enemyHp=0,maxEnemyHp=0,sp=3,
 // Four authored party formation positions. Enemy identities and wave queues are independent of these slots.
 // Encounter presets and enemy stats below are DEMO DATA; Approved Fundamental 2 defines the rules.
 const ENEMY_CATEGORIES=Object.freeze(['common','elite','boss']);
+const ENEMY_TRAIT_TAGS=Object.freeze(['Magical Attacker','Magical Resistant','Defensive','Physically Fragile','Slow','Fast','Physical Attacker','Strong','Magically Fragile','Fragile','Weak','Physically Resistant','Physically Defensive']);
 const ENCOUNTER_LIMITS=Object.freeze({enemiesOnField:5,bossesPerWave:1,elitesPerWave:5,elitesOnField:3,elitesOnFieldInBossWave:2});
 function validateEnemyCategory(category){
  if(!ENEMY_CATEGORIES.includes(category))throw Error(`Enemy category must be one of: ${ENEMY_CATEGORIES.join(', ')}`);
@@ -559,6 +560,12 @@ function validateEnemyHealthBars(category,bars=1){
  if(category!=='boss'&&bars!==1)throw Error('Only Boss enemies can have multiple health bars.');
  return bars;
 }
+function validateEnemyTags(tags,category){
+ if(!tags||typeof tags.area!=='string'||!tags.area.trim()||tags.type!==category||!Array.isArray(tags.strengths)||!Array.isArray(tags.weaknesses))throw Error(`Enemy ${category} needs area, matching type, strengths, and weaknesses tags.`);
+ for(const trait of [...tags.strengths,...tags.weaknesses])if(!ENEMY_TRAIT_TAGS.includes(trait))throw Error(`Unknown enemy trait tag: ${trait}`);
+ if(new Set(tags.strengths).size!==tags.strengths.length||new Set(tags.weaknesses).size!==tags.weaknesses.length)throw Error('Enemy trait tags cannot be duplicated within strengths or weaknesses.');
+ return {area:tags.area,type:tags.type,strengths:[...tags.strengths],weaknesses:[...tags.weaknesses]};
+}
 const ENEMY_FORMATIONS=[
  {id:'slot1',x:646,y:359,w:151,h:198},
  {id:'slot2',x:822,y:314,w:156,h:205},
@@ -567,12 +574,12 @@ const ENEMY_FORMATIONS=[
  {id:'slot5',x:1389,y:355,w:151,h:198},
 ];
 const ENEMY_ARCHETYPES={
- slime:{id:'slime',category:'common',name:'SLIME',level:1,hp:150,basePhysicalAttack:0,baseMagicalAttack:20,basePhysicalDefense:2,baseMagicalDefense:6,speed:10,stealth:0,lifesteal:0,battleSprite:'slimeBattle',battleAspectRatio:'1:1',artwork:'slimeArtwork',passive:{id:'slimy',every:3,damageBonus:.25},basicAttack:{targetMode:'single',damageType:'magical',multiplier:1.0}},
- wolf:{id:'wolf',category:'common',name:'WOLF',level:1,hp:50,basePhysicalAttack:30,baseMagicalAttack:0,basePhysicalDefense:2,baseMagicalDefense:2,speed:40,stealth:0,lifesteal:0,battleSprite:'wolfBattle',battleAspectRatio:'1:1',artwork:'wolfArtwork',passive:{id:'rampage',damageBonus:.25,maxStacks:4},basicAttack:{targetMode:'single',damageType:'physical',multiplier:1.0}},
- hawk:{id:'hawk',category:'common',name:'HAWK',level:1,hp:50,basePhysicalAttack:10,baseMagicalAttack:0,basePhysicalDefense:2,baseMagicalDefense:2,speed:60,stealth:.2,lifesteal:0,battleSprite:'hawkBattle',battleAspectRatio:'1:1',artwork:'hawkBattle',passive:{id:'mach-speed'},basicAttack:{targetMode:'single',damageType:'physical',multiplier:1.0}},
- goblin:{id:'goblin',category:'elite',name:'GOBLIN',level:1,hp:200,basePhysicalAttack:40,baseMagicalAttack:0,basePhysicalDefense:12,baseMagicalDefense:4,speed:40,stealth:0,lifesteal:0,battleSprite:'goblinBattle',battleAspectRatio:'1:2',artwork:'goblinBattle',passive:{id:'pursuit',actionAdvance:20},basicAttack:{targetMode:'blast',damageType:'physical',multiplier:1.0}},
- geode:{id:'geode',category:'elite',name:'GEODE',level:1,hp:250,basePhysicalAttack:20,baseMagicalAttack:0,basePhysicalDefense:16,baseMagicalDefense:8,speed:10,stealth:0,lifesteal:0,battleSprite:'geodeBattle',battleAspectRatio:'1:2',artwork:'geodeBattle',passive:{id:'momentum',damageBonus:.2,maxStacks:10},basicAttack:{targetMode:'aoe',damageType:'physical',multiplier:1.0}},
- bear:{id:'bear',category:'boss',name:'BEAR',level:1,hp:450,basePhysicalAttack:90,baseMagicalAttack:0,basePhysicalDefense:6,baseMagicalDefense:6,speed:60,stealth:0,lifesteal:0,battleSprite:'bearBattle',battleAspectRatio:'64:70',artwork:'bearBattle',healthBars:1,passive:{id:'sharp-claws',defenseIgnore:.25},basicAttack:{targetMode:'aoe',damageType:'true',multiplier:1.0}}
+ slime:{id:'slime',category:'common',tags:{area:'One',type:'common',strengths:['Magical Attacker','Magical Resistant','Defensive'],weaknesses:['Physically Fragile','Slow']},name:'SLIME',level:1,hp:150,basePhysicalAttack:0,baseMagicalAttack:20,basePhysicalDefense:2,baseMagicalDefense:6,speed:10,stealth:0,lifesteal:0,battleSprite:'slimeBattle',battleAspectRatio:'1:1',artwork:'slimeArtwork',passive:{id:'slimy',every:3,damageBonus:.25},basicAttack:{targetMode:'single',damageType:'magical',multiplier:1.0}},
+ wolf:{id:'wolf',category:'common',tags:{area:'One',type:'common',strengths:['Fast','Physical Attacker','Strong'],weaknesses:['Physically Fragile','Magically Fragile','Fragile']},name:'WOLF',level:1,hp:50,basePhysicalAttack:30,baseMagicalAttack:0,basePhysicalDefense:2,baseMagicalDefense:2,speed:40,stealth:0,lifesteal:0,battleSprite:'wolfBattle',battleAspectRatio:'1:1',artwork:'wolfArtwork',passive:{id:'rampage',damageBonus:.25,maxStacks:4},basicAttack:{targetMode:'single',damageType:'physical',multiplier:1.0}},
+ hawk:{id:'hawk',category:'common',tags:{area:'One',type:'common',strengths:['Fast','Physical Attacker'],weaknesses:['Physically Fragile','Magically Fragile','Weak','Fragile']},name:'HAWK',level:1,hp:50,basePhysicalAttack:10,baseMagicalAttack:0,basePhysicalDefense:2,baseMagicalDefense:2,speed:60,stealth:.2,lifesteal:0,battleSprite:'hawkBattle',battleAspectRatio:'1:1',artwork:'hawkBattle',passive:{id:'mach-speed'},basicAttack:{targetMode:'single',damageType:'physical',multiplier:1.0}},
+ goblin:{id:'goblin',category:'elite',tags:{area:'One',type:'elite',strengths:['Physical Attacker','Physically Defensive'],weaknesses:['Magically Fragile']},name:'GOBLIN',level:1,hp:200,basePhysicalAttack:40,baseMagicalAttack:0,basePhysicalDefense:12,baseMagicalDefense:4,speed:40,stealth:0,lifesteal:0,battleSprite:'goblinBattle',battleAspectRatio:'1:2',artwork:'goblinBattle',passive:{id:'pursuit',actionAdvance:20},basicAttack:{targetMode:'blast',damageType:'physical',multiplier:1.0}},
+ geode:{id:'geode',category:'elite',tags:{area:'One',type:'elite',strengths:['Defensive','Magical Resistant','Physically Resistant'],weaknesses:['Slow','Weak']},name:'GEODE',level:1,hp:250,basePhysicalAttack:20,baseMagicalAttack:0,basePhysicalDefense:16,baseMagicalDefense:8,speed:10,stealth:0,lifesteal:0,battleSprite:'geodeBattle',battleAspectRatio:'1:2',artwork:'geodeBattle',passive:{id:'momentum',damageBonus:.2,maxStacks:10},basicAttack:{targetMode:'aoe',damageType:'physical',multiplier:1.0}},
+ bear:{id:'bear',category:'boss',tags:{area:'One',type:'boss',strengths:['Defensive','Strong','Physical Attacker'],weaknesses:['Physically Fragile','Magically Fragile']},name:'BEAR',level:1,hp:450,basePhysicalAttack:90,baseMagicalAttack:0,basePhysicalDefense:6,baseMagicalDefense:6,speed:60,stealth:0,lifesteal:0,battleSprite:'bearBattle',battleAspectRatio:'64:70',artwork:'bearBattle',healthBars:1,passive:{id:'sharp-claws',defenseIgnore:.25},basicAttack:{targetMode:'aoe',damageType:'true',multiplier:1.0}}
 };
 // Any encounter may supply its own finite number of waves, each with 1–15 enemies.
 // Presets are only review scenarios; they are NOT a global wave-count limit.
@@ -765,7 +772,7 @@ function buildWavePlan(sizes){
   const finalMixedWave=enemyRosterMode==='mixed'&&wi===sizes.length-1,firstMixedWave=enemyRosterMode==='mixed'&&sizes.length>1&&wi===0;
   const mixedBoss=finalMixedWave&&i===0,mixedBossElite=finalMixedWave&&(i===1||i===2),mixedLeader=firstMixedWave&&i===0;
   const model=enemyRosterMode==='goblin'?(i<ENCOUNTER_LIMITS.elitesPerWave?ENEMY_ARCHETYPES.goblin:ENEMY_ARCHETYPES.slime):enemyRosterMode==='geode'?(i<ENCOUNTER_LIMITS.elitesPerWave?ENEMY_ARCHETYPES.geode:ENEMY_ARCHETYPES.slime):enemyRosterMode==='bear'?(i===0?ENEMY_ARCHETYPES.bear:ENEMY_ARCHETYPES.slime):enemyRosterMode==='hawk'?ENEMY_ARCHETYPES.hawk:mixedBoss?ENEMY_ARCHETYPES.bear:finalMixedWave&&i===2?ENEMY_ARCHETYPES.geode:(mixedBossElite||mixedLeader)?ENEMY_ARCHETYPES.goblin:ENEMY_ARCHETYPES[commonId];
-  const category=validateEnemyCategory(model.category);return {id:`wave${wi+1}-enemy${i+1}`,archetypeId:model.id,name:model.name,
+  const category=validateEnemyCategory(model.category),tags=validateEnemyTags(model.tags,category);return {id:`wave${wi+1}-enemy${i+1}`,archetypeId:model.id,name:model.name,tags,
    wave:wi+1,order:i+1,category,healthBars:validateEnemyHealthBars(category,model.healthBars??1),level:model.level,maxHp:model.hp,speed:model.speed,
    basePhysicalAttack:model.basePhysicalAttack,baseMagicalAttack:model.baseMagicalAttack,
    basePhysicalDefense:model.basePhysicalDefense,baseMagicalDefense:model.baseMagicalDefense,lifesteal:model.lifesteal??0,lifestealModifiers:{...(model.lifestealModifiers||{})},bleedStacks:[],bleedMaxStacks:model.bleedMaxStacks??5,

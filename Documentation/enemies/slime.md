@@ -6,6 +6,13 @@
 - Runtime archetype: `slime`
 - Level: 1 in the current training encounter
 
+## Tags
+
+- Area: One
+- Type: Common
+- Strengths: Magical Attacker, Magical Resistant, Defensive
+- Weaknesses: Physically Fragile, Slow
+
 ## Base Stats
 
 | Stat | Base value |

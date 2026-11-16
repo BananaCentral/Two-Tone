@@ -6,6 +6,13 @@
 - Runtime archetype: `goblin`
 - Level: 1
 
+## Tags
+
+- Area: One
+- Type: Elite
+- Strengths: Physical Attacker, Physically Defensive
+- Weaknesses: Magically Fragile
+
 ## Base Stats
 
 | Stat | Base value |

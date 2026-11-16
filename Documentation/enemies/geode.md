@@ -3,6 +3,13 @@
 **Category:** Elite  
 **Level:** 1
 
+## Tags
+
+- Area: One
+- Type: Elite
+- Strengths: Defensive, Magical Resistant, Physically Resistant
+- Weaknesses: Slow, Weak
+
 | Stat | Value |
 |---|---:|
 | HP | 250 |

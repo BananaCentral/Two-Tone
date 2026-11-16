@@ -167,6 +167,7 @@
     },
     "slime": {
       "name": "Slime",
+      "tags": {"area":"One","type":"common","strengths":["Magical Attacker","Magical Resistant","Defensive"],"weaknesses":["Physically Fragile","Slow"]},
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
@@ -194,6 +195,7 @@
     },
     "hawk": {
       "name": "Hawk",
+      "tags": {"area":"One","type":"common","strengths":["Fast","Physical Attacker"],"weaknesses":["Physically Fragile","Magically Fragile","Weak","Fragile"]},
       "level": 1,
       "barrierPercent": 0.2,
       "stealth": 0.2,
@@ -214,6 +216,7 @@
     },
     "goblin": {
       "name": "Goblin",
+      "tags": {"area":"One","type":"elite","strengths":["Physical Attacker","Physically Defensive"],"weaknesses":["Magically Fragile"]},
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
@@ -238,6 +241,7 @@
     },
     "geode": {
       "name": "Geode",
+      "tags": {"area":"One","type":"elite","strengths":["Defensive","Magical Resistant","Physically Resistant"],"weaknesses":["Slow","Weak"]},
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
@@ -263,6 +267,7 @@
     },
     "bear": {
       "name": "Bear",
+      "tags": {"area":"One","type":"boss","strengths":["Defensive","Strong","Physical Attacker"],"weaknesses":["Physically Fragile","Magically Fragile"]},
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {

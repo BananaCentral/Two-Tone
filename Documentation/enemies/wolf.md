@@ -6,6 +6,13 @@
 - Runtime archetype: `wolf`
 - Level: 1 in the current training encounter
 
+## Tags
+
+- Area: One
+- Type: Common
+- Strengths: Fast, Physical Attacker, Strong
+- Weaknesses: Physically Fragile, Magically Fragile, Fragile
+
 ## Base Stats
 
 | Stat | Base value |
