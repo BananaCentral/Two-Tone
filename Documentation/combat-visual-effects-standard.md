@@ -36,6 +36,7 @@ This standard defines how combat actions and passive effects receive readable, c
 | Goblin | Basic / blast | Fast gold motion streaks on each ally in the blast |
 | Bear | Basic / AoE | Broad claw strokes and a pale impact ring across the allied formation |
 | Wolf | Basic | Three red claw strokes on affected allies |
+| Hawk | Basic | Three warm gold talon strokes on the target |
 | Combat system | Stealth dodge | Brief pale-blue evasion ring and `DODGE` cue on the target |
 | Combat system | Lifesteal | Green recovery ring and `LIFESTEAL +N` on the source |
 | Combat system | Bleed | Red stack ring on application and a damage / remaining-stack cue on each tick |

@@ -192,6 +192,26 @@
         }
       ]
     },
+    "hawk": {
+      "name": "Hawk",
+      "level": 1,
+      "barrierPercent": 0.2,
+      "stealth": 0.2,
+      "stats": {
+        "hp": 50,
+        "physicalAttack": 10,
+        "magicalAttack": 0,
+        "physicalDefense": 2,
+        "magicalDefense": 2,
+        "speed": 60
+      },
+      "basic": {
+        "damageType": "physical",
+        "multiplier": 1,
+        "target": "random"
+      },
+      "passives": []
+    },
     "goblin": {
       "name": "Goblin",
       "level": 1,
