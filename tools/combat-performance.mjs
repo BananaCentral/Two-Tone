@@ -118,6 +118,8 @@ function candidateSpecs(raw) {
 function wearersFor(spec, party) {
   if (spec.type === 'character') return party.includes(spec.id) ? [spec.id] : [];
   if (spec.type === 'action') return party.includes(spec.character) ? [spec.character] : [];
+  if (spec.id === 'radiant-moon') return party.filter(id => ['lily', 'zero'].includes(id));
+  if (spec.id === 'eternal-sun') return party.filter(id => id !== 'dawn');
   if (spec.id === 'united') return party.filter(id => ['dawn', 'logan'].includes(id));
   return party.slice();
 }
@@ -249,7 +251,7 @@ function makeWinRateSvg(strataRows) {
   return parts.join('\n');
 }
 function parseArgs(args) {
-  const options = { candidates: [], runs: 100, seed: 1, output: 'Documentation/combat-simulator/performance-results.jsonl', limitScenarios: 1000, maxActions: 2000 };
+  const options = { candidates: [], runs: 100, seed: 1, output: 'Documentation/combat-simulator/performance-results.jsonl', limitScenarios: 1000, maxActions: 2000, compact: false };
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
     if (arg === '--candidate') options.candidates.push(...candidateSpecs(args[++index]));
@@ -259,6 +261,7 @@ function parseArgs(args) {
     else if (arg === '--limit-scenarios') options.limitScenarios = Number(args[++index]);
     else if (arg === '--max-actions') options.maxActions = Number(args[++index]);
     else if (arg === '--output') options.output = path.resolve(args[++index]);
+    else if (arg === '--compact') options.compact = true;
     else if (arg === '--help' || arg === '-h') options.help = true;
     else fail(`Unknown option: ${arg}`);
   }
@@ -271,7 +274,39 @@ function parseArgs(args) {
   return options;
 }
 function help() {
-  return `Two-Tone matched combat performance runner\n\nUsage: node tools/combat-performance.mjs [options]\n\nOptions:\n  --candidate all-runes|all-stats|all-weapons\n  --candidate rune:<id>|character:<id>|stat:<id>|weapon:standard@P1L1|weapon:premium@P1L50\n  --candidate action:<character>/skill|ultimate\n  --character <id>           Restrict item/stat tests to this eligible wearer\n  --runs <n>                  Matched seeds per matchup (default 100)\n  --seed <n>                  First reproducible seed (default 1)\n  --limit-scenarios <n>       Scenario cap (default 1000); use 0 for the full matrix\n  --max-actions <n>           Maximum unit actions in one battle (default 2000)\n  --output <path>             JSONL result path\n\nThe full position-aware matrix has 205 ordered legal ally teams, 9,330 ordered enemy lineups, three lengths and three difficulties (17,213,850 scenario cells). Full Monte Carlo is intentionally a large offline job.`;
+  return `Two-Tone matched combat performance runner\n\nUsage: node tools/combat-performance.mjs [options]\n\nOptions:\n  --candidate all-runes|all-stats|all-weapons\n  --candidate rune:<id>|character:<id>|stat:<id>|weapon:standard@P1L1|weapon:premium@P1L50\n  --candidate action:<character>/skill|ultimate\n  --character <id>           Restrict item/stat tests to this eligible wearer\n  --runs <n>                  Matched seeds per matchup (default 100)\n  --seed <n>                  First reproducible seed (default 1)\n  --limit-scenarios <n>       Scenario cap (default 1000); use 0 for the full matrix\n  --max-actions <n>           Maximum unit actions in one battle (default 2000)\n  --output <path>             JSONL result path\n  --compact                   Omit seed-level details; keep paired averages and confidence intervals\n\nThe full position-aware matrix has 205 ordered legal ally teams, 9,330 ordered enemy lineups, three lengths and three difficulties (17,213,850 scenario cells). Full Monte Carlo is intentionally a large offline job.`;
+}
+function* scenarioSamples(allyLists, enemyTeams, limit) {
+  if (!limit) {
+    for (const party of allyLists) for (const enemies of enemyTeams)
+      for (const length of LENGTHS) for (const difficulty of DIFFICULTIES)
+        yield { party, enemies, length, difficulty };
+    return;
+  }
+  const partyGroups = new Map(), enemyGroups = new Map();
+  for (const party of allyLists) {
+    const group = partyGroups.get(party.length) || [];
+    group.push(party); partyGroups.set(party.length, group);
+  }
+  for (const enemies of enemyTeams) {
+    const group = enemyGroups.get(enemies.length) || [];
+    group.push(enemies); enemyGroups.set(enemies.length, group);
+  }
+  const strata = [];
+  for (const partySize of [1, 2, 3, 4]) for (const enemyCount of [1, 2, 3, 4, 5])
+    for (const length of LENGTHS) for (const difficulty of DIFFICULTIES)
+      if (partyGroups.has(partySize) && enemyGroups.has(enemyCount)) strata.push({ partySize, enemyCount, length, difficulty });
+  const count = Math.min(limit, allyLists.length * enemyTeams.length * LENGTHS.length * DIFFICULTIES.length);
+  const perStratum = Math.floor(count / strata.length), remainder = count % strata.length;
+  for (let index = 0; index < strata.length; index++) {
+    const stratum = strata[index], parties = partyGroups.get(stratum.partySize), enemies = enemyGroups.get(stratum.enemyCount);
+    const quota = perStratum + (index < remainder ? 1 : 0);
+    for (let sample = 0; sample < quota; sample++) {
+      const partyIndex = (index * 13 + sample * 7) % parties.length;
+      const enemyIndex = (index * 17 + sample * 11) % enemies.length;
+      yield { party: parties[partyIndex], enemies: enemies[enemyIndex], length: stratum.length, difficulty: stratum.difficulty };
+    }
+  }
 }
 async function main() {
   const options = parseArgs(process.argv.slice(2));
@@ -287,14 +322,7 @@ async function main() {
   const matrixCount = allyLists.length * enemyTeams.length * LENGTHS.length * DIFFICULTIES.length;
   console.log(`Full matrix: ${matrixCount.toLocaleString()} scenarios; ${options.runs} matched runs per candidate/wearer.`);
   const selectedScenarioCount = options.limitScenarios ? Math.min(options.limitScenarios, matrixCount) : matrixCount;
-  for (let sampleIndex = 0; sampleIndex < selectedScenarioCount; sampleIndex++) {
-      const flatIndex = options.limitScenarios ? Math.floor(sampleIndex * matrixCount / selectedScenarioCount) : sampleIndex;
-      const partyIndex = Math.floor(flatIndex / (enemyTeams.length * LENGTHS.length * DIFFICULTIES.length));
-      const enemyIndex = Math.floor(flatIndex / (LENGTHS.length * DIFFICULTIES.length)) % enemyTeams.length;
-      const lengthIndex = Math.floor(flatIndex / DIFFICULTIES.length) % LENGTHS.length;
-      const difficultyIndex = flatIndex % DIFFICULTIES.length;
-      const party = allyLists[partyIndex], enemies = enemyTeams[enemyIndex];
-      const length = LENGTHS[lengthIndex], difficulty = DIFFICULTIES[difficultyIndex];
+  for (const { party, enemies, length, difficulty } of scenarioSamples(allyLists, enemyTeams, options.limitScenarios)) {
       scenarios++;
       const base = makeBaseConfig(library, party, enemies, difficulty, length);
       for (const spec of options.candidates) {
@@ -331,8 +359,10 @@ async function main() {
             averageShieldAbsorbed: { control: average(trials.map(row => row.control.shields)), treatment: average(trials.map(row => row.treatment.shields)) },
             averageTurns: { alliesControl: average(trials.map(row => row.control.allyTurns)), alliesTreatment: average(trials.map(row => row.treatment.allyTurns)), enemiesControl: average(trials.map(row => row.control.enemyTurns)), enemiesTreatment: average(trials.map(row => row.treatment.enemyTurns)) },
             actionOverride: trials.find(row => row.treatment.actionOverride)?.treatment.actionOverride || null,
+            runeDiagnostics: { averageActivations: average(trials.map(row => row.wearerDamageTreatment[wearer]?.runeActivations || 0)), averageEnergyRestored: average(trials.map(row => row.wearerDamageTreatment[wearer]?.runeEnergyRestored || 0)) },
             trials
           };
+          if (options.compact) delete summary.trials;
           out.write(JSON.stringify(summary) + '\n');
           comparisons++;
           const partyComposition = party.slice().sort().join('+');
