@@ -4,6 +4,8 @@
 
 Use a shared stat budget to define comparable combat tests, HP impact to explain an action's effect, and win probability to measure whether it improves the chance of victory. Do not combine stat points, HP, and win rate into one arbitrary sum.
 
+**Validity note:** The documented scenario and scoring standards do not make a separate combat model accurate. Until the [shared combat engine](combat-engine-standard.md) owns all action, passive, Rune, and effect resolution used by both the game and runner, simulator scores are provisional and should not drive balance decisions.
+
 ## Normalized stat budget
 
 The reference stat line is worth 100 normalized Stat Value Points (SVP) in each stat:

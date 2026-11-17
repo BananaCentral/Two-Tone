@@ -2,6 +2,8 @@
 
 Run balance batches in Node.js without opening the canvas game.
 
+> **Shared combat runtime:** Live battles and the headless runner now use the same authored combat definitions, math, and `TwoToneBattleEngine` for action plans/resources, typed damage and intake, shields/barriers, Echo/Reflect, status effects, character-specific effects, Rune rules, enemy attack plans, follow-ups, summons, turn scheduling, and battle outcomes. The browser owns input/animation/wave presentation; the runner owns automated action selection and metrics. Performance reports remain provisional until parity coverage is run for every action/effect family. See the [Combat Engine Standard](../combat-engine-standard.md).
+
 ## Run it
 
 From the repository root:

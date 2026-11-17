@@ -3,9 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { simulateBattle } from './combat-simulator.mjs';
+import { CHARACTER_COMBAT_DATA, ENEMY_COMBAT_DATA } from '../src/scripts/combat-definitions.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const FIXTURE_DIR = path.join(ROOT, 'Documentation/combat-simulator');
 const CHARACTER_IDS = ['soul', 'lily', 'dawn', 'logan', 'zero'];
 const ENEMY_IDS = ['slime', 'wolf', 'hawk', 'geode', 'goblin', 'bear'];
 const RUNES = ['radiant-moon', 'eternal-sun', 'celestial-star', 'dark-matter', 'clear-skies', 'infinite-space', 'recycle', 'amplify', 'united'];
@@ -47,14 +47,8 @@ function* enemyLineups(ids, maxSize = 5, prefix = []) {
   for (const id of ids) yield* enemyLineups(ids, maxSize, [...prefix, id]);
 }
 function archetypeLibrary() {
-  const archetypes = {};
-  for (const filename of ['example-logan-party-vs-bear-boss.json', 'example-zero-vs-slime.json']) {
-    const fixture = JSON.parse(fs.readFileSync(path.join(FIXTURE_DIR, filename), 'utf8'));
-    for (const [id, archetype] of Object.entries(fixture.archetypes)) {
-      archetypes[id] = { ...(archetypes[id] || {}), ...archetype, tags: archetype.tags ?? archetypes[id]?.tags };
-    }
-  }
-  for (const id of [...CHARACTER_IDS, ...ENEMY_IDS]) assert(archetypes[id], `Missing archetype ${id} in benchmark fixtures.`);
+  const archetypes = structuredClone({ ...CHARACTER_COMBAT_DATA, ...ENEMY_COMBAT_DATA });
+  for (const id of [...CHARACTER_IDS, ...ENEMY_IDS]) assert(archetypes[id], `Missing combat definition for ${id}.`);
   return archetypes;
 }
 function statBudget(stats) {
