@@ -75,6 +75,8 @@ function validateConfig(config) {
       assert(!archetype.ultimate || archetype.ultimate.type==='dawnSupport'||['physical', 'magical', 'true'].includes(archetype.ultimate.damageType), 'Ultimate needs a supported damage type or support handler.');
     }
   }
+  const disabledPassives=config.settings?.disabledPassives;
+  assert(disabledPassives===undefined||(Array.isArray(disabledPassives)&&disabledPassives.every(value=>typeof value==='string'&&value.includes(':'))),'settings.disabledPassives must be an array of character:passive keys.');
   const actionOverride=config.settings?.actionOverride;
   if(actionOverride!==undefined){
     assert(actionOverride&&typeof actionOverride.actorId==='string','Action override needs actorId.');
@@ -114,6 +116,9 @@ function celestialFactor(unit,key){const level=unit.celestials?.[key]??1;assert(
 function instantiate(config, side) {
   return config.teams[side].map((instance, index) => {
     const archetype = config.archetypes[instance.archetype];
+    const disabledPassiveIds = new Set((config.settings?.disabledPassives || [])
+      .filter(value => value.startsWith(`${instance.archetype}:`))
+      .map(value => value.slice(instance.archetype.length + 1)));
     const level = instance.level ?? archetype.level ?? 1;
     const weapon = instance.weapon ?? archetype.weapon ?? null;
     const weaponMultiplier = 1 + signatureWeaponBonus(weapon);
@@ -136,7 +141,7 @@ function instantiate(config, side) {
     const premiumWeaponDuplicates = weapon?.type === 'premium' ? weapon.potential - 1 : 0;
     assert(stats.physicalAttack !== undefined && stats.magicalAttack !== undefined && stats.physicalDefense !== undefined && stats.magicalDefense !== undefined, 'Archetype ' + instance.archetype + ' needs an attack basis and both defense stats.');
     const maxEnergy = archetype.energy?.max ?? 120;
-    const passives = (archetype.passives || []).map((passive, index) => ({
+    const passives = (archetype.passives || []).filter(passive => !disabledPassiveIds.has(passive.id || passive.type)).map((passive, index) => ({
       ...passive,
       key: passive.id || passive.type + '-' + index,
       remaining: passive.type === 'followUp' && instance.archetype === 'soul' && characterDuplicates >= 1 ? 7 : passive.charges ?? Infinity,
@@ -170,8 +175,9 @@ function instantiate(config, side) {
       runeActivations:0,
       runeEnergyRestored:0,
       darkMatterActive:false,
-      criticalRateBonus:(archetype.criticalRateBonus||0)+(instance.criticalRateBonus||0)+(instance.archetype==='soul'&&premiumWeaponDuplicates>=2?.1:0)+(instance.archetype==='zero'?.1*(premiumWeaponDuplicates>=4?2:1):0),
-      criticalDamageBonus:(archetype.criticalDamageBonus||0)+(instance.criticalDamageBonus||0)+(instance.archetype==='soul'&&premiumWeaponDuplicates>=2?.25:0)+(instance.archetype==='zero'?.25*(premiumWeaponDuplicates>=4?2:1):0),
+      disabledPassiveIds,
+      criticalRateBonus:(archetype.criticalRateBonus||0)+(instance.criticalRateBonus||0)+(instance.archetype==='soul'&&premiumWeaponDuplicates>=2?.1:0)+(instance.archetype==='zero'&&!disabledPassiveIds.has('cutthroat')?.1*(premiumWeaponDuplicates>=4?2:1):0),
+      criticalDamageBonus:(archetype.criticalDamageBonus||0)+(instance.criticalDamageBonus||0)+(instance.archetype==='soul'&&premiumWeaponDuplicates>=2?.25:0)+(instance.archetype==='zero'&&!disabledPassiveIds.has('cutthroat')?.25*(premiumWeaponDuplicates>=4?2:1):0),
       defenseIgnoreBonus:instance.archetype==='zero'&&premiumWeaponDuplicates>=3?.2:0,
       lifestealRate:(instance.lifesteal??archetype.lifesteal??0)+(instance.lifestealBonus||0)+(archetype.lifestealBonus||0),
       lifestealHealing:0,
@@ -246,12 +252,15 @@ function attackValue(unit, type) {
   return physical + magical;
 }
 function healFromLifesteal(state,attacker,damageDealt){
- const logan=state.allies.find(unit=>unit.archetypeId==='logan'&&unit.hp>0),rate=Math.max(0,(attacker.lifestealRate||0)+(attacker.side==='allies'&&logan?.hp>0?(logan.characterDuplicates>=4?.2:.1):0));
+ const logan=state.allies.find(unit=>unit.archetypeId==='logan'&&unit.hp>0&&!unit.disabledPassiveIds?.has('tasteForBlood'));
+ const passiveRate=attacker.side==='allies'&&logan?(logan.characterDuplicates>=4?.2:.1):0;
+ const rate=Math.max(0,(attacker.lifestealRate||0)+passiveRate);
  if(rate<=0||damageDealt<=0||attacker.hp<=0)return 0;
  const healing=Math.min(Math.max(0,attacker.maxHp-attacker.hp),roundStat(damageDealt*rate));
  attacker.hp+=healing;attacker.lifestealHealing=(attacker.lifestealHealing||0)+healing;
  state.lifestealHealingBySide[attacker.side]+=healing;
- const equipped=logan?.weapon?.type==='premium';if(logan&&attacker!==logan&&attacker.side==='allies'&&equipped){const echo=Math.min(healing,logan.maxHp-logan.hp);logan.hp+=echo;logan.lifestealHealing+=echo;state.lifestealHealingBySide.allies+=echo}
+ const passiveHealing=Math.min(healing,roundStat(damageDealt*passiveRate));
+ const equipped=logan?.weapon?.type==='premium';if(logan&&attacker!==logan&&attacker.side==='allies'&&equipped){const echo=Math.min(passiveHealing,logan.maxHp-logan.hp);logan.hp+=echo;logan.lifestealHealing+=echo;state.lifestealHealingBySide.allies+=echo}
  return healing;
 }
 function applyBleed(target,source,stacks=1,maxStacks=target.bleedMaxStacks??5){
@@ -304,7 +313,7 @@ function rollCritical(state,unit,damage,forceCritical=false,criticalDamageBonus=
  return {damage:critical?roundStat(damage*(1+(unit.criticalDamage??.5)+(unit.criticalDamageBonus||0)+(unit.tune?.criticalDamageBonus||0)+criticalDamageBonus)):damage,critical};
 }
 function applyExposed(attacker,targets){
- if(attacker.archetypeId!=='lily')return;
+ if(attacker.archetypeId!=='lily'||!attacker.passives.some(passive=>passive.type==='exposed'||passive.id==='exposed'))return;
  const duplicate=attacker.characterDuplicates||0;
  for(const target of targets){if(target.hp<=0)continue;const old=target.marks.filter(m=>m.id==='exposed').length;target.marks=target.marks.filter(m=>m.id!=='exposed');const stacks=duplicate>=2?Math.min(2,old+1):1;for(let i=0;i<stacks;i++)target.marks.push({id:'exposed',turns:duplicate>=2?3:2})}
 }

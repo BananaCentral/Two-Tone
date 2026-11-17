@@ -9,6 +9,13 @@ const FIXTURE_DIR = path.join(ROOT, 'Documentation/combat-simulator');
 const CHARACTER_IDS = ['soul', 'lily', 'dawn', 'logan', 'zero'];
 const ENEMY_IDS = ['slime', 'wolf', 'hawk', 'geode', 'goblin', 'bear'];
 const RUNES = ['radiant-moon', 'eternal-sun', 'celestial-star', 'dark-matter', 'clear-skies', 'infinite-space', 'recycle', 'amplify', 'united'];
+const CHARACTER_PASSIVES = [
+  { character: 'soul', id: 'followUp' },
+  { character: 'lily', id: 'exposed' },
+  { character: 'dawn', id: 'resourceful' },
+  { character: 'logan', id: 'tasteForBlood' },
+  { character: 'zero', id: 'cutthroat' }
+];
 const LENGTHS = ['short', 'medium', 'long'];
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 const RUNE_MAIN = ['hp', 'attack', 'physicalDefense', 'magicalDefense'];
@@ -102,6 +109,12 @@ function makeBaseConfig(library, allies, enemies, difficulty, length, archetypeC
   };
 }
 function candidateSpecs(raw) {
+  if (raw === 'all-actions') return CHARACTER_IDS.flatMap(character => ['basic', 'skill', 'ultimate'].map(id => ({ type: 'action', id, character })));
+  if (raw === 'all-passives') return CHARACTER_PASSIVES.map(spec => ({ type: 'passive', ...spec }));
+  if (raw === 'all-character-mechanics') return [
+    ...CHARACTER_PASSIVES.map(spec => ({ type: 'passive', ...spec })),
+    ...CHARACTER_IDS.flatMap(character => ['basic', 'skill', 'ultimate'].map(id => ({ type: 'action', id, character })))
+  ];
   if (raw === 'all-rune-ratings') return [...RUNES.map(id => ({ type: 'rune', id })), ...Object.keys(SVP_GAINS).map(id => ({ type: 'stat', id }))];
   if (raw === 'all-runes') return RUNES.map(id => ({ type: 'rune', id }));
   if (raw === 'all-stats') return Object.keys(SVP_GAINS).map(id => ({ type: 'stat', id }));
@@ -110,8 +123,12 @@ function candidateSpecs(raw) {
   const value = rest.join(':');
   if (type === 'rune' && RUNES.includes(value)) return [{ type, id: value }];
   if (type === 'character' && CHARACTER_IDS.includes(value)) return [{ type, id: value }];
+  if (type === 'passive' && /^(soul|lily|dawn|logan|zero)\/[A-Za-z][A-Za-z0-9-]*$/.test(value)) {
+    const [character, id] = value.split('/');
+    if (CHARACTER_PASSIVES.some(spec => spec.character === character && spec.id === id)) return [{ type, id, character }];
+  }
   if (type === 'stat' && Object.hasOwn(SVP_GAINS, value)) return [{ type, id: value }];
-  if (type === 'action' && /^(soul|lily|dawn|logan|zero)\/(skill|ultimate)$/.test(value)) {
+  if (type === 'action' && /^(soul|lily|dawn|logan|zero)\/(basic|skill|ultimate)$/.test(value)) {
     const [character, action] = value.split('/'); return [{ type, id: action, character }];
   }
   if (type === 'weapon' && /^(standard|premium)(?:@P[1-5](?:L(?:[1-9]|[1-4][0-9]|50))?)?$/.test(value)) {
@@ -122,7 +139,7 @@ function candidateSpecs(raw) {
 }
 function wearersFor(spec, party) {
   if (spec.type === 'character') return party.includes(spec.id) ? [spec.id] : [];
-  if (spec.type === 'action') return party.includes(spec.character) ? [spec.character] : [];
+  if (spec.type === 'action' || spec.type === 'passive') return party.includes(spec.character) ? [spec.character] : [];
   if (spec.id === 'radiant-moon') return party.filter(id => ['lily', 'zero'].includes(id));
   if (spec.id === 'eternal-sun') return party.filter(id => id !== 'dawn');
   if (spec.id === 'united') return party.filter(id => ['dawn', 'logan'].includes(id));
@@ -173,12 +190,25 @@ function makeBranches(base, spec, wearer) {
     archetype.passives = [];
     delete archetype.skill;
     delete archetype.ultimate;
+    control.settings.disabledPassives = [...(control.settings.disabledPassives || []), ...CHARACTER_PASSIVES.filter(passive => passive.character === wearer).map(passive => `${wearer}:${passive.id}`)];
     // Preserve the character's authored stats and Basic Attack as the kit-free control.
+  } else if (spec.type === 'passive') {
+    control.settings.disabledPassives = [...(control.settings.disabledPassives || []), `${wearer}:${spec.id}`];
   } else if (spec.type === 'action') {
     for (const config of [control, treatment]) {
       const unit = findUnit(config, wearer);
       if (spec.id === 'ultimate') config.archetypes[wearer].energy.start = 100;
       config.settings.actionOverride = { actorId: unit.id, turn: 1, action: config === treatment ? spec.id : 'basic' };
+    }
+    if (spec.id === 'basic') {
+      const basic = treatment.archetypes[wearer].basic;
+      control.archetypes[wearer].basic = {
+        damageType: basic.damageType,
+        multiplier: 1,
+        target: 'single',
+        energyGain: 10,
+        skillPointGain: 1
+      };
     }
   }
   return { control, treatment, treatmentStatBudget };
@@ -311,7 +341,7 @@ function parseArgs(args) {
   return options;
 }
 function help() {
-  return `Two-Tone matched combat performance runner\n\nUsage: node tools/combat-performance.mjs [options]\n\nOptions:\n  --preset quick|balanced|deep|full  Select a coverage/run-count preset (default quick)\n  --candidate all-rune-ratings|all-runes|all-stats|all-weapons\n  --candidate rune:<id>|character:<id>|stat:<id>|weapon:standard@P1L1|weapon:premium@P1L50\n  --candidate action:<character>/skill|ultimate\n  --character <id>           Restrict item/stat tests to this eligible wearer\n  --runs <n>                  Matched seeds per matchup\n  --seed <n>                  First reproducible seed (default 1)\n  --limit-scenarios <n>       Scenario cap; use 0 for the full matrix\n  --max-actions <n>           Maximum unit actions in one battle (default 2000)\n  --output <path>             JSONL result path\n  --include-trials            Include per-seed details (larger output)\n\nWithout --candidate, tests all Runes against the average +100 SVP stat reference and writes a rating report. Presets: quick=180 scenarios × 5 seeds; balanced=360 × 10; deep=1,000 × 20; full=all 17,213,850 × 100. Limited runs balance party size, enemy count, length, and difficulty. The full position-aware matrix uses 205 ordered legal ally teams and 9,330 ordered enemy lineups.`;
+  return `Two-Tone matched combat performance runner\n\nUsage: node tools/combat-performance.mjs [options]\n\nOptions:\n  --preset quick|balanced|deep|full  Select a coverage/run-count preset (default quick)\n  --candidate all-rune-ratings|all-runes|all-stats|all-weapons\n  --candidate all-actions|all-passives|all-character-mechanics\n  --candidate rune:<id>|character:<id>|passive:<character>/<id>|stat:<id>\n  --candidate weapon:standard@P1L1|weapon:premium@P1L50\n  --candidate action:<character>/basic|skill|ultimate\n  --character <id>           Restrict item/stat tests to this eligible wearer\n  --runs <n>                  Matched seeds per matchup\n  --seed <n>                  First reproducible seed (default 1)\n  --limit-scenarios <n>       Scenario cap; use 0 for the full matrix\n  --max-actions <n>           Maximum unit actions in one battle (default 2000)\n  --output <path>             JSONL result path\n  --include-trials            Include per-seed details (larger output)\n\nWithout --candidate, tests all Runes against the average +100 SVP stat reference and writes a rating report. Presets: quick=180 scenarios × 5 seeds; balanced=360 × 10; deep=1,000 × 20; full=all 17,213,850 × 100. Limited presets balance party size, enemy count, length, and difficulty. The full position-aware matrix uses 205 ordered legal ally teams and 9,330 ordered enemy lineups.`;
 }
 function* scenarioSamples(allyLists, enemyTeams, limit) {
   if (!limit) {
