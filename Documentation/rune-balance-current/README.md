@@ -14,7 +14,7 @@ Win-rate change is shown in percentage points relative to the same character, pa
 |---|---|---:|---:|---:|---:|---|
 | Amplify | dawn, lily, logan, soul, zero | +0.92 pp | +28.9 | +1.81 | 0.76 | Modest overall. Soul gains far more because enhanced basic actions multiply the same bonus across multiple targets. |
 | Celestial Star | dawn, lily, logan, soul, zero | +0.66 pp | +12.7 | +0.80 | 0.53 | Low average impact in this sample; only a small portion of battles reached an eligible Ultimate. |
-| Clear Skies | dawn, lily, logan, soul, zero | +1.97 pp | +39.8 | +2.49 | 1.55 | Highest broad win-rate lift. Its shield contributes; the Reflect bonus is dormant in the current roster because no unit has a base Reflect source. |
+| Clear Skies | dawn, lily, logan, soul, zero | +1.97 pp | +39.8 | +2.49 | 1.55 | Highest broad win-rate lift in this pass. Its shield adds 10 percentage points of Reflect while active, including when the wearer's base Reflect is 0%; the reported result includes that damage. |
 | Dark Matter | dawn, lily, logan, soul, zero | +0.96 pp | +27.5 | +1.72 | 1.57 | Useful for damage dealers, especially Soul, Lily, and Zero; less useful on support/tank turns that do not deal damage. |
 | Eternal Sun | lily, logan, soul, zero | +0.58 pp | +19.2 | +1.20 | 0.35 | Smaller average lift, with limited Ultimate activations. More of a burst option than a consistent value Rune. |
 | Infinite Space | dawn, lily, logan, soul, zero | +0.75 pp | +15.9 | +1.00 | 0.30 | Modest average, with more value in medium/long fights where the wearer can use an Ultimate while multiple enemies remain. |
@@ -52,16 +52,16 @@ The method preserves the coverage standard: it weights matchup strata and compat
 - **Eternal Sun:** next damaging Ultimate is guaranteed to crit, with +50 percentage points Critical Damage and +10 Energy; two wearer-turn cooldown.
 - **Celestial Star:** Ultimate advances the wearer 100% and grants 30 Energy; two wearer-turn cooldown.
 - **Dark Matter:** one damaging Basic, Skill, or Ultimate ignores 40% of both defenses and deals 20% more Physical, Magical, or True damage; one wearer-turn cooldown.
-- **Clear Skies:** after a Skill, grants a shield equal to 10% of max HP for two turns; while shielded, adds 10 percentage points Reflect; two wearer-turn cooldown after applying the shield.
+- **Clear Skies:** after a Skill, grants a shield equal to 10% of max HP for two turns; while shielded, adds 10 percentage points to Reflect regardless of base Reflect; two wearer-turn cooldown after applying the shield.
 - **Infinite Space:** Ultimate delays each living enemy 100%; each affected enemy is immune to this Rune for its next two turns.
 - **Recycle:** Skill grants one Skill Point and 10 Energy; two wearer-turn cooldown.
 - **Amplify:** Basic Attack deals 50% more damage across its full target pattern; two wearer-turn cooldown.
 - **United:** ally-targeted Skill advances the wearer 50% and grants 20 Energy; two wearer-turn cooldown.
 
 - These average lifts are small because the benchmark has many short fights where the player already wins or loses before a Rune can change the outcome. The per-wearer CSV and chart preserve the uneven matchup results.
-- Clear Skies currently grants its shield, but its +10% Reflect cannot add damage in the current single-set comparison: no current unit has base Reflect. A focused fixture with a Reflect source is needed to value that clause.
+- Clear Skies' +10 percentage-point Reflect is additive, so a wearer with 0% base Reflect has 10% Reflect while the Rune's shield remains. The combat runner applies this to damage received by the shielded wearer; it is already included in the reported HP swing and BAE.
 - Radiant Moon is tested only on Lily and Zero, whose Skills deal damage. Eternal Sun is tested only on damage-Ultimate users. United is tested only on Dawn and Logan, who have ally-targeting Skills. Ineligible combinations are marked N/A by exclusion, not scored as zero.
-- Recycle’s negative Dawn/Logan averages are a diagnostic signal, not proof that the energy/SP refund is inherently harmful. The battle policy may turn the refunded point into an extra Skill at a worse time, and branch divergence adds variance; investigate those action sequences before nerfing it.
+- The battle engine models Skills' effects, including damage, buffs, shields, and taunt. Its action policy currently uses a Skill whenever Skill Points are available, rather than choosing based on tactical value. That makes Recycle's results especially policy-sensitive: it can cause Dawn to Tune instead of Basic Attack or Logan to use Blood Shield before the shield is needed. Treat those wearer results as policy-specific until the simulator includes a tactical Skill-use policy; do not interpret them as proof that either Skill or Recycle is inherently harmful.
 
 ## Artifacts
 

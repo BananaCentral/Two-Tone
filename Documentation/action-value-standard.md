@@ -40,6 +40,8 @@ This is a diagnostic alongside action value. Include all damage sources attribut
 
 Recalculate the 16-HP reference if the game's damage formula or the reference stats change. BAE is an explanation scale; it does not replace the win-rate measure.
 
+For **Clear Skies**, while its Rune shield is active, add 10 percentage points to the wearer's Reflect chance/value: `effective Reflect = base Reflect + 0.10`. This is additive, not a 10% multiplier; a wearer with 0% base Reflect therefore has 10% Reflect while shielded. Resolve the reflected hit as true damage and include its realized HP swing in BAE.
+
 ## Action Value
 
 Action Value (AV) is the change in win probability caused by choosing an action instead of its standard alternative from the same combat state:
@@ -92,6 +94,8 @@ The complete position-aware matrix has 205 ally lineups × 9,330 enemy lineups �
 The coverage pass checks representation, not balance precision. The balance pass supplies win-rate estimates and confidence intervals. Preserve both results so a small average cannot hide a character-, enemy-, formation-, or duration-specific effect.
 
 The executable runner is [`tools/combat-performance.mjs`](../tools/combat-performance.mjs). It pairs baseline and treatment battles on the same seed, writes scenario-level JSON Lines, and creates a summary CSV that equal-weights distinct party/enemy compositions after averaging formations. Its frozen difficulty and length profile definitions above are implemented in that runner. When `--limit-scenarios` is used, the runner allocates the sample evenly across party sizes (1–4), enemy counts (1–5), lengths, and difficulties, then cycles through the legal ally formations and enemy lineups for each stratum. This preserves the main matchup dimensions but does not replace exhaustive identity, composition, and formation coverage; report sampled and total cell counts together.
+
+The simulator resolves Skill damage, buffs, shields, resource costs, and triggered effects. Its current default action policy uses an available Skill without evaluating whether its timing is tactically useful. Resource-dependent results such as Recycle are therefore specific to that policy; show per-character results and do not interpret a negative result as proof the Skill or resource refund is inherently harmful. Use a tactical policy or multiple declared policies before making balance decisions from those cases.
 
 Use the runner presets to avoid rebuilding long command lines: `quick` (default) runs 180 sampled cells × 5 paired seeds; `balanced` runs 360 × 10; `deep` runs 1,000 × 20; `full` runs the complete 17,213,850-cell matrix × 100. With no `--candidate`, the runner evaluates all Runes against the 100-SVP reference. Limited presets are screening passes; use the same preset for every candidate in a comparison. The runner caches the identical no-set Rune control once per wearer, matchup, and seed, and reuses it across that wearer's Rune candidates. Rune branches clone only mutable team data. This changes runtime and memory use, not the matched comparison or sampling weights. Output folders are created automatically, and compact per-cell summaries are the default; `--include-trials` writes individual seed records.
 
