@@ -102,6 +102,7 @@ function makeBaseConfig(library, allies, enemies, difficulty, length, archetypeC
   };
 }
 function candidateSpecs(raw) {
+  if (raw === 'all-rune-ratings') return [...RUNES.map(id => ({ type: 'rune', id })), ...Object.keys(SVP_GAINS).map(id => ({ type: 'stat', id }))];
   if (raw === 'all-runes') return RUNES.map(id => ({ type: 'rune', id }));
   if (raw === 'all-stats') return Object.keys(SVP_GAINS).map(id => ({ type: 'stat', id }));
   if (raw === 'all-weapons') return ['standard', 'premium'].flatMap(type => [1, 2, 3, 4, 5].flatMap(potential => [1, 10, 25, 50].map(level => ({ type: 'weapon', id: type, potential, level }))));
@@ -154,6 +155,9 @@ function makeBranches(base, spec, wearer) {
   if (spec.type === 'weapon') {
     treated.weapon = { type: spec.id, potential: spec.potential, level: spec.level || 1 };
   } else if (spec.type === 'stat') {
+    // Use the same setless four-Rune stat loadout as Rune-effect comparisons.
+    controlled.runes = makeBalancedRunes();
+    treated.runes = makeBalancedRunes();
     const before = statBudget(treatment.archetypes[wearer].stats);
     const stats = treatment.archetypes[wearer].stats;
     if (spec.id === 'attack' && !Number.isFinite(stats.attack)) {
@@ -267,7 +271,7 @@ function makeWinRateSvg(strataRows) {
   return parts.join('\n');
 }
 function parseArgs(args) {
-  const options = { candidates: [], preset: 'quick', runs: 5, seed: 1, output: 'Documentation/combat-simulator/performance-results.jsonl', limitScenarios: 180, maxActions: 2000, compact: true };
+  const options = { candidates: [], preset: 'quick', runs: 5, seed: 1, output: 'Documentation/combat-simulator/performance-results.jsonl', limitScenarios: 180, maxActions: 2000, compact: true, runeRating: false };
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
     if (arg === '--preset') {
@@ -279,7 +283,11 @@ function parseArgs(args) {
       else if (preset === 'full') Object.assign(options, { runs: 100, limitScenarios: 0, compact: true });
       else fail(`Unknown preset ${preset}. Choose quick, balanced, deep, or full.`);
     }
-    else if (arg === '--candidate') options.candidates.push(...candidateSpecs(args[++index]));
+    else if (arg === '--candidate') {
+      const raw = args[++index];
+      options.candidates.push(...candidateSpecs(raw));
+      if (raw === 'all-rune-ratings') options.runeRating = true;
+    }
     else if (arg === '--character') options.character = args[++index];
     else if (arg === '--runs') options.runs = Number(args[++index]);
     else if (arg === '--seed') options.seed = Number(args[++index]);
@@ -291,7 +299,10 @@ function parseArgs(args) {
     else if (arg === '--help' || arg === '-h') options.help = true;
     else fail(`Unknown option: ${arg}`);
   }
-  if (!options.candidates.length && !options.help) options.candidates = candidateSpecs('all-runes');
+  if (!options.candidates.length && !options.help) {
+    options.candidates = candidateSpecs('all-rune-ratings');
+    options.runeRating = true;
+  }
   if (options.character && !CHARACTER_IDS.includes(options.character)) fail(`Unknown character ${options.character}.`);
   assert(Number.isInteger(options.runs) && options.runs > 0, '--runs must be a positive integer.');
   assert(Number.isInteger(options.seed) && options.seed >= 0, '--seed must be a non-negative integer.');
@@ -300,7 +311,7 @@ function parseArgs(args) {
   return options;
 }
 function help() {
-  return `Two-Tone matched combat performance runner\n\nUsage: node tools/combat-performance.mjs [options]\n\nOptions:\n  --preset quick|balanced|deep|full  Select a coverage/run-count preset (default quick)\n  --candidate all-runes|all-stats|all-weapons\n  --candidate rune:<id>|character:<id>|stat:<id>|weapon:standard@P1L1|weapon:premium@P1L50\n  --candidate action:<character>/skill|ultimate\n  --character <id>           Restrict item/stat tests to this eligible wearer\n  --runs <n>                  Matched seeds per matchup\n  --seed <n>                  First reproducible seed (default 1)\n  --limit-scenarios <n>       Scenario cap; use 0 for the full matrix\n  --max-actions <n>           Maximum unit actions in one battle (default 2000)\n  --output <path>             JSONL result path\n  --include-trials            Include per-seed details (larger output)\n\nPresets: quick=180 scenarios × 5 seeds; balanced=360 × 10; deep=1,000 × 20; full=all 17,213,850 × 100. Limited runs balance party size, enemy count, length, and difficulty. The full position-aware matrix uses 205 ordered legal ally teams and 9,330 ordered enemy lineups.`;
+  return `Two-Tone matched combat performance runner\n\nUsage: node tools/combat-performance.mjs [options]\n\nOptions:\n  --preset quick|balanced|deep|full  Select a coverage/run-count preset (default quick)\n  --candidate all-rune-ratings|all-runes|all-stats|all-weapons\n  --candidate rune:<id>|character:<id>|stat:<id>|weapon:standard@P1L1|weapon:premium@P1L50\n  --candidate action:<character>/skill|ultimate\n  --character <id>           Restrict item/stat tests to this eligible wearer\n  --runs <n>                  Matched seeds per matchup\n  --seed <n>                  First reproducible seed (default 1)\n  --limit-scenarios <n>       Scenario cap; use 0 for the full matrix\n  --max-actions <n>           Maximum unit actions in one battle (default 2000)\n  --output <path>             JSONL result path\n  --include-trials            Include per-seed details (larger output)\n\nWithout --candidate, tests all Runes against the average +100 SVP stat reference and writes a rating report. Presets: quick=180 scenarios × 5 seeds; balanced=360 × 10; deep=1,000 × 20; full=all 17,213,850 × 100. Limited runs balance party size, enemy count, length, and difficulty. The full position-aware matrix uses 205 ordered legal ally teams and 9,330 ordered enemy lineups.`;
 }
 function* scenarioSamples(allyLists, enemyTeams, limit) {
   if (!limit) {
@@ -334,6 +345,153 @@ function* scenarioSamples(allyLists, enemyTeams, limit) {
     }
   }
 }
+function seededRandom(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state += 0x6D2B79F5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function quantile(sortedValues, probability) {
+  if (!sortedValues.length) return 0;
+  const position = (sortedValues.length - 1) * probability;
+  const lower = Math.floor(position), upper = Math.ceil(position);
+  if (lower === upper) return sortedValues[lower];
+  const ratio = position - lower;
+  return sortedValues[lower] * (1 - ratio) + sortedValues[upper] * ratio;
+}
+function buildRuneRatingRows(samples, runCount, seed) {
+  const scenarioGroups = new Map();
+  for (const sample of samples) {
+    const key = `${sample.wearer}|${sample.scenarioId}`;
+    if (!scenarioGroups.has(key)) scenarioGroups.set(key, { stats: new Map(), runes: [] });
+    const group = scenarioGroups.get(key);
+    if (sample.candidate.startsWith('stat:')) group.stats.set(sample.candidate.slice(5), sample);
+    else group.runes.push(sample);
+  }
+  const formationGroups = new Map();
+  for (const scenario of scenarioGroups.values()) {
+    if (!scenario.runes.length) continue;
+    assert(scenario.stats.size === Object.keys(SVP_GAINS).length, `Rune rating requires all five 100-SVP stat controls for ${scenario.runes[0].wearer}.`);
+    for (const rune of scenario.runes) {
+      const reference = Array.from({ length: runCount }, (_, index) => average([...scenario.stats.values()].map(stat => stat.winDeltas[index])));
+      const gap = rune.winDeltas.map((value, index) => value - reference[index]);
+      const stratum = [rune.difficulty, rune.length, rune.allyCount, rune.enemyCount, rune.enemyCategory].join('|');
+      const composition = `${rune.partyComposition}|${rune.enemyComposition}`;
+      const key = `${rune.candidate}|${rune.wearer}|${stratum}|${composition}`;
+      if (!formationGroups.has(key)) formationGroups.set(key, {
+        rune: rune.candidate.slice(5), wearer: rune.wearer, stratum, composition,
+        deltas: Array(runCount).fill(0), references: Array(runCount).fill(0), gaps: Array(runCount).fill(0),
+        bae: Array(runCount).fill(0), formations: 0
+      });
+      const aggregate = formationGroups.get(key);
+      aggregate.formations++;
+      for (let index = 0; index < runCount; index++) {
+        aggregate.deltas[index] += rune.winDeltas[index];
+        aggregate.references[index] += reference[index];
+        aggregate.gaps[index] += gap[index];
+        aggregate.bae[index] += rune.baeValues[index];
+      }
+    }
+  }
+  const runes = new Map();
+  for (const group of formationGroups.values()) {
+    for (const field of ['deltas', 'references', 'gaps', 'bae']) group[field] = group[field].map(value => value / group.formations);
+    if (!runes.has(group.rune)) runes.set(group.rune, new Map());
+    const byWearer = runes.get(group.rune);
+    if (!byWearer.has(group.wearer)) byWearer.set(group.wearer, new Map());
+    const strata = byWearer.get(group.wearer);
+    if (!strata.has(group.stratum)) strata.set(group.stratum, []);
+    strata.get(group.stratum).push(group);
+  }
+  function summarizeWearer(strata) {
+    const deltaBySeed = Array(runCount).fill(0), referenceBySeed = Array(runCount).fill(0), gapBySeed = Array(runCount).fill(0), baeBySeed = Array(runCount).fill(0);
+    const positiveStrata = [];
+    for (const compositions of strata.values()) {
+      const delta = Array(runCount).fill(0), reference = Array(runCount).fill(0), gap = Array(runCount).fill(0), bae = Array(runCount).fill(0);
+      for (const composition of compositions) for (let index = 0; index < runCount; index++) {
+        delta[index] += composition.deltas[index]; reference[index] += composition.references[index];
+        gap[index] += composition.gaps[index]; bae[index] += composition.bae[index];
+      }
+      for (let index = 0; index < runCount; index++) {
+        delta[index] /= compositions.length; reference[index] /= compositions.length;
+        gap[index] /= compositions.length; bae[index] /= compositions.length;
+        deltaBySeed[index] += delta[index]; referenceBySeed[index] += reference[index];
+        gapBySeed[index] += gap[index]; baeBySeed[index] += bae[index];
+      }
+      positiveStrata.push(average(delta) > 0 ? 1 : 0);
+    }
+    const count = strata.size;
+    for (let index = 0; index < runCount; index++) {
+      deltaBySeed[index] /= count; referenceBySeed[index] /= count;
+      gapBySeed[index] /= count; baeBySeed[index] /= count;
+    }
+    return { deltaBySeed, referenceBySeed, gapBySeed, baeBySeed, positiveStrataPct: average(positiveStrata) * 100, strataCount: count };
+  }
+  const random = seededRandom(seed), bootstrapRuns = 1000;
+  function bootstrapCI(byWearer, selectedWearer = null) {
+    const wearers = selectedWearer ? [selectedWearer] : [...byWearer.keys()];
+    const estimates = [];
+    for (let iteration = 0; iteration < bootstrapRuns; iteration++) {
+      const sampledSeeds = Array.from({ length: runCount }, () => Math.floor(random() * runCount));
+      const wearerMeans = [];
+      for (const wearer of wearers) {
+        const strata = byWearer.get(wearer), stratumMeans = [];
+        for (const compositions of strata.values()) {
+          let stratumSum = 0;
+          for (let index = 0; index < compositions.length; index++) {
+            const composition = compositions[Math.floor(random() * compositions.length)];
+            stratumSum += average(sampledSeeds.map(seedIndex => composition.gaps[seedIndex]));
+          }
+          stratumMeans.push(stratumSum / compositions.length);
+        }
+        wearerMeans.push(average(stratumMeans));
+      }
+      estimates.push(average(wearerMeans));
+    }
+    estimates.sort((a, b) => a - b);
+    return { lower: quantile(estimates, 0.025), upper: quantile(estimates, 0.975) };
+  }
+  const overallRows = [], wearerRows = [];
+  for (const rune of RUNES) {
+    const byWearer = runes.get(rune);
+    if (!byWearer?.size) continue;
+    const wearerSummaries = [...byWearer].map(([wearer, strata]) => ({ wearer, ...summarizeWearer(strata) }));
+    for (const summary of wearerSummaries) {
+      const ci = bootstrapCI(byWearer, summary.wearer);
+      wearerRows.push({ rune, wearer: summary.wearer, strata: summary.strataCount,
+        runeWinLiftPp: average(summary.deltaBySeed) * 100,
+        mean100SVPReferencePp: average(summary.referenceBySeed) * 100,
+        differenceVsReferencePp: average(summary.gapBySeed) * 100,
+        ci95LowerPp: ci.lower * 100, ci95UpperPp: ci.upper * 100,
+        rating: ci.lower > 0 ? 'Above 100-SVP reference' : ci.upper < 0 ? 'Below 100-SVP reference' : 'Within reference range',
+        positiveWinLiftStrataPct: summary.positiveStrataPct,
+        meanBAE: average(summary.baeBySeed), meanHpSwing: average(summary.baeBySeed) * 16
+      });
+    }
+    const combined = {
+      deltaBySeed: Array.from({ length: runCount }, (_, index) => average(wearerSummaries.map(row => row.deltaBySeed[index]))),
+      referenceBySeed: Array.from({ length: runCount }, (_, index) => average(wearerSummaries.map(row => row.referenceBySeed[index]))),
+      gapBySeed: Array.from({ length: runCount }, (_, index) => average(wearerSummaries.map(row => row.gapBySeed[index]))),
+      baeBySeed: Array.from({ length: runCount }, (_, index) => average(wearerSummaries.map(row => row.baeBySeed[index]))),
+      positiveStrataPct: average(wearerSummaries.map(row => row.positiveStrataPct))
+    };
+    const ci = bootstrapCI(byWearer);
+    overallRows.push({ rune, eligibleWearers: [...byWearer.keys()].join(';'), wearerCount: byWearer.size,
+      runeWinLiftPp: average(combined.deltaBySeed) * 100,
+      mean100SVPReferencePp: average(combined.referenceBySeed) * 100,
+      differenceVsReferencePp: average(combined.gapBySeed) * 100,
+      ci95LowerPp: ci.lower * 100, ci95UpperPp: ci.upper * 100,
+      rating: ci.lower > 0 ? 'Above 100-SVP reference' : ci.upper < 0 ? 'Below 100-SVP reference' : 'Within reference range',
+      positiveWinLiftStrataPct: combined.positiveStrataPct,
+      meanBAE: average(combined.baeBySeed), meanHpSwing: average(combined.baeBySeed) * 16
+    });
+  }
+  return { overallRows, wearerRows };
+}
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) { console.log(help()); return; }
@@ -342,6 +500,7 @@ async function main() {
   const out = fs.createWriteStream(options.output, { flags: 'w' });
   let scenarios = 0, comparisons = 0;
   const accumulated = new Map();
+  const ratingSamples = [];
   const allyTeams = orderedUniqueTeams(CHARACTER_IDS, 1, 4);
   const enemyTeams = [...enemyLineups(ENEMY_IDS, 5)];
   const allAllyLists = [...allyTeams];
@@ -354,24 +513,30 @@ async function main() {
   for (const { party, enemies, length, difficulty } of scenarioSamples(allyLists, enemyTeams, options.limitScenarios)) {
       scenarios++;
       const base = makeBaseConfig(library, party, enemies, difficulty, length, scaledArchetypes);
-      const runeControlConfigs = new Map(), runeControlResults = new Map();
+      const neutralControlConfigs = new Map(), neutralControlResults = new Map();
       for (const spec of options.candidates) {
         const wearers = wearersFor(spec, party).filter(wearer => !options.character || wearer === options.character);
         for (const wearer of wearers) {
           let controlConfig, treatmentConfig, treatmentStatBudget = null;
           if (spec.type === 'rune') {
-            controlConfig = runeControlConfigs.get(wearer);
+            controlConfig = neutralControlConfigs.get(wearer);
             if (!controlConfig) {
               controlConfig = makeRuneBranch(base, wearer, null);
-              runeControlConfigs.set(wearer, controlConfig);
+              neutralControlConfigs.set(wearer, controlConfig);
             }
             treatmentConfig = makeRuneBranch(base, wearer, spec.id);
+          } else if (spec.type === 'stat') {
+            const branches = makeBranches(base, spec, wearer);
+            controlConfig = neutralControlConfigs.get(wearer) || branches.control;
+            neutralControlConfigs.set(wearer, controlConfig);
+            treatmentConfig = branches.treatment;
+            treatmentStatBudget = branches.treatmentStatBudget;
           } else {
             ({ control: controlConfig, treatment: treatmentConfig, treatmentStatBudget } = makeBranches(base, spec, wearer));
           }
           const trials = [];
-          let controlRuns = runeControlResults.get(wearer);
-          const shouldCacheControl = spec.type === 'rune' && !controlRuns;
+          let controlRuns = neutralControlResults.get(wearer);
+          const shouldCacheControl = (spec.type === 'rune' || spec.type === 'stat') && !controlRuns;
           if (shouldCacheControl) controlRuns = [];
           for (let run = 0; run < options.runs; run++) {
             const seed = options.seed + run;
@@ -380,7 +545,7 @@ async function main() {
             const treatmentResult = simulateBattle(treatmentConfig, seed, options.maxActions);
             trials.push(battleMetrics(controlResult, treatmentResult, seed));
           }
-          if (shouldCacheControl) runeControlResults.set(wearer, controlRuns);
+          if (shouldCacheControl) neutralControlResults.set(wearer, controlRuns);
           const winsControl = trials.reduce((sum, trial) => sum + trial.controlWin, 0);
           const winsTreatment = trials.reduce((sum, trial) => sum + trial.treatmentWin, 0);
           const summary = {
@@ -410,6 +575,13 @@ async function main() {
           if (options.compact) delete summary.trials;
           out.write(JSON.stringify(summary) + '\n');
           comparisons++;
+          if (options.runeRating && (spec.type === 'rune' || spec.type === 'stat')) ratingSamples.push({
+            candidate: `${spec.type}:${spec.id}`, wearer, scenarioId: scenarios,
+            difficulty, length, partyComposition: party.slice().sort().join('+'),
+            enemyComposition: enemies.slice().sort().join('+'), allyCount: party.length,
+            enemyCount: enemies.length, enemyCategory: summary.enemyCategories.join('+'),
+            winDeltas: trials.map(trial => trial.winDelta), baeValues: trials.map(trial => trial.bae)
+          });
           const partyComposition = party.slice().sort().join('+');
           const enemyComposition = enemies.slice().sort().join('+');
           const key = `${summary.candidate}|${wearer}|${difficulty}|${length}|${partyComposition}|${enemyComposition}`;
@@ -438,6 +610,18 @@ async function main() {
   ].join('\n') + '\n');
   const chartFile = options.output.replace(/\.jsonl$/i, '') + '-winrate.svg';
   fs.writeFileSync(chartFile, makeWinRateSvg(rows));
+  if (options.runeRating) {
+    const { overallRows, wearerRows } = buildRuneRatingRows(ratingSamples, options.runs, options.seed + 42017);
+    const ratingFile = options.output.replace(/\.jsonl$/i, '') + '-rune-rating.csv';
+    const wearerRatingFile = options.output.replace(/\.jsonl$/i, '') + '-rune-rating-by-wearer.csv';
+    const columns = Object.keys(overallRows[0] || {});
+    fs.writeFileSync(ratingFile, [columns.join(','), ...overallRows.map(row => columns.map(column => csvEscape(row[column])).join(','))].join('\n') + '\n');
+    const wearerColumns = Object.keys(wearerRows[0] || {});
+    fs.writeFileSync(wearerRatingFile, [wearerColumns.join(','), ...wearerRows.map(row => wearerColumns.map(column => csvEscape(row[column])).join(','))].join('\n') + '\n');
+    console.log(`Rune ratings (compared with average +100-SVP controls): ${ratingFile}`);
+    console.log(`Rune ratings by wearer: ${wearerRatingFile}`);
+    for (const row of overallRows) console.log(`  ${row.rune}: ${row.rating} (${row.differenceVsReferencePp >= 0 ? '+' : ''}${row.differenceVsReferencePp.toFixed(2)} pp; 95% CI ${row.ci95LowerPp.toFixed(2)} to ${row.ci95UpperPp.toFixed(2)} pp).`);
+  }
   console.log(`Completed ${scenarios.toLocaleString()} scenario cells and ${comparisons.toLocaleString()} candidate/wearer comparisons.`);
   console.log(`Detailed pairs: ${options.output}`);
   console.log(`Stratified averages: ${summaryFile}`);

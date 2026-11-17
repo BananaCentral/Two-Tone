@@ -22,7 +22,29 @@ Win-rate change is shown in percentage points relative to the same character, pa
 | Recycle | dawn, lily, logan, soul, zero | +0.44 pp | +19.5 | +1.22 | 1.62 | Highly character-dependent: strongest on Soul in this model, while the Dawn/Logan results are weak or negative and need action-policy review. |
 | United | dawn, logan | +2.16 pp | +27.2 | +1.70 | 1.49 | Strong average utility for its two eligible users, Dawn and Logan; particularly noticeable when short fights reward the extra action sooner. |
 
+## Rating relative to +100 SVP stat controls
+
+The rating compares each Rune's win-rate lift with the average lift from five +100 SVP stat controls, using the same setless four-Rune stat loadout, wearer, matchup, and paired seeds. The tier is based on a stratified paired-bootstrap 95% interval for that difference. “Below reference” means a lower win-rate lift than the average +100 SVP stat control; it does not automatically mean the Rune is undertuned. BAE is shown as an explanation of HP impact and does not affect the rating.
+
+| Rune | Rune win lift | Mean +100 SVP lift | Difference vs reference (95% CI) | Rating |
+|---|---:|---:|---:|---|
+| Radiant Moon | +1.43 pp | +3.35 pp | −1.91 pp (−2.20 to −1.59) | Below reference |
+| Eternal Sun | +0.58 pp | +2.85 pp | −2.26 pp (−2.47 to −2.09) | Below reference |
+| Celestial Star | +0.66 pp | +2.80 pp | −2.14 pp (−2.34 to −1.95) | Below reference |
+| Dark Matter | +0.96 pp | +2.80 pp | −1.84 pp (−2.00 to −1.66) | Below reference |
+| Clear Skies | +1.97 pp | +2.80 pp | −0.83 pp (−1.08 to −0.59) | Below reference overall |
+| Infinite Space | +0.75 pp | +2.80 pp | −2.05 pp (−2.23 to −1.90) | Below reference |
+| Recycle | +0.44 pp | +2.80 pp | −2.36 pp (−2.60 to −2.11) | Below reference |
+| Amplify | +0.92 pp | +2.80 pp | −1.88 pp (−2.05 to −1.73) | Below reference |
+| United | +2.16 pp | +2.09 pp | +0.07 pp (−0.32 to +0.41) | Within reference range |
+
+Clear Skies is above the stat reference for Dawn in this sample. Its overall Rune tier is lower because compatible wearers are weighted equally and its other wearer results are smaller.
+
 ## How to read the results
+
+- **BAE:** 1 BAE represents 16 HP of favorable swing. Average BAE averages each matchup's `(extra enemy HP removed + extra ally HP retained) ÷ 16` across the sampled strata and eligible wearers. The prior Clear Skies result of +2.49 BAE therefore means about +39.8 HP of favorable swing per sampled matchup, including damage and prevented HP loss; it is not 39.8 damage dealt.
+- Win-rate lift is the primary performance measure. BAE and HP swing explain the effect's combat contribution; neither is added to the Rune rating.
+- The sample contains 360 of 17,213,850 scenario cells, with 10 paired seeds per cell. It covers party sizes 1–4, enemy counts 1–5, all lengths, and all difficulties, but does not exhaust roster identities or ordered formations.
 
 ## Rules simulated
 
@@ -36,7 +58,6 @@ Win-rate change is shown in percentage points relative to the same character, pa
 - **Amplify:** Basic Attack deals 50% more damage across its full target pattern; two wearer-turn cooldown.
 - **United:** ally-targeted Skill advances the wearer 50% and grants 20 Energy; two wearer-turn cooldown.
 
-- Win-rate lift is the primary balance signal. BAE and HP swing explain the effect’s combat contribution; neither is added to win rate.
 - These average lifts are small because the benchmark has many short fights where the player already wins or loses before a Rune can change the outcome. The per-wearer CSV and chart preserve the uneven matchup results.
 - Clear Skies currently grants its shield, but its +10% Reflect cannot add damage in the current single-set comparison: no current unit has base Reflect. A focused fixture with a Reflect source is needed to value that clause.
 - Radiant Moon is tested only on Lily and Zero, whose Skills deal damage. Eternal Sun is tested only on damage-Ultimate users. United is tested only on Dawn and Logan, who have ally-targeting Skills. Ineligible combinations are marked N/A by exclusion, not scored as zero.
@@ -49,9 +70,12 @@ Win-rate change is shown in percentage points relative to the same character, pa
 - [`paired-performance.jsonl`](paired-performance.jsonl): Compact per-cell paired estimates and confidence intervals.
 - [`rune-summary.csv`](rune-summary.csv): Overall Rune estimates, weighting each eligible wearer equally.
 - [`rune-summary-by-wearer.csv`](rune-summary-by-wearer.csv): Per-character estimates and activation diagnostics.
+- [`calibrated-rune-ratings-rune-rating.csv`](calibrated-rune-ratings-rune-rating.csv): Overall reference-based Rune tiers.
+- [`calibrated-rune-ratings-rune-rating-by-wearer.csv`](calibrated-rune-ratings-rune-rating-by-wearer.csv): The same comparison for each compatible character.
+- [`calibrated-rune-ratings-winrate.svg`](calibrated-rune-ratings-winrate.svg): Win rates for Runes and +100 SVP stat controls.
 
 ## Reproduction
 
 ```sh
-node tools/combat-performance.mjs --candidate all-runes --limit-scenarios 360 --runs 10 --seed 71017 --compact --output Documentation/rune-balance-current/paired-performance.jsonl
+node tools/combat-performance.mjs --candidate all-rune-ratings --preset balanced --seed 71017 --output Documentation/rune-balance-current/calibrated-rune-ratings.jsonl
 ```
