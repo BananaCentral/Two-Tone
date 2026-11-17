@@ -70,20 +70,24 @@ function makeBalancedRunes(setId = null) {
     ...(setId ? { setId } : {})
   }));
 }
-function makeBaseConfig(library, allies, enemies, difficulty, length) {
-  const archetypes = itemlessLibrary(library);
-  const enemyCount = enemies.length;
-  const hpMultiplier = length === 'short' ? 0.65 : length === 'medium' ? 3 : 8;
-  const bossHpMultiplier = length === 'medium' ? 5 : hpMultiplier;
-  const pressure = difficulty === 'easy' ? 0.75 : difficulty === 'hard' ? 1.25 : 1;
-  for (const id of ENEMY_IDS) {
-    const archetype = archetypes[id];
-    const isBoss = archetype.tags?.type === 'boss';
-    const hpScale = (isBoss ? bossHpMultiplier : hpMultiplier) * pressure;
-    archetype.stats.hp *= hpScale;
-    for (const stat of ['attack', 'physicalAttack', 'magicalAttack']) if (Number.isFinite(archetype.stats[stat])) archetype.stats[stat] *= pressure;
-    archetype.stats.physicalDefense *= pressure;
-    archetype.stats.magicalDefense *= pressure;
+function makeBaseConfig(library, allies, enemies, difficulty, length, archetypeCache = null) {
+  const profileKey = `${difficulty}|${length}`;
+  let archetypes = archetypeCache?.get(profileKey);
+  if (!archetypes) {
+    archetypes = itemlessLibrary(library);
+    const hpMultiplier = length === 'short' ? 0.65 : length === 'medium' ? 3 : 8;
+    const bossHpMultiplier = length === 'medium' ? 5 : hpMultiplier;
+    const pressure = difficulty === 'easy' ? 0.75 : difficulty === 'hard' ? 1.25 : 1;
+    for (const id of ENEMY_IDS) {
+      const archetype = archetypes[id];
+      const isBoss = archetype.tags?.type === 'boss';
+      const hpScale = (isBoss ? bossHpMultiplier : hpMultiplier) * pressure;
+      archetype.stats.hp *= hpScale;
+      for (const stat of ['attack', 'physicalAttack', 'magicalAttack']) if (Number.isFinite(archetype.stats[stat])) archetype.stats[stat] *= pressure;
+      archetype.stats.physicalDefense *= pressure;
+      archetype.stats.magicalDefense *= pressure;
+    }
+    archetypeCache?.set(profileKey, archetypes);
   }
   // Every enemy composition is scaled to its frozen length profile, not to the candidate's performance.
   return {
@@ -124,6 +128,22 @@ function wearersFor(spec, party) {
   return party.slice();
 }
 function findUnit(config, archetype) { return config.teams.allies.find(unit => unit.archetype === archetype); }
+function makeRuneBranch(base, wearer, setId) {
+  // Rune candidates only change one ally's Rune slots. Keep immutable archetypes shared
+  // and clone the small team/settings structures instead of deep-cloning the library.
+  const branch = {
+    ...base,
+    settings: { ...base.settings },
+    teams: {
+      allies: base.teams.allies.map(unit => ({ ...unit })),
+      enemies: base.teams.enemies.map(unit => ({ ...unit }))
+    }
+  };
+  const wearerUnit = findUnit(branch, wearer);
+  assert(wearerUnit, `Wearer ${wearer} is absent from matchup.`);
+  wearerUnit.runes = makeBalancedRunes(setId);
+  return branch;
+}
 function makeBranches(base, spec, wearer) {
   const control = structuredClone(base);
   const treatment = structuredClone(base);
@@ -131,11 +151,7 @@ function makeBranches(base, spec, wearer) {
   const treated = findUnit(treatment, wearer);
   assert(controlled && treated, `Wearer ${wearer} is absent from matchup.`);
   let treatmentStatBudget = null;
-  if (spec.type === 'rune') {
-    controlled.runes = makeBalancedRunes();
-    treated.runes = makeBalancedRunes(spec.id);
-    // The set effect is the only difference; the full four-Rune stat bundle is identical.
-  } else if (spec.type === 'weapon') {
+  if (spec.type === 'weapon') {
     treated.weapon = { type: spec.id, potential: spec.potential, level: spec.level || 1 };
   } else if (spec.type === 'stat') {
     const before = statBudget(treatment.archetypes[wearer].stats);
@@ -251,10 +267,19 @@ function makeWinRateSvg(strataRows) {
   return parts.join('\n');
 }
 function parseArgs(args) {
-  const options = { candidates: [], runs: 100, seed: 1, output: 'Documentation/combat-simulator/performance-results.jsonl', limitScenarios: 1000, maxActions: 2000, compact: false };
+  const options = { candidates: [], preset: 'quick', runs: 5, seed: 1, output: 'Documentation/combat-simulator/performance-results.jsonl', limitScenarios: 180, maxActions: 2000, compact: true };
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
-    if (arg === '--candidate') options.candidates.push(...candidateSpecs(args[++index]));
+    if (arg === '--preset') {
+      const preset = args[++index];
+      options.preset = preset;
+      if (preset === 'quick') Object.assign(options, { runs: 5, limitScenarios: 180, compact: true });
+      else if (preset === 'balanced') Object.assign(options, { runs: 10, limitScenarios: 360, compact: true });
+      else if (preset === 'deep') Object.assign(options, { runs: 20, limitScenarios: 1000, compact: true });
+      else if (preset === 'full') Object.assign(options, { runs: 100, limitScenarios: 0, compact: true });
+      else fail(`Unknown preset ${preset}. Choose quick, balanced, deep, or full.`);
+    }
+    else if (arg === '--candidate') options.candidates.push(...candidateSpecs(args[++index]));
     else if (arg === '--character') options.character = args[++index];
     else if (arg === '--runs') options.runs = Number(args[++index]);
     else if (arg === '--seed') options.seed = Number(args[++index]);
@@ -262,6 +287,7 @@ function parseArgs(args) {
     else if (arg === '--max-actions') options.maxActions = Number(args[++index]);
     else if (arg === '--output') options.output = path.resolve(args[++index]);
     else if (arg === '--compact') options.compact = true;
+    else if (arg === '--include-trials') options.compact = false;
     else if (arg === '--help' || arg === '-h') options.help = true;
     else fail(`Unknown option: ${arg}`);
   }
@@ -274,7 +300,7 @@ function parseArgs(args) {
   return options;
 }
 function help() {
-  return `Two-Tone matched combat performance runner\n\nUsage: node tools/combat-performance.mjs [options]\n\nOptions:\n  --candidate all-runes|all-stats|all-weapons\n  --candidate rune:<id>|character:<id>|stat:<id>|weapon:standard@P1L1|weapon:premium@P1L50\n  --candidate action:<character>/skill|ultimate\n  --character <id>           Restrict item/stat tests to this eligible wearer\n  --runs <n>                  Matched seeds per matchup (default 100)\n  --seed <n>                  First reproducible seed (default 1)\n  --limit-scenarios <n>       Scenario cap (default 1000); use 0 for the full matrix\n  --max-actions <n>           Maximum unit actions in one battle (default 2000)\n  --output <path>             JSONL result path\n  --compact                   Omit seed-level details; keep paired averages and confidence intervals\n\nThe full position-aware matrix has 205 ordered legal ally teams, 9,330 ordered enemy lineups, three lengths and three difficulties (17,213,850 scenario cells). Full Monte Carlo is intentionally a large offline job.`;
+  return `Two-Tone matched combat performance runner\n\nUsage: node tools/combat-performance.mjs [options]\n\nOptions:\n  --preset quick|balanced|deep|full  Select a coverage/run-count preset (default quick)\n  --candidate all-runes|all-stats|all-weapons\n  --candidate rune:<id>|character:<id>|stat:<id>|weapon:standard@P1L1|weapon:premium@P1L50\n  --candidate action:<character>/skill|ultimate\n  --character <id>           Restrict item/stat tests to this eligible wearer\n  --runs <n>                  Matched seeds per matchup\n  --seed <n>                  First reproducible seed (default 1)\n  --limit-scenarios <n>       Scenario cap; use 0 for the full matrix\n  --max-actions <n>           Maximum unit actions in one battle (default 2000)\n  --output <path>             JSONL result path\n  --include-trials            Include per-seed details (larger output)\n\nPresets: quick=180 scenarios × 5 seeds; balanced=360 × 10; deep=1,000 × 20; full=all 17,213,850 × 100. Limited runs balance party size, enemy count, length, and difficulty. The full position-aware matrix uses 205 ordered legal ally teams and 9,330 ordered enemy lineups.`;
 }
 function* scenarioSamples(allyLists, enemyTeams, limit) {
   if (!limit) {
@@ -312,6 +338,7 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) { console.log(help()); return; }
   const library = archetypeLibrary();
+  fs.mkdirSync(path.dirname(options.output), { recursive: true });
   const out = fs.createWriteStream(options.output, { flags: 'w' });
   let scenarios = 0, comparisons = 0;
   const accumulated = new Map();
@@ -319,23 +346,41 @@ async function main() {
   const enemyTeams = [...enemyLineups(ENEMY_IDS, 5)];
   const allAllyLists = [...allyTeams];
   const allyLists = options.character ? allAllyLists.filter(party => party.includes(options.character)) : allAllyLists;
+  const scaledArchetypes = new Map();
   const matrixCount = allyLists.length * enemyTeams.length * LENGTHS.length * DIFFICULTIES.length;
   console.log(`Full matrix: ${matrixCount.toLocaleString()} scenarios; ${options.runs} matched runs per candidate/wearer.`);
-  const selectedScenarioCount = options.limitScenarios ? Math.min(options.limitScenarios, matrixCount) : matrixCount;
+  const targetScenarios = options.limitScenarios ? Math.min(options.limitScenarios, matrixCount) : matrixCount;
+  const progressEvery = Math.max(1, Math.ceil(targetScenarios / 20));
   for (const { party, enemies, length, difficulty } of scenarioSamples(allyLists, enemyTeams, options.limitScenarios)) {
       scenarios++;
-      const base = makeBaseConfig(library, party, enemies, difficulty, length);
+      const base = makeBaseConfig(library, party, enemies, difficulty, length, scaledArchetypes);
+      const runeControlConfigs = new Map(), runeControlResults = new Map();
       for (const spec of options.candidates) {
         const wearers = wearersFor(spec, party).filter(wearer => !options.character || wearer === options.character);
         for (const wearer of wearers) {
-          const { control: controlConfig, treatment: treatmentConfig, treatmentStatBudget } = makeBranches(base, spec, wearer);
+          let controlConfig, treatmentConfig, treatmentStatBudget = null;
+          if (spec.type === 'rune') {
+            controlConfig = runeControlConfigs.get(wearer);
+            if (!controlConfig) {
+              controlConfig = makeRuneBranch(base, wearer, null);
+              runeControlConfigs.set(wearer, controlConfig);
+            }
+            treatmentConfig = makeRuneBranch(base, wearer, spec.id);
+          } else {
+            ({ control: controlConfig, treatment: treatmentConfig, treatmentStatBudget } = makeBranches(base, spec, wearer));
+          }
           const trials = [];
+          let controlRuns = runeControlResults.get(wearer);
+          const shouldCacheControl = spec.type === 'rune' && !controlRuns;
+          if (shouldCacheControl) controlRuns = [];
           for (let run = 0; run < options.runs; run++) {
             const seed = options.seed + run;
-            const controlResult = simulateBattle(controlConfig, seed, options.maxActions);
+            const controlResult = controlRuns?.[run] || simulateBattle(controlConfig, seed, options.maxActions);
+            if (shouldCacheControl) controlRuns.push(controlResult);
             const treatmentResult = simulateBattle(treatmentConfig, seed, options.maxActions);
             trials.push(battleMetrics(controlResult, treatmentResult, seed));
           }
+          if (shouldCacheControl) runeControlResults.set(wearer, controlRuns);
           const winsControl = trials.reduce((sum, trial) => sum + trial.controlWin, 0);
           const winsTreatment = trials.reduce((sum, trial) => sum + trial.treatmentWin, 0);
           const summary = {
@@ -372,6 +417,8 @@ async function main() {
           const aggregate = accumulated.get(key); aggregate.formations++; aggregate.controlWin += summary.winRate.control / 100; aggregate.treatmentWin += summary.winRate.treatment / 100; aggregate.controlDraw += summary.winRate.controlDrawRatePct / 100; aggregate.treatmentDraw += summary.winRate.treatmentDrawRatePct / 100; aggregate.winDelta += summary.winRate.differencePercentagePoints; aggregate.hpSwing += summary.hpSwing.mean; aggregate.bae += summary.bae.mean;
         }
       }
+      if (scenarios % progressEvery === 0 || scenarios === targetScenarios)
+        console.log(`Progress: ${scenarios.toLocaleString()}/${targetScenarios.toLocaleString()} scenario cells; ${comparisons.toLocaleString()} candidate/wearer comparisons.`);
   }
   await new Promise((resolve, reject) => out.end(error => error ? reject(error) : resolve()));
   const summaryFile = options.output.replace(/\.jsonl$/i, '') + '-summary.csv';
