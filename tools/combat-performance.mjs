@@ -441,19 +441,38 @@ function buildRuneRatingRows(samples, runCount, seed) {
       for (const wearer of wearers) {
         const strata = byWearer.get(wearer), stratumMeans = [];
         for (const compositions of strata.values()) {
-          let stratumSum = 0;
+          let stratumRune = 0, stratumReference = 0, stratumGap = 0;
           for (let index = 0; index < compositions.length; index++) {
             const composition = compositions[Math.floor(random() * compositions.length)];
-            stratumSum += average(sampledSeeds.map(seedIndex => composition.gaps[seedIndex]));
+            stratumRune += average(sampledSeeds.map(seedIndex => composition.deltas[seedIndex]));
+            stratumReference += average(sampledSeeds.map(seedIndex => composition.references[seedIndex]));
+            stratumGap += average(sampledSeeds.map(seedIndex => composition.gaps[seedIndex]));
           }
-          stratumMeans.push(stratumSum / compositions.length);
+          stratumMeans.push({
+            rune: stratumRune / compositions.length,
+            reference: stratumReference / compositions.length,
+            gap: stratumGap / compositions.length
+          });
         }
-        wearerMeans.push(average(stratumMeans));
+        wearerMeans.push({
+          rune: average(stratumMeans.map(value => value.rune)),
+          reference: average(stratumMeans.map(value => value.reference)),
+          gap: average(stratumMeans.map(value => value.gap))
+        });
       }
-      estimates.push(average(wearerMeans));
+      const rune = average(wearerMeans.map(value => value.rune));
+      const reference = average(wearerMeans.map(value => value.reference));
+      estimates.push({
+        gap: average(wearerMeans.map(value => value.gap)),
+        score: reference > 0 ? Math.max(0, Math.min(100, 100 * rune / reference)) : 0
+      });
     }
-    estimates.sort((a, b) => a - b);
-    return { lower: quantile(estimates, 0.025), upper: quantile(estimates, 0.975) };
+    const gaps = estimates.map(value => value.gap).sort((a, b) => a - b);
+    const scores = estimates.map(value => value.score).sort((a, b) => a - b);
+    return {
+      lower: quantile(gaps, 0.025), upper: quantile(gaps, 0.975),
+      scoreLower: quantile(scores, 0.025), scoreUpper: quantile(scores, 0.975)
+    };
   }
   const overallRows = [], wearerRows = [];
   for (const rune of RUNES) {
@@ -465,6 +484,8 @@ function buildRuneRatingRows(samples, runCount, seed) {
       wearerRows.push({ rune, wearer: summary.wearer, strata: summary.strataCount,
         runeWinLiftPp: average(summary.deltaBySeed) * 100,
         mean100SVPReferencePp: average(summary.referenceBySeed) * 100,
+        score0to100: average(summary.referenceBySeed) > 0 ? Math.max(0, Math.min(100, 100 * average(summary.deltaBySeed) / average(summary.referenceBySeed))) : 0,
+        score95Lower: ci.scoreLower, score95Upper: ci.scoreUpper,
         differenceVsReferencePp: average(summary.gapBySeed) * 100,
         ci95LowerPp: ci.lower * 100, ci95UpperPp: ci.upper * 100,
         rating: ci.lower > 0 ? 'Above 100-SVP reference' : ci.upper < 0 ? 'Below 100-SVP reference' : 'Within reference range',
@@ -483,6 +504,8 @@ function buildRuneRatingRows(samples, runCount, seed) {
     overallRows.push({ rune, eligibleWearers: [...byWearer.keys()].join(';'), wearerCount: byWearer.size,
       runeWinLiftPp: average(combined.deltaBySeed) * 100,
       mean100SVPReferencePp: average(combined.referenceBySeed) * 100,
+      score0to100: average(combined.referenceBySeed) > 0 ? Math.max(0, Math.min(100, 100 * average(combined.deltaBySeed) / average(combined.referenceBySeed))) : 0,
+      score95Lower: ci.scoreLower, score95Upper: ci.scoreUpper,
       differenceVsReferencePp: average(combined.gapBySeed) * 100,
       ci95LowerPp: ci.lower * 100, ci95UpperPp: ci.upper * 100,
       rating: ci.lower > 0 ? 'Above 100-SVP reference' : ci.upper < 0 ? 'Below 100-SVP reference' : 'Within reference range',
@@ -620,7 +643,7 @@ async function main() {
     fs.writeFileSync(wearerRatingFile, [wearerColumns.join(','), ...wearerRows.map(row => wearerColumns.map(column => csvEscape(row[column])).join(','))].join('\n') + '\n');
     console.log(`Rune ratings (compared with average +100-SVP controls): ${ratingFile}`);
     console.log(`Rune ratings by wearer: ${wearerRatingFile}`);
-    for (const row of overallRows) console.log(`  ${row.rune}: ${row.rating} (${row.differenceVsReferencePp >= 0 ? '+' : ''}${row.differenceVsReferencePp.toFixed(2)} pp; 95% CI ${row.ci95LowerPp.toFixed(2)} to ${row.ci95UpperPp.toFixed(2)} pp).`);
+    for (const row of overallRows) console.log(`  ${row.rune}: ${row.score0to100.toFixed(0)}/100 (95% CI ${row.score95Lower.toFixed(0)} to ${row.score95Upper.toFixed(0)}); ${row.rating} (${row.differenceVsReferencePp >= 0 ? '+' : ''}${row.differenceVsReferencePp.toFixed(2)} pp vs reference).`);
   }
   console.log(`Completed ${scenarios.toLocaleString()} scenario cells and ${comparisons.toLocaleString()} candidate/wearer comparisons.`);
   console.log(`Detailed pairs: ${options.output}`);

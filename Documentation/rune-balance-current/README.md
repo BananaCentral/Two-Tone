@@ -24,19 +24,19 @@ Win-rate change is shown in percentage points relative to the same character, pa
 
 ## Rating relative to +100 SVP stat controls
 
-The rating compares each Rune's win-rate lift with the average lift from five +100 SVP stat controls, using the same setless four-Rune stat loadout, wearer, matchup, and paired seeds. The tier is based on a stratified paired-bootstrap 95% interval for that difference. “Below reference” means a lower win-rate lift than the average +100 SVP stat control; it does not automatically mean the Rune is undertuned. BAE is shown as an explanation of HP impact and does not affect the rating.
+The 0–100 score compares each Rune's win-rate lift with the average lift from five +100 SVP stat controls, using the same setless four-Rune stat loadout, wearer, matchup, and paired seeds. **0** means no positive win-rate lift in this benchmark. **100** means the Rune matches or exceeds the average stat-control lift; scores are capped at 100. This is a comparative benchmark score, not a universal grade or an automatic balance verdict. The interval is a stratified paired-bootstrap 95% range. BAE explains HP impact and does not enter the score.
 
-| Rune | Rune win lift | Mean +100 SVP lift | Difference vs reference (95% CI) | Rating |
+| Rune | Score (95% range) | Rune win lift | Mean +100 SVP lift | Rating vs reference |
 |---|---:|---:|---:|---|
-| Radiant Moon | +1.43 pp | +3.35 pp | −1.91 pp (−2.20 to −1.59) | Below reference |
-| Eternal Sun | +0.58 pp | +2.85 pp | −2.26 pp (−2.47 to −2.09) | Below reference |
-| Celestial Star | +0.66 pp | +2.80 pp | −2.14 pp (−2.34 to −1.95) | Below reference |
-| Dark Matter | +0.96 pp | +2.80 pp | −1.84 pp (−2.00 to −1.66) | Below reference |
-| Clear Skies | +1.97 pp | +2.80 pp | −0.83 pp (−1.08 to −0.59) | Below reference overall |
-| Infinite Space | +0.75 pp | +2.80 pp | −2.05 pp (−2.23 to −1.90) | Below reference |
-| Recycle | +0.44 pp | +2.80 pp | −2.36 pp (−2.60 to −2.11) | Below reference |
-| Amplify | +0.92 pp | +2.80 pp | −1.88 pp (−2.05 to −1.73) | Below reference |
-| United | +2.16 pp | +2.09 pp | +0.07 pp (−0.32 to +0.41) | Within reference range |
+| Radiant Moon | **43** (35–51) | +1.43 pp | +3.35 pp | Below |
+| Eternal Sun | **20** (15–26) | +0.58 pp | +2.85 pp | Below |
+| Celestial Star | **23** (19–28) | +0.66 pp | +2.80 pp | Below |
+| Dark Matter | **34** (28–41) | +0.96 pp | +2.80 pp | Below |
+| Clear Skies | **70** (62–79) | +1.97 pp | +2.80 pp | Below overall |
+| Infinite Space | **27** (23–31) | +0.75 pp | +2.80 pp | Below |
+| Recycle | **16** (8–23) | +0.44 pp | +2.80 pp | Below |
+| Amplify | **33** (28–38) | +0.92 pp | +2.80 pp | Below |
+| United | **100** (84–100) | +2.16 pp | +2.09 pp | Within reference range |
 
 Clear Skies is above the stat reference for Dawn in this sample. Its overall Rune tier is lower because compatible wearers are weighted equally and its other wearer results are smaller.
 
