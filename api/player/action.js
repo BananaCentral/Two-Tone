@@ -3,7 +3,7 @@ import { auth } from "../../lib/auth.js";
 import { CHARACTER_IDS_PUBLIC, withLockedProfile } from "../../lib/player-profile.js";
 
 const RULES={ticketCost:100,mythic:.01,heightenedMythic:.02,rare:.10,featured:.75,characterPity:100,heightenedCharacterPity:50,weaponPity:50,heightenedWeaponPity:25,rarePity:10};
-const ASCENSION_GATES=[10,20,30,40],RUNE_SETS=["radiant-moon","eternal-sun","celestial-star","dark-matter","clear-skies","infinite-space","recycle","amplify","united"],RUNE_STATS=["hp","physicalAttack","magicalAttack","physicalDefense","magicalDefense","speed"];
+const ASCENSION_GATES=[10,20,30,40],RUNE_SETS=["radiant-moon","eternal-sun","celestial-star","dark-matter","clear-skies","infinite-space","recycle","amplify","united"],RUNE_STATS=["hp","attack","physicalDefense","magicalDefense","speed"];
 const itemReward=(id,name,quantity)=>({id,name,inventoryItem:id,quantity});
 const ROTATION_TZ="America/New_York";
 
@@ -213,6 +213,7 @@ export default async function handler(req,res){
     const {id,slot,kind,subIndex,stat}=body;
     if(!CHARACTER_IDS_PUBLIC.includes(id)||!state.ownedCharacters.includes(id)||!Number.isInteger(slot)||slot<0||slot>3||!RUNE_STATS.includes(stat)||!(["main","sub"].includes(kind)))return {ok:false,status:400,error:"invalid_rune_stat"};
     const rune=state.loadouts[id].runes[slot];if(!rune)return {ok:false,status:409,error:"rune_unavailable"};
+    rune.legacyAttackBonus=0;
     if(kind==="main"){
      if(stat===rune.main)return {ok:false,status:409,error:"stat_unchanged"};
      const oldMain=rune.main;rune.main=stat;rune.subs=[oldMain,...rune.subs.filter(value=>value!==stat)].slice(0,3);

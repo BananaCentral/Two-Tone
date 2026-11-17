@@ -1,0 +1,102 @@
+{
+  "description": "Matched-seed isolated Rune comparisons. Character damage includes every recorded damage channel: direct, bleed, follow-up, ricochet, summon, echo, and reflect. Damage is summed per character archetype (including its summon unit).",
+  "repetitions": 150,
+  "seedBase": 612947,
+  "totalRuneConditions": 5832,
+  "totalRuneBattles": 874800,
+  "baselineConditions": 162,
+  "totalBaselineBattles": 24300,
+  "parties": {
+    "balanced": "Soul · Lily · Dawn · Logan",
+    "withZero": "Soul · Zero · Dawn · Logan"
+  },
+  "profiles": [
+    {
+      "id": "common-slime",
+      "category": "Common",
+      "targetCount": "Single"
+    },
+    {
+      "id": "common-wolf",
+      "category": "Common",
+      "targetCount": "Single"
+    },
+    {
+      "id": "common-hawk",
+      "category": "Common",
+      "targetCount": "Single"
+    },
+    {
+      "id": "common-pack",
+      "category": "Common",
+      "targetCount": "Multiple"
+    },
+    {
+      "id": "elite-goblin",
+      "category": "Elite",
+      "targetCount": "Single"
+    },
+    {
+      "id": "elite-geode",
+      "category": "Elite",
+      "targetCount": "Single"
+    },
+    {
+      "id": "elite-pack",
+      "category": "Elite",
+      "targetCount": "Multiple"
+    },
+    {
+      "id": "boss-bear",
+      "category": "Boss",
+      "targetCount": "Single"
+    },
+    {
+      "id": "boss-with-adds",
+      "category": "Boss",
+      "targetCount": "Multiple"
+    }
+  ],
+  "lengths": [
+    {
+      "id": "short",
+      "label": "Short"
+    },
+    {
+      "id": "medium",
+      "label": "Medium"
+    },
+    {
+      "id": "long",
+      "label": "Long"
+    }
+  ],
+  "difficulties": [
+    {
+      "id": "easy",
+      "label": "Easy",
+      "defense": 0.85
+    },
+    {
+      "id": "medium",
+      "label": "Medium",
+      "defense": 1
+    },
+    {
+      "id": "hard",
+      "label": "Hard",
+      "defense": 1.2
+    }
+  ],
+  "runes": [
+    "radiant-moon",
+    "eternal-sun",
+    "celestial-star",
+    "dark-matter",
+    "clear-skies",
+    "infinite-space",
+    "recycle",
+    "amplify",
+    "united"
+  ]
+}

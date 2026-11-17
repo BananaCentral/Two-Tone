@@ -1,0 +1,96 @@
+{
+  "runeTrials": 874800,
+  "baselineTrials": 24300,
+  "isolatedConditions": 5832,
+  "runsPerCondition": 150,
+  "partyLabels": {
+    "balanced": "Soul \u00b7 Lily \u00b7 Dawn \u00b7 Logan",
+    "withZero": "Soul \u00b7 Zero \u00b7 Dawn \u00b7 Logan"
+  },
+  "lengthHPFactorsByCategory": {
+    "Common": {
+      "short": 0.65,
+      "medium": 3,
+      "long": 8
+    },
+    "Elite": {
+      "short": 0.65,
+      "medium": 3,
+      "long": 8
+    },
+    "Boss": {
+      "short": 0.65,
+      "medium": 5,
+      "long": 8
+    }
+  },
+  "difficultyAttackFactorsByCategory": {
+    "Common": {
+      "easy": 5,
+      "medium": 10,
+      "hard": 20
+    },
+    "Elite": {
+      "easy": 1,
+      "medium": 1.5,
+      "hard": 2.5
+    },
+    "Boss": {
+      "easy": 0.2,
+      "medium": 0.3,
+      "hard": 0.46
+    }
+  },
+  "difficultyDefenseFactors": {
+    "easy": 0.85,
+    "medium": 1,
+    "hard": 1.2
+  },
+  "enemyProfiles": [
+    {
+      "id": "common-slime",
+      "category": "Common",
+      "targetCount": "Single"
+    },
+    {
+      "id": "common-wolf",
+      "category": "Common",
+      "targetCount": "Single"
+    },
+    {
+      "id": "common-hawk",
+      "category": "Common",
+      "targetCount": "Single"
+    },
+    {
+      "id": "common-pack",
+      "category": "Common",
+      "targetCount": "Multiple"
+    },
+    {
+      "id": "elite-goblin",
+      "category": "Elite",
+      "targetCount": "Single"
+    },
+    {
+      "id": "elite-geode",
+      "category": "Elite",
+      "targetCount": "Single"
+    },
+    {
+      "id": "elite-pack",
+      "category": "Elite",
+      "targetCount": "Multiple"
+    },
+    {
+      "id": "boss-bear",
+      "category": "Boss",
+      "targetCount": "Single"
+    },
+    {
+      "id": "boss-with-adds",
+      "category": "Boss",
+      "targetCount": "Multiple"
+    }
+  ]
+}

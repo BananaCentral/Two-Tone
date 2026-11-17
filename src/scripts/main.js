@@ -5,15 +5,15 @@ const BATTLE_AREAS=Object.freeze({
 });
 const DEFAULT_BATTLE_AREA_ID='area-1';
 const RUNE_SET_DEFINITIONS=Object.freeze({
- 'radiant-moon':Object.freeze({name:'Radiant Moon',image:'runeRadiantMoon',lines:['CRIT RATE','+10 points']}),
- 'eternal-sun':Object.freeze({name:'Eternal Sun',image:'runeEternalSun',lines:['CRIT DAMAGE','+25 points']}),
- 'celestial-star':Object.freeze({name:'Celestial Star',image:'runeCelestialStar',lines:['ULTIMATE','Advance self 50%']}),
- 'dark-matter':Object.freeze({name:'Dark Matter',image:'runeDarkMatter',lines:['MAGICAL DEFENSE','Ignore 20%']}),
- 'clear-skies':Object.freeze({name:'Clear Skies',image:'runeClearSkies',lines:['PHYSICAL DEFENSE','Ignore 20%']}),
- 'infinite-space':Object.freeze({name:'Infinite Space',image:'runeInfiniteSpace',lines:['ULTIMATE','Delay damaged enemies 25%']}),
- recycle:Object.freeze({name:'Recycle',image:'runeRecycle',lines:['SKILL','Restore 1 Skill Point','2-turn cooldown']}),
+ 'radiant-moon':Object.freeze({name:'Radiant Moon',image:'runeRadiantMoon',lines:['ALL DIRECT HITS','20% Echo']}),
+ 'eternal-sun':Object.freeze({name:'Eternal Sun',image:'runeEternalSun',lines:['CRIT RATE +10','CRIT DAMAGE +25','DODGE +10']}),
+ 'celestial-star':Object.freeze({name:'Celestial Star',image:'runeCelestialStar',lines:['ULTIMATE','Advance self 100%','2-turn cooldown']}),
+ 'dark-matter':Object.freeze({name:'Dark Matter',image:'runeDarkMatter',lines:['ALL DEFENSE','Ignore 20%','DAMAGE +10%']}),
+ 'clear-skies':Object.freeze({name:'Clear Skies',image:'runeClearSkies',lines:['REFLECT 10%','20% while shielded']}),
+ 'infinite-space':Object.freeze({name:'Infinite Space',image:'runeInfiniteSpace',lines:['ULTIMATE','Delay all enemies 50%']}),
+ recycle:Object.freeze({name:'Recycle',image:'runeRecycle',lines:['SKILL','Restore 1 Skill Point','1-turn cooldown']}),
  amplify:Object.freeze({name:'Amplify',image:'runeAmplify',lines:['BASIC ATTACK','+50% damage','2-turn cooldown']}),
- united:Object.freeze({name:'United',image:'runeUnited',lines:['ALLY SKILL / ULTIMATE','Self Speed +25%','for 2 turns']})
+ united:Object.freeze({name:'United',image:'runeUnited',lines:['ALLY-TARGETED SKILL','Advance self 100%','2-turn cooldown']})
 });
 const ANIMATION_STEP_MS=250;
 const CAMERA_TRANSITION_SAME_VIEW_MS=ANIMATION_STEP_MS;
@@ -157,11 +157,11 @@ let playerRank=loadPlayerRank();
 // Numerical Base HP values are inherited/development-only combat fixtures, NOT
 // approved per-character stats. The unnamed units remain developer test slots.
 const ROSTER=[
- {id:'soul',name:'SOUL',label:'Character',hp:100,basePhysicalAttack:10,baseMagicalAttack:10,basePhysicalDefense:4,baseMagicalDefense:4,speed:20,stealth:0,lifesteal:0,art:'soul',test:false},
- {id:'zero',name:'ZERO',label:'Character',hp:50,basePhysicalAttack:40,baseMagicalAttack:0,basePhysicalDefense:2,baseMagicalDefense:2,speed:30,stealth:0,lifesteal:0,art:'zeroBattle',test:false,passive:{id:'cutthroat',criticalRateBonus:.1,criticalDamageBonus:.25}},
- {id:'lily',name:'LILY',label:'Character',hp:100,basePhysicalAttack:0,baseMagicalAttack:20,basePhysicalDefense:4,baseMagicalDefense:4,speed:20,stealth:0,lifesteal:0,art:'lily',test:false},
- {id:'dawn',name:'DAWN',label:'Character',hp:50,basePhysicalAttack:0,baseMagicalAttack:40,basePhysicalDefense:2,baseMagicalDefense:4,speed:20,stealth:0,lifesteal:0,art:'dawn',test:false},
- {id:'logan',name:'LOGAN',label:'Character',hp:200,basePhysicalAttack:10,baseMagicalAttack:0,basePhysicalDefense:4,baseMagicalDefense:4,speed:10,stealth:0,lifesteal:0,art:'logan',test:false},
+ {id:'soul',name:'SOUL',label:'Character',hp:100,baseAttack:20,basePhysicalDefense:4,baseMagicalDefense:4,speed:20,stealth:0,lifesteal:0,echoPercent:0,reflectPercent:0,art:'soul',test:false},
+ {id:'zero',name:'ZERO',label:'Character',hp:50,baseAttack:40,basePhysicalDefense:2,baseMagicalDefense:2,speed:30,stealth:0,lifesteal:0,echoPercent:0,reflectPercent:0,art:'zeroBattle',test:false,passive:{id:'cutthroat',criticalRateBonus:.1,criticalDamageBonus:.25}},
+ {id:'lily',name:'LILY',label:'Character',hp:100,basePhysicalAttack:0,baseMagicalAttack:20,basePhysicalDefense:4,baseMagicalDefense:4,speed:20,stealth:0,lifesteal:0,echoPercent:0,reflectPercent:0,art:'lily',test:false},
+ {id:'dawn',name:'DAWN',label:'Character',hp:50,baseAttack:40,basePhysicalDefense:2,baseMagicalDefense:4,speed:20,stealth:0,lifesteal:0,echoPercent:0,reflectPercent:0,art:'dawn',test:false},
+ {id:'logan',name:'LOGAN',label:'Character',hp:200,baseAttack:10,basePhysicalDefense:4,baseMagicalDefense:4,speed:10,stealth:0,lifesteal:0,echoPercent:0,reflectPercent:0,art:'logan',test:false},
 ];
 const ROSTER_IDS=new Set(ROSTER.map(u=>u.id));
 function normalizeOwnedCharacterIds(value){if(!Array.isArray(value)||value.some(id=>!ROSTER_IDS.has(id))||new Set(value).size!==value.length)return null;const ids=new Set(value);ids.add('soul');return [...ROSTER_IDS].filter(id=>ids.has(id))}
@@ -171,26 +171,30 @@ function isCharacterOwned(id){return DEV_MODE||ownedCharacterIds.has(id)}
 function saveOwnedCharacters(){if(!DEV_MODE)try{localStorage.setItem(OWNED_CHARACTERS_KEY,JSON.stringify([...ownedCharacterIds]))}catch(e){}}
 function availableCharacters(){return ROSTER.filter(model=>isCharacterOwned(model.id))}
 function roundHp(value){return Math.floor(value+0.5)}
+function roundStatQuarter(value){return Math.floor(value*4+0.5)/4}
+function formatCombatStat(value){return Number.isFinite(value)?(Number.isInteger(value)?String(value):value.toFixed(2).replace(/\.?0+$/,'')):'—'}
 function calculateLevelScaledStat(base,level,flat={},percent={},equipmentFlat={}){
  if(!Number.isFinite(base)||base<0||!Number.isInteger(level)||level<1||level>CHARACTER_MAX_LEVEL)return null;
  const flats=Object.values(flat),percents=Object.values(percent),equipment=Object.values(equipmentFlat);
  if([...flats,...percents,...equipment].some(v=>!Number.isFinite(v)))return null;
  const raw=((base+flats.reduce((a,b)=>a+b,0))*level+equipment.reduce((a,b)=>a+b,0))*(1+percents.reduce((a,b)=>a+b,0));
- return raw>=0&&Number.isFinite(raw)?roundHp(raw):null;
+ return raw>=0&&Number.isFinite(raw)?roundStatQuarter(raw):null;
 }
 function calculatePhysicalAttack(unit){
- if(!unit||!Number.isFinite(unit.basePhysicalAttack))return null;
- return calculateLevelScaledStat(unit.basePhysicalAttack,unit.level,unit.physicalAttackFlatModifiers||{},{...(unit.physicalAttackPercentModifiers||{}),dawnTune:unit.tune?.attackBonus||0,bloodShield:loganShieldAttackBonus(unit)},unit.physicalAttackEquipmentFlatModifiers||{});
+ if(!unit)return null;const base=Number.isFinite(unit.basePhysicalAttack)?unit.basePhysicalAttack:unit.baseAttack;
+ if(!Number.isFinite(base))return null;
+ return calculateLevelScaledStat(base,unit.level,unit.physicalAttackFlatModifiers||unit.attackFlatModifiers||{},{...(unit.physicalAttackPercentModifiers||unit.attackPercentModifiers||{}),dawnTune:unit.tune?.attackBonus||0,bloodShield:loganShieldAttackBonus(unit)},unit.physicalAttackEquipmentFlatModifiers||unit.attackEquipmentFlatModifiers||{});
 }
 function calculateMagicalAttack(unit){
- if(!unit||!Number.isFinite(unit.baseMagicalAttack))return null;
- return calculateLevelScaledStat(unit.baseMagicalAttack,unit.level,unit.magicalAttackFlatModifiers||{},{...(unit.magicalAttackPercentModifiers||{}),dawnTune:unit.tune?.attackBonus||0,bloodShield:loganShieldAttackBonus(unit)},unit.magicalAttackEquipmentFlatModifiers||{});
+ if(!unit)return null;const base=Number.isFinite(unit.baseMagicalAttack)?unit.baseMagicalAttack:unit.baseAttack;
+ if(!Number.isFinite(base))return null;
+ return calculateLevelScaledStat(base,unit.level,unit.magicalAttackFlatModifiers||unit.attackFlatModifiers||{},{...(unit.magicalAttackPercentModifiers||unit.attackPercentModifiers||{}),dawnTune:unit.tune?.attackBonus||0,bloodShield:loganShieldAttackBonus(unit)},unit.magicalAttackEquipmentFlatModifiers||unit.attackEquipmentFlatModifiers||{});
 }
 function loganShieldAttackBonus(unit){return unit?.shield>0&&premiumWeaponDuplicateRank('logan')>=4&&party.some(member=>member.id==='logan')?.2:0}
 const RESIDUE_RULES=Object.freeze({maxStacks:5,damageReductionPerStack:.05,resistanceReductionPerStack:.05,durationTurns:2});
 function residueStacksOf(unit){return Math.max(0,Math.min(unit?.residueMaxStacks||RESIDUE_RULES.maxStacks,Number.isInteger(unit?.residueStacks)?unit.residueStacks:0))}
 function residueReduction(unit){return residueStacksOf(unit)*(unit?.residueResistanceReductionPerStack??RESIDUE_RULES.resistanceReductionPerStack)}
-function damageDealtMultiplier(unit){return 1-residueStacksOf(unit)*(unit?.residueDamageReductionPerStack??RESIDUE_RULES.damageReductionPerStack)}
+function damageDealtMultiplier(unit){return (1-residueStacksOf(unit)*(unit?.residueDamageReductionPerStack??RESIDUE_RULES.damageReductionPerStack))*(unit?.id&&hasRuneSet(unit.id,'dark-matter')?1.1:1)}
 function calculatePhysicalDefense(unit){
  if(!unit||!Number.isFinite(unit.basePhysicalDefense))return null;
  return calculateLevelScaledStat(unit.basePhysicalDefense,unit.level,unit.physicalDefenseFlatModifiers||{},unit.physicalDefensePercentModifiers||{},unit.physicalDefenseEquipmentFlatModifiers||{});
@@ -200,6 +204,7 @@ function calculateMagicalDefense(unit){
  return calculateLevelScaledStat(unit.baseMagicalDefense,unit.level,unit.magicalDefenseFlatModifiers||{},unit.magicalDefensePercentModifiers||{},unit.magicalDefenseEquipmentFlatModifiers||{});
 }
 function calculateTrueAttack(unit){
+ if(Number.isFinite(unit?.baseAttack))return calculateLevelScaledStat(unit.baseAttack,Number.isInteger(unit.level)?unit.level:1,unit.attackFlatModifiers||{},{...(unit.attackPercentModifiers||{}),dawnTune:unit.tune?.attackBonus||0,bloodShield:loganShieldAttackBonus(unit)},unit.attackEquipmentFlatModifiers||{});
  const physical=calculatePhysicalAttack(unit),magical=calculateMagicalAttack(unit);
  return physical===null||magical===null?null:physical+magical;
 }
@@ -208,10 +213,10 @@ function calculateTrueDefense(unit){
  return physical===null||magical===null?null:(physical+magical)*.5;
 }
 function baseDefenseIgnoreOf(attacker){const passiveIgnore=Number.isFinite(attacker?.passive?.defenseIgnore)?attacker.passive.defenseIgnore:attacker?.passive?.id==='sharp-claws' ? .25 : 0;return Math.min(1,Math.max(0,(Number.isFinite(attacker?.tune?.defenseIgnore)?attacker.tune.defenseIgnore:0)+passiveIgnore))}
-function defenseIgnoreOf(attacker,type=null){const runeBonus=type==='physical'&&hasRuneSet(attacker?.id,'clear-skies') ? .2 : type==='magical'&&hasRuneSet(attacker?.id,'dark-matter') ? .2 : 0;return Math.min(1,baseDefenseIgnoreOf(attacker)+runeBonus)}
+function defenseIgnoreOf(attacker,type=null){const runeBonus=hasRuneSet(attacker?.id,'dark-matter')&&['physical','magical'].includes(type)? .20:0;return Math.min(1,baseDefenseIgnoreOf(attacker)+runeBonus)}
 function calculateTrueDamageReduction(attacker,target){
  const physicalAttack=calculatePhysicalAttack(attacker),magicalAttack=calculateMagicalAttack(attacker);
- const residueFactor=1-residueReduction(target),physicalDefense=calculatePhysicalDefense(target)*residueFactor*(1-defenseIgnoreOf(attacker,'physical')),magicalDefense=calculateMagicalDefense(target)*residueFactor*(1-defenseIgnoreOf(attacker,'magical'));
+ const exposedFactor=Math.pow(.9,target?.marks?.filter(m=>m.id==='exposed').length||0),residueFactor=1-residueReduction(target),physicalDefense=calculatePhysicalDefense(target)*residueFactor*(1-defenseIgnoreOf(attacker,'physical'))*exposedFactor,magicalDefense=calculateMagicalDefense(target)*residueFactor*(1-defenseIgnoreOf(attacker,'magical'))*exposedFactor;
  if(!Number.isFinite(physicalAttack)||physicalAttack<0||!Number.isFinite(magicalAttack)||magicalAttack<0||!Number.isFinite(physicalDefense)||physicalDefense<0||!Number.isFinite(magicalDefense)||magicalDefense<0)return null;
  const physicalContribution=physicalAttack>0 ? 0.5*Math.min(physicalDefense/physicalAttack,1) : 0;
  const magicalContribution=magicalAttack>0 ? 0.5*Math.min(magicalDefense/magicalAttack,1) : 0;
@@ -240,7 +245,7 @@ function calculateTypedActionDamage(type,attackRate,attacker,target){
  const defenseIgnore=defenseIgnoreOf(attacker,type),effectiveDefense=defense*(1-residueReduction(target));
  const trueDefenseBasis=(calculatePhysicalDefense(target)*(1-residueReduction(target))*(1-defenseIgnoreOf(attacker,'physical'))+calculateMagicalDefense(target)*(1-residueReduction(target))*(1-defenseIgnoreOf(attacker,'magical')))/2;
  let reduction=type==='true'?calculateTrueDamageReduction(attacker,target):(Number.isFinite(attack)&&attack>0&&Number.isFinite(effectiveDefense)&&effectiveDefense>=0?Math.min(effectiveDefense*(1-defenseIgnore)/attack,1):null);
- if(target?.marks?.some(m=>m.id==='exposed'))reduction=Math.max(0,reduction*Math.pow(.9,target.marks.filter(m=>m.id==='exposed').length));
+ if(type!=='true'&&target?.marks?.some(m=>m.id==='exposed'))reduction=Math.max(0,reduction*Math.pow(.9,target.marks.filter(m=>m.id==='exposed').length));
  if(!Number.isFinite(attack)||attack<=0||!Number.isFinite(defense)||defense<0||!Number.isFinite(reduction))return null;
  const damageBeforeDefense=attack*attackRate*damageDealtMultiplier(attacker);
  return {type,attackBasis:attack,defenseBasis:type==='true'?trueDefenseBasis:effectiveDefense*(1-defenseIgnore),attackRate,damageBeforeDefense,reduction,damageTaken:roundHp(damageBeforeDefense*(1-reduction))};
@@ -374,6 +379,16 @@ function setHpBonusForTest(id,source,kind,value){
  const max=calculateMaxHp(p.baseHp,p.level,kind==='flat'?next:p.hpFlatModifiers,kind==='percent'?next:p.hpPercentModifiers,p.hpEquipmentFlatModifiers);
  if(max===null)return false;p[key]=next;recomputeUnitMaxHp(p);return true;
 }
+function setEchoPercentForTest(id,percent){
+ if(!DEV_MODE||phase!=='player'||attackInProgress||!Number.isFinite(percent)||percent<0||percent>1)return false;
+ const unit=party.find(candidate=>candidate.id===id)||liveEnemies().find(candidate=>candidate.id===id);if(!unit)return false;
+ unit.echoPercent=percent;say(`TEST ONLY: ${unit.name} Echo ${roundHp(percent*100)}%.`);return true;
+}
+function setReflectPercentForTest(id,percent){
+ if(!DEV_MODE||phase!=='player'||attackInProgress||!Number.isFinite(percent)||percent<0||percent>1)return false;
+ const unit=party.find(candidate=>candidate.id===id)||liveEnemies().find(candidate=>candidate.id===id);if(!unit)return false;
+ unit.reflectPercent=percent;say(`TEST ONLY: ${unit.name} Reflect ${roundHp(percent*100)}%.`);return true;
+}
 function loadVitals(){try{const x=JSON.parse(localStorage.getItem(VITALS_KEY)||'{}');return x&&typeof x==='object'?x:{}}catch(e){return {}}}
 let savedVitals=loadVitals();
 let vitalsSyncTimer=null;
@@ -406,14 +421,14 @@ function spawnProgressedUnit(id){
 
 const turnTimeline=new TwoToneTurnTimeline();
 let speedModifiers=Object.create(null),summons=[],summonSerial=0,summonHistory=[],runeCombatState=Object.create(null);
-function runeSetState(id){return runeCombatState[id]||(runeCombatState[id]={cooldowns:{recycle:0,amplify:0},cooldownStartedTurn:{},unitedTurns:0,unitedStartedTurn:null})}
+function runeSetState(id){return runeCombatState[id]||(runeCombatState[id]={cooldowns:{recycle:0,amplify:0,'celestial-star':0,united:0},cooldownStartedTurn:{}})}
 function runeSetPieceCount(id,key){return typeof id==='string'&&ROSTER_IDS.has(id)&&key?loadoutFor(id).runes.filter(rune=>rune?.setId===key).length:0}
 function ownedRuneCount(setId){return (itemInventory?.runes?.[setId]?.length||0)+Object.values(characterLoadouts||{}).reduce((count,record)=>count+record.runes.filter(rune=>rune?.setId===setId).length,0)}
 function hasRuneSet(id,key){return runeSetPieceCount(id,key)===4}
 function runeEffectReady(id,effect){return (runeSetState(id).cooldowns[effect]||0)===0}
-function startRuneCooldown(id,effect){const state=runeSetState(id);if(state.cooldowns[effect]>0)return false;state.cooldowns[effect]=2;state.cooldownStartedTurn[effect]=turn;return true}
-function applyUnitedRune(id){const state=runeSetState(id);state.unitedTurns=2;state.unitedStartedTurn=turn;syncTurnTimeline();emitCombatVisual('rune-united',[id],COMBAT_ACTION_EFFECT_MS,{turns:2});return true}
-function ageRuneTurn(id){const state=runeSetState(id);let speedChanged=false;for(const effect of ['recycle','amplify'])if(state.cooldowns[effect]>0&&state.cooldownStartedTurn[effect]<turn){state.cooldowns[effect]--;if(!state.cooldowns[effect])delete state.cooldownStartedTurn[effect]}if(state.unitedTurns>0&&state.unitedStartedTurn<turn){state.unitedTurns--;speedChanged=state.unitedTurns===0}if(speedChanged)syncTurnTimeline()}
+function startRuneCooldown(id,effect,turns=2){const state=runeSetState(id);if(state.cooldowns[effect]>0)return false;state.cooldowns[effect]=turns;state.cooldownStartedTurn[effect]=turn;return true}
+function applyUnitedRune(id){if(!startRuneCooldown(id,'united',2))return false;addActionAdvance(id,100);emitCombatVisual('rune-united',[id],COMBAT_ACTION_EFFECT_MS,{advancePercent:100});return true}
+function ageRuneTurn(id){const state=runeSetState(id);for(const effect of ['recycle','amplify','celestial-star','united'])if(state.cooldowns[effect]>0&&state.cooldownStartedTurn[effect]<turn){state.cooldowns[effect]--;if(!state.cooldowns[effect])delete state.cooldownStartedTurn[effect]}}
 function calculateSpeed(unit){
  if(!unit)return null;
  const base=Number.isFinite(unit.baseSpeed)?unit.baseSpeed:unit.speed;
@@ -421,7 +436,7 @@ function calculateSpeed(unit){
  const effectMultiplier=speedModifiers[unit.id]||1;
  return calculateLevelScaledStat(base,Number.isInteger(unit.level)?unit.level:1,
   {...(unit.speedFlatModifiers||{})},
-  {...(unit.speedPercentModifiers||{}),temporarySpeedEffect:effectMultiplier-1,runeUnited:(runeCombatState[unit.id]?.unitedTurns||0)>0 ? .25 : 0},unit.speedEquipmentFlatModifiers||{});
+  {...(unit.speedPercentModifiers||{}),temporarySpeedEffect:effectMultiplier-1},unit.speedEquipmentFlatModifiers||{});
 }
 function speedOf(unit){return Math.max(1,calculateSpeed(unit)||1)}
 function timelineEnemyMembers(){
@@ -500,15 +515,15 @@ function executeIndependentSummonTurn(s){
  fx={kind:'basic',visual:'lily-hauntling',at:performance.now(),actor:owner?.id||s.ownerId,targetEnemyId:foe?.id,targetEnemyIds:liveEnemies().map(e=>e.id),targetGeometry:foe?{x:foe.x,y:foe.y,w:foe.w,h:foe.h}:null};
  const source={serial:++attackSerial,actor:'lily',action:'summon',hits:[],ricochetEligibleEnemyIds:liveEnemies().filter(enemy=>enemy.marks?.some(mark=>mark.id==='ricochet')).map(enemy=>enemy.id)};
  for(const enemy of liveEnemies().slice()){
-  const lily=party.find(p=>p.id==='lily'),raw=calculateTypedActionDamage('true',1,lily,enemy),dealt=applyEnemyDamage(enemy,raw?.damageTaken||0,lily);
-  source.hits.push({target:enemy.id,damage:dealt.damage,summon:true});if(enemy.hp<=0)resolveEnemyDefeat(enemy);
+  const lily=party.find(p=>p.id==='lily'),raw=calculateTypedActionDamage('true',1,lily,enemy),dealt=applyEnemyDamage(enemy,raw?.damageTaken||0,lily,{damageType:'true'});
+  source.hits.push({target:enemy.id,damage:dealt.damage,summon:true,reflect:dealt.reflect||null,echo:dealt.echo||null});if(dealt.reflect)source.hits.push({index:source.hits.length+1,target:lily?.id||null,damage:dealt.reflect.damage,healthDamage:dealt.reflect.healthDamage,damageType:'true',reflect:true,phase:'reflect'});if(enemy.hp<=0)resolveEnemyDefeat(enemy);
   else{
    enemy.marks=enemy.marks||[];emitCombatVisual('lily-exposed',[enemy.id],COMBAT_ACTION_EFFECT_MS);const dup=characterDuplicateRank('lily'),existing=enemy.marks.filter(m=>m.id==='exposed').length;enemy.marks=enemy.marks.filter(m=>m.id!=='exposed');for(let i=0;i<(dup>=2?Math.min(2,existing+1):1);i++)enemy.marks.push({id:'exposed',turns:dup>=2?3:2});emitCombatVisual('lily-ricochet-mark',[enemy.id],COMBAT_ACTION_EFFECT_MS);applyLilyUltimateDebuff(enemy);if(!source.pendingRicochet&&dealt.damage>0)source.pendingRicochet={enemyId:enemy.id,damage:dealt.damage};if(lily&&loadoutFor('lily').weapon.selected==='premium'&&loadoutFor('lily').weapon.premiumOwned)lily.energy=Math.min(120,lily.energy+5);
   }
  }
  log=`${s.name} • INITIAL AOE • TRUE DAMAGE`;
  const finishTurn=()=>{attackInProgress=false;settleAfterAttack();if(s.remaining<=0){summons=summons.filter(x=>x.id!==s.id);turnTimeline.states.delete(s.id);summonHistory.push({event:'expired',id:s.id})}drainUltimateQueueBefore(()=>nextTurn())};
- schedule(()=>{const pending=source.pendingRicochet,ricochetCount=pending?triggerRicochet(source,enemies.find(e=>e.id===pending.enemyId),pending.damage):0;if(ricochetCount)log=`Hauntling triggers Lily's Ricochet • ${ricochetCount} marked ${ricochetCount===1?'enemy':'enemies'}.`;schedule(finishTurn,COMBAT_ACTION_PHASE_GAP_MS)},COMBAT_ACTION_EFFECT_MS);
+ schedule(()=>{const pending=source.pendingRicochet,ricochetCount=pending?triggerRicochet(source,enemies.find(e=>e.id===pending.enemyId),pending.damage):0;if(ricochetCount)log=`Hauntling triggers Lily's Ricochet • ${ricochetCount} marked ${ricochetCount===1?'enemy':'enemies'}.`;schedule(finishTurn,COMBAT_ACTION_PHASE_GAP_MS)},COMBAT_ACTION_EFFECT_MS+(source.hits.some(hit=>hit.echo)?COMBAT_ACTION_PHASE_GAP_MS:0));
 }
 
 const color={ink:'#0a101f',panel:'rgba(13,17,35,.94)',gold:'#eacb87',white:'#f7f3f8',sub:'#bfc8d9',blue:'#85d9ff',red:'#f47679',green:'#5bebac'};
@@ -543,11 +558,11 @@ const ENEMY_FORMATIONS=[
  {id:'slot5',x:1389,y:355,w:151,h:198},
 ];
 const ENEMY_ARCHETYPES={
- slime:{id:'slime',category:'common',tags:{area:'One',type:'common',strengths:['Magical Attacker','Magical Resistant','Defensive'],weaknesses:['Physically Fragile','Slow']},name:'SLIME',level:1,hp:150,basePhysicalAttack:0,baseMagicalAttack:20,basePhysicalDefense:2,baseMagicalDefense:6,speed:10,stealth:0,lifesteal:0,battleSprite:'slimeBattle',battleAspectRatio:'1:1',artwork:'slimeArtwork',passive:{id:'slimy',every:3,damageBonus:.25},basicAttack:{targetMode:'single',damageType:'magical',multiplier:1.0}},
- wolf:{id:'wolf',category:'common',tags:{area:'One',type:'common',strengths:['Fast','Physical Attacker','Strong'],weaknesses:['Physically Fragile','Magically Fragile','Fragile']},name:'WOLF',level:1,hp:50,basePhysicalAttack:30,baseMagicalAttack:0,basePhysicalDefense:2,baseMagicalDefense:2,speed:40,stealth:0,lifesteal:0,battleSprite:'wolfBattle',battleAspectRatio:'1:1',artwork:'wolfArtwork',passive:{id:'rampage',damageBonus:.25,maxStacks:4},basicAttack:{targetMode:'single',damageType:'physical',multiplier:1.0}},
- hawk:{id:'hawk',category:'common',tags:{area:'One',type:'common',strengths:['Fast','Physical Attacker'],weaknesses:['Physically Fragile','Magically Fragile','Weak','Fragile']},name:'HAWK',level:1,hp:50,basePhysicalAttack:10,baseMagicalAttack:0,basePhysicalDefense:2,baseMagicalDefense:2,speed:60,stealth:.2,lifesteal:0,battleSprite:'hawkBattle',battleAspectRatio:'1:1',artwork:'hawkBattle',passive:{id:'mach-speed'},basicAttack:{targetMode:'single',damageType:'physical',multiplier:1.0}},
+ slime:{id:'slime',category:'common',tags:{area:'One',type:'common',strengths:['Magical Attacker','Magical Resistant','Defensive'],weaknesses:['Physically Fragile','Slow']},name:'SLIME',level:1,hp:150,baseAttack:20,basePhysicalDefense:2,baseMagicalDefense:6,speed:10,stealth:0,lifesteal:0,battleSprite:'slimeBattle',battleAspectRatio:'1:1',artwork:'slimeArtwork',passive:{id:'slimy',every:3,damageBonus:.25},basicAttack:{targetMode:'single',damageType:'magical',multiplier:1.0}},
+ wolf:{id:'wolf',category:'common',tags:{area:'One',type:'common',strengths:['Fast','Physical Attacker','Strong'],weaknesses:['Physically Fragile','Magically Fragile','Fragile']},name:'WOLF',level:1,hp:50,baseAttack:30,basePhysicalDefense:2,baseMagicalDefense:2,speed:40,stealth:0,lifesteal:0,battleSprite:'wolfBattle',battleAspectRatio:'1:1',artwork:'wolfArtwork',passive:{id:'ravage',stacksPerHit:1,maxStacks:5},basicAttack:{targetMode:'single',damageType:'physical',multiplier:1.0}},
+ hawk:{id:'hawk',category:'common',tags:{area:'One',type:'common',strengths:['Fast','Physical Attacker'],weaknesses:['Physically Fragile','Magically Fragile','Weak','Fragile']},name:'HAWK',level:1,hp:50,baseAttack:10,basePhysicalDefense:2,baseMagicalDefense:2,speed:60,stealth:.2,lifesteal:0,battleSprite:'hawkBattle',battleAspectRatio:'1:1',artwork:'hawkBattle',passive:{id:'mach-speed'},basicAttack:{targetMode:'single',damageType:'physical',multiplier:1.0}},
  goblin:{id:'goblin',category:'elite',tags:{area:'One',type:'elite',strengths:['Physical Attacker','Physically Defensive'],weaknesses:['Magically Fragile']},name:'GOBLIN',level:1,hp:200,basePhysicalAttack:40,baseMagicalAttack:0,basePhysicalDefense:12,baseMagicalDefense:4,speed:40,stealth:0,lifesteal:0,battleSprite:'goblinBattle',battleAspectRatio:'1:2',artwork:'goblinBattle',passive:{id:'pursuit',actionAdvance:20},basicAttack:{targetMode:'blast',damageType:'physical',multiplier:1.0}},
- geode:{id:'geode',category:'elite',tags:{area:'One',type:'elite',strengths:['Defensive','Magical Resistant','Physically Resistant'],weaknesses:['Slow','Weak']},name:'GEODE',level:1,hp:250,basePhysicalAttack:20,baseMagicalAttack:0,basePhysicalDefense:16,baseMagicalDefense:8,speed:10,stealth:0,lifesteal:0,battleSprite:'geodeBattle',battleAspectRatio:'1:2',artwork:'geodeBattle',passive:{id:'momentum',damageBonus:.2,maxStacks:10},basicAttack:{targetMode:'aoe',damageType:'physical',multiplier:1.0}},
+ geode:{id:'geode',category:'elite',tags:{area:'One',type:'elite',strengths:['Defensive','Magical Resistant','Physically Resistant'],weaknesses:['Slow','Weak']},name:'GEODE',level:1,hp:250,baseAttack:20,basePhysicalDefense:16,baseMagicalDefense:8,speed:10,stealth:0,lifesteal:0,battleSprite:'geodeBattle',battleAspectRatio:'1:2',artwork:'geodeBattle',passive:{id:'momentum',damageBonus:.2,maxStacks:10},basicAttack:{targetMode:'aoe',damageType:'physical',multiplier:1.0}},
  bear:{id:'bear',category:'boss',tags:{area:'One',type:'boss',strengths:['Defensive','Strong','Physical Attacker'],weaknesses:['Physically Fragile','Magically Fragile']},name:'BEAR',level:1,hp:450,basePhysicalAttack:90,baseMagicalAttack:0,basePhysicalDefense:6,baseMagicalDefense:6,speed:60,stealth:0,lifesteal:0,battleSprite:'bearBattle',battleAspectRatio:'64:70',artwork:'bearBattle',healthBars:1,passive:{id:'sharp-claws',defenseIgnore:.25},basicAttack:{targetMode:'aoe',damageType:'true',multiplier:1.0}}
 };
 // Any encounter may supply its own finite number of waves, each with 1–15 enemies.
@@ -587,7 +602,7 @@ function isUltPending(id){return ultimateQueue.some(q=>q.actorId===id)||(ultimat
 function ultimateEnergyCost(p){return p?.id==='zero'&&premiumWeaponDuplicateRank('zero')>=2?80:ULTIMATE_ENERGY_COST}
 function canQueueUltimate(p){return !!p&&p.hp>0&&!paused&&['player','enemy','resolve'].includes(phase)
   &&availableEnergy(p)>=ultimateEnergyCost(p)&&!isUltPending(p.id)}
-function emitCombatVisual(type,targetIds=[],duration=COMBAT_ACTION_EFFECT_MS,details={}){combatVisualEvents.push({type,targetIds:[...targetIds],at:performance.now(),duration,...details})}
+function emitCombatVisual(type,targetIds=[],duration=COMBAT_ACTION_EFFECT_MS,details={}){const {delayMs=0,...payload}=details;combatVisualEvents.push({type,targetIds:[...targetIds],at:performance.now()+delayMs,duration,...payload})}
 function resetActionResources(){const resourceful=party.some(p=>p.id==='dawn');combatVisualEvents=[];runeCombatState=Object.create(null);sp=resourceful?5:3;soulEnhanceStacks=0;soulFollowUpProcs=soulFollowUpLimit();soulFollowUpSources=new Set();soulEnhanceSpendingRemainder=0;soulFollowUpActivationCount=0;zeroHitEnemyIds=new Set();spCapModifiers=Object.create(null);if(resourceful){setSpCapModifier('dawn-resourceful',2);emitCombatVisual('dawn-resourceful',party.map(p=>p.id),1250)}ultimateQueue=[];ultimateSequence=0;ultimateHistory=[];ultimateResume=null;ultimateExecuting=false;
   for(const p of party)p.energyReserved=0;}
 function setSpCapTestSource(source,bonus){
@@ -703,7 +718,7 @@ function activateSoulEnhance(){
  const a=active();if(phase!=='player'||paused||!a||a.id!=='soul'){say('Enhance is available on Soul’s turn.');return false}
  if(sp<1){say('Soul Enhance needs 1 Skill Point.');return false}
  sp--;soulEnhanceStacks++;let refunded=false,recycled=false;
- if(hasRuneSet(a.id,'recycle')&&runeEffectReady(a.id,'recycle')){gainSp(1);startRuneCooldown(a.id,'recycle');recycled=true;emitCombatVisual('rune-recycle',[a.id],COMBAT_ACTION_EFFECT_MS,{skillPoints:1})}
+ if(hasRuneSet(a.id,'recycle')&&runeEffectReady(a.id,'recycle')){gainSp(1);startRuneCooldown(a.id,'recycle',1);recycled=true;emitCombatVisual('rune-recycle',[a.id],COMBAT_ACTION_EFFECT_MS,{skillPoints:1})}
  if(loadoutFor('soul').weapon.selected==='premium'&&loadoutFor('soul').weapon.premiumOwned){soulEnhanceSpendingRemainder++;if(soulEnhanceSpendingRemainder>=3){soulEnhanceSpendingRemainder-=3;gainSp(1);refunded=true}}
  zeroSkillArmed=false;pendingTargetAction=null;cameraPreview=null;fx={kind:'self',visual:'soul-enhance',at:performance.now(),actor:a.id};
  log='SOUL ENHANCE: '+soulEnhanceStacks+' Skill Point(s) banked for the next Basic Attack.'+(recycled?' Recycle restored 1 Skill Point.':'')+(refunded?' Standard signature weapon restored 1 Skill Point.':'');return true;
@@ -743,7 +758,7 @@ function buildWavePlan(sizes){
   const model=enemyRosterMode==='goblin'?(i<ENCOUNTER_LIMITS.elitesPerWave?ENEMY_ARCHETYPES.goblin:ENEMY_ARCHETYPES.slime):enemyRosterMode==='geode'?(i<ENCOUNTER_LIMITS.elitesPerWave?ENEMY_ARCHETYPES.geode:ENEMY_ARCHETYPES.slime):enemyRosterMode==='bear'?(i===0?ENEMY_ARCHETYPES.bear:ENEMY_ARCHETYPES.slime):enemyRosterMode==='hawk'?ENEMY_ARCHETYPES.hawk:mixedBoss?ENEMY_ARCHETYPES.bear:finalMixedWave&&i===2?ENEMY_ARCHETYPES.geode:(mixedBossElite||mixedLeader)?ENEMY_ARCHETYPES.goblin:ENEMY_ARCHETYPES[commonId];
   const category=validateEnemyCategory(model.category),tags=validateEnemyTags(model.tags,category);return {id:`wave${wi+1}-enemy${i+1}`,archetypeId:model.id,name:model.name,tags,
    wave:wi+1,order:i+1,category,healthBars:validateEnemyHealthBars(category,model.healthBars??1),level:model.level,maxHp:model.hp,speed:model.speed,
-   basePhysicalAttack:model.basePhysicalAttack,baseMagicalAttack:model.baseMagicalAttack,
+   baseAttack:model.baseAttack,basePhysicalAttack:model.basePhysicalAttack,baseMagicalAttack:model.baseMagicalAttack,
    basePhysicalDefense:model.basePhysicalDefense,baseMagicalDefense:model.baseMagicalDefense,lifesteal:model.lifesteal??0,lifestealModifiers:{...(model.lifestealModifiers||{})},bleedStacks:[],bleedMaxStacks:model.bleedMaxStacks??5,
    battleSprite:model.battleSprite,battleAspectRatio:model.battleAspectRatio,art:model.artwork,artwork:model.artwork,barrierPercent:model.barrierPercent??.2,passive:{...model.passive},basicAttack:{...model.basicAttack},basicAttackCount:0,rampageStacks:0,momentumStacks:0};
  })));
@@ -775,7 +790,7 @@ function enterEnemy(slot){
  const queueIndex=waveQueue.findIndex(canDeployEnemy);if(queueIndex<0)return null;
  const [incoming]=waveQueue.splice(queueIndex,1),formation=ENEMY_FORMATIONS[slot];
  const barrier=roundHp(incoming.maxHp*incoming.barrierPercent);
- const e={...incoming,slot,x:formation.x,y:formation.y,w:formation.w,h:formation.h,hp:incoming.maxHp,shield:incoming.shield||0,maxBarrier:barrier,barrier,brokenTurns:0,debuffs:[],marks:[],tauntEffects:[],reinforcement:waveKills>0,entryPending:waveKills>0,enteredAt:waveKills>0?performance.now():null};
+ const e={...incoming,echoPercent:incoming.echoPercent??0,slot,x:formation.x,y:formation.y,w:formation.w,h:formation.h,hp:incoming.maxHp,shield:incoming.shield||0,maxBarrier:barrier,barrier,brokenTurns:0,debuffs:[],marks:[],tauntEffects:[],reinforcement:waveKills>0,entryPending:waveKills>0,enteredAt:waveKills>0?performance.now():null};
  if(premiumWeaponDuplicateRank('lily')>=1&&party.some(p=>p.id==='lily'))e.marks.push({id:'soul-mark',turns:2},{id:'ricochet',turns:2,sources:[]});
  enemies.push(e);enemies.sort((a,b)=>a.slot-b.slot);gauges[e.id]=0;
  spawnHistory.push({wave:e.wave,id:e.id,slot,initial:waveKills===0,duringAttack:attackInProgress});
@@ -797,7 +812,7 @@ function resetEnemies(){
  totalEnemyDefeats=0;encounterCleared=false;spawnHistory=[];enemies=[];selectedEnemyId=null;actingEnemyId=null;pendingVacancies=[];attackInProgress=false;lastAttack=null;supportDemo=null;supportTestHistory=[];
  beginWave(0);
 }
-function resolveEnemyDefeat(victim){
+function resolveEnemyDefeat(victim,{deferSettlement=false}={}){
  if(!victim||victim.hp>0||victim.deathAt||!enemies.some(e=>e.id===victim.id))return null;
  // Keep the defeated unit on stage for a visible fade-out. Its zero HP keeps it
  // out of targeting and turn order while its slot remains unavailable.
@@ -805,7 +820,7 @@ function resolveEnemyDefeat(victim){
  pendingVacancies.push(victim.slot);waveKills++;totalEnemyDefeats++;
  if(lastAttack&&attackInProgress&&!lastAttack.finished)lastAttack.defeats.push({id:victim.id,slot:victim.slot});
  syncEnemyHp();
- if(!attackInProgress)schedule(()=>{if(!attackInProgress)settleAfterAttack()},ENEMY_DEATH_BEAT_MS);
+ if(!attackInProgress&&!deferSettlement)schedule(()=>{if(!attackInProgress)settleAfterAttack()},ENEMY_DEATH_BEAT_MS);
  return victim;
 }
 function settleAfterAttack(){
@@ -827,11 +842,13 @@ function applyTrainingHit(enemy,damage,hitNumber,deferRicochet=false){
  if(!enemy||enemy.hp<=0||!attackInProgress)return false;
  const source=party.find(p=>p.id===lastAttack.actor)||summons.find(s=>s.id===lastAttack.actor)||null;
  const actionDamage=lastAttack.runeAmplifyActive?roundHp(damage*1.5):damage;
- const dealt=applyEnemyDamage(enemy,actionDamage,source);
+ const dealt=applyEnemyDamage(enemy,actionDamage,source,{damageType:lastAttack.damageType});
  if(source?.id==='zero'&&dealt.damage>0)zeroHitEnemyIds.add(enemy.id);
  if(!dealt.dodged&&(lastAttack.actor!=='lily'||lastAttack.action==='summon')&&enemy.marks?.some(m=>m.id==='exposed')){const lily=party.find(p=>p.id==='lily');if(lily&&loadoutFor('lily').weapon.selected==='premium'&&loadoutFor('lily').weapon.premiumOwned)lily.energy=Math.min(120,lily.energy+5)}
  lastAttack.hits.push({index:hitNumber,target:enemy.id,slot:enemy.slot,damage:dealt.damage+dealt.breakDamage,healthDamage:dealt.healthDamage,shieldDamage:dealt.shieldDamage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,breakDamage:dealt.breakDamage,barrierAfter:enemy.barrier,broken:dealt.broken,critical:dealt.critical,criticalMultiplier:dealt.criticalMultiplier,dodged:!!dealt.dodged,phase:'initial'});
- if(!dealt.dodged&&lastAttack.actor==='lily'&&(lastAttack.action==='skill'||lastAttack.action==='ultimate')){
+ if(dealt.reflect)lastAttack.hits.push({index:lastAttack.hits.length+1,target:source?.id||null,damage:dealt.reflect.damage,healthDamage:dealt.reflect.healthDamage,shieldDamage:dealt.reflect.shieldDamage,damageType:'true',reflect:true,phase:'reflect'});
+ if(dealt.echo)lastAttack.hits.push({index:lastAttack.hits.length+1,target:enemy.id,slot:enemy.slot,damage:dealt.echo.damage,healthDamage:dealt.echo.healthDamage,damageType:dealt.echo.damageType,echo:true,phase:'echo'});
+ if(!dealt.dodged&&lastAttack.actor==='lily'){
   emitCombatVisual('lily-exposed',[enemy.id],COMBAT_ACTION_EFFECT_MS);
   enemy.marks=enemy.marks||[];const dup=characterDuplicateRank('lily');
   if(dup>=2){const stacks=Math.min(2,(enemy.marks.filter(m=>m.id==='exposed').length||0)+1);enemy.marks=enemy.marks.filter(m=>m.id!=='exposed');for(let i=0;i<stacks;i++)enemy.marks.push({id:'exposed',turns:3})}
@@ -856,7 +873,7 @@ function triggerRicochet(sourceAttack,hitEnemy,sourceDamage){
  const lily=party.find(p=>p.id==='lily');if(!lily)return;
  sourceAttack.ricochetFollowUp=true;const repetitions=characterDuplicateRank('lily')>=4?2:1,damageByTarget={};
  const dodgedTargets=[];for(const enemy of triggered){const mark=enemy.marks.find(m=>m.id==='ricochet');mark.sources=[...(mark.sources||[]),sourceAttack.serial];
-  for(let n=0;n<repetitions&&enemy.hp>0;n++){const reduction=calculateTrueDamageReduction(lily,enemy),amount=roundHp(sourceDamage*.1*(n===1?.5:1)*(1-(Number.isFinite(reduction)?reduction:0))),dealt=applyEnemyDamage(enemy,amount,lily);damageByTarget[enemy.id]=(damageByTarget[enemy.id]||0)+dealt.damage;if(dealt.dodged)dodgedTargets.push(enemy.id);sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,damage:dealt.damage,barrierDamage:dealt.barrierDamage,ricochet:true,ricochetSource:sourceAttack.serial,critical:dealt.critical,dodged:!!dealt.dodged,phase:'ricochet'});if(enemy.hp<=0)resolveEnemyDefeat(enemy)}
+  for(let n=0;n<repetitions&&enemy.hp>0;n++){const reduction=calculateTrueDamageReduction(lily,enemy),amount=roundHp(sourceDamage*.1*(n===1?.5:1)*(1-(Number.isFinite(reduction)?reduction:0))),dealt=applyEnemyDamage(enemy,amount,lily,{damageType:'true'});damageByTarget[enemy.id]=(damageByTarget[enemy.id]||0)+dealt.damage;if(dealt.dodged)dodgedTargets.push(enemy.id);sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,damage:dealt.damage,barrierDamage:dealt.barrierDamage,ricochet:true,ricochetSource:sourceAttack.serial,critical:dealt.critical,dodged:!!dealt.dodged,phase:'ricochet'});if(dealt.reflect)sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:lily.id,damage:dealt.reflect.damage,healthDamage:dealt.reflect.healthDamage,damageType:'true',reflect:true,phase:'reflect'});if(dealt.echo)sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,damage:dealt.echo.damage,damageType:dealt.echo.damageType,echo:true,phase:'echo'});if(enemy.hp<=0)resolveEnemyDefeat(enemy)}
  }
  emitCombatVisual('lily-ricochet-trigger',triggered.map(e=>e.id),COMBAT_ACTION_EFFECT_MS,{damageByTarget,dodgedTargets});sourceAttack.ricochetFollowUp=false;syncEnemyHp();return triggered.length;
 }
@@ -870,22 +887,45 @@ function teamBaseTurns(faction){
 function brokenDuration(speed,baseTurns){
  return Math.max(1,roundHp(baseTurns*Math.max(.5,Math.min(1.5,2-speed/100))));
 }
-function stealthChanceOf(unit){return Math.min(1,Math.max(0,Number.isFinite(unit?.stealth)?unit.stealth:0))}
-function applyEnemyDamage(enemy,rawDamage,attacker=null){
- const stealth=stealthChanceOf(enemy);if(rawDamage>0&&stealth>0&&Math.random()<stealth){return {damage:0,healthDamage:0,shieldDamage:0,breakShieldDamage:0,barrierDamage:0,breakDamage:0,broken:false,critical:false,criticalMultiplier:1,lifestealHealing:0,dodged:true}}
- const critical=!!attacker&&rawDamage>0&&Math.random()<criticalRateOf(attacker),criticalMultiplier=critical?1+criticalDamageOf(attacker):1,damageReduction=Math.min(1,Math.max(0,enemy.tune?.damageReduction||0));
+function stealthChanceOf(unit){const base=Number.isFinite(unit?.stealth)?unit.stealth:0,runeBonus=unit?.id&&hasRuneSet(unit.id,'eternal-sun')?.10:0;return Math.min(1,Math.max(0,base+runeBonus))}
+function echoPercentOf(source){const base=Number.isFinite(source?.echoPercent)?source.echoPercent:0,runeBonus=source?.id&&hasRuneSet(source.id,'radiant-moon') ? .2 : 0;return Math.max(0,Math.min(1,base+runeBonus))}
+function reflectPercentOf(source){const base=Number.isFinite(source?.reflectPercent)?source.reflectPercent:0,runeBonus=source?.id&&hasRuneSet(source.id,'clear-skies') ? (shieldOf(source)>0 ? .2 : .1) : 0;return Math.max(0,Math.min(1,base+runeBonus))}
+function applyEnemyDamage(enemy,rawDamage,attacker=null,{damageType=null,isEcho=false,isReflect=false}={}){
+ const stealth=stealthChanceOf(enemy);if(!isEcho&&rawDamage>0&&stealth>0&&Math.random()<stealth){return {damage:0,healthDamage:0,directHealthDamage:0,shieldDamage:0,breakShieldDamage:0,barrierDamage:0,breakDamage:0,broken:false,critical:false,criticalMultiplier:1,lifestealHealing:0,dodged:true}}
+ const critical=!isEcho&&!!attacker&&rawDamage>0&&Math.random()<criticalRateOf(attacker),criticalMultiplier=critical?1+criticalDamageOf(attacker):1,damageReduction=isEcho?0:Math.min(1,Math.max(0,enemy.tune?.damageReduction||0));
  const targetHpBefore=enemy.hp;
- const damage=roundHp(rawDamage*(1-damageReduction)*criticalMultiplier*(enemy.brokenTurns>0?1.5:1)),shieldDamage=absorbShield(enemy,damage);
+ const damage=roundHp(rawDamage*(1-damageReduction)*criticalMultiplier*(!isEcho&&enemy.brokenTurns>0?1.5:1)),shieldDamage=absorbShield(enemy,damage);
  enemy.hp=Math.max(0,enemy.hp-(damage-shieldDamage));
+ const directHealthDamage=Math.max(0,targetHpBefore-enemy.hp);
  let barrierDamage=0,breakDamage=0,breakShieldDamage=0,broken=false;
  if(enemy.barrier>0){
   const exposed=enemy.marks?.filter(m=>m.id==='exposed').length||0;
   // Tune's barrier bonus belongs to the Tune target, so only that ally's hits receive it.
-  barrierDamage=damage*.25*(1+(premiumWeaponDuplicateRank('lily')>=2?exposed*.1:0)+(attacker?.tune?.barrierDamageBonus||0));enemy.barrier=Math.max(0,enemy.barrier-barrierDamage);
+  barrierDamage=damage*.25*(1+(!isEcho&&premiumWeaponDuplicateRank('lily')>=2?exposed*.1:0)+(!isEcho?(attacker?.tune?.barrierDamageBonus||0):0));enemy.barrier=Math.max(0,enemy.barrier-barrierDamage);
   if(enemy.barrier===0){enemy.brokenTurns=brokenDuration(speedOf(enemy),teamBaseTurns('enemy'));breakDamage=roundHp(enemy.maxHp*(.1+(premiumWeaponDuplicateRank('lily')>=3?exposed*.05:0)));breakShieldDamage=absorbShield(enemy,breakDamage);enemy.hp=Math.max(0,enemy.hp-(breakDamage-breakShieldDamage));broken=true;}
  }
  const healthDamage=Math.max(0,targetHpBefore-enemy.hp),lifestealHealing=applyLifesteal(attacker,healthDamage);
- syncEnemyHp();return {damage,healthDamage,shieldDamage:shieldDamage+breakShieldDamage,breakShieldDamage,barrierDamage,breakDamage,broken,critical,criticalMultiplier,lifestealHealing};
+ let reflect=null;
+ if(!isEcho&&!isReflect&&attacker?.hp>0){
+  const percent=reflectPercentOf(enemy),receivedDamage=healthDamage+shieldDamage+breakShieldDamage,reflectRawDamage=roundHp(receivedDamage*percent),trueAttack=calculateTrueAttack(enemy);
+  if(percent>0&&reflectRawDamage>0&&Number.isFinite(trueAttack)&&trueAttack>0){
+   const calculated=calculateTypedActionDamage('true',reflectRawDamage/trueAttack,enemy,attacker),reflected=applyEnemyDamage(attacker,calculated?.damageTaken||0,enemy,{damageType:'true',isReflect:true});
+   reflect={damage:reflected.damage,healthDamage:reflected.healthDamage,shieldDamage:reflected.shieldDamage,damageType:'true',dodged:!!reflected.dodged};
+   emitCombatVisual('reflect-damage',[attacker.id],COMBAT_ACTION_EFFECT_MS,{damage:reflected.healthDamage,shieldDamage:reflected.shieldDamage,dodged:!!reflected.dodged,sourceId:enemy.id,delayMs:COMBAT_ACTION_PHASE_GAP_MS});
+   if(enemies.includes(attacker)&&attacker.hp<=0)resolveEnemyDefeat(attacker,{deferSettlement:phase==='enemy'});
+  }
+ }
+ let echo=null;
+ if(!isEcho&&!isReflect&&attacker&&['physical','magical','true'].includes(damageType)&&directHealthDamage>0&&enemy.hp>0){
+  const percent=echoPercentOf(attacker),echoDamage=roundHp(directHealthDamage*percent);
+  if(percent>0&&echoDamage>0){
+   const echoed=applyEnemyDamage(enemy,echoDamage,attacker,{damageType,isEcho:true});
+   echo={damage:echoDamage,damageType,healthDamage:echoed.healthDamage,directHealthDamage:echoed.directHealthDamage};
+   const now=performance.now(),stackIndex=combatVisualEvents.filter(event=>event.type==='echo-damage'&&event.targetIds.includes(enemy.id)&&event.at<=now+COMBAT_ACTION_EFFECT_MS&&event.at>=now-COMBAT_ACTION_EFFECT_MS).length;
+   emitCombatVisual('echo-damage',[enemy.id],COMBAT_ACTION_EFFECT_MS,{damage:echoDamage,healthDamage:echoed.healthDamage,shieldDamage:echoed.shieldDamage,damageType,sourceId:attacker.id,stackIndex,delayMs:COMBAT_ACTION_PHASE_GAP_MS*(reflect?2:1)});
+  }
+ }
+ syncEnemyHp();return {damage,healthDamage,directHealthDamage,shieldDamage:shieldDamage+breakShieldDamage,breakShieldDamage,barrierDamage,breakDamage,broken,critical,criticalMultiplier,lifestealHealing,reflect,echo};
 }
 function applyBleed(target,source,stacks=1,maxStacks=target?.bleedMaxStacks??5){
  if(!target||target.hp<=0||!source||!Number.isInteger(stacks)||stacks<1||!Number.isInteger(maxStacks)||maxStacks<1)return false;
@@ -906,7 +946,7 @@ function resolveSoulFollowUp(sourceAttack){
  const affected=[...new Set(sourceAttack.hits.filter(h=>h.damage>0).map(h=>h.target))].map(id=>enemies.find(e=>e.id===id)).filter(e=>e&&e.hp>0);
  if(!affected.length)return false;soulFollowUpSources.add(sourceAttack.serial);soulFollowUpProcs--;
  const attack=calculateTrueAttack(soul),dupeBonus=characterDuplicateRank(soul.id)>=2?2:1,rawTotal=Number.isFinite(attack)?roundHp(attack*.5*dupeBonus*celestialMultiplier(soul.id,'passive')):0,base=Math.floor(rawTotal/affected.length),remainder=rawTotal%affected.length;let total=0;
- for(let i=0;i<affected.length;i++){const share=base+(i<remainder?1:0),rate=attack>0?share/attack:0,amount=soulDamageForTarget(soul,affected[i],rate);if(amount<=0)continue;const enemy=affected[i],dealt=applyEnemyDamage(enemy,amount,soul);total+=dealt.damage;sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,slot:enemy.slot,damage:dealt.damage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,barrierAfter:enemy.barrier,broken:dealt.broken,followUp:true,critical:dealt.critical,dodged:!!dealt.dodged,phase:'follow-up'});if(enemy.hp<=0)resolveEnemyDefeat(enemy)}
+ for(let i=0;i<affected.length;i++){const share=base+(i<remainder?1:0),rate=attack>0?share/attack:0,amount=soulDamageForTarget(soul,affected[i],rate);if(amount<=0)continue;const enemy=affected[i],dealt=applyEnemyDamage(enemy,amount,soul,{damageType:'true'});total+=dealt.damage;sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,slot:enemy.slot,damage:dealt.damage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,barrierAfter:enemy.barrier,broken:dealt.broken,followUp:true,critical:dealt.critical,dodged:!!dealt.dodged,phase:'follow-up'});if(dealt.reflect)sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:soul.id,damage:dealt.reflect.damage,healthDamage:dealt.reflect.healthDamage,damageType:'true',reflect:true,phase:'reflect'});if(dealt.echo)sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,damage:dealt.echo.damage,damageType:dealt.echo.damageType,echo:true,phase:'echo'});if(enemy.hp<=0)resolveEnemyDefeat(enemy)}
  soulFollowUpActivationCount++;
   if(premiumWeaponDuplicateRank(soul.id)>=4&&soulFollowUpActivationCount%2===0)soulFollowUpProcs=Math.min(soulFollowUpLimit(),soulFollowUpProcs+1);
  const dodgedTargets=sourceAttack.hits.filter(hit=>hit.followUp&&hit.dodged).map(hit=>hit.target);sourceAttack.followUp={sourceSerial:sourceAttack.serial,damage:total,targets:affected.map(e=>e.id),procsRemaining:soulFollowUpProcs};emitCombatVisual('soul-follow-up',affected.map(e=>e.id),ANIMATION_STEP_MS*5,{damageByTarget:Object.fromEntries(sourceAttack.hits.filter(hit=>hit.followUp).map(hit=>[hit.target,hit.damage])),dodgedTargets,targetGeometry:Object.fromEntries(affected.map(e=>[e.id,{x:e.x,y:e.y,w:e.w,h:e.h}]))});syncEnemyHp();return total>0;
@@ -915,11 +955,11 @@ function resolveRuneUltimateEffects(attack){
  if(!attack||attack.action!=='ultimate'||attack.runeSetEffectsApplied)return false;
  attack.runeSetEffectsApplied=true;
  if(hasRuneSet(attack.actor,'infinite-space')){
-  const damagedIds=[...new Set(attack.hits.filter(hit=>hit.phase==='initial'&&hit.damage>0).map(hit=>hit.target))];
-  for(const id of damagedIds)addActionDelay(id,25);
-  if(damagedIds.length)emitCombatVisual('rune-infinite-space',damagedIds,COMBAT_ACTION_EFFECT_MS,{delayPercent:25});
+  const enemyIds=[...new Set(enemies.filter(enemy=>enemy.hp>0).map(enemy=>enemy.id))];
+  for(const id of enemyIds)addActionDelay(id,50);
+  if(enemyIds.length)emitCombatVisual('rune-infinite-space',enemyIds,COMBAT_ACTION_EFFECT_MS,{delayPercent:50});
  }
- if(hasRuneSet(attack.actor,'celestial-star')){addActionAdvance(attack.actor,50);emitCombatVisual('rune-celestial-star',[attack.actor],COMBAT_ACTION_EFFECT_MS,{advancePercent:50})}
+ if(hasRuneSet(attack.actor,'celestial-star')&&runeEffectReady(attack.actor,'celestial-star')){addActionAdvance(attack.actor,100);startRuneCooldown(attack.actor,'celestial-star',2);emitCombatVisual('rune-celestial-star',[attack.actor],COMBAT_ACTION_EFFECT_MS,{advancePercent:100})}
  return true;
 }
 function finishTrainingAttack(serial){
@@ -1032,8 +1072,8 @@ function resolveEnemyBasicAttack(attacker,candidates){
  const hits=targets.map(target=>{
   const calculated=basic.damageType?calculateTypedActionDamage(basic.damageType,multiplier,attacker,target):null;
   const damage=calculated?.damageTaken??(basic.damageType?0:92+((turn*37)%51));
-  const dealt=applyEnemyDamage(target,damage,attacker);if(!dealt.dodged)target.energy=Math.min(120,target.energy+10);if(attacker.passive?.id==='residue'&&dealt.damage>0)applyResidue(target,attacker.passive);
-  return {target:target.id,damage:dealt.damage+dealt.breakDamage,healthDamage:dealt.healthDamage,shieldDamage:dealt.shieldDamage,barrierDamage:dealt.barrierDamage,breakDamage:dealt.breakDamage,barrierAfter:target.barrier,broken:dealt.broken,critical:dealt.critical,dodged:!!dealt.dodged};
+  const dealt=applyEnemyDamage(target,damage,attacker,{damageType:basic.damageType});if(!dealt.dodged)target.energy=Math.min(120,target.energy+10);if(attacker.passive?.id==='ravage'&&!dealt.dodged)applyBleed(target,attacker,attacker.passive.stacksPerHit??1,attacker.passive.maxStacks??5);if(attacker.passive?.id==='residue'&&dealt.damage>0)applyResidue(target,attacker.passive);
+  return {target:target.id,damage:dealt.damage+dealt.breakDamage,healthDamage:dealt.healthDamage,shieldDamage:dealt.shieldDamage,barrierDamage:dealt.barrierDamage,breakDamage:dealt.breakDamage,barrierAfter:target.barrier,broken:dealt.broken,critical:dealt.critical,dodged:!!dealt.dodged,reflect:dealt.reflect||null,echo:dealt.echo||null};
  });
  if(rampage&&hits.some(hit=>hit.damage>0))attacker.rampageStacks=Math.min(attacker.passive.maxStacks??4,(attacker.rampageStacks||0)+1);
  if(momentum)attacker.momentumStacks=Math.min(attacker.passive.maxStacks??10,(attacker.momentumStacks||0)+1);
@@ -1048,13 +1088,13 @@ function nextTurn(){
  turn++;
  const actingSummon=summons.find(s=>s.id===next&&s.mode==='independent');
  if(actingSummon){executeIndependentSummonTurn(actingSummon);return;}
- const attacking=enemies.find(e=>e.id===next&&e.hp>0);
- if(attacking&&attacking.bleedStacks?.length){resolveBleedTick(attacking);if(attacking.hp<=0){resolveEnemyDefeat(attacking);schedule(()=>nextTurn(),ENEMY_DEATH_BEAT_MS);return}}
+ const bleedTarget=[...party,...enemies].find(unit=>unit.id===next&&unit.hp>0),attacking=enemies.find(e=>e.id===next&&e.hp>0);
+ if(bleedTarget?.bleedStacks?.length){resolveBleedTick(bleedTarget);if(!enemies.includes(bleedTarget))saveVitals();if(bleedTarget.hp<=0){if(enemies.includes(bleedTarget))resolveEnemyDefeat(bleedTarget);schedule(()=>nextTurn(),ENEMY_DEATH_BEAT_MS);return}}
  if(attacking&&attacking.brokenTurns>0){attacking.brokenTurns--;if(attacking.brokenTurns===0){attacking.barrier=attacking.maxBarrier;cleanseEnemy(attacking);addActionAdvance(attacking.id,100);}schedule(()=>nextTurn(),0);return;}
  if(attacking?.marks)attacking.marks=attacking.marks.map(m=>({...m,turns:m.turns-1})).filter(m=>m.turns>0);
  if(attacking?.debuffs)attacking.debuffs=attacking.debuffs.map(d=>({...d,turns:d.turns-1})).filter(d=>d.turns>0);
  if(attacking){activeId=null;zeroSkillArmed=false;pendingTargetAction=null;actingEnemyId=next;cameraPreview=null;phase='enemy';log=`${attacking.name} prepares an attack.`;
-  schedule(()=>{if(phase!=='enemy'||paused)return;if(attacking.hp<=0){nextTurn();return}const candidates=alive();if(!candidates.length){cancelAllQueuedUltimates('defeat');phase='defeat';return}enemyCount++;const attack=resolveEnemyBasicAttack(attacking,candidates),firstHit=attack.hits[0];if(attacking.passive?.id==='pursuit')addActionAdvance(attacking.id,attacking.passive.actionAdvance??20);ageTaunt(attacking);saveVitals();cancelQueuedUltimatesOfDefeated();const visual=ENEMY_ACTION_VISUALS[attacking.archetypeId]?.basic||ENEMY_ACTION_VISUALS.slime.basic;fx={kind:'enemy',visual,at:performance.now(),damage:firstHit.damage,target:firstHit.target,hits:attack.hits,actorEnemyId:attacking.id};log=attack.hits.length&&attack.hits.every(hit=>hit.dodged)?`${attacking.name}'s attack was dodged.`:attack.enhanced?`${attacking.name} uses Slimy against all allied characters.`:attack.mode==='aoe'?`${attacking.name} attacks all allied characters.`:attack.mode==='blast'?`${attacking.name} blasts ${attack.hits.length} allied characters.`:firstHit.dodged?`${party.find(p=>p.id===firstHit.target)?.name||'An ally'} dodges ${attacking.name}'s attack.`:`${attacking.name} hits ${party.find(p=>p.id===firstHit.target)?.name||'an ally'} for ${firstHit.damage}.`;if(attacking.passive?.id==='momentum')log+=` Momentum ${attacking.momentumStacks}/${attacking.passive.maxStacks??10}.`;phase='resolve';schedule(()=>drainUltimateQueueBefore(()=>{if(!alive().length){phase='defeat';log='All allied characters were defeated.'}else nextTurn()}),ENEMY_ATTACK_EFFECT_MS)},ENEMY_WINDUP_MS);
+  schedule(()=>{if(phase!=='enemy'||paused)return;if(attacking.hp<=0){nextTurn();return}const candidates=alive();if(!candidates.length){cancelAllQueuedUltimates('defeat');phase='defeat';return}enemyCount++;const attack=resolveEnemyBasicAttack(attacking,candidates),firstHit=attack.hits[0];if(attacking.passive?.id==='pursuit')addActionAdvance(attacking.id,attacking.passive.actionAdvance??20);ageTaunt(attacking);saveVitals();cancelQueuedUltimatesOfDefeated();const visual=ENEMY_ACTION_VISUALS[attacking.archetypeId]?.basic||ENEMY_ACTION_VISUALS.slime.basic;fx={kind:'enemy',visual,at:performance.now(),damage:firstHit.damage,target:firstHit.target,hits:attack.hits,actorEnemyId:attacking.id};log=attack.hits.length&&attack.hits.every(hit=>hit.dodged)?`${attacking.name}'s attack was dodged.`:attack.enhanced?`${attacking.name} uses Slimy against all allied characters.`:attack.mode==='aoe'?`${attacking.name} attacks all allied characters.`:attack.mode==='blast'?`${attacking.name} blasts ${attack.hits.length} allied characters.`:firstHit.dodged?`${party.find(p=>p.id===firstHit.target)?.name||'An ally'} dodges ${attacking.name}'s attack.`:`${attacking.name} hits ${party.find(p=>p.id===firstHit.target)?.name||'an ally'} for ${firstHit.damage}.`;const reflectDamage=attack.hits.reduce((sum,hit)=>sum+((hit.reflect?.healthDamage||0)+(hit.reflect?.shieldDamage||0)),0),echoDamage=attack.hits.reduce((sum,hit)=>sum+(hit.echo?.damage||0),0),echoHit=attack.hits.find(hit=>hit.echo)?.echo,hasReflect=attack.hits.some(hit=>hit.reflect),hasEcho=attack.hits.some(hit=>hit.echo);if(reflectDamage)log+=` Reflect deals ${reflectDamage} True damage.`;if(echoDamage)log+=` Echo deals ${echoDamage} ${echoHit?.damageType?.toUpperCase()||'typed'} damage.`;if(attacking.passive?.id==='momentum')log+=` Momentum ${attacking.momentumStacks}/${attacking.passive.maxStacks??10}.`;phase='resolve';schedule(()=>{settleAfterAttack();drainUltimateQueueBefore(()=>{if(!alive().length){phase='defeat';log='All allied characters were defeated.'}else nextTurn()})},ENEMY_ATTACK_EFFECT_MS+COMBAT_ACTION_PHASE_GAP_MS*((hasReflect?1:0)+(hasEcho?(hasReflect?2:1):0)))},ENEMY_WINDUP_MS);
  }else{actingEnemyId=null;activeId=next;zeroSkillArmed=false;pendingTargetAction=null;cameraPreview=null;phase='player';log=`${active().name}'s turn — select an ability, then choose an enemy.`;}
 }
 // Normal turns can use Basic or Skill. Ultimate is off-turn and never spends a turn.
@@ -1092,7 +1132,7 @@ function executeCombatAction(a,action,ultimateSeq=null,allyTargetId=null){
  const targetGeometry=victim?{x:victim.x,y:victim.y,w:victim.w,h:victim.h,slot:victim.slot}:null;
  const mode=supportAction?'ally':actionTargetMode(a,action),targets=supportAction?[]:chooseAttackTargets(mode,victim);
  const controlledSummon=action==='skill'&&a.test?summons.find(s=>s.mode==='controlled'&&!s.pendingCreation&&s.ownerId===a.id):null;
- const runeAmplifyActive=action==='basic'&&hasRuneSet(a.id,'amplify')&&runeEffectReady(a.id,'amplify'),runeRecycleActive=action==='skill'&&hasRuneSet(a.id,'recycle')&&runeEffectReady(a.id,'recycle');
+ const runeAmplifyActive=action==='basic'&&hasRuneSet(a.id,'amplify')&&runeEffectReady(a.id,'amplify'),runeRecycleActive=action==='skill'&&hasRuneSet(a.id,'recycle')&&runeEffectReady(a.id,'recycle'),runeUnitedActive=action==='skill'&&supportAction&&hasRuneSet(a.id,'united')&&runeEffectReady(a.id,'united')&&(allyTarget||teamWideSupport&&party.some(ally=>ally.hp>0));
  if(runeAmplifyActive)startRuneCooldown(a.id,'amplify');
  const energyBefore=a.energy,spBefore=sp,spMaxBefore=effectiveSpMax();
  let damage=0,enhanceSpent=0,soulRate=null,zeroRate=null,loganUltimateRate=null,tuneBasicUsed=action==='basic'&&!!a.tune?.basicEnhanced;
@@ -1123,11 +1163,12 @@ function executeCombatAction(a,action,ultimateSeq=null,allyTargetId=null){
  else damage=980;
  if(action==='basic')gainSp(1);
  if(tuneBasicUsed)gainSp(1);
- if(runeRecycleActive){gainSp(1);startRuneCooldown(a.id,'recycle');emitCombatVisual('rune-recycle',[a.id],COMBAT_ACTION_EFFECT_MS,{skillPoints:1})}
- if(supportAction&&(action==='skill'||action==='ultimate')&&hasRuneSet(a.id,'united')&&(allyTarget||teamWideSupport&&party.some(ally=>ally.hp>0)))applyUnitedRune(a.id);
+ if(runeRecycleActive){gainSp(1);startRuneCooldown(a.id,'recycle',1);emitCombatVisual('rune-recycle',[a.id],COMBAT_ACTION_EFFECT_MS,{skillPoints:1})}
+ if(runeUnitedActive)applyUnitedRune(a.id);
  const serial=++attackSerial,ricochetEligibleEnemyIds=liveEnemies().filter(enemy=>enemy.marks?.some(mark=>mark.id==='ricochet')).map(enemy=>enemy.id);
  attackInProgress=true;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;cameraPreview=null;selectedAllyId=null;
- lastAttack={serial,actor:a.id,action,mode,ultimateSeq,allyTargetId:allyTarget?.id||null,tuneBasicUsed,runeAmplifyActive,controlledSummonId:controlledSummon?.id||null,initialTarget:victim?.id||allyTarget?.id||null,initialTargets:targets.map(e=>e.id),
+ const damageType=a.id==='soul'?'true':a.id==='lily'||a.id==='dawn'?'magical':a.id==='zero'||a.id==='logan'?'physical':null;
+ lastAttack={serial,actor:a.id,action,mode,damageType,ultimateSeq,allyTargetId:allyTarget?.id||null,tuneBasicUsed,runeAmplifyActive,controlledSummonId:controlledSummon?.id||null,initialTarget:victim?.id||allyTarget?.id||null,initialTargets:targets.map(e=>e.id),
   ricochetEligibleEnemyIds,hits:[],defeats:[],finished:false,startedAt:performance.now(),finishedAt:null,energyBefore,energyAfter:a.energy,spBefore,spAfter:sp,spMaxBefore,spMaxAfter:effectiveSpMax(),enhanceSpent,soulRate,zeroRate,loganUltimateRate};
  if(runeAmplifyActive)emitCombatVisual('rune-amplify',targets.map(enemy=>enemy.id),COMBAT_ACTION_EFFECT_MS,{damageBonus:.5});
  phase='resolve';if(dawnSupport)selectedAllyId=allyTarget.id;const actionVisual=ACTION_VISUALS[a.id]?.[action]||`${a.id}-${action}`;fx=supportAction?{kind:'support',visual:actionVisual,at:performance.now(),damage:0,actor:a.id,targetAllyId:allyTarget?.id||null,targetAllyIds:teamWideSupport?party.filter(ally=>ally.hp>0).map(ally=>ally.id):null,action}:{kind:action,visual:actionVisual,at:performance.now(),damage,actor:a.id,targetEnemyId:victim?.id||null,targetEnemyIds:targets.map(e=>e.id),targetGeometry};
@@ -1140,7 +1181,8 @@ function executeCombatAction(a,action,ultimateSeq=null,allyTargetId=null){
   if(phase!=='resolve'||!attackInProgress||lastAttack?.serial!==serial)return;
   for(let n=0;n<targets.length;n++)if(targets[n].hp>0){let hitDamage=damage;if(a.id==='soul'&&(action==='basic'||action==='ultimate'))hitDamage=soulDamageForTarget(a,targets[n],soulRate);else if(a.id==='zero')hitDamage=calculateTypedActionDamage('physical',zeroRate,a,targets[n])?.damageTaken??0;else if(a.id==='lily')hitDamage=calculateTypedActionDamage('magical',(action==='skill' ? 0.5 : 1)*celestialMultiplier(a.id,action)*(action==='ultimate'&&characterDuplicateRank(a.id)>=3?2:1)*(tuneBasicUsed?1+a.tune.damageBonus:1),a,targets[n])?.damageTaken??0;else if(a.id==='dawn'&&action==='basic')hitDamage=calculateTypedActionDamage('magical',2*celestialMultiplier(a.id,'basic')*(tuneBasicUsed?1+a.tune.damageBonus:1),a,targets[n])?.damageTaken??0;else if(a.id==='logan'&&action==='ultimate')hitDamage=calculateTypedActionDamage('physical',loganUltimateRate,a,targets[n])?.damageTaken??0;applyTrainingHit(targets[n],hitDamage,n+1,true)}
  },a.id==='soul'&&action==='basic'?ANIMATION_STEP_MS*3:ANIMATION_STEP_MS);
- schedule(()=>finishTrainingAttack(serial),mode==='five-hit'?ULTIMATE_PRESENTATION_MS:a.id==='soul'&&action==='basic'?SOUL_BASIC_MS:action==='ultimate'?ULTIMATE_PRESENTATION_MS:COMBAT_ACTION_EFFECT_MS);
+ const hitResolveAt=mode==='five-hit'?ANIMATION_STEP_MS*5:a.id==='soul'&&action==='basic'?ANIMATION_STEP_MS*3:ANIMATION_STEP_MS,normalFinishAt=mode==='five-hit'?ULTIMATE_PRESENTATION_MS:a.id==='soul'&&action==='basic'?SOUL_BASIC_MS:action==='ultimate'?ULTIMATE_PRESENTATION_MS:COMBAT_ACTION_EFFECT_MS,hasReflect=targets.some(target=>reflectPercentOf(target)>0),hasEcho=echoPercentOf(a)>0,reactionDelay=hasEcho?COMBAT_ACTION_PHASE_GAP_MS*(hasReflect?2:1):hasReflect?COMBAT_ACTION_PHASE_GAP_MS:0,reactionFinishPadding=(hasReflect||hasEcho)?Math.max(0,hitResolveAt+reactionDelay+COMBAT_ACTION_EFFECT_MS-normalFinishAt):0;
+ schedule(()=>finishTrainingAttack(serial),normalFinishAt+reactionFinishPadding);
  return true;
 }
 // Developer-only test helpers. They do not define the game's revival resource, cost, or eligibility rules.
@@ -1162,21 +1204,23 @@ function shieldedHealthBar(x,y,w,h,hp,maxHp,shield,fill='#72e3ae',background='#3
 function addButton(x,y,w,h,action,label,sub='',enabled=true,labelSize=19){choiceRects.push({x,y,w,h,action,enabled});rect(x,y,w,h,enabled?'#263754':'#1d2538',enabled?'#a5c9dc':'#526176',11);text(label,x+w/2,y+h/2-(sub?10:0),labelSize,enabled?'#fff4e6':'#9eafc1','750','center');if(sub)text(sub,x+w/2,y+h/2+16,13,'#bacadb','500','center')}
 function drawBackground(){ctx.imageSmoothingEnabled=false;if(images.arena.complete&&images.arena.naturalWidth)ctx.drawImage(images.arena,0,0,W,H);else{rect(0,0,W,H,'#596f83');rect(0,480,W,420,'#a38f9e')}rect(0,0,W,165,'rgba(8,10,22,.24)');const shade=ctx.createLinearGradient(0,580,0,900);shade.addColorStop(0,'#17122500');shade.addColorStop(1,'#090d23dc');rect(0,560,W,340,shade)}
 
-const RUNE_STATS=['hp','physicalAttack','magicalAttack','physicalDefense','magicalDefense','speed'];
+const RUNE_STATS=['hp','attack','physicalDefense','magicalDefense','speed'];
 const RUNE_STAT_INFO={
- hp:{label:'HP',main:100},physicalAttack:{label:'Physical Attack',main:20},
- magicalAttack:{label:'Magical Attack',main:20},physicalDefense:{label:'Physical Defense',main:4},
+ hp:{label:'HP',main:100},attack:{label:'Attack',main:20},
+ physicalDefense:{label:'Physical Defense',main:4},
  magicalDefense:{label:'Magical Defense',main:4},speed:{label:'Speed',main:20}
 };
 const CELESTIALS=[['passive','PASSIVE'],['basic','BASIC'],['skill','SKILL'],['ultimate','ULTIMATE']];
 function defaultLoadout(){return {characterDuplicates:0,weapon:{selected:'standard',standardPotential:1,premiumPotential:1,premiumOwned:false,standardLevel:1,standardExp:0,standardAscended:[],premiumLevel:1,premiumExp:0,premiumAscended:[]},runes:[null,null,null,null],celestials:{passive:1,basic:1,skill:1,ultimate:1}}}
 function normalizeRune(value){
- if(!value||typeof value!=='object'||!RUNE_STATS.includes(value.main)||!Array.isArray(value.subs))return null;
- const subs=value.subs.filter((x,i,a)=>RUNE_STATS.includes(x)&&x!==value.main&&a.indexOf(x)===i).slice(0,3);
+ if(!value||typeof value!=='object'||!Array.isArray(value.subs))return null;
+ const convert=x=>x==='physicalAttack'||x==='magicalAttack'?'attack':x,main=convert(value.main);if(!RUNE_STATS.includes(main))return null;
+ const rawSubs=value.subs.map(convert),legacyAttackBonus=Math.max(0,rawSubs.filter(x=>x==='attack').length-(main==='attack'?0:1)),subs=rawSubs.filter((x,i,a)=>RUNE_STATS.includes(x)&&x!==main&&a.indexOf(x)===i).slice(0,3);
+ for(const stat of RUNE_STATS)if(subs.length<3&&stat!==main&&!subs.includes(stat))subs.push(stat);
  const setId=typeof value.setId==='string'&&Object.hasOwn(RUNE_SET_DEFINITIONS,value.setId)?value.setId:null;
- return subs.length===3?{level:Number.isInteger(value.level)?Math.max(1,Math.min(5,value.level)):1,main:value.main,subs,setId,criticalRateBonus:Number.isFinite(value.criticalRateBonus)?Math.max(0,value.criticalRateBonus):0,criticalDamageBonus:Number.isFinite(value.criticalDamageBonus)?Math.max(0,value.criticalDamageBonus):0}:null
+ return subs.length===3?{level:Number.isInteger(value.level)?Math.max(1,Math.min(5,value.level)):1,main,subs,setId,legacyAttackBonus,criticalRateBonus:Number.isFinite(value.criticalRateBonus)?Math.max(0,value.criticalRateBonus):0,criticalDamageBonus:Number.isFinite(value.criticalDamageBonus)?Math.max(0,value.criticalDamageBonus):0}:null
 }
-function createRune(setId){return {level:1,main:'hp',subs:['physicalAttack','magicalAttack','physicalDefense'],setId,criticalRateBonus:0,criticalDamageBonus:0}}
+function createRune(setId){return {level:1,main:'hp',subs:['attack','physicalDefense','magicalDefense'],setId,criticalRateBonus:0,criticalDamageBonus:0}}
 function normalizeLoadout(value,cap=characterLevelCap()){
  const base=defaultLoadout();if(!value||typeof value!=='object')return base;
  base.characterDuplicates=Number.isInteger(value.characterDuplicates)?Math.max(0,Math.min(4,value.characterDuplicates)):0;
@@ -1342,11 +1386,12 @@ function ascendWeaponWithGem(id,type){
 }
 function loadoutStatModifiers(id,characterLevel=1){
  const record=loadoutFor(id),bonus=weaponBonus(record,id),totals=Object.fromEntries(RUNE_STATS.map(k=>[k,0]));
- for(const rune of record.runes){if(!rune)continue;totals[rune.main]+=RUNE_STAT_INFO[rune.main].main*rune.level;for(const sub of rune.subs)totals[sub]+=RUNE_STAT_INFO[sub].main*.25*rune.level}
- const pct={signatureWeapon:bonus},criticalRateFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalRateBonus||0),0)+(hasRuneSet(id,'radiant-moon') ? .10 : 0),criticalDamageFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalDamageBonus||0),0)+(hasRuneSet(id,'eternal-sun') ? .25 : 0);
+ for(const rune of record.runes){if(!rune)continue;totals[rune.main]+=RUNE_STAT_INFO[rune.main].main*rune.level;for(const sub of rune.subs)totals[sub]+=RUNE_STAT_INFO[sub].main*.25*rune.level;if(rune.legacyAttackBonus)totals.attack+=20*.25*rune.level*rune.legacyAttackBonus}
+ const pct={signatureWeapon:bonus},criticalRateFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalRateBonus||0),0)+(hasRuneSet(id,'eternal-sun') ? .10 : 0),criticalDamageFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalDamageBonus||0),0)+(hasRuneSet(id,'eternal-sun') ? .25 : 0);
  return {hpFlatModifiers:{},hpPercentModifiers:pct,hpEquipmentFlatModifiers:{runes:totals.hp},
- physicalAttackFlatModifiers:{},physicalAttackPercentModifiers:pct,physicalAttackEquipmentFlatModifiers:{runes:totals.physicalAttack},
- magicalAttackFlatModifiers:{},magicalAttackPercentModifiers:pct,magicalAttackEquipmentFlatModifiers:{runes:totals.magicalAttack},
+ attackFlatModifiers:{},attackPercentModifiers:pct,attackEquipmentFlatModifiers:{runes:totals.attack},
+ physicalAttackFlatModifiers:{},physicalAttackPercentModifiers:pct,physicalAttackEquipmentFlatModifiers:{runes:totals.attack},
+ magicalAttackFlatModifiers:{},magicalAttackPercentModifiers:pct,magicalAttackEquipmentFlatModifiers:{runes:totals.attack},
  physicalDefenseFlatModifiers:{},physicalDefensePercentModifiers:pct,physicalDefenseEquipmentFlatModifiers:{runes:totals.physicalDefense},
  magicalDefenseFlatModifiers:{},magicalDefensePercentModifiers:pct,magicalDefenseEquipmentFlatModifiers:{runes:totals.magicalDefense},
  speedFlatModifiers:{},speedPercentModifiers:pct,speedEquipmentFlatModifiers:{runes:totals.speed},criticalRateModifiers:{runes:criticalRateFromRunes,premiumWeaponDuplicate2:id==='soul'&&premiumWeaponDuplicateRank(id)>=2 ? .1 : 0},criticalDamageModifiers:{runes:criticalDamageFromRunes,premiumWeaponDuplicate2:id==='soul'&&premiumWeaponDuplicateRank(id)>=2 ? .25 : 0}}
@@ -1360,8 +1405,9 @@ function soulEnhancedBasicTargetMode(stacks){if(stacks<3)return 'single';return 
 function loadoutStats(id){
  const model=ROSTER.find(x=>x.id===id),level=progressFor(id)?.level||1;if(!model)return null;
  const unit={...model,level,...loadoutStatModifiers(id,level)};
- return {HP:calculateMaxHp(model.hp,level,unit.hpFlatModifiers,unit.hpPercentModifiers,unit.hpEquipmentFlatModifiers),
- 'Physical Attack':calculatePhysicalAttack(unit),'Magical Attack':calculateMagicalAttack(unit),
+ const stats={HP:calculateMaxHp(model.hp,level,unit.hpFlatModifiers,unit.hpPercentModifiers,unit.hpEquipmentFlatModifiers)};
+ if(Number.isFinite(model.baseAttack))stats.Attack=calculateTrueAttack(unit);else{stats['Physical Attack']=calculatePhysicalAttack(unit);stats['Magical Attack']=calculateMagicalAttack(unit)}
+ return {...stats,
  'Physical Defense':calculatePhysicalDefense(unit),'Magical Defense':calculateMagicalDefense(unit),Speed:calculateSpeed(unit)}
 }
 function enterLoadout(){loadoutCharacterId='soul';selectedLoadoutRune=0;loadoutPage='details';runePanelMode='slots';runeStatPicker=null;weaponBookSelection={small:0,medium:0,large:0};phase='loadout';hint=''}
@@ -1540,7 +1586,7 @@ function drawLoadoutLevels(){
  const statList=Object.entries(stats||{});
  for(let i=0;i<statList.length;i++){
   const [name,value]=statList[i],x=165+(i%2)*275,y=610+Math.floor(i/2)*28;
-  text(name+'  '+(value===null?'—':Math.round(value)),x,y,14,'#d6dceb','650');
+  text(name+'  '+formatCombatStat(value),x,y,14,'#d6dceb','650');
  }
  rect(790,190,680,450,'rgba(25,37,58,.94)','#718ba4',14);
  text(DEV_MODE?'CHARACTER DUPLICATES • TEST':'CHARACTER DUPLICATES',830,240,21,'#f3dfb9','850');
@@ -2419,12 +2465,22 @@ function drawFx(t){
 }
 function drawCombatVisualEvents(t,shot){
  combatVisualEvents=combatVisualEvents.filter(e=>t-e.at<e.duration);
- for(const event of combatVisualEvents){const q=clamp01((t-event.at)/event.duration),fade=1-q;
+ for(const event of combatVisualEvents){if(t<event.at)continue;const q=clamp01((t-event.at)/event.duration),fade=1-q;
   if(event.type==='zero-delay'){
    for(const id of event.targetIds){const pos=enemyVisualPosition(id);if(!pos)continue;drawCombatSigil(pos.x,pos.y,28+q*44,'#f57482',fade,'ring');text('DELAYED 20%',pos.x,pos.y-58,13,`rgba(255,220,223,${fade})`,'900','center')}continue;
   }
+  if(event.type==='reflect-damage'){
+   const view=shotWorld(shot)==='reverse'?'party':'command',pan=view==='party'?.32:.52;
+   for(const id of event.targetIds){const ally=party.find(unit=>unit.id===id),allyPosition=ally&&cameraAllyPosition(id,view),enemyPosition=!ally&&enemyVisualPosition(id),x=allyPosition?allyPosition.x+allyPosition.w/2+camera.currentX*pan:enemyPosition?.x,y=allyPosition?allyPosition.baseY-allyPosition.h*.58:enemyPosition?.y;if(!Number.isFinite(x)||!Number.isFinite(y))continue;drawCombatSigil(x,y,30+q*24,'#ff8c86',fade,'ring');const label=event.dodged?'REFLECT DODGED':event.damage+event.shieldDamage>0?`REFLECT -${event.damage+event.shieldDamage} TRUE`:'REFLECT';text(label,x,y+34,13,`rgba(255,230,224,${fade})`,'900','center')}
+   continue;
+  }
+  if(event.type==='echo-damage'){
+   const view=shotWorld(shot)==='reverse'?'party':'command',pan=view==='party'?.32:.52,color=event.damageType==='physical'?'#f2b36f':event.damageType==='magical'?'#c595ff':'#79e3ff';
+   for(const id of event.targetIds){const ally=party.find(unit=>unit.id===id),allyPosition=ally&&cameraAllyPosition(id,view),enemyPosition=!ally&&enemyVisualPosition(id),x=allyPosition?allyPosition.x+allyPosition.w/2+camera.currentX*pan:enemyPosition?.x,y=allyPosition?allyPosition.baseY-allyPosition.h*.58:enemyPosition?.y;if(!Number.isFinite(x)||!Number.isFinite(y))continue;drawCombatSigil(x,y,27+q*26,color,fade,'ring');const label=event.healthDamage>0?`ECHO -${event.healthDamage} ${event.damageType.toUpperCase()}`:event.shieldDamage>0?'ECHO BLOCKED':'ECHO';text(label,x,y+34+(event.stackIndex%3)*16,13,`rgba(239,247,255,${fade})`,'900','center')}
+   continue;
+  }
   if(event.type.startsWith('rune-')){
-   const runeKey=event.type.slice(5),set=RUNE_SET_DEFINITIONS[runeKey],labels={recycle:'+1 SKILL POINT',amplify:'BASIC ATTACK +50%',united:'SPEED +25%', 'celestial-star':'ADVANCE 50%', 'infinite-space':'DELAY 25%'};
+   const runeKey=event.type.slice(5),set=RUNE_SET_DEFINITIONS[runeKey],labels={recycle:'+1 SKILL POINT',amplify:'BASIC ATTACK +50%',united:'ADVANCE SELF 100%', 'celestial-star':'ADVANCE 100%', 'infinite-space':'DELAY ALL 50%'};
    const view=shotWorld(shot)==='reverse'?'party':'command',pan=view==='party'?.32:.52;
    for(const id of event.targetIds){const ally=party.find(unit=>unit.id===id),allyPosition=ally&&cameraAllyPosition(id,view),enemyPosition=!ally&&enemyVisualPosition(id);const x=allyPosition?allyPosition.x+allyPosition.w/2+camera.currentX*pan:enemyPosition?.x,y=allyPosition?allyPosition.baseY-allyPosition.h*.62:enemyPosition?.y;if(!Number.isFinite(x)||!Number.isFinite(y))continue;drawCombatSigil(x,y,30+q*24,set?.name==='Recycle'?'#80ecbb':'#f1d28b',fade,'ring');const icon=images[set?.image];if(icon?.complete&&icon.naturalWidth){ctx.save();ctx.globalAlpha=fade;ctx.imageSmoothingEnabled=true;ctx.drawImage(icon,x-16,y-58,32,32);ctx.restore()}text(labels[runeKey]||set?.name||'RUNE',x,y-72,13,`rgba(255,244,220,${fade})`,'900','center')}
    continue;
@@ -2485,7 +2541,7 @@ function hudPortrait(img,x,y,w,h,headShoulders=false){
  ctx.restore();
 }
 // Render active combat statuses beside each ally portrait.
-function hudStatusList(p){const runeState=runeCombatState[p.id],runeStatuses=[];if(hasRuneSet(p.id,'united')&&runeState?.unitedTurns>0)runeStatuses.push({kind:'buff',image:'runeUnited',turns:runeState.unitedTurns});if(hasRuneSet(p.id,'recycle')&&runeState?.cooldowns.recycle>0)runeStatuses.push({kind:'debuff',image:'runeRecycle',turns:runeState.cooldowns.recycle});if(hasRuneSet(p.id,'amplify')&&runeState?.cooldowns.amplify>0)runeStatuses.push({kind:'debuff',image:'runeAmplify',turns:runeState.cooldowns.amplify});return [...(Array.isArray(p.hudStatuses)?p.hudStatuses:[]),...runeStatuses,...(p.tune?[{kind:'buff',icon:'♫',turns:p.tune.turns}]:[]),...(p.residueStacks?[{kind:'debuff',icon:'R',stacks:p.residueStacks,turns:p.residueTurns}]:[])]}
+function hudStatusList(p){const runeState=runeCombatState[p.id],runeStatuses=[];for(const effect of ['recycle','amplify','celestial-star','united'])if(hasRuneSet(p.id,effect)&&runeState?.cooldowns[effect]>0)runeStatuses.push({kind:'debuff',image:RUNE_SET_DEFINITIONS[effect].image,turns:runeState.cooldowns[effect]});return [...(Array.isArray(p.hudStatuses)?p.hudStatuses:[]),...runeStatuses,...(p.tune?[{kind:'buff',icon:'♫',turns:p.tune.turns}]:[]),...(p.residueStacks?[{kind:'debuff',icon:'R',stacks:p.residueStacks,turns:p.residueTurns}]:[])]}
 function drawAllyStatuses(p,x,portraitY,sz){
  const effects=hudStatusList(p);if(!effects.length)return;
  const iconSize=23,pitch=26,perRow=Math.max(1,Math.floor((sz+3)/pitch));
@@ -2782,6 +2838,8 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)c
 if(DEV_MODE){
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,momentumStacks:e.momentumStacks||0,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
 window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.1.0',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneEchoStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,echoPercent:echoPercentOf(unit)}));
+window.twoToneReflectStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,reflectPercent:reflectPercentOf(unit)}));
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
  characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
  unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}})),
@@ -2790,7 +2848,7 @@ window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLeve
  unitPhysicalDefense:party.map(p=>({id:p.id,level:p.level,basePhysicalDefense:p.basePhysicalDefense,physicalDefense:calculatePhysicalDefense(p),flat:{...p.physicalDefenseFlatModifiers},percent:{...p.physicalDefensePercentModifiers}})),
  unitMagicalDefense:party.map(p=>({id:p.id,level:p.level,baseMagicalDefense:p.baseMagicalDefense,magicalDefense:calculateMagicalDefense(p),flat:{...p.magicalDefenseFlatModifiers},percent:{...p.magicalDefensePercentModifiers}})),
  unitTrueDamageBasis:party.map(p=>({id:p.id,trueAttack:calculateTrueAttack(p),trueDefense:calculateTrueDefense(p),selfTrueDamageReduction:calculateTrueDamageReduction(p,p)}))});
-window.twoToneTest={testGrantExp,testAscend,setPlayerRankForTest,setHpBonusForTest,calculateMaxHp,calculateLevelScaledStat,calculatePhysicalAttack,calculateMagicalAttack,calculatePhysicalDefense,calculateMagicalDefense,calculateTrueAttack,calculateTrueDefense,calculateTrueDamageReduction,calculateDamageAfterDefense,calculatePhysicalDamageAfterDefense,calculateMagicalDamageAfterDefense,calculateTrueDamageAfterDefense,calculateTypedActionDamage,requiredExp,setTrainingRecoveryMode,roundHp,addActionAdvance,addActionDelay,setSpeedMultiplierForTest,queueSummonForTest,turnTimelineSnapshot:()=>turnTimeline.snapshot(),queueUltimate,chargeUltimateForTest,toggleHudStatusDemo,setHudStatusesForTest:(id,items)=>{const p=party.find(p=>p.id===id);if(!p||!Array.isArray(items)||items.length>80)return false;p.hudStatuses=items.map(e=>({kind:e.kind==='debuff'?'debuff':'buff',icon:String(e.icon||'✦').slice(0,2),turns:e.turns===null?null:(Number.isInteger(e.turns)&&e.turns>=0?e.turns:null)}));return true;},setSpCapTestSource,cycleSpCapTest,canQueueUltimate,debugKOForTest:(id)=>{if(['setup','intro','victory','defeat'].includes(phase))return false;const p=party.find(p=>p.id===id);if(!p||p.hp<=0)return false;p.hp=0;gauges[p.id]=0;saveVitals();cancelQueuedUltimatesOfDefeated();return true},startBattle,addUnit,removeUnit,enterSelection,enterPartySetup,saveParty,testKO,testRevive,play,replay,zeroSkillControl,setTargetingMode,startSupportDemo,confirmSupportDemo,cancelSupportDemo,eligibleAllyTarget:(id,kind)=>eligibleAllyTarget(party.find(p=>p.id===id),kind),setEnemyHpForTest:(id,hp)=>{if(phase!=='player'||attackInProgress)return false;const e=liveEnemies().find(e=>e.id===id);if(!e||!Number.isFinite(hp)||hp<1||hp>e.maxHp)return false;e.hp=hp;syncEnemyHp();return true},applyBleedForTest:(enemyId,sourceId,stacks=1,maxStacks=5)=>{const enemy=liveEnemies().find(unit=>unit.id===enemyId),source=party.find(unit=>unit.id===sourceId);return enemy&&source?applyBleed(enemy,source,stacks,maxStacks):false},setEnemyTarget,setWavePlanForTest,toggleWavePreset,setEnemyRoster,debugDefeatEnemy:(id)=>{const e=liveEnemies().find(e=>e.id===id);if(!e||phase==='setup'||phase==='victory'||phase==='defeat')return false;e.hp=0;resolveEnemyDefeat(e);return true;},selectEnemy:(id)=>setEnemyTarget(id),setCameraPreview:(view)=>{if(phase==='player'){cameraPreview=view;selectedAllyId=activeId}},cameraStatus:()=>cameraShot()};
+window.twoToneTest={testGrantExp,testAscend,setPlayerRankForTest,setHpBonusForTest,setEchoPercentForTest,setReflectPercentForTest,calculateMaxHp,calculateLevelScaledStat,calculatePhysicalAttack,calculateMagicalAttack,calculatePhysicalDefense,calculateMagicalDefense,calculateTrueAttack,calculateTrueDefense,calculateTrueDamageReduction,calculateDamageAfterDefense,calculatePhysicalDamageAfterDefense,calculateMagicalDamageAfterDefense,calculateTrueDamageAfterDefense,calculateTypedActionDamage,requiredExp,setTrainingRecoveryMode,roundHp,addActionAdvance,addActionDelay,setSpeedMultiplierForTest,queueSummonForTest,turnTimelineSnapshot:()=>turnTimeline.snapshot(),queueUltimate,chargeUltimateForTest,toggleHudStatusDemo,setHudStatusesForTest:(id,items)=>{const p=party.find(p=>p.id===id);if(!p||!Array.isArray(items)||items.length>80)return false;p.hudStatuses=items.map(e=>({kind:e.kind==='debuff'?'debuff':'buff',icon:String(e.icon||'✦').slice(0,2),turns:e.turns===null?null:(Number.isInteger(e.turns)&&e.turns>=0?e.turns:null)}));return true;},setSpCapTestSource,cycleSpCapTest,canQueueUltimate,debugKOForTest:(id)=>{if(['setup','intro','victory','defeat'].includes(phase))return false;const p=party.find(p=>p.id===id);if(!p||p.hp<=0)return false;p.hp=0;gauges[p.id]=0;saveVitals();cancelQueuedUltimatesOfDefeated();return true},startBattle,addUnit,removeUnit,enterSelection,enterPartySetup,saveParty,testKO,testRevive,play,replay,zeroSkillControl,setTargetingMode,startSupportDemo,confirmSupportDemo,cancelSupportDemo,eligibleAllyTarget:(id,kind)=>eligibleAllyTarget(party.find(p=>p.id===id),kind),setEnemyHpForTest:(id,hp)=>{if(phase!=='player'||attackInProgress)return false;const e=liveEnemies().find(e=>e.id===id);if(!e||!Number.isFinite(hp)||hp<1||hp>e.maxHp)return false;e.hp=hp;syncEnemyHp();return true},applyBleedForTest:(enemyId,sourceId,stacks=1,maxStacks=5)=>{const enemy=liveEnemies().find(unit=>unit.id===enemyId),source=party.find(unit=>unit.id===sourceId);return enemy&&source?applyBleed(enemy,source,stacks,maxStacks):false},setEnemyTarget,setWavePlanForTest,toggleWavePreset,setEnemyRoster,debugDefeatEnemy:(id)=>{const e=liveEnemies().find(e=>e.id===id);if(!e||phase==='setup'||phase==='victory'||phase==='defeat')return false;e.hp=0;resolveEnemyDefeat(e);return true;},selectEnemy:(id)=>setEnemyTarget(id),setCameraPreview:(view)=>{if(phase==='player'){cameraPreview=view;selectedAllyId=activeId}},cameraStatus:()=>cameraShot()};
 window.twoToneTest.grantWeaponXp=grantWeaponXp;window.twoToneTest.weaponLevelCap=weaponLevelCap;window.twoToneTest.weaponPotentialMultiplier=weaponPotentialMultiplier;
 window.zeroBasicAnimationDebug=()=>({durationMs:SOUL_BASIC_MS,elapsed:fx?.kind==='basic'&&fx.actor==='soul'?Math.max(0,performance.now()-fx.at):null,active:soulBasicStage(performance.now())!==null,assets:['soul','soulBasicWindup','soulBasicSlash'].map(id=>({id,loaded:!!images[id]?.complete&&!!images[id]?.naturalWidth}))});
 window.twoToneTest.applyTauntForTest=(targetId,sourceId,rate,turns)=>{const target=party.find(unit=>unit.id===targetId)||enemies.find(unit=>unit.id===targetId),source=party.find(unit=>unit.id===sourceId)||enemies.find(unit=>unit.id===sourceId);return target&&source?applyTaunt(target,source,rate,turns):false};

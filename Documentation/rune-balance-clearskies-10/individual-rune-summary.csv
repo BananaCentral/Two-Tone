@@ -1,0 +1,46 @@
+character,rune,beforeWinRate,afterWinRate,deltaPercentagePoints,eligibleByCurrentMechanics,eligibilityReason,averageActivationsPerBattle,matchedBattles,encounterCells
+Soul,radiant-moon,0.9106584362139918,0.9106584362139918,0.0,False,Requires a damaging skill; Lily and Zero have one in the current simulator.,0.0,24300,162
+Soul,eternal-sun,0.9106584362139918,0.91559670781893,0.49382716049382713,True,Requires a damaging Ultimate; Dawn’s current Ultimate deals no damage.,0.2743621399176955,24300,162
+Soul,celestial-star,0.9106584362139918,0.9162139917695473,0.5555555555555556,True,Triggers on Ultimate use.,0.31131687242798356,24300,162
+Soul,dark-matter,0.9106584362139918,0.9223456790123457,1.168724279835391,True,Defense ignore works with the current damage model; the +10% bonus applies to physical and magical damage.,1.2,24300,162
+Soul,clear-skies,0.9106584362139918,0.915843621399177,0.5185185185185185,True,"After a skill, grants a 10%-Max-HP shield for two wearer turns, then enters cooldown for the next two wearer turns. Reflect increases by 10 percentage points while the wearer has any shield.",3.252139917695473,24300,162
+Soul,infinite-space,0.9106584362139918,0.9176543209876543,0.6995884773662552,True,Triggers on Ultimate use; support Ultimates also trigger it.,0.37584362139917693,24300,162
+Soul,recycle,0.9106584362139918,0.9292181069958848,1.8559670781893005,True,Triggers when the wearer uses a skill and can receive a skill point.,1.0728395061728395,24300,162
+Soul,amplify,0.9106584362139918,0.9289300411522634,1.8271604938271606,True,Triggers on the wearer’s basic attack.,1.1533333333333333,24300,162
+Soul,united,0.9106584362139918,0.9106584362139918,0.0,False,A skill targeting an ally advances the wearer by 50% and restores 20 Energy; then cools down for two wearer turns. Soul’s self-only Enhance does not qualify.,0.0,24300,162
+Lily,radiant-moon,0.9021399176954733,0.9047736625514403,0.26337448559670784,True,Requires a damaging skill; Lily and Zero have one in the current simulator.,1.0200823045267489,12150,81
+Lily,eternal-sun,0.9021399176954733,0.9036213991769547,0.14814814814814814,True,Requires a damaging Ultimate; Dawn’s current Ultimate deals no damage.,0.16065843621399176,12150,81
+Lily,celestial-star,0.9021399176954733,0.902633744855967,0.04938271604938272,True,Triggers on Ultimate use.,0.16855967078189302,12150,81
+Lily,dark-matter,0.9021399176954733,0.9051851851851852,0.3045267489711934,True,Defense ignore works with the current damage model; the +10% bonus applies to physical and magical damage.,1.13679012345679,12150,81
+Lily,clear-skies,0.9021399176954733,0.9048559670781893,0.2716049382716049,True,"After a skill, grants a 10%-Max-HP shield for two wearer turns, then enters cooldown for the next two wearer turns. Reflect increases by 10 percentage points while the wearer has any shield.",3.5097119341563787,12150,81
+Lily,infinite-space,0.9021399176954733,0.9054320987654321,0.3292181069958848,True,Triggers on Ultimate use; support Ultimates also trigger it.,0.21539094650205762,12150,81
+Lily,recycle,0.9021399176954733,0.9065020576131687,0.43621399176954734,True,Triggers when the wearer uses a skill and can receive a skill point.,0.9978600823045267,12150,81
+Lily,amplify,0.9021399176954733,0.9049382716049382,0.27983539094650206,True,Triggers on the wearer’s basic attack.,0.43637860082304525,12150,81
+Lily,united,0.9021399176954733,0.9021399176954733,0.0,False,A skill targeting an ally advances the wearer by 50% and restores 20 Energy; then cools down for two wearer turns. Soul’s self-only Enhance does not qualify.,0.0,12150,81
+Dawn,radiant-moon,0.9106584362139918,0.9106584362139918,0.0,False,Requires a damaging skill; Lily and Zero have one in the current simulator.,0.0,24300,162
+Dawn,eternal-sun,0.9106584362139918,0.9106584362139918,0.0,False,Requires a damaging Ultimate; Dawn’s current Ultimate deals no damage.,0.0,24300,162
+Dawn,celestial-star,0.9106584362139918,0.9108230452674897,0.01646090534979424,True,Triggers on Ultimate use.,0.12847736625514403,24300,162
+Dawn,dark-matter,0.9106584362139918,0.9120576131687242,0.13991769547325103,True,Defense ignore works with the current damage model; the +10% bonus applies to physical and magical damage.,0.32967078189300414,24300,162
+Dawn,clear-skies,0.9106584362139918,0.9137860082304526,0.31275720164609055,True,"After a skill, grants a 10%-Max-HP shield for two wearer turns, then enters cooldown for the next two wearer turns. Reflect increases by 10 percentage points while the wearer has any shield.",3.0202880658436215,24300,162
+Dawn,infinite-space,0.9106584362139918,0.911440329218107,0.07818930041152264,True,Triggers on Ultimate use; support Ultimates also trigger it.,0.15534979423868311,24300,162
+Dawn,recycle,0.9106584362139918,0.9205761316872428,0.9917695473251029,True,Triggers when the wearer uses a skill and can receive a skill point.,0.91440329218107,24300,162
+Dawn,amplify,0.9106584362139918,0.9132098765432098,0.2551440329218107,True,Triggers on the wearer’s basic attack.,0.32724279835390946,24300,162
+Dawn,united,0.9106584362139918,0.9164197530864198,0.5761316872427984,True,A skill targeting an ally advances the wearer by 50% and restores 20 Energy; then cools down for two wearer turns. Soul’s self-only Enhance does not qualify.,0.9768312757201646,24300,162
+Logan,radiant-moon,0.9106584362139918,0.9106584362139918,0.0,False,Requires a damaging skill; Lily and Zero have one in the current simulator.,0.0,24300,162
+Logan,eternal-sun,0.9106584362139918,0.91119341563786,0.053497942386831275,True,Requires a damaging Ultimate; Dawn’s current Ultimate deals no damage.,0.09366255144032921,24300,162
+Logan,celestial-star,0.9106584362139918,0.91119341563786,0.053497942386831275,True,Triggers on Ultimate use.,0.1,24300,162
+Logan,dark-matter,0.9106584362139918,0.9121399176954732,0.14814814814814814,True,Defense ignore works with the current damage model; the +10% bonus applies to physical and magical damage.,0.42263374485596705,24300,162
+Logan,clear-skies,0.9106584362139918,0.9164197530864198,0.5761316872427984,True,"After a skill, grants a 10%-Max-HP shield for two wearer turns, then enters cooldown for the next two wearer turns. Reflect increases by 10 percentage points while the wearer has any shield.",2.9335802469135803,24300,162
+Logan,infinite-space,0.9106584362139918,0.9119341563786009,0.12757201646090535,True,Triggers on Ultimate use; support Ultimates also trigger it.,0.11263374485596708,24300,162
+Logan,recycle,0.9106584362139918,0.912633744855967,0.19753086419753088,True,Triggers when the wearer uses a skill and can receive a skill point.,0.6192181069958848,24300,162
+Logan,amplify,0.9106584362139918,0.9127983539094651,0.2139917695473251,True,Triggers on the wearer’s basic attack.,0.3774485596707819,24300,162
+Logan,united,0.9106584362139918,0.9180246913580247,0.7366255144032922,True,A skill targeting an ally advances the wearer by 50% and restores 20 Energy; then cools down for two wearer turns. Soul’s self-only Enhance does not qualify.,0.6708230452674897,24300,162
+Zero,radiant-moon,0.9191769547325103,0.9265020576131687,0.7325102880658436,True,Requires a damaging skill; Lily and Zero have one in the current simulator.,1.3500411522633744,12150,81
+Zero,eternal-sun,0.9191769547325103,0.9215637860082304,0.23868312757201643,True,Requires a damaging Ultimate; Dawn’s current Ultimate deals no damage.,0.24921810699588479,12150,81
+Zero,celestial-star,0.9191769547325103,0.9191769547325103,0.0,True,Triggers on Ultimate use.,0.26164609053497945,12150,81
+Zero,dark-matter,0.9191769547325103,0.9240329218106996,0.48559670781893005,True,Defense ignore works with the current damage model; the +10% bonus applies to physical and magical damage.,1.460493827160494,12150,81
+Zero,clear-skies,0.9191769547325103,0.9230452674897119,0.3868312757201646,True,"After a skill, grants a 10%-Max-HP shield for two wearer turns, then enters cooldown for the next two wearer turns. Reflect increases by 10 percentage points while the wearer has any shield.",3.2906172839506174,12150,81
+Zero,infinite-space,0.9191769547325103,0.9237037037037037,0.45267489711934156,True,Triggers on Ultimate use; support Ultimates also trigger it.,0.32510288065843623,12150,81
+Zero,recycle,0.9191769547325103,0.9320987654320988,1.2921810699588478,True,Triggers when the wearer uses a skill and can receive a skill point.,1.3738271604938272,12150,81
+Zero,amplify,0.9191769547325103,0.9208230452674897,0.1646090534979424,True,Triggers on the wearer’s basic attack.,0.4185185185185185,12150,81
+Zero,united,0.9191769547325103,0.9191769547325103,0.0,False,A skill targeting an ally advances the wearer by 50% and restores 20 Energy; then cools down for two wearer turns. Soul’s self-only Enhance does not qualify.,0.0,12150,81
