@@ -109,11 +109,13 @@ function makeBaseConfig(library, allies, enemies, difficulty, length, archetypeC
   };
 }
 function candidateSpecs(raw) {
-  if (raw === 'all-actions') return CHARACTER_IDS.flatMap(character => ['basic', 'skill', 'ultimate'].map(id => ({ type: 'action', id, character })));
-  if (raw === 'all-passives') return CHARACTER_PASSIVES.map(spec => ({ type: 'passive', ...spec }));
+  if (raw === 'all-actions') return [...CHARACTER_IDS.flatMap(character => ['basic', 'skill', 'ultimate'].map(id => ({ type: 'action', id, character }))), ...Object.keys(SVP_GAINS).map(id => ({ type: 'stat', id }))];
+  if (raw === 'all-passives') return [...CHARACTER_PASSIVES.map(spec => ({ type: 'passive', ...spec })), ...Object.keys(SVP_GAINS).map(id => ({ type: 'stat', id }))];
   if (raw === 'all-character-mechanics') return [
     ...CHARACTER_PASSIVES.map(spec => ({ type: 'passive', ...spec })),
-    ...CHARACTER_IDS.flatMap(character => ['basic', 'skill', 'ultimate'].map(id => ({ type: 'action', id, character })))
+    ...CHARACTER_IDS.flatMap(character => ['basic', 'skill', 'ultimate'].map(id => ({ type: 'action', id, character }))),
+    ...CHARACTER_IDS.map(character => ({ type: 'character-overall', id: character, character })),
+    ...Object.keys(SVP_GAINS).map(id => ({ type: 'stat', id }))
   ];
   if (raw === 'all-rune-ratings') return [...RUNES.map(id => ({ type: 'rune', id })), ...Object.keys(SVP_GAINS).map(id => ({ type: 'stat', id }))];
   if (raw === 'all-runes') return RUNES.map(id => ({ type: 'rune', id }));
@@ -122,7 +124,7 @@ function candidateSpecs(raw) {
   const [type, ...rest] = raw.split(':');
   const value = rest.join(':');
   if (type === 'rune' && RUNES.includes(value)) return [{ type, id: value }];
-  if (type === 'character' && CHARACTER_IDS.includes(value)) return [{ type, id: value }];
+  if ((type === 'character' || type === 'character-overall') && CHARACTER_IDS.includes(value)) return [{ type, id: value, character: value }];
   if (type === 'passive' && /^(soul|lily|dawn|logan|zero)\/[A-Za-z][A-Za-z0-9-]*$/.test(value)) {
     const [character, id] = value.split('/');
     if (CHARACTER_PASSIVES.some(spec => spec.character === character && spec.id === id)) return [{ type, id, character }];
@@ -137,9 +139,14 @@ function candidateSpecs(raw) {
   }
   fail(`Unknown candidate ${raw}. See --help.`);
 }
+function candidateLabel(spec) {
+  if (spec.type === 'character-overall') return `${spec.type}:${spec.character}`;
+  if (spec.type === 'action' || spec.type === 'passive') return `${spec.type}:${spec.character}/${spec.id}`;
+  return `${spec.type}:${spec.id}${spec.potential ? `@P${spec.potential}L${spec.level || 1}` : ''}`;
+}
 function wearersFor(spec, party) {
   if (spec.type === 'character') return party.includes(spec.id) ? [spec.id] : [];
-  if (spec.type === 'action' || spec.type === 'passive') return party.includes(spec.character) ? [spec.character] : [];
+  if (spec.type === 'action' || spec.type === 'passive' || spec.type === 'character-overall') return party.includes(spec.character) ? [spec.character] : [];
   if (spec.id === 'radiant-moon') return party.filter(id => ['lily', 'zero'].includes(id));
   if (spec.id === 'eternal-sun') return party.filter(id => id !== 'dawn');
   if (spec.id === 'united') return party.filter(id => ['dawn', 'logan'].includes(id));
@@ -185,13 +192,16 @@ function makeBranches(base, spec, wearer) {
       } else stats.physicalAttack = SVP_GAINS.attack;
     } else stats[spec.id] += SVP_GAINS[spec.id];
     treatmentStatBudget = statBudget(treatment.archetypes[wearer].stats) - before;
-  } else if (spec.type === 'character') {
+  } else if (spec.type === 'character' || spec.type === 'character-overall') {
     const archetype = control.archetypes[wearer];
     archetype.passives = [];
     delete archetype.skill;
     delete archetype.ultimate;
     control.settings.disabledPassives = [...(control.settings.disabledPassives || []), ...CHARACTER_PASSIVES.filter(passive => passive.character === wearer).map(passive => `${wearer}:${passive.id}`)];
-    // Preserve the character's authored stats and Basic Attack as the kit-free control.
+    if (spec.type === 'character-overall') {
+      const basic = archetype.basic;
+      archetype.basic = { damageType: basic.damageType, multiplier: 1, target: 'single', energyGain: 10, skillPointGain: 1 };
+    }
   } else if (spec.type === 'passive') {
     control.settings.disabledPassives = [...(control.settings.disabledPassives || []), `${wearer}:${spec.id}`];
   } else if (spec.type === 'action') {
@@ -301,7 +311,7 @@ function makeWinRateSvg(strataRows) {
   return parts.join('\n');
 }
 function parseArgs(args) {
-  const options = { candidates: [], preset: 'quick', runs: 5, seed: 1, output: 'Documentation/combat-simulator/performance-results.jsonl', limitScenarios: 180, maxActions: 2000, compact: true, runeRating: false };
+  const options = { candidates: [], preset: 'quick', runs: 5, seed: 1, output: 'Documentation/combat-simulator/performance-results.jsonl', limitScenarios: 180, maxActions: 2000, compact: true, runeRating: false, mechanicRating: false };
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
     if (arg === '--preset') {
@@ -317,6 +327,7 @@ function parseArgs(args) {
       const raw = args[++index];
       options.candidates.push(...candidateSpecs(raw));
       if (raw === 'all-rune-ratings') options.runeRating = true;
+      if (['all-character-mechanics', 'all-actions', 'all-passives'].includes(raw)) options.mechanicRating = true;
     }
     else if (arg === '--character') options.character = args[++index];
     else if (arg === '--runs') options.runs = Number(args[++index]);
@@ -573,6 +584,122 @@ function buildRuneRatingRows(samples, runCount, seed) {
   }
   return { overallRows, wearerRows };
 }
+function buildMechanicRatingRows(samples, runCount, seed) {
+  // Same matched, stratified reference score used for Runes. Candidate controls
+  // are five +100-SVP investments; each mechanic is paired against the same
+  // wearer, matchup, and seeds. This scores impact, not standalone damage.
+  const scenarioGroups = new Map();
+  for (const sample of samples) {
+    const key = `${sample.wearer}|${sample.scenarioId}`;
+    if (!scenarioGroups.has(key)) scenarioGroups.set(key, { stats: new Map(), candidates: [] });
+    const group = scenarioGroups.get(key);
+    if (sample.candidate.startsWith('stat:')) group.stats.set(sample.candidate.slice(5), sample);
+    else group.candidates.push(sample);
+  }
+  const formationGroups = new Map();
+  for (const scenario of scenarioGroups.values()) {
+    if (!scenario.candidates.length) continue;
+    assert(scenario.stats.size === Object.keys(SVP_GAINS).length, `Mechanic rating requires all five 100-SVP stat controls for ${scenario.candidates[0].wearer}.`);
+    const reference = Array.from({ length: runCount }, (_, index) => average([...scenario.stats.values()].map(stat => stat.winDeltas[index])));
+    const referenceBae = Array.from({ length: runCount }, (_, index) => average([...scenario.stats.values()].map(stat => stat.baeValues[index])));
+    for (const candidate of scenario.candidates) {
+      const stratum = [candidate.difficulty, candidate.length, candidate.allyCount, candidate.enemyCount, candidate.enemyCategory].join('|');
+      const composition = `${candidate.partyComposition}|${candidate.enemyComposition}`;
+      const key = `${candidate.candidate}|${candidate.wearer}|${stratum}|${composition}`;
+      if (!formationGroups.has(key)) formationGroups.set(key, {
+        candidate: candidate.candidate, wearer: candidate.wearer, stratum, composition,
+        deltas: Array(runCount).fill(0), references: Array(runCount).fill(0), gaps: Array(runCount).fill(0),
+        bae: Array(runCount).fill(0), referenceBae: Array(runCount).fill(0), formations: 0
+      });
+      const aggregate = formationGroups.get(key);
+      aggregate.formations++;
+      for (let index = 0; index < runCount; index++) {
+        aggregate.deltas[index] += candidate.winDeltas[index]; aggregate.references[index] += reference[index];
+        aggregate.gaps[index] += candidate.winDeltas[index] - reference[index];
+        aggregate.bae[index] += candidate.baeValues[index]; aggregate.referenceBae[index] += referenceBae[index];
+      }
+    }
+  }
+  const candidates = new Map();
+  for (const group of formationGroups.values()) {
+    for (const field of ['deltas', 'references', 'gaps', 'bae', 'referenceBae']) group[field] = group[field].map(value => value / group.formations);
+    if (!candidates.has(group.candidate)) candidates.set(group.candidate, new Map());
+    const byWearer = candidates.get(group.candidate);
+    if (!byWearer.has(group.wearer)) byWearer.set(group.wearer, new Map());
+    const strata = byWearer.get(group.wearer);
+    if (!strata.has(group.stratum)) strata.set(group.stratum, []);
+    strata.get(group.stratum).push(group);
+  }
+  function summarize(strata) {
+    const fields = ['deltas', 'references', 'gaps', 'bae', 'referenceBae'];
+    const bySeed = Object.fromEntries(fields.map(field => [field, Array(runCount).fill(0)]));
+    const positive = [];
+    for (const compositions of strata.values()) {
+      const means = Object.fromEntries(fields.map(field => [field, Array(runCount).fill(0)]));
+      for (const composition of compositions) for (const field of fields) for (let i = 0; i < runCount; i++) means[field][i] += composition[field][i];
+      for (const field of fields) for (let i = 0; i < runCount; i++) bySeed[field][i] += means[field][i] / compositions.length;
+      positive.push(average(means.deltas) > 0 ? 1 : 0);
+    }
+    for (const field of fields) for (let i = 0; i < runCount; i++) bySeed[field][i] /= strata.size;
+    return { ...bySeed, positiveStrataPct: average(positive) * 100, strataCount: strata.size };
+  }
+  const random = seededRandom(seed), bootstrapRuns = 1000;
+  function scoreOf(runeLift, referenceLift, bae, referenceBae) {
+    const win = referenceLift > 0 ? Math.max(0, Math.min(100, 100 * runeLift / referenceLift)) : 0;
+    const action = referenceBae > 0 ? Math.max(0, Math.min(100, 100 * bae / referenceBae)) : 0;
+    return { win, action, overall: Math.sqrt(win * action) };
+  }
+  function bootstrap(byWearer, selectedWearer = null) {
+    const wearers = selectedWearer ? [selectedWearer] : [...byWearer.keys()], estimates = [];
+    for (let b = 0; b < bootstrapRuns; b++) {
+      const seeds = Array.from({ length: runCount }, () => Math.floor(random() * runCount)), wearerStats = [];
+      for (const wearer of wearers) {
+        const strataStats = [];
+        for (const compositions of byWearer.get(wearer).values()) {
+          const sums = { delta: 0, reference: 0, gap: 0, bae: 0, referenceBae: 0 };
+          for (let i = 0; i < compositions.length; i++) {
+            const row = compositions[Math.floor(random() * compositions.length)];
+            sums.delta += average(seeds.map(s => row.deltas[s])); sums.reference += average(seeds.map(s => row.references[s]));
+            sums.gap += average(seeds.map(s => row.gaps[s])); sums.bae += average(seeds.map(s => row.bae[s]));
+            sums.referenceBae += average(seeds.map(s => row.referenceBae[s]));
+          }
+          strataStats.push(Object.fromEntries(Object.entries(sums).map(([key, value]) => [key, value / compositions.length])));
+        }
+        wearerStats.push(Object.fromEntries(['delta', 'reference', 'gap', 'bae', 'referenceBae'].map(key => [key, average(strataStats.map(row => row[key]))])));
+      }
+      const combined = Object.fromEntries(['delta', 'reference', 'gap', 'bae', 'referenceBae'].map(key => [key, average(wearerStats.map(row => row[key]))]));
+      estimates.push({ gap: combined.gap, score: scoreOf(combined.delta, combined.reference, combined.bae, combined.referenceBae).overall });
+    }
+    const scores = estimates.map(row => row.score).sort((a, b) => a - b), gaps = estimates.map(row => row.gap).sort((a, b) => a - b);
+    return { scoreLower: quantile(scores, 0.025), scoreUpper: quantile(scores, 0.975), gapLower: quantile(gaps, 0.025), gapUpper: quantile(gaps, 0.975) };
+  }
+  const overallRows = [], wearerRows = [];
+  for (const [candidate, byWearer] of candidates) {
+    const summaries = [...byWearer].map(([wearer, strata]) => ({ wearer, ...summarize(strata) }));
+    for (const summary of summaries) {
+      const ci = bootstrap(byWearer, summary.wearer), score = scoreOf(average(summary.deltas), average(summary.references), average(summary.bae), average(summary.referenceBae));
+      wearerRows.push({ candidate, wearer: summary.wearer, strata: summary.strataCount, winLiftPp: average(summary.deltas) * 100,
+        mean100SVPReferencePp: average(summary.references) * 100, winLiftScore0to100: score.win, meanBAE: average(summary.bae),
+        mean100SVPReferenceBAE: average(summary.referenceBae), actionValueScore0to100: score.action, score0to100: score.overall,
+        score95Lower: ci.scoreLower, score95Upper: ci.scoreUpper, differenceVsReferencePp: average(summary.gaps) * 100,
+        ci95LowerPp: ci.gapLower * 100, ci95UpperPp: ci.gapUpper * 100,
+        rating: ci.gapLower > 0 ? 'Above 100-SVP reference' : ci.gapUpper < 0 ? 'Below 100-SVP reference' : 'Within reference range',
+        positiveWinLiftStrataPct: summary.positiveStrataPct, meanHpSwing: average(summary.bae) * 16 });
+    }
+    const combined = Object.fromEntries(['deltas', 'references', 'gaps', 'bae', 'referenceBae'].map(field => [field,
+      Array.from({ length: runCount }, (_, i) => average(summaries.map(row => row[field][i])))]));
+    const ci = bootstrap(byWearer), score = scoreOf(average(combined.deltas), average(combined.references), average(combined.bae), average(combined.referenceBae));
+    overallRows.push({ candidate, eligibleCharacters: [...byWearer.keys()].join(';'), characterCount: byWearer.size,
+      winLiftPp: average(combined.deltas) * 100, mean100SVPReferencePp: average(combined.references) * 100,
+      winLiftScore0to100: score.win, meanBAE: average(combined.bae), mean100SVPReferenceBAE: average(combined.referenceBae),
+      actionValueScore0to100: score.action, score0to100: score.overall, score95Lower: ci.scoreLower, score95Upper: ci.scoreUpper,
+      differenceVsReferencePp: average(combined.gaps) * 100, ci95LowerPp: ci.gapLower * 100, ci95UpperPp: ci.gapUpper * 100,
+      rating: ci.gapLower > 0 ? 'Above 100-SVP reference' : ci.gapUpper < 0 ? 'Below 100-SVP reference' : 'Within reference range',
+      positiveWinLiftStrataPct: average(summaries.map(row => row.positiveStrataPct)),
+      meanHpSwing: average(combined.bae) * 16 });
+  }
+  return { overallRows, wearerRows };
+}
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) { console.log(help()); return; }
@@ -630,7 +757,7 @@ async function main() {
           const winsControl = trials.reduce((sum, trial) => sum + trial.controlWin, 0);
           const winsTreatment = trials.reduce((sum, trial) => sum + trial.treatmentWin, 0);
           const summary = {
-            candidate: `${spec.type}:${spec.id}${spec.potential ? `@P${spec.potential}L${spec.level || 1}` : ''}`,
+            candidate: candidateLabel(spec),
             wearer, party, enemies,
             enemyCategories: [...new Set(enemies.map(id => library[id].tags?.type || 'unknown'))].sort(),
             difficulty, length, runs: options.runs, seed: options.seed,
@@ -656,8 +783,9 @@ async function main() {
           if (options.compact) delete summary.trials;
           out.write(JSON.stringify(summary) + '\n');
           comparisons++;
-          if (options.runeRating && (spec.type === 'rune' || spec.type === 'stat')) ratingSamples.push({
-            candidate: `${spec.type}:${spec.id}`, wearer, scenarioId: scenarios,
+          if ((options.runeRating && (spec.type === 'rune' || spec.type === 'stat')) ||
+              (options.mechanicRating && ['passive', 'action', 'character-overall', 'stat'].includes(spec.type))) ratingSamples.push({
+            candidate: candidateLabel(spec), wearer, scenarioId: scenarios,
             difficulty, length, partyComposition: party.slice().sort().join('+'),
             enemyComposition: enemies.slice().sort().join('+'), allyCount: party.length,
             enemyCount: enemies.length, enemyCategory: summary.enemyCategories.join('+'),
@@ -702,6 +830,17 @@ async function main() {
     console.log(`Rune ratings (compared with average +100-SVP controls): ${ratingFile}`);
     console.log(`Rune ratings by wearer: ${wearerRatingFile}`);
     for (const row of overallRows) console.log(`  ${row.rune}: ${row.score0to100.toFixed(0)}/100 (win ${row.winLiftScore0to100.toFixed(0)}, action ${row.actionValueScore0to100.toFixed(0)}; 95% CI ${row.score95Lower.toFixed(0)} to ${row.score95Upper.toFixed(0)}); ${row.rating} (${row.differenceVsReferencePp >= 0 ? '+' : ''}${row.differenceVsReferencePp.toFixed(2)} pp vs reference).`);
+  }
+  if (options.mechanicRating) {
+    const { overallRows, wearerRows } = buildMechanicRatingRows(ratingSamples, options.runs, options.seed + 82031);
+    const ratingFile = options.output.replace(/\.jsonl$/i, '') + '-mechanic-rating.csv';
+    const characterFile = options.output.replace(/\.jsonl$/i, '') + '-mechanic-rating-by-character.csv';
+    const columns = Object.keys(overallRows[0] || {}), characterColumns = Object.keys(wearerRows[0] || {});
+    fs.writeFileSync(ratingFile, [columns.join(','), ...overallRows.map(row => columns.map(column => csvEscape(row[column])).join(','))].join('\n') + '\n');
+    fs.writeFileSync(characterFile, [characterColumns.join(','), ...wearerRows.map(row => characterColumns.map(column => csvEscape(row[column])).join(','))].join('\n') + '\n');
+    console.log(`Mechanic and character ratings (vs average +100-SVP controls): ${ratingFile}`);
+    console.log(`Character-specific component ratings: ${characterFile}`);
+    for (const row of overallRows) console.log(`  ${row.candidate}: ${row.score0to100.toFixed(0)}/100 (win ${row.winLiftScore0to100.toFixed(0)}, action ${row.actionValueScore0to100.toFixed(0)}; 95% CI ${row.score95Lower.toFixed(0)} to ${row.score95Upper.toFixed(0)}); ${row.rating}.`);
   }
   console.log(`Completed ${scenarios.toLocaleString()} scenario cells and ${comparisons.toLocaleString()} candidate/wearer comparisons.`);
   console.log(`Detailed pairs: ${options.output}`);
