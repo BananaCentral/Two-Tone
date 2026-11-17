@@ -99,13 +99,17 @@ Use the runner presets to avoid rebuilding long command lines: `quick` (default)
 
 Run `node tools/combat-performance.mjs --candidate all-rune-ratings --preset balanced` to compare each Rune with the five +100 SVP stat controls on the same wearer and matchup. Both sides use the same four setless Runes and their stat rolls, so only the Rune set effect or the 100-SVP stat investment changes. For each matched seed, calculate the Rune's win-rate change from its no-effect control and subtract the mean win-rate change from the five stat controls. Average formations within the same unordered party/enemy composition, compositions within each standard matchup stratum, and compatible wearers equally.
 
-The simulator gives each Rune a numeric score from 0 to 100:
+The simulator scores both outcome and action value against the same average of five +100-SVP stat controls:
 
-`score = clamp(100 × Rune win-rate lift ÷ mean +100-SVP win-rate lift, 0, 100)`
+`win score = clamp(100 × Rune win-rate lift ÷ mean stat-control win-rate lift, 0, 100)`
 
-Thus 0 means no positive win-rate lift in this benchmark, and 100 means the Rune matches or exceeds the average win-rate lift of the +100-SVP controls. Scores above that reference are capped at 100. This is a benchmark score, not a universal grade: it is meaningful only alongside the tested roster, scenario coverage, and the Rune's BAE/HP impact. BAE explains HP impact and is not added to the score.
+`action score = clamp(100 × Rune BAE ÷ mean stat-control BAE, 0, 100)`
 
-The score interval uses a stratified paired bootstrap: resample paired seeds, then resample compositions within each fixed matchup stratum. If the entire 95% interval for Rune lift minus the mean stat-control lift is above zero, rate it **Above 100-SVP reference**; if entirely below zero, **Below 100-SVP reference**; if it overlaps zero, **Within reference range**. This comparison tier is shown beside the numeric score because a capped score of 100 can still have uncertainty around whether it exceeds the reference. Always show the Rune's win-rate lift, score interval, percentage of strata with positive lift, and BAE beside the score.
+`overall score = √(win score × action score)`
+
+The overall 0–100 score uses an equal proportional weighting of the two measures. The geometric mean prevents a strong result in one measure from completely hiding a weak or negative result in the other. 100 means matching or exceeding the average +100-SVP controls on both measures; 0 means no positive performance on at least one measure. The cap and benchmark make this a comparative score, not a universal grade.
+
+The coverage protocol supplies equal weighting across the defined difficulty, encounter length, party size, enemy count/category, and sampled compositions; compatible wearers are then weighted equally. Per-wearer scores and the share of matchup strata with positive win lift expose fit and consistency. A stratified paired bootstrap resamples seeds and compositions to give the 95% score range. Keep the win and action component scores, BAE/HP swing, and reference tier beside the overall score. If the entire 95% interval for Rune win lift minus mean stat-control win lift is above zero, show **Above 100-SVP reference**; if entirely below zero, **Below 100-SVP reference**; if it overlaps zero, **Within reference range**.
 
 The runner isolates comparison branches as follows: Rune sets use the same four Rune stat rolls in both branches, with only the four-piece effect enabled in treatment; a weapon is compared with no weapon; a stat candidate adds exactly 100 SVP in one stat while holding the same setless four-Rune stat package in both branches; a character kit is compared with a basic-only control that keeps that character's stats and Basic Attack; and an action candidate is forced on the wearer's first turn and compared with that same unit using Basic Attack. For characters with separate Physical and Magical Attack stats, the 20-point Attack investment is split proportionally across their existing Attack values, preserving a 100-SVP increase. Ultimate comparisons start both branches with enough Energy to cast it. These controls identify what the reported difference measures.
 

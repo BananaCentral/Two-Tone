@@ -24,26 +24,26 @@ Win-rate change is shown in percentage points relative to the same character, pa
 
 ## Rating relative to +100 SVP stat controls
 
-The 0–100 score compares each Rune's win-rate lift with the average lift from five +100 SVP stat controls, using the same setless four-Rune stat loadout, wearer, matchup, and paired seeds. **0** means no positive win-rate lift in this benchmark. **100** means the Rune matches or exceeds the average stat-control lift; scores are capped at 100. This is a comparative benchmark score, not a universal grade or an automatic balance verdict. The interval is a stratified paired-bootstrap 95% range. BAE explains HP impact and does not enter the score.
+The 0–100 score includes both win rate and HP-based action value. For each measure, the Rune is compared with the average of the five +100-SVP stat controls, with the same setless four-Rune stat loadout, wearer, matchup, and paired seeds. The overall score is the geometric mean of the two 0–100 component scores. This gives each measure equal proportional weight and keeps a strong result in one from hiding a weak result in the other. **100** means matching or exceeding the stat controls on both measures; **0** means no positive performance on at least one. The score is a comparative benchmark, not a universal grade. The range is a stratified paired-bootstrap 95% interval.
 
-| Rune | Score (95% range) | Rune win lift | Mean +100 SVP lift | Rating vs reference |
+| Rune | Overall score (95% range) | Win score | Action score | Rating vs win reference |
 |---|---:|---:|---:|---|
-| Radiant Moon | **43** (35–51) | +1.43 pp | +3.35 pp | Below |
-| Eternal Sun | **20** (15–26) | +0.58 pp | +2.85 pp | Below |
-| Celestial Star | **23** (19–28) | +0.66 pp | +2.80 pp | Below |
-| Dark Matter | **34** (28–41) | +0.96 pp | +2.80 pp | Below |
-| Clear Skies | **70** (62–79) | +1.97 pp | +2.80 pp | Below overall |
-| Infinite Space | **27** (23–31) | +0.75 pp | +2.80 pp | Below |
-| Recycle | **16** (8–23) | +0.44 pp | +2.80 pp | Below |
-| Amplify | **33** (28–38) | +0.92 pp | +2.80 pp | Below |
-| United | **100** (84–100) | +2.16 pp | +2.09 pp | Within reference range |
+| Radiant Moon | **46** (42–51) | 43 | 50 | Below |
+| Eternal Sun | **23** (19–25) | 20 | 25 | Below |
+| Celestial Star | **21** (18–23) | 23 | 18 | Below |
+| Dark Matter | **37** (33–41) | 34 | 40 | Below |
+| Clear Skies | **64** (58–69) | 70 | 57 | Below overall |
+| Infinite Space | **25** (22–27) | 27 | 23 | Below |
+| Recycle | **21** (15–26) | 16 | 28 | Below |
+| Amplify | **37** (34–40) | 33 | 42 | Below |
+| United | **86** (78–88) | 100 | 73 | Within reference range |
 
-Clear Skies is above the stat reference for Dawn in this sample. Its overall Rune tier is lower because compatible wearers are weighted equally and its other wearer results are smaller.
+The method preserves the coverage standard: it weights matchup strata and compatible wearers equally, and reports per-wearer scores and positive-strata rates in the CSV. Win-reference tiers remain separate from the composite score. Clear Skies is above the win reference for Dawn in this sample; its table tier is overall.
 
 ## How to read the results
 
 - **BAE:** 1 BAE represents 16 HP of favorable swing. Average BAE averages each matchup's `(extra enemy HP removed + extra ally HP retained) ÷ 16` across the sampled strata and eligible wearers. The prior Clear Skies result of +2.49 BAE therefore means about +39.8 HP of favorable swing per sampled matchup, including damage and prevented HP loss; it is not 39.8 damage dealt.
-- Win-rate lift is the primary performance measure. BAE and HP swing explain the effect's combat contribution; neither is added to the Rune rating.
+- The overall score includes both normalized win-rate lift and normalized BAE/action value. Keep their component scores, raw BAE/HP swing, positive-strata share, and confidence range visible so the single number does not hide the reason for the result.
 - The sample contains 360 of 17,213,850 scenario cells, with 10 paired seeds per cell. It covers party sizes 1–4, enemy counts 1–5, all lengths, and all difficulties, but does not exhaust roster identities or ordered formations.
 
 ## Rules simulated
