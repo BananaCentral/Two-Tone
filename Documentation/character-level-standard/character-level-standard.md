@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This standard defines character Levels and Character XP. All six primary stats—HP, Physical Attack, Physical Defense, Magical Attack, Magical Defense, and Speed—scale with character Level according to their individual stat standards.
+This standard defines character Levels and Character XP. Character HP, Attack (or separately defined Physical and Magical Attack), Physical Defense, Magical Defense, and Speed scale with character Level according to their stat standards, including the [Attack Standard](../attack-standard/attack-standard.md).
 
 ## Character Levels
 

@@ -24,13 +24,15 @@ Each character has exactly two character-bound signature weapon options. Each op
 - **Standard** is the default weapon and starts at Potential 1. Its Level 1 stat bonus is 31%, increasing by 5 percentage points per Potential. Weapon Level adds 1 percentage point per level, reaching 80% at Potential 1 and 100% at Potential 5 at weapon Level 50.
 - **Premium** is acquired through the Store. It starts at Potential 1 with a 51% Level 1 stat bonus, increasing by 25 percentage points per Potential. Weapon Level adds 1 percentage point per level, reaching 100% at Potential 1 and 200% at Potential 5 at weapon Level 50.
 
-A character can use only their own Standard or Premium signature weapon. The active weapon percentage applies to all six stats. Character-specific weapon effects are added when that character's weapon is defined.
+A character can use only their own Standard or Premium signature weapon. The active weapon percentage applies to all defined combat stats. Character-specific weapon effects are added when that character's weapon is defined.
 
 See the [Weapon Level Standard](../weapon-level-standard/weapon-level-standard.md) for caps, XP requirements, and the full Potential bonus table.
 
 ## Runes
 
 A character equips up to four owned Runes in independent slots. Slots may contain Runes from different sets; a set effect activates only when all four equipped pieces belong to that same set. Mixed sets have no set effect. Selecting an occupied slot opens its main and substat customization, level upgrade, Switch, and Remove actions. Selecting an empty slot opens the owned Rune picker. Set effects are fixed at every Rune level and affect the wearer as defined in the [Rune Set Standard](../rune-standard/rune-standard.md).
+
+Calculated combat stats round to the nearest 0.25 after character level, equipment, and percentage modifiers are applied. Keep quarter-point precision through stat calculations. Damage and HP changes continue to round to whole HP.
 
 Each rune has a level from 1 to 5, one main stat, and three substats. Within each rune, all four selected stats must be different. Main and substats may repeat across different runes.
 
@@ -41,18 +43,17 @@ At rune level L, the main stat adds:
 | Stat | Main stat bonus |
 |---|---:|
 | HP | 100 × L |
-| Physical Attack | 20 × L |
-| Magical Attack | 20 × L |
+| Attack | 20 × L |
 | Physical Defense | 4 × L |
 | Magical Defense | 4 × L |
 | Speed | 20 × L |
 
-Each substat adds 25% of its corresponding main stat value at that rune level.
+Each substat adds 25% of its corresponding main stat value at that rune level. Attack is a universal flat attack bonus: it adds to a character’s generic Attack or to each defined typed Attack stat.
 
 ## Rune selection UI
 
 - Each rune card shows the main stat as a prominent clickable control above its three clickable substats.
-- Selecting the main stat or a substat opens a picker showing all six available stats at once.
+- Selecting the main stat or a substat opens a picker showing all five available stats at once.
 - Choices that would duplicate another stat within that rune are disabled.
 
 ## Celestials

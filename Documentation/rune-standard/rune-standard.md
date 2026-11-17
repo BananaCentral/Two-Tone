@@ -16,15 +16,15 @@ This standard defines Rune Set equipment and combat effects. Rune Set effects ar
 
 | Rune Set | Effect |
 |---|---|
-| **Radiant Moon** | Adds 10 percentage points of Critical Rate to the wearer. Effective Critical Rate remains capped at 100%. |
-| **Eternal Sun** | Adds 25 percentage points of Critical Damage to the wearer. Critical Damage bonuses add together before being applied to a critical hit. |
-| **Celestial Star** | After the wearer resolves an Ultimate, advance the wearer's next action by 50% of their action interval. |
-| **Dark Matter** | The wearer's attacks ignore 20% of the target's Magical Defense. This applies to Magical Defense wherever it contributes to damage, including the Magical Defense portion of True Damage. |
-| **Clear Skies** | The wearer's attacks ignore 20% of the target's Physical Defense. This applies to Physical Defense wherever it contributes to damage, including the Physical Defense portion of True Damage. |
-| **Infinite Space** | Once per Ultimate, delay each enemy damaged by that Ultimate by 25% of that enemy's action interval. An enemy must take damage from the Ultimate to be delayed. Multi-hit Ultimates still delay each affected enemy only once per Ultimate. |
-| **Recycle** | When the wearer uses a Skill, restore 1 Skill Point, subject to the party's Skill Point cap. After the Skill resolves, Recycle is unavailable for the wearer's next two turns. |
+| **Radiant Moon** | Direct damage from the wearer's passives, Basic Attacks, Skills, and Ultimates applies 20% Echo to each hit. Damage-over-time does not Echo. Echo follows the [Echo Standard](../echo-standard.md). |
+| **Eternal Sun** | Adds 10 percentage points of Critical Rate, 25 percentage points of Critical Damage, and 10 percentage points of Stealth (dodge chance) to the wearer. Effective Critical Rate and Stealth are each capped at 100%; Critical Damage bonuses add together before being applied to a critical hit. |
+| **Celestial Star** | After the wearer resolves an Ultimate, advance the wearer's next action by 100% of their action interval. Then Celestial Star is unavailable for the wearer's next two turns. |
+| **Dark Matter** | The wearer's Physical, Magical, and True damage is amplified by 10%. The wearer's attacks also ignore 20% of both Physical and Magical Defense. This applies to each defense wherever it contributes to damage, including both portions of True Damage. |
+| **Clear Skies** | The wearer reflects 10% of received HP and shield damage as True damage. While the wearer has a shield, this increases to 20%; the increase ends immediately when the shield is depleted. Damage dealt to an enemy Barrier does not trigger Reflect. Reflect follows the [Reflect Standard](../reflect-standard.md). |
+| **Infinite Space** | When the wearer uses an Ultimate, delay every living enemy on the field by 50% of that enemy's action interval. This applies even if the Ultimate does not damage an enemy and only once per enemy per Ultimate. |
+| **Recycle** | When the wearer uses a Skill, restore 1 Skill Point, subject to the party's Skill Point cap. After the Skill resolves, Recycle is unavailable for the wearer's next turn. |
 | **Amplify** | When Amplify is not on cooldown, the wearer's Basic Attack deals 50% more damage. Apply the bonus once per Basic Attack action to the complete action, including all its hits and targets, whether Single Target, Blast, or AoE. After the Basic Attack resolves, Amplify is unavailable for the wearer's next two turns. |
-| **United** | When the wearer successfully uses a Skill or Ultimate on one or more allies, increase the wearer's Speed by 25% for the wearer's next two turns. This affects only the wearer. Reapplying United refreshes its duration; the Speed bonus does not stack. |
+| **United** | When the wearer successfully uses a Skill on one or more allies, advance the wearer by 100% of their action interval. United is then unavailable for the wearer's next two turns. |
 
 ## Rune Set Artwork
 
@@ -46,8 +46,7 @@ All sprites are stored in `assets/` and registered in the application asset cata
 
 ## Timing and Combination Rules
 
-- A cooldown starts after its triggering action resolves. The next two scheduled turns belonging to the Rune's wearer are the cooldown turns; the effect is ready again after those turns.
-- A two-turn effect starts after its triggering action resolves and remains active through the wearer's next two scheduled turns.
+- A cooldown starts after its triggering action resolves. Recycle is unavailable during the wearer's next scheduled turn; Celestial Star, Amplify, and United are unavailable during the wearer's next two scheduled turns. Each becomes ready again after those turns.
 - Action Advance and Action Delay use the action interval rules in the [Turn Order Standard](../turn-order-standard/turn-order-standard.md). Independent effects from separate actions resolve normally under that standard.
 - Apply set effects once per named trigger as specified above. Do not reapply an effect for each hit within one action unless the effect explicitly says otherwise.
 
@@ -57,4 +56,4 @@ Rune equipment is available per character in Loadout → Runes. Each slot can eq
 
 The set effect list shows the equipped count for each represented set and marks a bonus active only at four pieces. Mixed sets are allowed and grant no set effects. Selecting an occupied slot opens its main and substat controls, upgrade action, and Switch/Remove actions. Selecting an empty slot opens the owned Rune picker. Switching or removing a Rune returns it to inventory.
 
-Set cooldowns and durations are tracked per wearer for the current battle and reset when a new battle starts. Recycle and Amplify become ready again after the wearer's next two scheduled turns. United remains active through the wearer's next two scheduled turns. Runes are intended to come from Challenges; Challenge content and reward rules are not configured yet.
+Set cooldowns are tracked per wearer for the current battle and reset when a new battle starts. Recycle becomes ready after the wearer's next scheduled turn; Amplify, Celestial Star, and United become ready after the wearer's next two scheduled turns. Runes are intended to come from Challenges; Challenge content and reward rules are not configured yet.

@@ -18,29 +18,20 @@
 | Stat | Base value |
 |---|---:|
 | HP | 50 |
-| Physical Attack | 30 |
-| Magical Attack | 0 |
+| Attack | 30 |
 | Physical Defense | 2 |
 | Magical Defense | 2 |
 | Speed | 40 |
 
-## Passive: Rampage
+## Passive: Ravage
 
-Each successful Basic Attack adds one Rampage stack after that attack resolves. Each stack increases the Wolf's Basic Attack damage by 25%. Rampage stacks up to four times, for a maximum +100% Basic Attack damage. A failed attack that deals no damage does not add a stack. Reaching four stacks does not consume or remove them.
-
-| Successful Basics completed | Stacks before next Basic | Basic damage bonus |
-|---:|---:|---:|
-| 0 | 0 | 0% |
-| 1 | 1 | 25% |
-| 2 | 2 | 50% |
-| 3 | 3 | 75% |
-| 4 or more | 4 | 100% |
+Each successful attack applies one Bleed stack to the target, up to five stacks. A successful attack means it deals damage and is not dodged. Each Bleed stack deals damage equal to 2% of the affected unit's maximum HP at the start of that unit's next turn.
 
 ## Basic Attack
 
 - Targets one random living ally.
 - Deals Physical damage at a 1.0× multiplier.
-- Applies the current Rampage damage bonus. The first Basic Attack uses the base multiplier; subsequent attacks use the stacks earned from earlier successful Basics.
+- Ravage applies one Bleed stack on a successful hit.
 
 ## Barrier
 

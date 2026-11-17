@@ -13,11 +13,10 @@
       "level": 1,
       "stats": {
         "hp": 100,
-        "physicalAttack": 20,
-        "magicalAttack": 20,
         "physicalDefense": 4,
         "magicalDefense": 4,
-        "speed": 20
+        "speed": 20,
+        "attack": 20
       },
       "basic": {
         "damageType": "true",
@@ -50,7 +49,8 @@
       ],
       "weapon": {
         "type": "standard",
-        "potential": 1
+        "potential": 1,
+        "level": 1
       },
       "celestials": {
         "passive": 1,
@@ -70,10 +70,10 @@
       "stats": {
         "hp": 100,
         "physicalAttack": 0,
-        "magicalAttack": 30,
+        "magicalAttack": 20,
         "physicalDefense": 4,
         "magicalDefense": 4,
-        "speed": 30
+        "speed": 20
       },
       "basic": {
         "damageType": "magical",
@@ -105,7 +105,8 @@
       ],
       "weapon": {
         "type": "standard",
-        "potential": 1
+        "potential": 1,
+        "level": 1
       },
       "celestials": {
         "passive": 1,
@@ -124,11 +125,10 @@
       "level": 1,
       "stats": {
         "hp": 50,
-        "physicalAttack": 0,
-        "magicalAttack": 40,
         "physicalDefense": 2,
-        "magicalDefense": 6,
-        "speed": 30
+        "magicalDefense": 4,
+        "speed": 20,
+        "attack": 40
       },
       "basic": {
         "damageType": "magical",
@@ -152,7 +152,8 @@
       ],
       "weapon": {
         "type": "standard",
-        "potential": 1
+        "potential": 1,
+        "level": 1
       },
       "celestials": {
         "passive": 1,
@@ -167,16 +168,27 @@
     },
     "slime": {
       "name": "Slime",
-      "tags": {"area":"One","type":"common","strengths":["Magical Attacker","Magical Resistant","Defensive"],"weaknesses":["Physically Fragile","Slow"]},
+      "tags": {
+        "area": "One",
+        "type": "common",
+        "strengths": [
+          "Magical Attacker",
+          "Magical Resistant",
+          "Defensive"
+        ],
+        "weaknesses": [
+          "Physically Fragile",
+          "Slow"
+        ]
+      },
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
         "hp": 150,
-        "physicalAttack": 0,
-        "magicalAttack": 20,
         "physicalDefense": 2,
         "magicalDefense": 6,
-        "speed": 10
+        "speed": 10,
+        "attack": 20
       },
       "basic": {
         "damageType": "magical",
@@ -195,17 +207,29 @@
     },
     "hawk": {
       "name": "Hawk",
-      "tags": {"area":"One","type":"common","strengths":["Fast","Physical Attacker"],"weaknesses":["Physically Fragile","Magically Fragile","Weak","Fragile"]},
+      "tags": {
+        "area": "One",
+        "type": "common",
+        "strengths": [
+          "Fast",
+          "Physical Attacker"
+        ],
+        "weaknesses": [
+          "Physically Fragile",
+          "Magically Fragile",
+          "Weak",
+          "Fragile"
+        ]
+      },
       "level": 1,
       "barrierPercent": 0.2,
       "stealth": 0.2,
       "stats": {
         "hp": 50,
-        "physicalAttack": 10,
-        "magicalAttack": 0,
         "physicalDefense": 2,
         "magicalDefense": 2,
-        "speed": 60
+        "speed": 60,
+        "attack": 10
       },
       "basic": {
         "damageType": "physical",
@@ -216,7 +240,17 @@
     },
     "goblin": {
       "name": "Goblin",
-      "tags": {"area":"One","type":"elite","strengths":["Physical Attacker","Physically Defensive"],"weaknesses":["Magically Fragile"]},
+      "tags": {
+        "area": "One",
+        "type": "elite",
+        "strengths": [
+          "Physical Attacker",
+          "Physically Defensive"
+        ],
+        "weaknesses": [
+          "Magically Fragile"
+        ]
+      },
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
@@ -241,16 +275,27 @@
     },
     "geode": {
       "name": "Geode",
-      "tags": {"area":"One","type":"elite","strengths":["Defensive","Magical Resistant","Physically Resistant"],"weaknesses":["Slow","Weak"]},
+      "tags": {
+        "area": "One",
+        "type": "elite",
+        "strengths": [
+          "Defensive",
+          "Magical Resistant",
+          "Physically Resistant"
+        ],
+        "weaknesses": [
+          "Slow",
+          "Weak"
+        ]
+      },
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
         "hp": 250,
-        "physicalAttack": 20,
-        "magicalAttack": 0,
         "physicalDefense": 16,
         "magicalDefense": 8,
-        "speed": 10
+        "speed": 10,
+        "attack": 20
       },
       "basic": {
         "damageType": "physical",
@@ -267,7 +312,19 @@
     },
     "bear": {
       "name": "Bear",
-      "tags": {"area":"One","type":"boss","strengths":["Defensive","Strong","Physical Attacker"],"weaknesses":["Physically Fragile","Magically Fragile"]},
+      "tags": {
+        "area": "One",
+        "type": "boss",
+        "strengths": [
+          "Defensive",
+          "Strong",
+          "Physical Attacker"
+        ],
+        "weaknesses": [
+          "Physically Fragile",
+          "Magically Fragile"
+        ]
+      },
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
@@ -296,11 +353,10 @@
       "level": 1,
       "stats": {
         "hp": 200,
-        "physicalAttack": 10,
-        "magicalAttack": 0,
         "physicalDefense": 4,
         "magicalDefense": 4,
-        "speed": 10
+        "speed": 10,
+        "attack": 10
       },
       "basic": {
         "damageType": "physical",
@@ -322,7 +378,8 @@
       "passives": [],
       "weapon": {
         "type": "standard",
-        "potential": 1
+        "potential": 1,
+        "level": 1
       },
       "celestials": {
         "passive": 1,
@@ -334,6 +391,45 @@
         "start": 20
       },
       "characterDuplicates": 0
+    },
+    "wolf": {
+      "name": "Wolf",
+      "level": 1,
+      "barrierPercent": 0.2,
+      "stats": {
+        "hp": 50,
+        "physicalDefense": 2,
+        "magicalDefense": 2,
+        "speed": 40,
+        "attack": 30
+      },
+      "basic": {
+        "damageType": "physical",
+        "multiplier": 1,
+        "target": "random"
+      },
+      "passives": [
+        {
+          "type": "bleed",
+          "id": "ravage",
+          "stacksPerHit": 1,
+          "maxStacks": 5
+        }
+      ],
+      "tags": {
+        "area": "One",
+        "type": "common",
+        "strengths": [
+          "Fast",
+          "Physical Attacker",
+          "Strong"
+        ],
+        "weaknesses": [
+          "Physically Fragile",
+          "Magically Fragile",
+          "Fragile"
+        ]
+      }
     }
   },
   "teams": {

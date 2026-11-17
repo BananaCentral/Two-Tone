@@ -12,11 +12,10 @@
       "level": 1,
       "stats": {
         "hp": 100,
-        "physicalAttack": 20,
-        "magicalAttack": 20,
         "physicalDefense": 4,
         "magicalDefense": 4,
-        "speed": 20
+        "speed": 20,
+        "attack": 20
       },
       "basic": {
         "damageType": "true",
@@ -49,7 +48,8 @@
       ],
       "weapon": {
         "type": "standard",
-        "potential": 1
+        "potential": 1,
+        "level": 1
       },
       "celestials": {
         "passive": 1,
@@ -62,16 +62,27 @@
     },
     "slime": {
       "name": "Slime",
-      "tags": {"area":"One","type":"common","strengths":["Magical Attacker","Magical Resistant","Defensive"],"weaknesses":["Physically Fragile","Slow"]},
+      "tags": {
+        "area": "One",
+        "type": "common",
+        "strengths": [
+          "Magical Attacker",
+          "Magical Resistant",
+          "Defensive"
+        ],
+        "weaknesses": [
+          "Physically Fragile",
+          "Slow"
+        ]
+      },
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
         "hp": 150,
-        "physicalAttack": 0,
-        "magicalAttack": 20,
         "physicalDefense": 2,
         "magicalDefense": 6,
-        "speed": 10
+        "speed": 10,
+        "attack": 20
       },
       "basic": {
         "damageType": "magical",
@@ -94,11 +105,10 @@
       "barrierPercent": 0.2,
       "stats": {
         "hp": 50,
-        "physicalAttack": 30,
-        "magicalAttack": 0,
         "physicalDefense": 2,
         "magicalDefense": 2,
-        "speed": 40
+        "speed": 40,
+        "attack": 30
       },
       "basic": {
         "damageType": "physical",
@@ -107,10 +117,10 @@
       },
       "passives": [
         {
-          "type": "rampage",
-          "id": "rampage",
-          "damageBonus": 0.25,
-          "maxStacks": 4
+          "type": "bleed",
+          "id": "ravage",
+          "stacksPerHit": 1,
+          "maxStacks": 5
         }
       ]
     }

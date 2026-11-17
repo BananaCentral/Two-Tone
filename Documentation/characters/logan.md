@@ -2,9 +2,9 @@
 
 ## Stats
 
-| HP | Physical Attack | Magical Attack | Physical Defense | Magical Defense | Speed |
-|---:|---:|---:|---:|---:|---:|
-| 200 | 10 | 0 | 4 | 4 | 10 |
+| HP | Attack | Physical Defense | Magical Defense | Speed |
+|---:|---:|---:|---:|---:|
+| 200 | 10 | 4 | 4 | 10 |
 
 ## Kit
 

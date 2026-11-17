@@ -13,8 +13,7 @@ Battle-stage artwork uses `assets/soul-battle.png` under the shared Character Ba
 | Stat | Base value |
 |---|---:|
 | HP | 100 |
-| Physical Attack | 10 |
-| Magical Attack | 10 |
+| Attack | 20 |
 | Physical Defense | 4 |
 | Magical Defense | 4 |
 | Speed | 20 |
@@ -56,7 +55,7 @@ Calculated stats scale with Level and use the matching stat standards.
 
 ## Loadout
 
-- Soul starts with his Standard signature weapon at Potential 1, granting +80% to all six stats. Potential 5 grants +100%; each intermediate potential adds 5 percentage points.
+- Soul starts with his Standard signature weapon at Potential 1. Weapon bonuses apply to Soul’s base stats.
 - The Premium signature effect refunds 1 Skill Point after every 3 Skill Points spent on Enhance. It is active starting at Potential 1.
 - His Premium signature weapon is a separate, character-locked option. It grants +100% at Potential 1 and +200% at Potential 5, with 25 percentage points per potential. Its Potential 1 effect refunds 1 Skill Point after every 3 Skill Points spent on Enhance. Store ownership remains unavailable until the Store is implemented.
 - Premium Potential 2–5 correspond to weapon Duplicates 1–4. Duplicate 1 doubles Basic's base multiplier; Duplicate 2 adds 10 percentage points of Critical Rate and 25 percentage points of Critical Damage; Duplicate 3 changes a 3-stack Enhanced Basic from Blast to AoE; Duplicate 4 restores one Follow Up proc for every two Follow Up activations.

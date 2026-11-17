@@ -4,7 +4,7 @@ Battle-stage artwork uses the side-facing `assets/dawn-battle.png`; her HUD and 
 
 ## Identity and base stats
 
-Character ID: `dawn`. Dawn starts at Level 1 with base HP 50, Physical Attack 0, Magical Attack 40, Physical Defense 2, Magical Defense 4, and Speed 20. Stats use the shared character-level and loadout formulas.
+Character ID: `dawn`. Dawn starts at Level 1 with base HP 50, Attack 40, Physical Defense 2, Magical Defense 4, and Speed 20. Stats use the shared character-level and loadout formulas.
 
 ## Passive: Resourceful
 
@@ -18,7 +18,7 @@ Deal Magical damage at a 2.0× multiplier and restore 10 Energy. A Basic Attack 
 
 Costs 1 party Skill Point, restores 20 Energy, and targets one living ally (Dawn may target herself). Choose the target by tapping their battlefield sprite or HUD portrait card. The target's next Basic Attack deals 40% more damage and restores 1 additional Skill Point when used. Tune lasts through the target's next scheduled turn, then expires. The enhanced-Basic effect is consumed by the first Basic during the duration; if the target does not use a Basic, that enhancement expires with Tune.
 
-Dawn Duplicate 3 adds 20% Physical and Magical Attack and extends Tune to two target turns. Duplicate 4 adds a further 40% to the enhanced Basic's damage bonus, for +80% total.
+Dawn Duplicate 3 adds 20% Attack and extends Tune to two target turns. Duplicate 4 adds a further 40% to the enhanced Basic's damage bonus, for +80% total.
 
 While an ally is Tuned, Dawn's equipped signature weapon lets that ally ignore 20% of enemy Physical and Magical Defense. Premium weapon effects are active only while Dawn owns and has equipped the Premium weapon:
 
@@ -37,5 +37,5 @@ Costs 100 Energy, targets one living ally (Dawn may target herself), restores en
 
 1. Restore 100% of the Ultimate target's maximum Energy.
 2. Restore 3 Skill Points with the Ultimate.
-3. Tune grants +20% Physical and Magical Attack and lasts two target turns.
+3. Tune grants +20% Attack and lasts two target turns.
 4. Tune's enhanced Basic bonus increases from +40% to +80%.

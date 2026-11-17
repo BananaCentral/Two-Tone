@@ -18,8 +18,7 @@
 | Stat | Base value |
 |---|---:|
 | HP | 150 |
-| Physical Attack | 0 |
-| Magical Attack | 20 |
+| Attack | 20 |
 | Physical Defense | 2 |
 | Magical Defense | 6 |
 | Speed | 10 |

@@ -18,8 +18,9 @@ function buildSuite(source){
  if(source.archetypes.slime){const config=clone(source);config.teams.enemies=Array.from({length:5},(_,slot)=>({id:`slime-${slot+1}`,archetype:'slime',slot}));suite.push({name:'Wave • five Slimes',config})}
  if(source.archetypes.goblin){const config=clone(source);config.teams.enemies=Array.from({length:3},(_,slot)=>({id:`goblin-${slot+1}`,archetype:'goblin',slot}));suite.push({name:'Wave • three Goblins',config})}
  if(source.archetypes.hawk){const config=clone(source);config.teams.enemies=Array.from({length:3},(_,slot)=>({id:`hawk-${slot+1}`,archetype:'hawk',slot}));suite.push({name:'Wave • three Hawks',config})}
+ if(source.archetypes.wolf){const config=clone(source);config.teams.enemies=Array.from({length:3},(_,slot)=>({id:`wolf-${slot+1}`,archetype:'wolf',slot}));suite.push({name:'Wave • three Wolves',config})}
  if(source.archetypes.geode){const config=clone(source);config.teams.enemies=Array.from({length:3},(_,slot)=>({id:`geode-${slot+1}`,archetype:'geode',slot}));suite.push({name:'Wave • three Geodes',config})}
- if(!suite.length)throw new Error('The benchmark config needs bear, slime, goblin, hawk, or geode archetypes.');
+ if(!suite.length)throw new Error('The benchmark config needs bear, slime, goblin, hawk, wolf, or geode archetypes.');
  return suite;
 }
 function parseArgs(args){const options={config:DEFAULT_CONFIG,runs:1000,seed:1,json:false};for(let i=0;i<args.length;i++){if(args[i]==='--config')options.config=path.resolve(args[++i]);else if(args[i]==='--runs')options.runs=Number(args[++i]);else if(args[i]==='--seed')options.seed=Number(args[++i]);else if(args[i]==='--json')options.json=true;else if(args[i]==='--help'||args[i]==='-h')options.help=true;else throw new Error(`Unknown option: ${args[i]}`)}return options}

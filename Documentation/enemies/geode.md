@@ -13,19 +13,18 @@
 | Stat | Value |
 |---|---:|
 | HP | 250 |
-| Physical Attack | 20 |
-| Magical Attack | 0 |
+| Attack | 20 |
 | Physical Defense | 16 |
 | Magical Defense | 8 |
 | Speed | 10 |
 
 ## Momentum
 
-After each Basic Attack action, Geode gains one Momentum stack, up to 10. Each stack increases Physical Attack by 20% of its base value. The stack is gained after the attack resolves, so the first attack uses base Physical Attack; subsequent attacks gain the accumulated bonus. Momentum counts attack actions, not targets hit.
+After each Basic Attack action, Geode gains one Momentum stack, up to 10. Each stack increases Attack by 20% of its base value. The stack is gained after the attack resolves, so the first attack uses base Attack; subsequent attacks gain the accumulated bonus. Momentum counts attack actions, not targets hit.
 
 ## Basic Attack
 
-Deals AoE Physical damage to all living allies with a 1.0× multiplier. Momentum's accumulated Physical Attack bonus applies to this damage.
+Deals AoE Physical damage to all living allies with a 1.0× multiplier. Momentum's accumulated Attack bonus applies to this damage.
 
 ## Sprite
 

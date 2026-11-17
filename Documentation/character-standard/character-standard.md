@@ -6,18 +6,14 @@ This standard defines the required stat and ability entries for every playable c
 
 ## Character Stat Sheet
 
-Every playable character must define these six base stats:
+Every playable character must define HP, Physical Defense, Magical Defense, and Speed. Its attack basis must follow the [Attack Standard](../attack-standard/attack-standard.md) and use one of:
 
-- Base HP
-- Base Physical Attack
-- Base Physical Defense
-- Base Magical Attack
-- Base Magical Defense
-- Base Speed
+- A generic Base Attack, used at full value by Physical, Magical, or True actions as specified by the action; or
+- One or both typed Base Attack stats (Physical Attack and/or Magical Attack) when actions use a specific damage type.
 
-Calculated values use the formulas in the matching stat standards. All six stats scale with character Level. A character starts at Level 1.
+Calculated values use the matching stat formulas and scale with character Level. A character starts at Level 1.
 
-Critical Rate, Critical Damage, Stealth, and Lifesteal are hidden combat stats and are excluded from this six-stat list. Their rules follow the [Critical Hit Standard](../critical-hit-standard.md), [Stealth Standard](../stealth-standard.md), and [Lifesteal Standard](../lifesteal-standard.md).
+Critical Rate, Critical Damage, Stealth, and Lifesteal are hidden combat stats and are excluded from the primary stat list. Their rules follow the [Critical Hit Standard](../critical-hit-standard.md), [Stealth Standard](../stealth-standard.md), and [Lifesteal Standard](../lifesteal-standard.md).
 
 Each character record must also include a stable character ID and display name. Test placeholders are not character records and do not satisfy this standard.
 
@@ -60,9 +56,9 @@ An ability whose multiplier depends on the first time its user hits a particular
 Character ID:
 Display name:
 Base HP:
-Base Physical Attack:
+Base Attack (or Base Physical Attack):
 Base Physical Defense:
-Base Magical Attack:
+Base Magical Attack (if using separate attack stats):
 Base Magical Defense:
 Base Speed:
 

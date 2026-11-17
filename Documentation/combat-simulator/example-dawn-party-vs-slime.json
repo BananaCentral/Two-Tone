@@ -10,75 +10,255 @@
     "soul": {
       "name": "Soul",
       "level": 1,
-      "stats": { "hp": 100, "physicalAttack": 20, "magicalAttack": 20, "physicalDefense": 4, "magicalDefense": 4, "speed": 20 },
-      "basic": { "damageType": "true", "multiplier": 1, "target": "single", "energyGain": 10, "skillPointGain": 1 },
-      "skill": { "type": "enhanceBasic", "damagePerStack": 1, "energyPerStack": 10, "blastAtStacks": 3 },
-      "ultimate": { "damageType": "true", "multiplier": 2, "target": "aoe", "energyCost": 100, "refillFollowUps": true },
-      "passives": [{ "type": "followUp", "id": "followUp", "damageType": "true", "multiplier": 0.5, "charges": 5 }],
-      "weapon": { "type": "standard", "potential": 1 },
-      "celestials": { "passive": 1, "basic": 1, "skill": 1, "ultimate": 1 },
-      "energy": { "start": 20 },
+      "stats": {
+        "hp": 100,
+        "physicalDefense": 4,
+        "magicalDefense": 4,
+        "speed": 20,
+        "attack": 20
+      },
+      "basic": {
+        "damageType": "true",
+        "multiplier": 1,
+        "target": "single",
+        "energyGain": 10,
+        "skillPointGain": 1
+      },
+      "skill": {
+        "type": "enhanceBasic",
+        "damagePerStack": 1,
+        "energyPerStack": 10,
+        "blastAtStacks": 3
+      },
+      "ultimate": {
+        "damageType": "true",
+        "multiplier": 2,
+        "target": "aoe",
+        "energyCost": 100,
+        "refillFollowUps": true
+      },
+      "passives": [
+        {
+          "type": "followUp",
+          "id": "followUp",
+          "damageType": "true",
+          "multiplier": 0.5,
+          "charges": 5
+        }
+      ],
+      "weapon": {
+        "type": "standard",
+        "potential": 1,
+        "level": 1
+      },
+      "celestials": {
+        "passive": 1,
+        "basic": 1,
+        "skill": 1,
+        "ultimate": 1
+      },
+      "energy": {
+        "start": 20
+      },
       "characterDuplicates": 0
     },
     "lily": {
       "name": "Lily",
       "level": 1,
-      "stats": { "hp": 100, "physicalAttack": 0, "magicalAttack": 30, "physicalDefense": 4, "magicalDefense": 4, "speed": 30 },
-      "basic": { "damageType": "magical", "multiplier": 1, "target": "single", "energyGain": 10, "skillPointGain": 1 },
-      "skill": { "type": "ricochet", "damageType": "magical", "multiplier": 0.5, "target": "aoe", "energyGain": 20, "markTurns": 2 },
-      "ultimate": { "damageType": "magical", "multiplier": 1, "target": "aoe", "energyCost": 100 },
-      "passives": [{ "type": "exposed", "defenseReduction": 0.1, "duration": 2 }],
-      "weapon": { "type": "standard", "potential": 1 },
-      "celestials": { "passive": 1, "basic": 1, "skill": 1, "ultimate": 1 },
-      "energy": { "start": 20 },
+      "stats": {
+        "hp": 100,
+        "physicalAttack": 0,
+        "magicalAttack": 20,
+        "physicalDefense": 4,
+        "magicalDefense": 4,
+        "speed": 20
+      },
+      "basic": {
+        "damageType": "magical",
+        "multiplier": 1,
+        "target": "single",
+        "energyGain": 10,
+        "skillPointGain": 1
+      },
+      "skill": {
+        "type": "ricochet",
+        "damageType": "magical",
+        "multiplier": 0.5,
+        "target": "aoe",
+        "energyGain": 20,
+        "markTurns": 2
+      },
+      "ultimate": {
+        "damageType": "magical",
+        "multiplier": 1,
+        "target": "aoe",
+        "energyCost": 100
+      },
+      "passives": [
+        {
+          "type": "exposed",
+          "defenseReduction": 0.1,
+          "duration": 2
+        }
+      ],
+      "weapon": {
+        "type": "standard",
+        "potential": 1,
+        "level": 1
+      },
+      "celestials": {
+        "passive": 1,
+        "basic": 1,
+        "skill": 1,
+        "ultimate": 1
+      },
+      "energy": {
+        "start": 20
+      },
       "characterDuplicates": 0
     },
     "dawn": {
       "name": "Dawn",
       "level": 1,
-      "stats": { "hp": 50, "physicalAttack": 0, "magicalAttack": 40, "physicalDefense": 2, "magicalDefense": 6, "speed": 30 },
-      "basic": { "damageType": "magical", "multiplier": 2, "target": "single", "energyGain": 10, "skillPointGain": 1 },
-      "skill": { "type": "tune", "energyGain": 20 },
-      "ultimate": { "type": "dawnSupport", "energyCost": 100 },
-      "passives": [{ "type": "resourceful" }],
-      "weapon": { "type": "standard", "potential": 1 },
-      "celestials": { "passive": 1, "basic": 1, "skill": 1, "ultimate": 1 },
-      "energy": { "start": 20 },
+      "stats": {
+        "hp": 50,
+        "physicalDefense": 2,
+        "magicalDefense": 4,
+        "speed": 20,
+        "attack": 40
+      },
+      "basic": {
+        "damageType": "magical",
+        "multiplier": 2,
+        "target": "single",
+        "energyGain": 10,
+        "skillPointGain": 1
+      },
+      "skill": {
+        "type": "tune",
+        "energyGain": 20
+      },
+      "ultimate": {
+        "type": "dawnSupport",
+        "energyCost": 100
+      },
+      "passives": [
+        {
+          "type": "resourceful"
+        }
+      ],
+      "weapon": {
+        "type": "standard",
+        "potential": 1,
+        "level": 1
+      },
+      "celestials": {
+        "passive": 1,
+        "basic": 1,
+        "skill": 1,
+        "ultimate": 1
+      },
+      "energy": {
+        "start": 20
+      },
       "characterDuplicates": 0
     },
     "slime": {
       "name": "Slime",
       "level": 1,
       "barrierPercent": 0.2,
-      "stats": { "hp": 150, "physicalAttack": 0, "magicalAttack": 20, "physicalDefense": 2, "magicalDefense": 6, "speed": 10 },
-      "basic": { "damageType": "magical", "multiplier": 1, "target": "random" },
-      "passives": [{ "type": "everyNthBasic", "id": "slimy", "every": 3, "damageBonus": 0.25, "target": "aoe" }]
+      "stats": {
+        "hp": 150,
+        "physicalDefense": 2,
+        "magicalDefense": 6,
+        "speed": 10,
+        "attack": 20
+      },
+      "basic": {
+        "damageType": "magical",
+        "multiplier": 1,
+        "target": "random"
+      },
+      "passives": [
+        {
+          "type": "everyNthBasic",
+          "id": "slimy",
+          "every": 3,
+          "damageBonus": 0.25,
+          "target": "aoe"
+        }
+      ]
     },
     "goblin": {
       "name": "Goblin",
       "level": 1,
       "barrierPercent": 0.2,
-      "stats": { "hp": 200, "physicalAttack": 40, "magicalAttack": 0, "physicalDefense": 12, "magicalDefense": 4, "speed": 40 },
-      "basic": { "damageType": "physical", "multiplier": 1, "target": "blast" },
-      "passives": [{ "type": "pursuit", "actionAdvance": 20 }]
+      "stats": {
+        "hp": 200,
+        "physicalAttack": 40,
+        "magicalAttack": 0,
+        "physicalDefense": 12,
+        "magicalDefense": 4,
+        "speed": 40
+      },
+      "basic": {
+        "damageType": "physical",
+        "multiplier": 1,
+        "target": "blast"
+      },
+      "passives": [
+        {
+          "type": "pursuit",
+          "actionAdvance": 20
+        }
+      ]
     },
     "bear": {
       "name": "Bear",
       "level": 1,
       "barrierPercent": 0.2,
-      "stats": { "hp": 450, "physicalAttack": 90, "magicalAttack": 0, "physicalDefense": 6, "magicalDefense": 6, "speed": 60 },
-      "basic": { "damageType": "true", "multiplier": 1, "target": "aoe" },
-      "passives": [{ "type": "sharpClaws", "defenseIgnore": 0.25 }]
+      "stats": {
+        "hp": 450,
+        "physicalAttack": 90,
+        "magicalAttack": 0,
+        "physicalDefense": 6,
+        "magicalDefense": 6,
+        "speed": 60
+      },
+      "basic": {
+        "damageType": "true",
+        "multiplier": 1,
+        "target": "aoe"
+      },
+      "passives": [
+        {
+          "type": "sharpClaws",
+          "defenseIgnore": 0.25
+        }
+      ]
     }
   },
   "teams": {
     "allies": [
-      { "id": "soul-1", "archetype": "soul" },
-      { "id": "lily-1", "archetype": "lily" },
-      { "id": "dawn-1", "archetype": "dawn" }
+      {
+        "id": "soul-1",
+        "archetype": "soul"
+      },
+      {
+        "id": "lily-1",
+        "archetype": "lily"
+      },
+      {
+        "id": "dawn-1",
+        "archetype": "dawn"
+      }
     ],
     "enemies": [
-      { "id": "slime-1", "archetype": "slime", "slot": 2 }
+      {
+        "id": "slime-1",
+        "archetype": "slime",
+        "slot": 2
+      }
     ]
   }
 }

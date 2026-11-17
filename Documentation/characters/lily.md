@@ -4,11 +4,11 @@ Battle-stage artwork uses the northeast-facing `assets/lily-back.png` under the 
 
 ## Identity and base stats
 
-Character ID: `lily`. Lily starts at Level 1. Her base stats are HP 100, Physical Attack 0, Magical Attack 20, Physical Defense 4, Magical Defense 4, and Speed 20. Stats use the shared character-level and loadout formulas.
+Character ID: `lily`. Lily starts at Level 1. Her base stats are HP 100, Magical Attack 20, Physical Defense 4, Magical Defense 4, and Speed 20. Stats use the shared character-level and loadout formulas.
 
 ## Passive: Exposed
 
-When Lily's Skill or Ultimate damages an enemy, that enemy receives Exposed. Exposed lowers both defenses by 10% of the target's applicable defense for two enemy turns. Lily Duplicate 2 allows two stacks and extends the duration to three enemy turns. Summon attacks apply Exposed as well. Exposed stacks multiply resistance reduction additively.
+When Lily damages an enemy with an ability, that enemy receives Exposed. Exposed lowers both Physical and Magical Defense by 10% per stack for two enemy turns. Lily Duplicate 2 allows two stacks and extends the duration to three enemy turns. Summon attacks apply Exposed as well. Exposed stacks multiply resistance reduction additively.
 
 ## Basic Attack
 

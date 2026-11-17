@@ -11,26 +11,87 @@
       "name": "Zero",
       "role": "mainDps",
       "level": 1,
-      "stats": { "hp": 50, "physicalAttack": 40, "magicalAttack": 0, "physicalDefense": 2, "magicalDefense": 2, "speed": 40 },
-      "basic": { "damageType": "physical", "multiplier": 0.5, "target": "blast", "energyGain": 20, "skillPointGain": 1 },
-      "skill": { "type": "firstStrike", "damageType": "physical", "multiplier": 1.0, "firstHitMultiplier": 1.5, "energyGain": 20 },
-      "ultimate": { "damageType": "physical", "multiplier": 1.0, "target": "aoe", "energyCost": 100 },
-      "passives": [{ "type": "cutthroat", "criticalRateBonus": 0.1, "criticalDamageBonus": 0.25 }],
-      "weapon": { "type": "standard", "potential": 1 },
-      "energy": { "start": 20 },
-      "characterDuplicates": 0
+      "stats": {
+        "hp": 50,
+        "physicalDefense": 2,
+        "magicalDefense": 2,
+        "speed": 30,
+        "attack": 40
+      },
+      "basic": {
+        "damageType": "physical",
+        "multiplier": 0.5,
+        "target": "blast",
+        "energyGain": 20,
+        "skillPointGain": 1
+      },
+      "skill": {
+        "type": "firstStrike",
+        "damageType": "physical",
+        "multiplier": 1.0,
+        "firstHitMultiplier": 1.5,
+        "energyGain": 20
+      },
+      "ultimate": {
+        "damageType": "physical",
+        "multiplier": 1.0,
+        "target": "aoe",
+        "energyCost": 100
+      },
+      "passives": [
+        {
+          "type": "cutthroat",
+          "criticalRateBonus": 0.1,
+          "criticalDamageBonus": 0.25
+        }
+      ],
+      "weapon": {
+        "type": "standard",
+        "potential": 1,
+        "level": 1
+      },
+      "energy": {
+        "start": 20
+      },
+      "characterDuplicates": 0,
+      "celestials": {
+        "passive": 1,
+        "basic": 1,
+        "skill": 1,
+        "ultimate": 1
+      }
     },
     "slime": {
       "name": "Slime",
       "role": "enemy",
       "level": 1,
-      "stats": { "hp": 150, "physicalAttack": 0, "magicalAttack": 20, "physicalDefense": 2, "magicalDefense": 6, "speed": 10 },
-      "basic": { "damageType": "physical", "multiplier": 1, "target": "single" },
+      "stats": {
+        "hp": 150,
+        "physicalDefense": 2,
+        "magicalDefense": 6,
+        "speed": 10,
+        "attack": 20
+      },
+      "basic": {
+        "damageType": "magical",
+        "multiplier": 1,
+        "target": "single"
+      },
       "passives": []
     }
   },
   "teams": {
-    "allies": [{ "id": "zero", "archetype": "zero" }],
-    "enemies": [{ "id": "slime", "archetype": "slime" }]
+    "allies": [
+      {
+        "id": "zero",
+        "archetype": "zero"
+      }
+    ],
+    "enemies": [
+      {
+        "id": "slime",
+        "archetype": "slime"
+      }
+    ]
   }
 }

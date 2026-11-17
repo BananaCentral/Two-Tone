@@ -34,7 +34,7 @@ Potential determines a weapon's Level 1 stat bonus. Each weapon level adds one p
 | 4 | 46% | 95% | 126% | 175% |
 | 5 | 51% | 100% | 151% | 200% |
 
-The bonus applies to all six character stats, as defined in the [Loadout Standard](../systems/loadout.md). The Level 50 values are reached only at weapon Level 50. At a lower Rank-based cap, the weapon stops at the value for its current Level and resumes leveling when the cap increases.
+The bonus applies to all combat stats defined for that character, as described in the [Loadout Standard](../systems/loadout.md). The Level 50 values are reached only at weapon Level 50. At a lower Rank-based cap, the weapon stops at the value for its current Level and resumes leveling when the cap increases.
 
 The bonus for weapon type `T`, Potential `P`, and weapon Level `L` is:
 
