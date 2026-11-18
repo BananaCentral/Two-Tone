@@ -6,6 +6,8 @@ Mechanic tags describe what an ability or combat rule does so the performance ev
 
 Character and enemy actions/passives expose `mechanicTags`, per-tag `mechanicTargets`, and per-tag `mechanicTriggers`. Actions also expose `targeting` for their primary target and may expose `targetingVariants` when a rule changes coverage conditionally. Rune rules expose tags, triggers, and targeting. Temporary effects additionally use `COMBAT_EFFECT_LIFECYCLE`, documented in the [Combat Effect Lifecycle Standard](combat-effect-lifecycle-standard.md). The canonical lists are exported from `src/scripts/combat-definitions.mjs` as `COMBAT_MECHANIC_TAGS`, `COMBAT_TARGETING_SCHEMA`, and `COMBAT_TRIGGER_EVENTS`.
 
+Damage-event provenance and proc eligibility are defined separately by `COMBAT_DAMAGE_EVENT_TYPES` and `COMBAT_TRIGGER_ELIGIBILITY`. See the [Combat Trigger Eligibility Standard](combat-trigger-eligibility-standard.md); mechanic tags describe what an effect does, while the event catalog defines which damage sources may activate it.
+
 ## Targeting fields
 
 Target side, acquisition, and coverage are separate:

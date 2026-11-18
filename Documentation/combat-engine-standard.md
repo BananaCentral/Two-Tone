@@ -10,6 +10,7 @@ Combat balance reports must execute the same combat rules and authored combat da
 - `src/scripts/combat-math.mjs` owns shared numeric primitives used by live battle code and the simulator, including HP/stat rounding and typed direct-hit damage.
 - `src/scripts/combat-engine-api.mjs` is the shared runtime API boundary. Both live battles and the runner use its action intents (authored action plan plus resource commitment), typed-hit calculation, target plans, enemy basic-attack plans, Rune triggers, complete direct/Reflect/Echo damage sequences, bleed ticks, Shield/healing application, character-specific effect handlers, shared status application and aging, Follow-Up/Ricochet allocation, summon lifetime, battle outcomes, and turn timeline.
 - `Documentation/combat-effect-lifecycle-standard.md` and `COMBAT_EFFECT_LIFECYCLE` define reapplication, turn clocks, stack consumption, cooldown timing, summon lifetime, cleanse, and defeat cleanup. The shared engine owns these transitions.
+- `Documentation/combat-trigger-eligibility-standard.md` and the shared `COMBAT_DAMAGE_EVENT_TYPES` / `COMBAT_TRIGGER_ELIGIBILITY` catalogs define damage-event provenance and which event types can activate Echo, Reflect, attack effects, Follow-Up, Ricochet, and Lifesteal.
 - Simulation-only scenario settings may select lineups, scale encounter profiles, choose AI policies, and seed randomness. They must not redefine a character's stats, abilities, passives, enemy attacks, or damage rules.
 
 ## Required architecture for trusted results

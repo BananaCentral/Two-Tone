@@ -1,6 +1,6 @@
 // Shared deterministic combat runtime primitives.
 import { calculateCombatHit, roundCombatHp, roundCombatStatQuarter } from './combat-math.mjs';
-import { COMBAT_EFFECT_LIFECYCLE, COMBAT_EFFECT_LIFECYCLE_EVENTS, getActiveCharacterUpgradeEffect, getCharacterUpgradeEffect, RUNE_COMBAT_RULES } from './combat-definitions.mjs';
+import { COMBAT_DAMAGE_EVENT_TYPES, COMBAT_EFFECT_LIFECYCLE, COMBAT_EFFECT_LIFECYCLE_EVENTS, COMBAT_TRIGGER_ELIGIBILITY, getActiveCharacterUpgradeEffect, getCharacterUpgradeEffect, RUNE_COMBAT_RULES } from './combat-definitions.mjs';
 export { roundCombatHp, roundCombatStatQuarter };
 
 function activeUpgradeEffect(id, state = {}) {
@@ -8,6 +8,9 @@ function activeUpgradeEffect(id, state = {}) {
 }
 function upgradeValue(id, key, state = {}, fallback = 0) {
   return activeUpgradeEffect(id, state)?.values?.[key] ?? fallback;
+}
+function eventCanTrigger(trigger, eventType) {
+  return COMBAT_TRIGGER_ELIGIBILITY[trigger]?.from?.includes(eventType) === true;
 }
 
 export class TwoToneTurnTimeline {
@@ -205,10 +208,10 @@ export class TwoToneBattleEngine {
   // Per-hit authored effects live here so the browser and simulator cannot
   // disagree about Bleed, Exposed, Ricochet marks, or character-duplicate
   // triggers. Clients report the resolved hit and equipment state.
-  resolveHitEffects({ actor, target, hit, action, passives = actor?.passives || [],
+  resolveHitEffects({ actor, target, hit, action, eventType = 'direct_hit', passives = actor?.passives || [],
     characterDuplicates = actor?.characterDuplicates || 0, premiumWeaponDuplicates = 0,
     hasPremiumWeapon = false, allies = [], isEnemyTarget = actor?.side !== target?.side } = {}) {
-    if (!actor || !target || !hit || hit.dodged || !Array.isArray(passives)) return Object.freeze([]);
+    if (!actor || !target || !hit || hit.dodged || !eventCanTrigger('attackEffects', eventType) || !Array.isArray(passives)) return Object.freeze([]);
     const results = [], archetypeId = actor.archetypeId || actor.id;
     const upgradeState = { characterDuplicates, premiumWeaponDuplicates,
       weaponType: hasPremiumWeapon ? 'premium' : actor.weapon?.type || null,
@@ -302,8 +305,9 @@ export class TwoToneBattleEngine {
     mark.sources.push(sourceId);
     return true;
   }
-  resolveRicochetPlan({ targets = [], sourceId, sourceDamage, repeats = 1, damageMultiplier = .1, secondHitMultiplier = .5 } = {}) {
+  resolveRicochetPlan({ targets = [], sourceId, sourceDamage, eventType = 'direct_hit', repeats = 1, damageMultiplier = .1, secondHitMultiplier = .5 } = {}) {
     if (!Array.isArray(targets) || sourceId === undefined || sourceId === null ||
+        !eventCanTrigger('lilyRicochet', eventType) ||
         !Number.isFinite(sourceDamage) || sourceDamage <= 0 || !Number.isInteger(repeats) || repeats < 1 ||
         !Number.isFinite(damageMultiplier) || damageMultiplier < 0 ||
         !Number.isFinite(secondHitMultiplier) || secondHitMultiplier < 0) return Object.freeze([]);
@@ -343,9 +347,11 @@ export class TwoToneBattleEngine {
     if (!passive || passive.type !== 'followUp' || ownerId === sourceActorId ||
         !Array.isArray(hits) || !Array.isArray(enemies)) return null;
     const targets = [...new Set(hits.filter(hit => hit &&
+      eventCanTrigger('soulFollowUp', hit.eventType || (hit.summon ? 'summon_hit' : 'direct_hit')) &&
       (hit.damage > 0 || hit.shieldDamage > 0 || hit.barrierDamage > 0 || hit.breakDamage > 0) && !hit.dodged &&
-      !hit.followUp && !hit.reflect && !hit.echo && !hit.ricochet && hit.phase !== 'reflect' &&
-      hit.phase !== 'echo' && hit.phase !== 'follow-up' && hit.phase !== 'ricochet')
+      !hit.followUp && !hit.ricochet && hit.eventType !== 'reflect_hit' && hit.eventType !== 'echo_hit' &&
+      hit.phase !== 'reflect' && hit.phase !== 'echo' && hit.phase !== 'echo-reflect' &&
+      hit.phase !== 'follow-up' && hit.phase !== 'ricochet')
       .map(hit => typeof hit.target === 'string' ? enemies.find(enemy => enemy.id === hit.target) : hit.target)
       .filter(target => target && target.hp > 0 && enemies.some(enemy => enemy.id === target.id)))];
     const allocation = this.resolveFollowUpAllocation({ passive, sourceId, targets, totalDamage,
@@ -525,11 +531,14 @@ export class TwoToneBattleEngine {
   resolveDamageEvent({ target, rawDamage, stealthChance = 0, criticalRate = 0, criticalDamage = 0,
     damageReduction = 0, vulnerabilityMultiplier = 1, isEcho = false, isReflect = false,
     random = Math.random, barrierDamageMultiplier = 1, barrierDamageRatio = .25,
-    breakDamagePercent = .1, brokenDuration = 0, reflectPercent = 0, echoPercent = 0 } = {}) {
+    breakDamagePercent = .1, brokenDuration = 0, reflectPercent = 0, echoPercent = 0,
+    eventType = isReflect ? 'reflect_hit' : isEcho ? 'echo_hit' : 'direct_hit',
+    sourceId = null, actionId = null } = {}) {
+    if (!COMBAT_DAMAGE_EVENT_TYPES.includes(eventType)) return null;
     if (!target || !Number.isFinite(target.hp) || !Number.isFinite(target.maxHp) || !Number.isFinite(rawDamage)) return null;
     const outcome = this.resolveDamageIntake({ rawDamage, targetHp: target.hp, targetShield: Math.max(0,target.shield||0),
       stealthChance, criticalRate, criticalDamage, damageReduction, vulnerabilityMultiplier, isEcho, random });
-    if (!outcome || outcome.dodged) return outcome ? Object.freeze({ ...outcome, healthDamage: 0, directHealthDamage: 0,
+    if (!outcome || outcome.dodged) return outcome ? Object.freeze({ ...outcome, eventType, sourceId, actionId, healthDamage: 0, directHealthDamage: 0,
       breakShieldDamage: 0, barrierDamage: 0, breakDamage: 0, broken: false, reflectRawDamage: 0, echoRawDamage: 0 }) : null;
     const targetHpBefore=target.hp;
     target.shield = Math.max(0,(target.shield||0)-outcome.shieldDamage);
@@ -552,13 +561,16 @@ export class TwoToneBattleEngine {
     }
     const healthDamage=Math.max(0,targetHpBefore-target.hp);
     const receivedDamage=healthDamage+outcome.shieldDamage+breakShieldDamage;
-    const reflectRawDamage=!isEcho&&!isReflect?roundCombatHp(receivedDamage*Math.max(0,reflectPercent)):0;
-    const echoRawDamage=!isEcho&&!isReflect&&target.hp>0?roundCombatHp(directHealthDamage*Math.max(0,echoPercent)):0;
-    return Object.freeze({ ...outcome, directHealthDamage, healthDamage:Math.max(0,targetHpBefore-target.hp),
-      breakShieldDamage, barrierDamage, breakDamage, broken, reflectRawDamage, echoRawDamage,
+    const reflectRawDamage=eventCanTrigger('reflect',eventType)?roundCombatHp(receivedDamage*Math.max(0,reflectPercent)):0;
+    const echoRawDamage=eventCanTrigger('echo',eventType)&&target.hp>0?roundCombatHp(directHealthDamage*Math.max(0,echoPercent)):0;
+    const barrierBreakEvent=broken?Object.freeze({eventType:'barrier_break',sourceId,actionId,damage:breakDamage+breakShieldDamage}):null;
+    return Object.freeze({ ...outcome, eventType, sourceId, actionId, directHealthDamage, healthDamage:Math.max(0,targetHpBefore-target.hp),
+      breakShieldDamage, barrierDamage, breakDamage, broken, barrierBreakEvent, reflectRawDamage, echoRawDamage,
       echoRequest:echoRawDamage>0?Object.freeze({rawDamage:echoRawDamage,damageType:'typed'}):null });
   }
-  resolveDamageOverTime({ target, rawDamage, damageReduction = 0, vulnerabilityMultiplier = 1 } = {}) {
+  resolveDamageOverTime({ target, rawDamage, sourceId = null, actionId = null,
+    eventType = 'damage_over_time', damageReduction = 0, vulnerabilityMultiplier = 1 } = {}) {
+    if (eventType !== 'damage_over_time') return null;
     if (!target || !Number.isFinite(target.hp) || !Number.isFinite(rawDamage) || rawDamage < 0 ||
         !Number.isFinite(damageReduction) || !Number.isFinite(vulnerabilityMultiplier)) return null;
     const damage = roundCombatHp(rawDamage * (1 - Math.min(1, Math.max(0, damageReduction))) * Math.max(0, vulnerabilityMultiplier));
@@ -566,7 +578,7 @@ export class TwoToneBattleEngine {
     target.shield = Math.max(0, (target.shield || 0) - shieldDamage);
     const healthDamage = Math.min(Math.max(0, target.hp), damage - shieldDamage);
     target.hp = Math.max(0, target.hp - (damage - shieldDamage));
-    return Object.freeze({ damage, healthDamage, shieldDamage });
+    return Object.freeze({ damage, healthDamage, shieldDamage, eventType, sourceId, actionId });
   }
   resolveBleedTick({ target, units = [], damagePerStack = COMBAT_EFFECT_LIFECYCLE.bleed.damagePerStack } = {}) {
     if (!target || target.hp <= 0 || !Number.isFinite(target.maxHp) || !Array.isArray(target.bleedStacks) || !target.bleedStacks.length || !Number.isFinite(damagePerStack) || damagePerStack < 0) return Object.freeze([]);
@@ -577,7 +589,8 @@ export class TwoToneBattleEngine {
     }
     const events = [];
     for (const [source, rawDamage] of grouped) {
-      const result = this.resolveDamageOverTime({ target, rawDamage, damageReduction: target.tune?.damageReduction || 0,
+      const result = this.resolveDamageOverTime({ target, rawDamage, sourceId: source.id,
+        actionId: `bleed:${target.id}:${source.id}`, damageReduction: target.tune?.damageReduction || 0,
         vulnerabilityMultiplier: target.brokenTurns > 0 ? 1.5 : 1 });
       if (!result) continue;
       target.damageTaken = (target.damageTaken || 0) + result.healthDamage;
@@ -590,21 +603,33 @@ export class TwoToneBattleEngine {
     return Object.freeze(events);
   }
   resolveDamageSequence({ target, attacker = null, rawDamage, damageType, primary = {},
+    eventType = 'direct_hit', sourceId = attacker?.id || null, actionId = null,
     calculateReflectDamage = null, reflect = {}, echo = {} } = {}) {
-    const direct = this.resolveDamageEvent({ target, rawDamage, ...primary });
+    if (!COMBAT_DAMAGE_EVENT_TYPES.includes(eventType)) return null;
+    const direct = this.resolveDamageEvent({ target, rawDamage, ...primary, eventType, sourceId, actionId });
     if (!direct || direct.dodged) return direct ? Object.freeze({ ...direct, reflect: null, echo: null }) : null;
     let reflected = null;
     if (direct.reflectRawDamage > 0 && attacker?.hp > 0 && typeof calculateReflectDamage === 'function') {
       const reflectedRawDamage = calculateReflectDamage(direct.reflectRawDamage, target, attacker);
       if (Number.isFinite(reflectedRawDamage) && reflectedRawDamage >= 0) {
         reflected = this.resolveDamageEvent({ target: attacker, rawDamage: reflectedRawDamage,
-          ...reflect, isReflect: true, reflectPercent: 0, echoPercent: 0 });
+          ...reflect, isReflect: true, eventType: 'reflect_hit', sourceId: target.id || null, actionId,
+          reflectPercent: 0, echoPercent: 0 });
       }
     }
     let echoed = null;
     if (direct.echoRawDamage > 0 && target.hp > 0) {
       echoed = this.resolveDamageEvent({ target, rawDamage: direct.echoRawDamage,
-        ...echo, isEcho: true, isReflect: false, reflectPercent: 0, echoPercent: 0 });
+        ...echo, isEcho: true, isReflect: false, eventType: 'echo_hit', sourceId, actionId, echoPercent: 0 });
+      if (echoed?.reflectRawDamage > 0 && attacker?.hp > 0 && typeof calculateReflectDamage === 'function') {
+        const reflectedRawDamage = calculateReflectDamage(echoed.reflectRawDamage, target, attacker);
+        if (Number.isFinite(reflectedRawDamage) && reflectedRawDamage >= 0) {
+          const echoReflect = this.resolveDamageEvent({ target: attacker, rawDamage: reflectedRawDamage,
+            ...reflect, isReflect: true, eventType: 'reflect_hit', sourceId: target.id || null, actionId,
+            reflectPercent: 0, echoPercent: 0 });
+          echoed = Object.freeze({ ...echoed, reflect: echoReflect });
+        }
+      }
     }
     return Object.freeze({ ...direct, reflect: reflected, echo: echoed,
       echoDamageType: echoed ? (damageType || null) : null });
@@ -622,8 +647,8 @@ export class TwoToneBattleEngine {
     target.hp = allowOverMax ? target.hp + rounded : Math.min(target.maxHp, target.hp + rounded);
     return Object.freeze({ requested: rounded, applied: Math.max(0, target.hp - before), hp: target.hp });
   }
-  resolveLifesteal({ attacker, damage, rate } = {}) {
-    if (!attacker || attacker.hp <= 0 || !Number.isFinite(damage) || damage <= 0 ||
+  resolveLifesteal({ attacker, damage, rate, eventType = 'direct_hit' } = {}) {
+    if (!attacker || attacker.hp <= 0 || !eventCanTrigger('lifesteal', eventType) || !Number.isFinite(damage) || damage <= 0 ||
         !Number.isFinite(rate) || rate <= 0) return null;
     return this.resolveHealing({ target: attacker, amount: roundCombatHp(damage * rate) });
   }

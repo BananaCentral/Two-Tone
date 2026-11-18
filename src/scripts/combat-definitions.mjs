@@ -33,6 +33,28 @@ export const COMBAT_TRIGGER_EVENTS = Object.freeze([
   'on_direct_damage', 'on_ally_skill', 'on_ability_hit', 'on_turn_start', 'on_ability_damage', 'on_barrier_break', 'on_first_hit_per_target', 'on_shield_applied'
 ]);
 
+// Damage events carry provenance separately from ability tags. This matrix is
+// the shared default for proc eligibility in live battles and simulations.
+export const COMBAT_DAMAGE_EVENT_TYPES = Object.freeze([
+  'direct_hit', 'follow_up_hit', 'ricochet_hit', 'summon_hit',
+  'echo_hit', 'reflect_hit', 'damage_over_time', 'barrier_break'
+]);
+export const COMBAT_TRIGGER_ELIGIBILITY = Object.freeze({
+  echo: Object.freeze({ from: Object.freeze(['direct_hit', 'follow_up_hit', 'ricochet_hit', 'summon_hit']),
+    requires: 'hp_damage', recursive: false }),
+  reflect: Object.freeze({ from: Object.freeze(['direct_hit', 'follow_up_hit', 'ricochet_hit', 'summon_hit', 'echo_hit']),
+    requires: 'hp_or_shield_damage', recursive: false }),
+  attackEffects: Object.freeze({ from: Object.freeze(['direct_hit', 'follow_up_hit', 'ricochet_hit', 'summon_hit']) }),
+  soulFollowUp: Object.freeze({ from: Object.freeze(['direct_hit', 'summon_hit']), uniqueBy: 'source_action', recursive: false }),
+  lilyRicochet: Object.freeze({ from: Object.freeze(['direct_hit', 'summon_hit']), uniqueBy: 'source_action', recursive: false }),
+  lifesteal: Object.freeze({ from: COMBAT_DAMAGE_EVENT_TYPES, requires: 'actual_hp_damage' })
+});
+for (const [trigger, rule] of Object.entries(COMBAT_TRIGGER_ELIGIBILITY)) {
+  if (!Array.isArray(rule.from) || rule.from.some(eventType => !COMBAT_DAMAGE_EVENT_TYPES.includes(eventType))) {
+    throw new Error(`Combat trigger ${trigger} references an unregistered damage event type.`);
+  }
+}
+
 // Lifecycle rules define the clock and reapplication behavior for timed effects.
 // Numeric duration, stack cap, and magnitude values remain on authored effects.
 export const COMBAT_EFFECT_LIFECYCLE_EVENTS = Object.freeze([

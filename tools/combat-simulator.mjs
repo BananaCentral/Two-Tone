@@ -267,12 +267,12 @@ function attackValue(unit, type) {
   if (type === 'magical') return magical;
   return physical + magical;
 }
-function healFromLifesteal(state,attacker,damageDealt){
+function healFromLifesteal(state,attacker,damageDealt,eventType='direct_hit'){
  const logan=state.allies.find(unit=>unit.archetypeId==='logan'&&unit.hp>0&&!unit.disabledPassiveIds?.has('tasteForBlood'));
  const passiveRate=attacker.side==='allies'&&logan?upgradeValue(logan,'logan.duplicate.4.lifesteal','lifestealRate',.1):0;
  const rate=Math.max(0,(attacker.lifestealRate||0)+passiveRate);
  if(rate<=0||damageDealt<=0||attacker.hp<=0)return 0;
- const healing=state.engine.resolveLifesteal({attacker,damage:damageDealt,rate})?.applied||0;
+ const healing=state.engine.resolveLifesteal({attacker,damage:damageDealt,rate,eventType})?.applied||0;
  attacker.lifestealHealing=(attacker.lifestealHealing||0)+healing;
  state.lifestealHealingBySide[attacker.side]+=healing;
  const passiveHealing=Math.min(healing,roundStat(damageDealt*passiveRate));
@@ -286,7 +286,7 @@ function applyBleed(state,target,source,stacks=1,maxStacks=target.bleedMaxStacks
 function resolveBleedTick(state,target){
  if(target.hp<=0||!target.bleedStacks.length)return 0;
  const events=state.engine.resolveBleedTick({target,units:[...state.allies,...state.enemies]}),total=events.reduce((sum,event)=>sum+event.healthDamage,0);
- for(const event of events){target.shieldAbsorbed+=event.shieldDamage;state.damageBySide[event.source.side]+=event.healthDamage;healFromLifesteal(state,event.source,event.healthDamage)}
+ for(const event of events){target.shieldAbsorbed+=event.shieldDamage;state.damageBySide[event.source.side]+=event.healthDamage;healFromLifesteal(state,event.source,event.healthDamage,'damage_over_time')}
  if(target.hp<=0)state.engine.clearUnitEffects(target,{reason:'defeat'});
  return total;
 }
@@ -328,8 +328,9 @@ function applyRicochet(state,sourceActor,sourceId,hits){
  const lily=state.allies.find(unit=>unit.archetypeId==='lily'&&unit.hp>0);if(!lily)return;
  const targets=[...new Set(state.enemies.filter(enemy=>enemy.hp>0&&enemy.marks.some(m=>m.id==='ricochet')))];
  const sourceDamage=Math.max(...triggered.map(hit=>hit.damage));
- const allocations=state.engine.resolveRicochetPlan({targets,sourceId,sourceDamage,damageMultiplier:lily.skill?.ricochetDamageMultiplier??.1,repeats:upgradeValue(lily,'lily.duplicate.4.ricochet-repeat','ricochetRepeats',1),secondHitMultiplier:upgradeValue(lily,'lily.duplicate.4.ricochet-repeat','ricochetSecondHitMultiplier',.5)});
- for(const entry of allocations){if(entry.target.hp<=0)continue;const trueAttack=attackValue(lily,'true'),hits=runAttack(state,lily,[entry.target],{damageType:'true',multiplier:trueAttack>0?entry.damage/trueAttack:0,target:'single'},{damageChannel:'ricochet'});if(hits[0]?.damage>0)lily.ricochetHits=(lily.ricochetHits||0)+1;
+ const eventType=hits.some(hit=>hit.eventType==='summon_hit')?'summon_hit':'direct_hit';
+ const allocations=state.engine.resolveRicochetPlan({targets,sourceId,sourceDamage,eventType,damageMultiplier:lily.skill?.ricochetDamageMultiplier??.1,repeats:upgradeValue(lily,'lily.duplicate.4.ricochet-repeat','ricochetRepeats',1),secondHitMultiplier:upgradeValue(lily,'lily.duplicate.4.ricochet-repeat','ricochetSecondHitMultiplier',.5)});
+ for(const entry of allocations){if(entry.target.hp<=0)continue;const trueAttack=attackValue(lily,'true'),hits=runAttack(state,lily,[entry.target],{damageType:'true',multiplier:trueAttack>0?entry.damage/trueAttack:0,target:'single'},{damageChannel:'ricochet',sourceActionId:sourceId});if(hits[0]?.damage>0)lily.ricochetHits=(lily.ricochetHits||0)+1;
  }
 }
 function cleanse(unit, state, full = true) {
@@ -355,14 +356,17 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
   if (!candidates.length) return [];
   const targets = chooseTarget(state.engine,attacker, candidates, options.targetMode || spec.target || 'single', state.random);
   if (!targets.length) return [];
-  const hits = [];
+  const hits = [], eventType = options.damageChannel === 'followUp' ? 'follow_up_hit'
+    : options.damageChannel === 'ricochet' ? 'ricochet_hit'
+    : options.damageChannel === 'summon' ? 'summon_hit' : 'direct_hit';
+  const actionId = options.sourceActionId ?? ++state.sourceSerial;
   for (const target of targets) {
     const hpBefore = target.hp,shieldBefore=target.shield||0;
     const baseDamage = damageFor(state,attacker, target, spec.damageType, (options.multiplier ?? spec.multiplier)*(1-(attacker.residueStacks||0)*(attacker.residueDamageReductionPerStack??.05)));
     const exposedStacks=target.marks?.filter(mark=>mark.id==='exposed').length||0,barrierLily=state.allies.find(unit=>unit.archetypeId==='lily');
     const runeEcho=attacker.runeSetId==='radiant-moon'?state.engine.resolveRuneEffect({setId:'radiant-moon',trigger:'directDamage'})?.echo||0:0;
     const reflectExposed=target.marks?.filter(mark=>mark.id==='exposed').length||0;
-    const outcome=state.engine.resolveDamageSequence({target,attacker,rawDamage:baseDamage,damageType:spec.damageType,
+    const outcome=state.engine.resolveDamageSequence({target,attacker,rawDamage:baseDamage,damageType:spec.damageType,eventType,sourceId:attacker.id,actionId,
       primary:{stealthChance:Math.min(1,Math.max(0,target.stealth||0)),criticalRate:attacker.criticalRate+(attacker.criticalRateBonus||0)+(attacker.tune?.criticalRateBonus||0)+(options.forceCritical?1:0),criticalDamage:attacker.criticalDamage+(attacker.criticalDamageBonus||0)+(attacker.tune?.criticalDamageBonus||0)+(options.criticalDamageBonus||0),damageReduction:target.tune?.damageReduction||0,vulnerabilityMultiplier:target.side==='enemies'&&target.brokenTurns>0?1.5:1,random:state.random,
        barrierDamageMultiplier:target.side==='enemies'?1+(attacker.tune?.barrierDamageBonus||0)+exposedStacks*upgradeValue(barrierLily||{},'lily.premium-duplicate.2.exposed-barrier-damage','exposedBarrierDamagePerStack'):1,
        breakDamagePercent:.1+exposedStacks*upgradeValue(barrierLily||{},'lily.premium-duplicate.3.exposed-break-damage','exposedBreakDamagePerStack'),brokenDuration:brokenDuration(target.stats.speed,Math.max(1,state.enemyAverage/state.slowerAverage)),
@@ -371,8 +375,8 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
       reflect:{stealthChance:attacker.stealth||0,criticalRate:target.criticalRate+(target.criticalRateBonus||0)+(target.tune?.criticalRateBonus||0),criticalDamage:target.criticalDamage+(target.criticalDamageBonus||0)+(target.tune?.criticalDamageBonus||0),damageReduction:attacker.tune?.damageReduction||0,vulnerabilityMultiplier:attacker.side==='enemies'&&attacker.brokenTurns>0?1.5:1,random:state.random,
        barrierDamageMultiplier:1+(attacker.tune?.barrierDamageBonus||0)+reflectExposed*upgradeValue(barrierLily||{},'lily.premium-duplicate.2.exposed-barrier-damage','exposedBarrierDamagePerStack'),
        breakDamagePercent:.1+reflectExposed*upgradeValue(barrierLily||{},'lily.premium-duplicate.3.exposed-break-damage','exposedBreakDamagePerStack'),brokenDuration:brokenDuration(attacker.stats.speed,Math.max(1,state.enemyAverage/state.slowerAverage))},
-      echo:{random:state.random,barrierDamageMultiplier:1,breakDamagePercent:.1+exposedStacks*upgradeValue(barrierLily||{},'lily.premium-duplicate.3.exposed-break-damage','exposedBreakDamagePerStack'),brokenDuration:brokenDuration(target.stats.speed,Math.max(1,state.enemyAverage/state.slowerAverage))}});
-    if(!outcome||outcome.dodged){hits.push({target,damage:0,shieldDamage:0,barrierDamage:0,breakDamage:0,barrierRemaining:target.barrier,broken:false,critical:false,dodged:true});continue}
+      echo:{random:state.random,reflectPercent:reflectPercentOf(target,state),barrierDamageMultiplier:1,breakDamagePercent:.1+exposedStacks*upgradeValue(barrierLily||{},'lily.premium-duplicate.3.exposed-break-damage','exposedBreakDamagePerStack'),brokenDuration:brokenDuration(target.stats.speed,Math.max(1,state.enemyAverage/state.slowerAverage))}});
+    if(!outcome||outcome.dodged){hits.push({target,damage:0,shieldDamage:0,barrierDamage:0,breakDamage:0,barrierRemaining:target.barrier,broken:false,critical:false,dodged:true,eventType,actionId});continue}
     if(outcome.critical){state.criticalHits++;attacker.criticalHits=(attacker.criticalHits||0)+1}
     const roll={damage:outcome.damage,critical:outcome.critical},damage=outcome.damage,shieldAbsorbed=outcome.shieldDamage,breakShieldAbsorbed=outcome.breakShieldDamage,barrierDamage=outcome.barrierDamage,breakDamage=outcome.breakDamage,broken=outcome.broken;
     target.shieldAbsorbed=(target.shieldAbsorbed||0)+shieldAbsorbed+breakShieldAbsorbed;
@@ -382,15 +386,15 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
     attacker.damageDealt += finalHpDamage;
     attacker.damageBreakdown[options.damageChannel||'direct']+=finalHpDamage;
     state.damageBySide[attacker.side] += finalHpDamage;
-    healFromLifesteal(state,attacker,finalHpDamage);
+    healFromLifesteal(state,attacker,finalHpDamage,eventType);
     const action=options.action||(spec===attacker.basic?'basic':spec===attacker.skill?'skill':spec===attacker.ultimate?'ultimate':null);
-    const hitEffects=state.engine.resolveHitEffects({actor:attacker,target,hit:outcome,action,passives:attacker.passives,characterDuplicates:attacker.characterDuplicates||0,premiumWeaponDuplicates:attacker.premiumWeaponDuplicates||0,hasPremiumWeapon:attacker.weapon?.type==='premium',allies:state.allies,isEnemyTarget:attacker.side!==target.side});
+    const hitEffects=state.engine.resolveHitEffects({actor:attacker,target,hit:outcome,action,eventType,passives:attacker.passives,characterDuplicates:attacker.characterDuplicates||0,premiumWeaponDuplicates:attacker.premiumWeaponDuplicates||0,hasPremiumWeapon:attacker.weapon?.type==='premium',allies:state.allies,isEnemyTarget:attacker.side!==target.side});
     for(const effect of hitEffects)if(effect.type==='lily-exposed-energy'&&effect.target){effect.target.energyGained=(effect.target.energyGained||0)+effect.energyGained;effect.target.energyGranted=(effect.target.energyGranted||0)+effect.energyGained}
     let reflect=null;
-    if(outcome.reflect){const hit=outcome.reflect,reflectShield=hit.shieldDamage+hit.breakShieldDamage;attacker.shieldAbsorbed=(attacker.shieldAbsorbed||0)+reflectShield;attacker.damageTaken+=hit.healthDamage;target.damageDealt+=hit.healthDamage;target.damageBreakdown.reflect+=hit.healthDamage;state.damageBySide[target.side]+=hit.healthDamage;healFromLifesteal(state,target,hit.healthDamage);reflect={damage:hit.damage,healthDamage:hit.healthDamage,shieldDamage:reflectShield,damageType:'true',dodged:!!hit.dodged}}
+    if(outcome.reflect){const hit=outcome.reflect,reflectShield=hit.shieldDamage+hit.breakShieldDamage;attacker.shieldAbsorbed=(attacker.shieldAbsorbed||0)+reflectShield;attacker.damageTaken+=hit.healthDamage;target.damageDealt+=hit.healthDamage;target.damageBreakdown.reflect+=hit.healthDamage;state.damageBySide[target.side]+=hit.healthDamage;healFromLifesteal(state,target,hit.healthDamage,'reflect_hit');reflect={damage:hit.damage,healthDamage:hit.healthDamage,shieldDamage:reflectShield,damageType:'true',dodged:!!hit.dodged,eventType:hit.eventType,sourceId:hit.sourceId,actionId:hit.actionId}}
     let echo=null;
-    if(outcome.echo){const hit=outcome.echo,echoShield=hit.shieldDamage+hit.breakShieldDamage;target.shieldAbsorbed=(target.shieldAbsorbed||0)+echoShield;target.damageTaken+=hit.healthDamage;attacker.damageDealt+=hit.healthDamage;attacker.damageBreakdown.echo+=hit.healthDamage;state.damageBySide[attacker.side]+=hit.healthDamage;healFromLifesteal(state,attacker,hit.healthDamage);echo={damage:hit.damage,healthDamage:hit.healthDamage,directHealthDamage:hit.directHealthDamage,damageType:spec.damageType,shieldAbsorbed:echoShield,echo:true}}
-    hits.push({ target, damage: finalHpDamage, shieldDamage:shieldAbsorbed, barrierDamage, breakDamage, barrierRemaining: target.barrier, broken,critical:roll.critical,dodged:false,damageType:spec.damageType,reflect,echo });
+    if(outcome.echo){const hit=outcome.echo,echoShield=hit.shieldDamage+hit.breakShieldDamage;target.shieldAbsorbed=(target.shieldAbsorbed||0)+echoShield;target.damageTaken+=hit.healthDamage;attacker.damageDealt+=hit.healthDamage;attacker.damageBreakdown.echo+=hit.healthDamage;state.damageBySide[attacker.side]+=hit.healthDamage;healFromLifesteal(state,attacker,hit.healthDamage,'echo_hit');echo={damage:hit.damage,healthDamage:hit.healthDamage,directHealthDamage:hit.directHealthDamage,damageType:spec.damageType,shieldAbsorbed:echoShield,echo:true,eventType:hit.eventType,sourceId:hit.sourceId,actionId:hit.actionId};if(hit.reflect){const echoReflect=hit.reflect,reflectShield=echoReflect.shieldDamage+echoReflect.breakShieldDamage;attacker.shieldAbsorbed=(attacker.shieldAbsorbed||0)+reflectShield;attacker.damageTaken+=echoReflect.healthDamage;target.damageDealt+=echoReflect.healthDamage;target.damageBreakdown.reflect+=echoReflect.healthDamage;state.damageBySide[target.side]+=echoReflect.healthDamage;healFromLifesteal(state,target,echoReflect.healthDamage,'reflect_hit');echo.reflect={damage:echoReflect.damage,healthDamage:echoReflect.healthDamage,shieldDamage:reflectShield,damageType:'true',dodged:!!echoReflect.dodged,eventType:echoReflect.eventType,sourceId:echoReflect.sourceId,actionId:echoReflect.actionId}}}
+    hits.push({ target, damage: finalHpDamage, shieldDamage:shieldAbsorbed, barrierDamage, breakDamage, barrierRemaining: target.barrier, broken,critical:roll.critical,dodged:false,damageType:spec.damageType,reflect,echo,eventType,actionId });
     if(attacker.archetypeId==='zero'&&finalHpDamage>0)attacker.firstStrikeTargets.add(target.id);
     if(target.hp<=0)state.engine.clearUnitEffects(target,{reason:'defeat',taunts:true});
   }
@@ -411,7 +415,7 @@ function triggerFollowUps(state, sourceId, sourceActorId, hits) {
       soul.followUpActivations=allocation.activations;
       allocation.targets.forEach(({target,damage:share}) => {
         const divisor = attackValue(soul, passive.damageType);
-        runAttack(state,soul,[target],{damageType:passive.damageType,multiplier:divisor>0?share/divisor:0,target:'single'},{damageChannel:'followUp'});
+        runAttack(state,soul,[target],{damageType:passive.damageType,multiplier:divisor>0?share/divisor:0,target:'single'},{damageChannel:'followUp',sourceActionId:sourceId});
       });
     }
   }
@@ -462,9 +466,9 @@ function resolveAllyAction(state, actor) {
   if (!foes.length) return;
   const actionOverride=state.actionOverride?.actorId===actor.id&&state.actionOverride.turn===actor.turns?state.actionOverride.action:null;
   if(actor.isHauntling){
-    const id=++state.sourceSerial,hits=runAttack(state,actor,foes,{damageType:'true',multiplier:1,target:'aoe'},{multiplier:celestialFactor(actor,'ultimate'),damageChannel:'summon'});
+    const id=++state.sourceSerial,hits=runAttack(state,actor,foes,{damageType:'true',multiplier:1,target:'aoe'},{multiplier:celestialFactor(actor,'ultimate'),damageChannel:'summon',sourceActionId:id});
     const lily=state.allies.find(unit=>unit.archetypeId==='lily'&&unit.hp>0);
-    if(lily)for(const target of landedTargets(hits))state.engine.resolveHitEffects({actor:lily,target,hit:{dodged:false},action:'summon',passives:lily.passives,characterDuplicates:lily.characterDuplicates||0,isEnemyTarget:true});
+    if(lily)for(const target of landedTargets(hits))state.engine.resolveHitEffects({actor:lily,target,hit:{dodged:false},action:'summon',eventType:'summon_hit',passives:lily.passives,characterDuplicates:lily.characterDuplicates||0,isEnemyTarget:true});
     applyRicochet(state,actor,id,hits);triggerFollowUps(state,id,actor.id,hits);
     state.engine.advanceSummonTurn(actor);return;
   }
@@ -479,9 +483,9 @@ function resolveAllyAction(state, actor) {
       applyUltimateRuneEffects(state,actor);
     }else{
     const plan=actionPlan(state,actor,'ultimate');
-    const hits = runAttack(state, actor, foes, ultimate, { multiplier: plan.multiplier });
-    applyUltimateRuneEffects(state,actor,hits);
     const sourceId=++state.sourceSerial;
+    const hits = runAttack(state, actor, foes, ultimate, { multiplier: plan.multiplier,sourceActionId:sourceId });
+    applyUltimateRuneEffects(state,actor,hits);
     applyRicochet(state,actor,sourceId,hits);triggerFollowUps(state, sourceId, actor.id, hits);
     if(actor.archetypeId==='zero'){
       const result=state.engine.resolveZeroUltimateEffects({actor,enemies:state.enemies,battle:state,characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0,hasPremiumWeapon:actor.weapon?.type==='premium'});
@@ -520,7 +524,7 @@ function resolveAllyAction(state, actor) {
   if(skill?.type==='firstStrike'&&state.skillPoints>0){
     const plan=actionPlan(state,actor,'skill');if(!settleActionResources(state,actor,plan))return;state.skillUses++;actor.skillUses++;
     const target=foes.slice().sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp||a.id.localeCompare(b.id))[0];
-    if(target){const plan=actionPlan(state,actor,'skill',{targetAlreadyHit:actor.firstStrikeTargets.has(target.id)}),hits=runAttack(state,actor,[target],skill,{multiplier:plan.multiplier,targetMode:'single'});const sourceId=++state.sourceSerial;triggerFollowUps(state,sourceId,actor.id,hits)}
+    if(target){const sourceId=++state.sourceSerial,plan=actionPlan(state,actor,'skill',{targetAlreadyHit:actor.firstStrikeTargets.has(target.id)}),hits=runAttack(state,actor,[target],skill,{multiplier:plan.multiplier,targetMode:'single',sourceActionId:sourceId});triggerFollowUps(state,sourceId,actor.id,hits)}
     useRuneRecycle(state,actor);return;
   }
   if (skill?.type === 'enhanceBasic') {
@@ -534,7 +538,7 @@ function resolveAllyAction(state, actor) {
   }
   if(skill?.type==='ricochet'&&state.skillPoints>0){
     const plan=actionPlan(state,actor,'skill');if(!settleActionResources(state,actor,plan))return;state.skillUses++;actor.skillUses++;
-    const sourceId=++state.sourceSerial,hits=runAttack(state,actor,foes,skill,{multiplier:plan.multiplier,targetMode:plan.target||'aoe'});
+    const sourceId=++state.sourceSerial,hits=runAttack(state,actor,foes,skill,{multiplier:plan.multiplier,targetMode:plan.target||'aoe',sourceActionId:sourceId});
     useRuneRecycle(state,actor);
     applyRicochet(state,actor,sourceId,hits);
     triggerFollowUps(state,sourceId,actor.id,hits);return;
@@ -549,11 +553,12 @@ function resolveAllyAction(state, actor) {
   const amplify=amplifyBasic(state,actor);
   const untunedPlan=actor.tune?.basicEnhanced?actionPlan(state,actor,'basic'):plan;
   if(!settleActionResources(state,actor,plan,{enhancedStacks:stacks}))return;
-  const hits = runAttack(state, actor, foes, basic, { multiplier:basicMultiplier*amplify,unbuffedMultiplier:actor.tune?.basicEnhanced?untunedPlan.multiplier*amplify:undefined,targetMode });
+  const sourceId=++state.sourceSerial;
+  const hits = runAttack(state, actor, foes, basic, { multiplier:basicMultiplier*amplify,unbuffedMultiplier:actor.tune?.basicEnhanced?untunedPlan.multiplier*amplify:undefined,targetMode,sourceActionId:sourceId });
   actor.basicAttackCount++;
   if(actor.tune?.basicEnhanced){const tuneSource=state.allies.find(unit=>unit.id===actor.tune.sourceId);actor.tune.basicEnhanced=false;const tunedSpBefore=state.skillPoints;state.skillPoints=Math.min(state.skillPointCap,state.skillPoints+(actor.tune.skillPointReturn||0));const refund=state.skillPoints-tunedSpBefore;actor.skillPointsGenerated+=refund;if(tuneSource){tuneSource.skillPointsGranted+=refund;tuneSource.skillPointsGenerated+=refund}}
   actor.enhanceStacks = 0;
-  const sourceId=++state.sourceSerial;applyRicochet(state,actor,sourceId,hits);triggerFollowUps(state, sourceId, actor.id, hits);
+  applyRicochet(state,actor,sourceId,hits);triggerFollowUps(state, sourceId, actor.id, hits);
 }
 function resolveEnemyAction(state, actor) {
   const targets = state.allies.filter(unit => unit.hp > 0);

@@ -5,11 +5,12 @@ Resolve battle actions in visible phases so players can follow the acting charac
 ## Phase order
 
 1. Show the acting character's ability and resolve its primary hit or hits, including each target's Stealth roll. All targets of the same AoE are one primary phase.
-2. Resolve Reflect from HP and shield damage caused by each hit. Reflected damage uses True damage and cannot trigger Reflect or Echo.
+2. Resolve Reflect from HP and shield damage caused by each eligible hit. Reflected damage uses True damage and cannot trigger Reflect or Echo.
 3. Resolve each resulting Echo hit after its source hit, before other ability-triggered effects. Echo is a separate damage event and uses the source hit's damage type.
-4. Resolve other ability-triggered effects caused by those hits, such as Lily's Ricochet. Show each effect after the primary, Reflect, and Echo phases.
-5. Resolve ally follow-ups caused by the action, such as Soul's Follow-up, after ability-triggered effects.
-6. Begin the next scheduled action after the previous action's visible resolution phases have been presented.
+4. Resolve Reflect caused by each Echo hit, if that Echo caused HP or Shield damage.
+5. Resolve other ability-triggered effects caused by those hits, such as Lily's Ricochet. Show each effect after the primary, Reflect, and Echo phases.
+6. Resolve ally follow-ups caused by the action, such as Soul's Follow-up, after ability-triggered effects.
+7. Begin the next scheduled action after the previous action's visible resolution phases have been presented.
 
 ## Timing and feedback
 
