@@ -73,8 +73,7 @@
         "physicalDefense": 4,
         "magicalDefense": 4,
         "speed": 20,
-        "physicalAttack": 0,
-        "magicalAttack": 20
+        "attack": 20
       },
       "basic": {
         "damageType": "magical",
@@ -279,8 +278,7 @@
         "physicalDefense": 12,
         "magicalDefense": 4,
         "speed": 40,
-        "physicalAttack": 40,
-        "magicalAttack": 0
+        "attack": 40
       },
       "basic": {
         "damageType": "physical",
@@ -357,8 +355,7 @@
         "physicalDefense": 6,
         "magicalDefense": 6,
         "speed": 60,
-        "physicalAttack": 90,
-        "magicalAttack": 0
+        "attack": 90
       },
       "basic": {
         "damageType": "true",

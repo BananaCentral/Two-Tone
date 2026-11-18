@@ -19,7 +19,7 @@
 ## Weapon Effects
 
 - **Signature Weapon:** When an ally's Taste for Blood Lifesteal restores HP, Logan also heals by the amount actually restored to that ally.
-- **Premium Weapon Duplicate 4:** Units with a Blood Shield gain 20% Physical and Magical Attack while their Shield remains above zero. The bonus ends when their Shield is depleted.
+- **Premium Weapon Duplicate 4:** Units with a Blood Shield gain 20% Attack while their Shield remains above zero. The bonus ends when their Shield is depleted.
 
 ## Artwork
 

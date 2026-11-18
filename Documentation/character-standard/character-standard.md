@@ -6,10 +6,7 @@ This standard defines the required stat and ability entries for every playable c
 
 ## Character Stat Sheet
 
-Every playable character must define HP, Physical Defense, Magical Defense, and Speed. Its attack basis must follow the [Attack Standard](../attack-standard/attack-standard.md) and use one of:
-
-- A generic Base Attack, used at full value by Physical, Magical, or True actions as specified by the action; or
-- One or both typed Base Attack stats (Physical Attack and/or Magical Attack) when actions use a specific damage type.
+Every playable character must define HP, one Base Attack, Physical Defense, Magical Defense, and Speed. Attack is used at full value by Physical, Magical, and True damage actions. Damage type selects the matching defense, as defined in the [Attack Standard](../attack-standard/attack-standard.md).
 
 Calculated values use the matching stat formulas and scale with character Level. A character starts at Level 1.
 
@@ -31,7 +28,7 @@ Every ability entry must define:
 - Ability name and slot.
 - Effect, including its trigger and timing when applicable.
 - Target or target-selection rule.
-- Damage type and scaling stat/rate when it deals damage.
+- Damage type and Attack multiplier when it deals damage.
 - Resource cost or gain when it changes a resource.
 - Duration, stacking, and expiration rules for temporary effects.
 
@@ -56,9 +53,8 @@ An ability whose multiplier depends on the first time its user hits a particular
 Character ID:
 Display name:
 Base HP:
-Base Attack (or Base Physical Attack):
+Base Attack:
 Base Physical Defense:
-Base Magical Attack (if using separate attack stats):
 Base Magical Defense:
 Base Speed:
 

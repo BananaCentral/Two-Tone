@@ -33,6 +33,20 @@ export const COMBAT_TRIGGER_EVENTS = Object.freeze([
   'on_direct_damage', 'on_ally_skill', 'on_ability_hit', 'on_turn_start', 'on_ability_damage', 'on_barrier_break', 'on_first_hit_per_target', 'on_shield_applied'
 ]);
 
+// Shared reference values for performance comparisons and BAE reporting.
+export const COMBAT_PERFORMANCE_STANDARD = Object.freeze({
+  baseStats: Object.freeze({ hp: 100, attack: 20, physicalDefense: 4, magicalDefense: 4, speed: 20 }),
+  damageMultipliers: Object.freeze({
+    basic: Object.freeze({ single: 1, blast: .75, aoe: .5 }),
+    skill: Object.freeze({ single: 2, blast: 1.5, aoe: 1 }),
+    ultimate: Object.freeze({ single: 3, blast: 2.25, aoe: 1.5 })
+  }),
+  referenceBasicSkillPointGain: 1,
+  referenceSkillEnergyGain: 10,
+  referenceSkillPointCost: 1,
+  referenceUltimateEnergyCost: 100
+});
+
 // Damage events carry provenance separately from ability tags. This matrix is
 // the shared default for proc eligibility in live battles and simulations.
 export const COMBAT_DAMAGE_EVENT_TYPES = Object.freeze([
@@ -236,16 +250,26 @@ export const CHARACTER_ROSTER = Object.freeze([
     { name: 'Zero', role: 'mainDps', level: 1, basic: { damageType: 'physical', multiplier: .5, target: 'blast', energyGain: 20, skillPointGain: 1 }, skill: { type: 'firstStrike', target: 'single', damageType: 'physical', multiplier: 1, firstHitMultiplier: 1.5, energyGain: 20 }, ultimate: { damageType: 'physical', multiplier: 1, target: 'aoe', energyCost: 100, actionAdvance: 100, mechanicTargets: { 'tempo.action_advance': { side: 'self', acquisition: 'self', coverage: 'single' } } }, passives: [{ type: 'cutthroat', criticalRateBonus: .1, criticalDamageBonus: .25 }] }
   ),
   character(
-    { id: 'lily', name: 'LILY', label: 'Character', hp: 100, basePhysicalAttack: 0, baseMagicalAttack: 20, basePhysicalDefense: 4, baseMagicalDefense: 4, speed: 20, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'lily', test: false },
+    { id: 'lily', name: 'LILY', label: 'Character', hp: 100, baseAttack: 20, basePhysicalDefense: 4, baseMagicalDefense: 4, speed: 20, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'lily', test: false },
     { name: 'Lily', role: 'subDps', level: 1, basic: { damageType: 'magical', multiplier: 1, target: 'single', energyGain: 10, skillPointGain: 1 }, skill: { type: 'ricochet', damageType: 'magical', multiplier: .5, target: 'aoe', energyGain: 20, markTurns: 2, ricochetDamageMultiplier: .1 }, ultimate: { damageType: 'magical', multiplier: 1, target: 'aoe', energyCost: 100, summonDuration: 3, summonSpeed: 30, summonHp: 1, summonDamageType: 'true', summonMultiplier: 1, summonTarget: 'aoe', mechanicTags: ['summon.create', 'summon.action'] }, passives: [{ type: 'exposed', defenseReduction: .1, duration: 2 }] }
   ),
   character(
     { id: 'dawn', name: 'DAWN', label: 'Character', hp: 50, baseAttack: 40, basePhysicalDefense: 2, baseMagicalDefense: 4, speed: 20, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'dawn', test: false },
-    { name: 'Dawn', role: 'support', level: 1, basic: { damageType: 'magical', multiplier: 2, target: 'single', energyGain: 10, skillPointGain: 1 }, skill: { type: 'tune', target: 'ally', energyGain: 20, damageBonus: .4, duration: 1, skillPointReturn: 1 }, ultimate: { type: 'dawnSupport', target: 'ally', energyCost: 100, energyRestore: .5, skillPointGain: 1, actionAdvance: 100 }, passives: [{ type: 'resourceful', skillPointCapBonus: 2, startingSkillPointBonus: 2 }] }
+    { name: 'Dawn', role: 'support', level: 1, basic: { damageType: 'magical', multiplier: 2, target: 'single', energyGain: 10, skillPointGain: 1 }, skill: { type: 'tune', target: 'ally', energyGain: 20, damageBonus: .4, duration: 1, skillPointReturn: 1,
+      effects: [{ id: 'dawn.tune.support', mechanicTags: ['status.tune', 'buff.next_basic', 'buff.damage', 'resource.skill_point', 'limit.duration'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', measures: ['damageBonus', 'duration', 'skillPointReturn', 'actionAdvance'] }] }, ultimate: { type: 'dawnSupport', target: 'ally', energyCost: 100, energyRestore: .5, skillPointGain: 1, actionAdvance: 100,
+      effects: [
+        { id: 'dawn.ultimate.energy-restore', mechanicTags: ['resource.energy'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_ultimate', measures: ['energyGained'] },
+        { id: 'dawn.ultimate.action-advance', mechanicTags: ['tempo.action_advance'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_ultimate', measures: ['actionAdvance'] },
+        { id: 'dawn.ultimate.skill-point', mechanicTags: ['resource.skill_point'], targeting: { side: 'self', acquisition: 'self', coverage: 'single' }, trigger: 'on_ultimate', measures: ['skillPointsGained'] }
+      ] }, passives: [{ type: 'resourceful', skillPointCapBonus: 2, startingSkillPointBonus: 2 }] }
   ),
   character(
     { id: 'logan', name: 'LOGAN', label: 'Character', hp: 200, baseAttack: 10, basePhysicalDefense: 4, baseMagicalDefense: 4, speed: 10, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'logan', test: false },
-    { name: 'Logan', role: 'sustain', level: 1, basic: { damageType: 'physical', multiplier: 1, target: 'single', energyGain: 10, skillPointGain: 1, mechanicTags: ['status.bleed', 'damage.over_time', 'trigger.per_hit', 'limit.stacks'], mechanicTriggers: { 'status.bleed': 'on_successful_hit', 'damage.over_time': 'on_turn_start', 'trigger.per_hit': 'on_successful_hit' } }, skill: { type: 'bloodShield', target: 'allAllies', energyGain: 20, healthCost: .25, shieldDistribution: 'perAlly', tauntChance: .25, tauntTurns: 2 }, ultimate: { damageType: 'physical', multiplier: 1, target: 'aoe', energyCost: 100, mechanicTags: ['status.bleed', 'damage.over_time', 'trigger.per_hit', 'limit.stacks'], mechanicTriggers: { 'status.bleed': 'on_successful_hit', 'damage.over_time': 'on_turn_start', 'trigger.per_hit': 'on_successful_hit' } }, passives: [{ type: 'tasteForBlood', lifesteal: .1 }] }
+    { name: 'Logan', role: 'sustain', level: 1, basic: { damageType: 'physical', multiplier: 1, target: 'single', energyGain: 10, skillPointGain: 1, mechanicTags: ['status.bleed', 'damage.over_time', 'trigger.per_hit', 'limit.stacks'], mechanicTriggers: { 'status.bleed': 'on_successful_hit', 'damage.over_time': 'on_turn_start', 'trigger.per_hit': 'on_successful_hit' } }, skill: { type: 'bloodShield', target: 'allAllies', energyGain: 20, healthCost: .25, shieldDistribution: 'perAlly', tauntChance: .25, tauntTurns: 2,
+      effects: [
+        { id: 'logan.blood-shield.protection', mechanicTags: ['defense.shield'], targeting: { side: 'ally', acquisition: 'all', coverage: 'all' }, trigger: 'on_skill', measures: ['shieldGranted', 'shieldPerAlly'] },
+        { id: 'logan.blood-shield.taunt', mechanicTags: ['tempo.taunt'], targeting: { side: 'enemy', acquisition: 'all', coverage: 'all' }, trigger: 'on_skill', measures: ['tauntRate', 'duration', 'tauntsApplied'] }
+      ] }, ultimate: { damageType: 'physical', multiplier: 1, target: 'aoe', energyCost: 100, mechanicTags: ['status.bleed', 'damage.over_time', 'trigger.per_hit', 'limit.stacks'], mechanicTriggers: { 'status.bleed': 'on_successful_hit', 'damage.over_time': 'on_turn_start', 'trigger.per_hit': 'on_successful_hit' } }, passives: [{ type: 'tasteForBlood', lifesteal: .1 }] }
   )
 ]);
 
@@ -256,22 +280,43 @@ export const ENEMY_ARCHETYPES = Object.freeze({
     { name: 'Wolf', role: 'enemy', level: 1, basic: { damageType: 'physical', multiplier: 1, target: 'random' }, passives: [{ type: 'bleed', id: 'ravage', stacksPerHit: 1, maxStacks: 5 }], barrierPercent: .2 }),
   hawk: enemy({ id: 'hawk', category: 'common', tags: { area: 'One', type: 'common', strengths: ['Fast', 'Physical Attacker'], weaknesses: ['Physically Fragile', 'Magically Fragile', 'Weak', 'Fragile'] }, name: 'HAWK', level: 1, hp: 50, baseAttack: 10, basePhysicalDefense: 2, baseMagicalDefense: 2, speed: 60, stealth: .2, lifesteal: 0, battleSprite: 'hawkBattle', battleAspectRatio: '1:1', artwork: 'hawkBattle', passive: { id: 'mach-speed' }, basicAttack: { targetMode: 'single', damageType: 'physical', multiplier: 1 } },
     { name: 'Hawk', role: 'enemy', level: 1, basic: { damageType: 'physical', multiplier: 1, target: 'random' }, passives: [], barrierPercent: .2, stealth: .2 }),
-  goblin: enemy({ id: 'goblin', category: 'elite', tags: { area: 'One', type: 'elite', strengths: ['Physical Attacker', 'Physically Defensive'], weaknesses: ['Magically Fragile'] }, name: 'GOBLIN', level: 1, hp: 200, basePhysicalAttack: 40, baseMagicalAttack: 0, basePhysicalDefense: 12, baseMagicalDefense: 4, speed: 40, stealth: 0, lifesteal: 0, battleSprite: 'goblinBattle', battleAspectRatio: '1:2', artwork: 'goblinBattle', passive: { id: 'pursuit', actionAdvance: 20 }, basicAttack: { targetMode: 'blast', damageType: 'physical', multiplier: 1 } },
+  goblin: enemy({ id: 'goblin', category: 'elite', tags: { area: 'One', type: 'elite', strengths: ['Physical Attacker', 'Physically Defensive'], weaknesses: ['Magically Fragile'] }, name: 'GOBLIN', level: 1, hp: 200, baseAttack: 40, basePhysicalDefense: 12, baseMagicalDefense: 4, speed: 40, stealth: 0, lifesteal: 0, battleSprite: 'goblinBattle', battleAspectRatio: '1:2', artwork: 'goblinBattle', passive: { id: 'pursuit', actionAdvance: 20 }, basicAttack: { targetMode: 'blast', damageType: 'physical', multiplier: 1 } },
     { name: 'Goblin', role: 'enemy', level: 1, basic: { damageType: 'physical', multiplier: 1, target: 'blast' }, passives: [{ type: 'pursuit', actionAdvance: 20 }], barrierPercent: .2 }),
   geode: enemy({ id: 'geode', category: 'elite', tags: { area: 'One', type: 'elite', strengths: ['Defensive', 'Magical Resistant', 'Physically Resistant'], weaknesses: ['Slow', 'Weak'] }, name: 'GEODE', level: 1, hp: 250, baseAttack: 20, basePhysicalDefense: 16, baseMagicalDefense: 8, speed: 10, stealth: 0, lifesteal: 0, battleSprite: 'geodeBattle', battleAspectRatio: '1:2', artwork: 'geodeBattle', passive: { id: 'momentum', damageBonus: .2, maxStacks: 10 }, basicAttack: { targetMode: 'aoe', damageType: 'physical', multiplier: 1 } },
     { name: 'Geode', role: 'enemy', level: 1, basic: { damageType: 'physical', multiplier: 1, target: 'aoe' }, passives: [{ type: 'momentum', damageBonus: .2, maxStacks: 10 }], barrierPercent: .2 }),
-  bear: enemy({ id: 'bear', category: 'boss', tags: { area: 'One', type: 'boss', strengths: ['Defensive', 'Strong', 'Physical Attacker'], weaknesses: ['Physically Fragile', 'Magically Fragile'] }, name: 'BEAR', level: 1, hp: 450, basePhysicalAttack: 90, baseMagicalAttack: 0, basePhysicalDefense: 6, baseMagicalDefense: 6, speed: 60, stealth: 0, lifesteal: 0, battleSprite: 'bearBattle', battleAspectRatio: '64:70', artwork: 'bearBattle', healthBars: 1, passive: { id: 'sharp-claws', defenseIgnore: .25 }, basicAttack: { targetMode: 'aoe', damageType: 'true', multiplier: 1 } },
+  bear: enemy({ id: 'bear', category: 'boss', tags: { area: 'One', type: 'boss', strengths: ['Defensive', 'Strong', 'Physical Attacker'], weaknesses: ['Physically Fragile', 'Magically Fragile'] }, name: 'BEAR', level: 1, hp: 450, baseAttack: 90, basePhysicalDefense: 6, baseMagicalDefense: 6, speed: 60, stealth: 0, lifesteal: 0, battleSprite: 'bearBattle', battleAspectRatio: '64:70', artwork: 'bearBattle', healthBars: 1, passive: { id: 'sharp-claws', defenseIgnore: .25 }, basicAttack: { targetMode: 'aoe', damageType: 'true', multiplier: 1 } },
     { name: 'Bear', role: 'boss', level: 1, basic: { damageType: 'true', multiplier: 1, target: 'aoe' }, passives: [{ type: 'sharpClaws', defenseIgnore: .25 }], barrierPercent: .2 })
 });
 
 function runtimeStats(unit) {
   const stats = { hp: unit.hp, physicalDefense: unit.basePhysicalDefense, magicalDefense: unit.baseMagicalDefense, speed: unit.speed };
-  if (Number.isFinite(unit.baseAttack)) stats.attack = unit.baseAttack;
-  else { stats.physicalAttack = unit.basePhysicalAttack; stats.magicalAttack = unit.baseMagicalAttack; }
+  stats.attack = unit.baseAttack;
   return stats;
 }
 
 export const CHARACTER_COMBAT_DATA = Object.freeze(Object.fromEntries(CHARACTER_ROSTER.map(unit => [unit.id, Object.freeze({ ...tagCombatKit(unit.combat), stats: runtimeStats(unit) })])));
+
+// Catalogued effects are independently measurable and suppressible by stable ID.
+// Keep effect metadata beside the authored ability so tags, targeting, and trigger
+// semantics cannot drift away from the mechanic they describe.
+const combatEffectCatalog = {};
+for (const unit of CHARACTER_ROSTER) for (const slot of ['basic', 'skill', 'ultimate'])
+  for (const effect of unit.combat[slot]?.effects || []) {
+    if (!effect.id || typeof effect.id !== 'string') throw new Error(`${unit.id}.${slot} effect needs a stable ID.`);
+    if (Object.hasOwn(combatEffectCatalog, effect.id)) throw new Error(`Duplicate combat effect ID: ${effect.id}.`);
+    if (!Array.isArray(effect.mechanicTags) || !effect.mechanicTags.length || effect.mechanicTags.some(tag => !COMBAT_MECHANIC_TAGS.includes(tag)))
+      throw new Error(`${effect.id} needs canonical mechanic tags.`);
+    if (!Array.isArray(effect.measures) || !effect.measures.length || effect.measures.some(key => typeof key !== 'string'))
+      throw new Error(`${effect.id} needs numeric measure fields for reporting its magnitude.`);
+    if (new Set(effect.measures).size !== effect.measures.length || !effect.targeting ||
+        !COMBAT_TARGETING_SCHEMA.side.includes(effect.targeting.side) ||
+        !COMBAT_TARGETING_SCHEMA.acquisition.includes(effect.targeting.acquisition) ||
+        !COMBAT_TARGETING_SCHEMA.coverage.includes(effect.targeting.coverage) ||
+        !COMBAT_TRIGGER_EVENTS.includes(effect.trigger))
+      throw new Error(`${effect.id} needs valid, unique targeting, trigger, and measure metadata.`);
+    combatEffectCatalog[effect.id] = Object.freeze({ ...effect, character: unit.id, slot });
+  }
+export const COMBAT_EFFECT_CATALOG = Object.freeze(combatEffectCatalog);
 
 function enemyPassive(unit) {
   const passive = unit.passive || {};

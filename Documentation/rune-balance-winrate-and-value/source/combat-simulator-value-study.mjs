@@ -45,7 +45,7 @@ function validateConfig(config) {
       const archetype = config.archetypes[instance.archetype];
       assert(archetype, 'Unknown archetype ' + instance.archetype + ' for ' + instance.id + '.');
       assert(archetype.stats && Number.isFinite(archetype.stats.hp) && Number.isFinite(archetype.stats.speed), 'Archetype ' + instance.archetype + ' needs HP and Speed stats.');
-      assert(Number.isFinite(archetype.stats.attack) || (Number.isFinite(archetype.stats.physicalAttack) && Number.isFinite(archetype.stats.magicalAttack)), 'Archetype ' + instance.archetype + ' needs Attack or both typed Attack stats.');
+      assert(Number.isFinite(archetype.stats.attack) && archetype.stats.attack >= 0, 'Archetype ' + instance.archetype + ' needs Attack stat.');
       const barrierPercent = instance.barrierPercent ?? archetype.barrierPercent ?? 0.2;
       const stealth = instance.stealth ?? archetype.stealth ?? 0;
       const echoPercent=instance.echoPercent??archetype.echoPercent??0;
@@ -111,20 +111,10 @@ function instantiate(config, side) {
     const weaponMultiplier = 1 + signatureWeaponBonus(weapon);
     const runeTotals = runeStatTotals(instance.runes ?? archetype.runes ?? []);
     const stats = Object.fromEntries(Object.entries(archetype.stats).map(([name, value]) => [name, roundStatQuarter((statAtLevel(value, level) + (runeTotals[name] || 0)) * weaponMultiplier)]));
-    if (Number.isFinite(stats.attack)) {
-      stats.physicalAttack ??= stats.attack;
-      stats.magicalAttack ??= stats.attack;
-    } else {
-      stats.attack = null;
-      stats.physicalAttack = roundStatQuarter((stats.physicalAttack ?? 0) + (runeTotals.attack || 0));
-      stats.magicalAttack = roundStatQuarter((stats.magicalAttack ?? 0) + (runeTotals.attack || 0));
-    }
-    stats.physicalAttack ??= 0;
-    stats.magicalAttack ??= 0;
+    assert(Number.isFinite(stats.attack) && stats.attack >= 0 && Number.isFinite(stats.physicalDefense) && Number.isFinite(stats.magicalDefense), 'Archetype ' + instance.archetype + ' needs Attack and both Defense stats.');
     const characterDuplicates = instance.characterDuplicates ?? archetype.characterDuplicates ?? 0;
     assert(Number.isInteger(characterDuplicates) && characterDuplicates >= 0 && characterDuplicates <= 4, 'Character duplicates must be from 0 to 4.');
     const premiumWeaponDuplicates = weapon?.type === 'premium' ? weapon.potential - 1 : 0;
-    assert(stats.physicalAttack !== undefined && stats.magicalAttack !== undefined && stats.physicalDefense !== undefined && stats.magicalDefense !== undefined, 'Archetype ' + instance.archetype + ' needs an attack basis and both defense stats.');
     const maxEnergy = archetype.energy?.max ?? 120;
     const passives = (archetype.passives || []).map((passive, index) => ({
       ...passive,
@@ -223,15 +213,9 @@ function instantiate(config, side) {
     };
   });
 }
-function attackValue(unit, type) {
-  if (Number.isFinite(unit.stats.attack)) {
-    const generic = roundStatQuarter(unit.stats.attack * (1 + (unit.tune?.attackBonus || 0) + (unit.shield > 0 && unit.archetypeId === 'logan' && unit.premiumWeaponDuplicates >= 4 ? 0.2 : 0)));
-    return generic;
-  }
-  const multiplier=1+(unit.tune?.attackBonus||0)+(unit.shield>0&&unit.archetypeId==='logan'&&unit.premiumWeaponDuplicates>=4?.2:0),physical=roundStatQuarter(unit.stats.physicalAttack*multiplier),magical=roundStatQuarter(unit.stats.magicalAttack*multiplier);
-  if (type === 'physical') return physical;
-  if (type === 'magical') return magical;
-  return physical + magical;
+function attackValue(unit) {
+  const shieldedAttackBonus = unit.shield > 0 ? upgradeValue(unit, 'logan.premium-duplicate.4.shielded-attack', 'shieldedAttackBonus') : 0;
+  return roundStatQuarter(unit.stats.attack * (1 + (unit.tune?.attackBonus || 0) + shieldedAttackBonus));
 }
 function healFromLifesteal(state,attacker,damageDealt){
  const logan=state.allies.find(unit=>unit.archetypeId==='logan'&&unit.hp>0),rate=Math.max(0,(attacker.lifestealRate||0)+(attacker.side==='allies'&&logan?.hp>0?(logan.characterDuplicates>=4?.2:.1):0));
@@ -264,7 +248,7 @@ function defenseValue(unit, type) {
   return (unit.stats.physicalDefense + unit.stats.magicalDefense) / 2;
 }
 function damageFor(attacker, target, type, multiplier) {
-  const attack = attackValue(attacker, type);
+  const attack = attackValue(attacker);
   if (attack <= 0) return 0;
   const defenseIgnorePassive=attacker.passives.find(passive=>passive.type==='lethalImpact'||passive.type==='sharpClaws')?.defenseIgnore||0;
   const globalIgnore=Math.min(1,Math.max(0,(attacker.tune?.defenseIgnore||0)+(attacker.defenseIgnoreBonus||0)+defenseIgnorePassive));
@@ -275,9 +259,9 @@ function damageFor(attacker, target, type, multiplier) {
   const exposedFactor=Math.pow(.9,target.marks.filter(mark=>mark.id==='exposed').length),physicalDefense=target.stats.physicalDefense*resistance*(1-physicalIgnore)*exposedFactor,magicalDefense=target.stats.magicalDefense*resistance*(1-magicalIgnore)*exposedFactor;
   let reduction;
   if (type === 'true') {
-    const physicalAttack=attackValue(attacker,'physical'),magicalAttack=attackValue(attacker,'magical');
-    const physicalReduction = physicalAttack > 0 ? 0.5 * Math.min(physicalDefense / physicalAttack, 1) : 0;
-    const magicalReduction = magicalAttack > 0 ? 0.5 * Math.min(magicalDefense / magicalAttack, 1) : 0;
+    const attack=attackValue(attacker);
+    const physicalReduction = 0.5 * Math.min(physicalDefense / attack, 1);
+    const magicalReduction = 0.5 * Math.min(magicalDefense / attack, 1);
     reduction = physicalReduction + magicalReduction;
   } else {
     reduction = Math.min((type==='physical'?physicalDefense:magicalDefense) / attack, 1);
@@ -309,7 +293,7 @@ function applyRicochet(state,sourceActor,sourceId,hits){
  for(const enemy of targets){const mark=enemy.marks.find(m=>m.id==='ricochet');mark.sources ||= [];if(mark.sources.includes(sourceId))continue;mark.sources.push(sourceId);
   const base=roundStat(sourceDamage*.1);
   const repeats=lily.characterDuplicates>=4?2:1;
-  for(let i=0;i<repeats&&enemy.hp>0;i++){const raw=base*(i===1?.5:1),trueAttack=attackValue(lily,'true'),uncrit=roundStat(raw*(trueAttack>0?damageFor(lily,enemy,'true',1)/trueAttack:0));if(uncrit>0&&enemy.stealth>0&&state.random()<enemy.stealth)continue;const roll=rollCritical(state,lily,uncrit),absorbed=Math.min(enemy.shield||0,roll.damage);enemy.shield=Math.max(0,(enemy.shield||0)-absorbed);enemy.shieldAbsorbed+=absorbed;
+  for(let i=0;i<repeats&&enemy.hp>0;i++){const raw=base*(i===1?.5:1),attack=attackValue(lily),uncrit=roundStat(raw*(attack>0?damageFor(lily,enemy,'true',1)/attack:0));if(uncrit>0&&enemy.stealth>0&&state.random()<enemy.stealth)continue;const roll=rollCritical(state,lily,uncrit),absorbed=Math.min(enemy.shield||0,roll.damage);enemy.shield=Math.max(0,(enemy.shield||0)-absorbed);enemy.shieldAbsorbed+=absorbed;
    const damage=Math.min(enemy.hp,roll.damage-absorbed);enemy.hp=Math.max(0,enemy.hp-(roll.damage-absorbed));enemy.damageTaken+=damage;lily.damageDealt+=damage;lily.damageBreakdown.ricochet+=damage;state.damageBySide.allies+=damage;healFromLifesteal(state,lily,damage);applyReflectDamage(state,enemy,lily,damage+absorbed);applyEchoDamage(state,lily,enemy,damage,'true');
   }
  }
@@ -353,9 +337,9 @@ function applyReflectDamage(state,reflector,attacker,receivedDamage){
  const reflectPercent=reflectPercentOf(reflector);
  if(reflectPercent<=0||receivedDamage<=0||attacker.hp<=0)return null;
  if(reflector.runeSetId==='clear-skies')reflector.runeActivations++;
- const reflectRawDamage=roundStat(receivedDamage*reflectPercent),trueAttack=attackValue(reflector,'true');if(reflectRawDamage<=0||trueAttack<=0)return null;
+ const reflectRawDamage=roundStat(receivedDamage*reflectPercent),attack=attackValue(reflector);if(reflectRawDamage<=0||attack<=0)return null;
  const stealth=Math.max(0,Math.min(1,attacker.stealth||0));if(stealth>0&&state.random()<stealth)return {damage:0,healthDamage:0,shieldDamage:0,damageType:'true',dodged:true,reflect:true};
- const residueMultiplier=1-(reflector.residueStacks||0)*(reflector.residueDamageReductionPerStack??.05),baseDamage=damageFor(reflector,attacker,'true',reflectRawDamage/trueAttack*residueMultiplier),resolvedDamage=roundStat(baseDamage*(1-(attacker.tune?.damageReduction||0))*(attacker.side==='enemies'&&attacker.brokenTurns>0?1.5:1)),roll=rollCritical(state,reflector,resolvedDamage),damage=roll.damage;
+ const residueMultiplier=1-(reflector.residueStacks||0)*(reflector.residueDamageReductionPerStack??.05),baseDamage=damageFor(reflector,attacker,'true',reflectRawDamage/attack*residueMultiplier),resolvedDamage=roundStat(baseDamage*(1-(attacker.tune?.damageReduction||0))*(attacker.side==='enemies'&&attacker.brokenTurns>0?1.5:1)),roll=rollCritical(state,reflector,resolvedDamage),damage=roll.damage;
  const shieldAbsorbed=Math.min(attacker.shield||0,damage);attacker.shield=Math.max(0,(attacker.shield||0)-shieldAbsorbed);attacker.shieldAbsorbed+=shieldAbsorbed;
  const hpBefore=attacker.hp;attacker.hp=Math.max(0,attacker.hp-(damage-shieldAbsorbed));let directHealthDamage=Math.max(0,hpBefore-attacker.hp),barrierDamage=0,breakDamage=0,breakShieldAbsorbed=0,broken=false;
  if(attacker.side==='enemies'&&attacker.barrier>0){const exposedStacks=attacker.marks.filter(mark=>mark.id==='exposed').length,lily=state.allies.find(unit=>unit.archetypeId==='lily');barrierDamage=damage*.25*(1+(reflector.tune?.barrierDamageBonus||0)+(lily?.weapon?.type==='premium'&&lily.premiumWeaponDuplicates>=2?exposedStacks*.1:0));attacker.barrier=Math.max(0,attacker.barrier-barrierDamage);if(attacker.barrier===0){attacker.brokenTurns=brokenDuration(attacker.stats.speed,Math.max(1,state.enemyAverage/state.slowerAverage));const breakRaw=roundStat(attacker.maxHp*(.1+(lily?.weapon?.type==='premium'&&lily.premiumWeaponDuplicates>=3?exposedStacks*.05:0)));breakShieldAbsorbed=Math.min(attacker.shield||0,breakRaw);attacker.shield=Math.max(0,(attacker.shield||0)-breakShieldAbsorbed);attacker.shieldAbsorbed+=breakShieldAbsorbed;breakDamage=Math.min(attacker.hp,breakRaw-breakShieldAbsorbed);attacker.hp=Math.max(0,attacker.hp-(breakRaw-breakShieldAbsorbed));attacker.barriersBroken++;broken=true}}

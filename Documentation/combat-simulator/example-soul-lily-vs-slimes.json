@@ -72,8 +72,7 @@
         "physicalDefense": 4,
         "magicalDefense": 4,
         "speed": 20,
-        "physicalAttack": 0,
-        "magicalAttack": 20
+        "attack": 20
       },
       "basic": {
         "damageType": "magical",

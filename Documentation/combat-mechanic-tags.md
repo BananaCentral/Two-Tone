@@ -28,6 +28,19 @@ For example, a Blast attack selects one primary enemy and has `coverage: 'blast'
 
 An ability can affect more than one side. Its primary `targeting` describes the chosen target; `mechanicTargets` records the target for each tag. Logan’s Skill, for example, targets all allies for shields and all enemies for Taunt. `mechanicTriggers` records when each tag resolves, such as `on_skill`, `on_tuned_basic_used`, or `on_incoming_attack`. The allowed event names are in `COMBAT_TRIGGER_EVENTS`.
 
+## Independently measured effects
+
+For performance analysis, each separable outcome declares an effect record beside its authored ability. The record has:
+
+- A stable unique `id` used to isolate the effect in matched control/treatment battles.
+- One or more canonical `mechanicTags` describing the kind of effect.
+- `targeting` and `trigger` describing who receives it and when it resolves.
+- `measures`, the numeric result fields that the battle engine must report, such as `damageBonus`, `energyGained`, `shieldGranted`, `tauntRate`, or `actionAdvance`.
+
+The shared `COMBAT_EFFECT_CATALOG` validates unique IDs, recognized tags, and declared measurement fields. Resolvers use `TwoToneBattleEngine.isCombatEffectEnabled(id)` to suppress a single effect for counterfactual analysis, and `recordCombatEffect(id, ...)` to record its status and actual resolved magnitudes. Every declared measure must be present as a numeric value, including zero when an effect was prevented or capped. This distinguishes “the effect did nothing in this situation” from “the simulator did not measure it.”
+
+Use separate IDs for distinct outcomes of a compound action when you want to know which part mattered. Dawn’s Ultimate has separate Energy, action-advance, and Skill Point effects; Logan’s Blood Shield separates the team protection/health cost from enemy Taunt. For an indivisible effect, one ID can own several tags and measures. Future support effects should follow this contract instead of adding character-specific scoring weights.
+
 ## Mechanic tag catalog
 
 | Tag | Meaning |
@@ -111,7 +124,7 @@ The shared `TwoToneBattleEngine` records mechanic events when effects resolve. E
 
 The event ledger is capped at 10,000 events per battle to bound memory. Its snapshot includes the dropped-event count and truncation flag. Performance reports aggregate event counts/statuses/values by component and tag and compare the paired branches. A tag can be present in a candidate plan but absent from a particular matchup; reports call this `tagged_but_not_triggered_in_this_comparison`, not a zero-value result. If the capture cap is reached, reports expose truncation. An observed event with zero delta means both branches resolved the event equally.
 
-The tag registry selects evidence and interpretation only. It does not itself award score points. Component value is still measured by the standardized paired outcomes and +100 SVP controls in the [Action Value Standard](action-value-standard.md): win probability, HP swing/BAE, and relevant resolved support/resource evidence. Keep these outcome measures visible together so a trigger count or raw damage total cannot stand in for win impact.
+The tag registry selects evidence and interpretation only. It does not itself award score points. Component value is measured by paired outcomes against a same-state control in the [Action Value Standard](action-value-standard.md): win probability, HP swing/BAE, and relevant resolved support/resource evidence. Keep these outcome measures visible together so a trigger count or raw damage total cannot stand in for win impact.
 
 Tag coverage follows the current shared combat definitions. A change to a Rune’s values or behavior must update that definition; a new mechanic requires a catalog tag and test coverage.
 

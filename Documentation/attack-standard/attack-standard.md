@@ -1,15 +1,21 @@
 # Two-Tone Attack Standard
 
-## Generic Attack
+## One Attack stat
 
-Characters may have one generic Attack stat instead of separate Physical Attack and Magical Attack stats. Generic Attack is used at its full value by Physical, Magical, and True actions. The action's damage type determines which target Defense applies.
+Every character and enemy has one **Attack** stat. Physical, Magical, and True damage actions all use that full Attack stat. An action's damage type determines which defense applies; it does not select a different attack stat.
 
 `Attack = round-to-nearest-0.25(((Base Attack + non-equipment flat modifiers) × Level + equipment flat modifiers) × (1 + percentage modifiers))`
 
-Attack increases from character Level, weapons, Tune, and Attack Runes use this same calculation. An Attack Rune adds its full value to generic Attack. For a character with typed Attack stats, it adds to each defined typed Attack stat.
+Attack increases from character Level, weapons, Tune, shields, and Attack Runes use the same calculation. An Attack Rune adds its full value to Attack. Percentage Attack effects apply once to the unified Attack stat.
 
-## Typed Attack
+## Damage and defense
 
-Characters may instead define Physical Attack, Magical Attack, or both when their ability kits require separate stats. Physical actions use Physical Attack and Magical actions use Magical Attack. True Attack for a split-stat character is the full sum of its Physical and Magical Attack values.
+- Physical damage uses Attack and the target's Physical Defense.
+- Magical damage uses Attack and the target's Magical Defense.
+- True damage uses full Attack. Its defense reduction combines both defenses:
+
+  `True damage reduction = 0.5 × min(Physical Defense ÷ Attack, 1) + 0.5 × min(Magical Defense ÷ Attack, 1)`
+
+Apply damage-type-specific defense ignores to their matching defense contributions before calculating the True damage reduction. The total reduction cannot exceed 100%.
 
 Calculated stats round to the nearest 0.25 without rounding to whole numbers. Damage and HP changes use their separate whole-number rounding rules. See the [Damage Type Standard](../damage-type-standard/damage-type-standard.md).

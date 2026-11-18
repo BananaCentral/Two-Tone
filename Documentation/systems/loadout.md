@@ -48,7 +48,7 @@ At rune level L, the main stat adds:
 | Magical Defense | 4 × L |
 | Speed | 20 × L |
 
-Each substat adds 25% of its corresponding main stat value at that rune level. Attack is a universal flat attack bonus: it adds to a character’s generic Attack or to each defined typed Attack stat.
+Each substat adds 25% of its corresponding main stat value at that rune level. Attack is a universal flat bonus added once to the character's Attack stat.
 
 ## Rune selection UI
 

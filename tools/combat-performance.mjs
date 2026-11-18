@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { simulateBattle } from './combat-simulator.mjs';
-import { CHARACTER_COMBAT_DATA, CHARACTER_UPGRADE_EFFECTS, COMBAT_MECHANIC_TAGS, ENEMY_COMBAT_DATA, RUNE_COMBAT_RULES } from '../src/scripts/combat-definitions.mjs';
+import { CHARACTER_COMBAT_DATA, CHARACTER_UPGRADE_EFFECTS, COMBAT_EFFECT_CATALOG, COMBAT_MECHANIC_TAGS, COMBAT_PERFORMANCE_STANDARD, ENEMY_COMBAT_DATA, RUNE_COMBAT_RULES } from '../src/scripts/combat-definitions.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CHARACTER_IDS = ['soul', 'lily', 'dawn', 'logan', 'zero'];
@@ -14,7 +14,8 @@ const CHARACTER_PASSIVES = Object.entries(CHARACTER_COMBAT_DATA).flatMap(([chara
 const LENGTHS = ['short', 'medium', 'long'];
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 const RUNE_MAIN = ['hp', 'attack', 'physicalDefense', 'magicalDefense'];
-const SVP_GAINS = { hp: 100, attack: 20, physicalDefense: 4, magicalDefense: 4, speed: 20 };
+const BAE_REFERENCE_HP = COMBAT_PERFORMANCE_STANDARD.baseStats.attack * (1 - Math.min(
+  COMBAT_PERFORMANCE_STANDARD.baseStats.physicalDefense / COMBAT_PERFORMANCE_STANDARD.baseStats.attack, 1));
 
 // This registry is the contract between authored tags, event evidence, and
 // scenario coverage. It never contributes an extra score weight.
@@ -71,10 +72,6 @@ function archetypeLibrary() {
   for (const id of [...CHARACTER_IDS, ...ENEMY_IDS]) assert(archetypes[id], `Missing combat definition for ${id}.`);
   return archetypes;
 }
-function statBudget(stats) {
-  const attack = Number.isFinite(stats.attack) ? stats.attack : (stats.physicalAttack || 0) + (stats.magicalAttack || 0);
-  return stats.hp + 5 * attack + 25 * (stats.physicalDefense || 0) + 25 * (stats.magicalDefense || 0) + 5 * stats.speed;
-}
 function itemlessLibrary(source) {
   return Object.fromEntries(Object.entries(source).map(([id, archetype]) => {
     const clone = structuredClone(archetype);
@@ -104,7 +101,7 @@ function makeBaseConfig(library, allies, enemies, difficulty, length, archetypeC
       const isBoss = archetype.tags?.type === 'boss';
       const hpScale = (isBoss ? bossHpMultiplier : hpMultiplier) * pressure;
       archetype.stats.hp *= hpScale;
-      for (const stat of ['attack', 'physicalAttack', 'magicalAttack']) if (Number.isFinite(archetype.stats[stat])) archetype.stats[stat] *= pressure;
+      for (const stat of ['attack']) if (Number.isFinite(archetype.stats[stat])) archetype.stats[stat] *= pressure;
       archetype.stats.physicalDefense *= pressure;
       archetype.stats.magicalDefense *= pressure;
     }
@@ -126,18 +123,20 @@ function candidateSpecs(raw) {
   if (raw === 'all-upgrade-effects') return Object.values(CHARACTER_UPGRADE_EFFECTS).map(effect => ({ type: 'upgrade', id: effect.id, character: effect.character, source: effect.source }));
   if (raw === 'all-actions') return CHARACTER_IDS.flatMap(character => ['basic', 'skill', 'ultimate'].map(id => ({ type: 'action', id, character })));
   if (raw === 'all-passives') return CHARACTER_PASSIVES.map(spec => ({ type: 'passive', ...spec }));
+  if (raw === 'all-effects') return Object.values(COMBAT_EFFECT_CATALOG).map(effect => ({ type: 'effect', id: effect.id, character: effect.character }));
   if (raw === 'all-character-mechanics') return [
     ...CHARACTER_PASSIVES.map(spec => ({ type: 'passive', ...spec })),
+    ...Object.values(COMBAT_EFFECT_CATALOG).map(effect => ({ type: 'effect', id: effect.id, character: effect.character })),
     ...CHARACTER_IDS.flatMap(character => ['basic', 'skill', 'ultimate'].map(id => ({ type: 'action', id, character }))),
     ...CHARACTER_IDS.map(character => ({ type: 'character-overall', id: character, character }))
   ];
-  if (raw === 'all-rune-ratings') return [...RUNES.map(id => ({ type: 'rune', id })), ...Object.keys(SVP_GAINS).map(id => ({ type: 'stat', id }))];
+  if (raw === 'all-rune-impact' || raw === 'all-rune-ratings') return RUNES.map(id => ({ type: 'rune', id }));
   if (raw === 'all-runes') return RUNES.map(id => ({ type: 'rune', id }));
-  if (raw === 'all-stats') return Object.keys(SVP_GAINS).map(id => ({ type: 'stat', id }));
   if (raw === 'all-weapons') return ['standard', 'premium'].flatMap(type => [1, 2, 3, 4, 5].flatMap(potential => [1, 10, 25, 50].map(level => ({ type: 'weapon', id: type, potential, level }))));
   const [type, ...rest] = raw.split(':');
   const value = rest.join(':');
   if (type === 'rune' && RUNES.includes(value)) return [{ type, id: value }];
+  if (type === 'effect' && COMBAT_EFFECT_CATALOG[value]) return [{ type, id: value, character: COMBAT_EFFECT_CATALOG[value].character }];
   if ((type === 'character' || type === 'character-overall') && CHARACTER_IDS.includes(value)) return [{ type, id: value, character: value }];
   if (type === 'passive' && /^(soul|lily|dawn|logan|zero)\/[A-Za-z][A-Za-z0-9-]*$/.test(value)) {
     const [character, id] = value.split('/');
@@ -147,7 +146,6 @@ function candidateSpecs(raw) {
     const effect = CHARACTER_UPGRADE_EFFECTS[value];
     return [{ type, id: effect.id, character: effect.character, source: effect.source }];
   }
-  if (type === 'stat' && Object.hasOwn(SVP_GAINS, value)) return [{ type, id: value }];
   if (type === 'action' && /^(soul|lily|dawn|logan|zero)\/(basic|skill|ultimate)$/.test(value)) {
     const [character, action] = value.split('/'); return [{ type, id: action, character }];
   }
@@ -160,6 +158,7 @@ function candidateSpecs(raw) {
 function candidateLabel(spec) {
   if (spec.type === 'character-overall') return `${spec.type}:${spec.character}`;
   if (spec.type === 'action' || spec.type === 'passive') return `${spec.type}:${spec.character}/${spec.id}`;
+  if (spec.type === 'effect') return `effect:${spec.id}`;
   return `${spec.type}:${spec.id}${spec.potential ? `@P${spec.potential}L${spec.level || 1}` : ''}`;
 }
 function componentFor(spec) {
@@ -167,6 +166,7 @@ function componentFor(spec) {
   if (spec.type === 'passive') return CHARACTER_COMBAT_DATA[spec.character]?.passives.find(effect => (effect.id || effect.type) === spec.id) || null;
   if (spec.type === 'upgrade') return CHARACTER_UPGRADE_EFFECTS[spec.id] || null;
   if (spec.type === 'rune') return RUNE_COMBAT_RULES[spec.id] || null;
+  if (spec.type === 'effect') return COMBAT_EFFECT_CATALOG[spec.id] || null;
   if (spec.type === 'character-overall') {
     const kit = CHARACTER_COMBAT_DATA[spec.character];
     if (!kit) return null;
@@ -183,6 +183,7 @@ function evaluationPlan(spec) {
     : spec.type === 'passive' ? [`passive:${spec.character}/${spec.id}`]
       : spec.type === 'upgrade' ? [`upgrade:${spec.id}`]
         : spec.type === 'rune' ? [`rune:${spec.id}`]
+        : spec.type === 'effect' ? [`effect:${spec.id}`]
           : spec.type === 'character-overall' ? [
             ...(CHARACTER_COMBAT_DATA[spec.character]?.passives || []).map(effect => `passive:${spec.character}/${effect.id || effect.type}`),
             ...['basic', 'skill', 'ultimate'].map(slot => `action:${spec.character}/${slot}`)
@@ -191,7 +192,8 @@ function evaluationPlan(spec) {
   return { tags, componentIds, byTag: tags.map(tag => ({ tag, measurementFields: TAG_MEASUREMENT_RULES[tag],
     target: component?.mechanicTargets?.[tag] || component?.targeting || null,
     trigger: component?.mechanicTriggers?.[tag] || null,
-    coverage: component?.mechanicTargets?.[tag]?.coverage || component?.targeting?.coverage || 'event_defined' })) };
+    coverage: component?.mechanicTargets?.[tag]?.coverage || component?.targeting?.coverage || 'event_defined' })),
+    measuredValues: component?.measures || [] };
 }
 function measurementPlanLabel(plan) {
   return plan.byTag.map(entry => `${entry.tag}:${entry.measurementFields.join('+')}@${entry.trigger || 'event_defined'}:${entry.target?.side || 'event_defined'}/${entry.coverage}`).join(';');
@@ -241,12 +243,49 @@ function wearersFor(spec, party) {
   if (spec.type === 'upgrade') return party.includes(spec.character) ? [spec.character] : [];
   if (spec.type === 'character') return party.includes(spec.id) ? [spec.id] : [];
   if (spec.type === 'action' || spec.type === 'passive' || spec.type === 'character-overall') return party.includes(spec.character) ? [spec.character] : [];
+  if (spec.type === 'effect') return party.includes(spec.character) ? [spec.character] : [];
   if (spec.id === 'radiant-moon') return party.filter(id => ['lily', 'zero'].includes(id));
   if (spec.id === 'eternal-sun') return party.filter(id => id !== 'dawn');
   if (spec.id === 'united') return party.filter(id => ['dawn', 'logan'].includes(id));
   return party.slice();
 }
 function findUnit(config, archetype) { return config.teams.allies.find(unit => unit.archetype === archetype); }
+function selectedAllyTargetIds(spec, base) {
+  if (!['effect', 'action'].includes(spec.type)) return [];
+  const targeting = spec.type === 'effect' ? COMBAT_EFFECT_CATALOG[spec.id]?.targeting : componentFor(spec)?.targeting;
+  return targeting?.side === 'ally' && targeting?.acquisition === 'selected' && targeting?.coverage === 'single'
+    ? base.teams.allies.map(unit => unit.id) : [];
+}
+function referenceDamageAction(slot, action) {
+  const coverage = action?.target || action?.targetMode;
+  const multiplier = COMBAT_PERFORMANCE_STANDARD.damageMultipliers[slot]?.[coverage];
+  if (!Number.isFinite(multiplier) || !['physical', 'magical', 'true'].includes(action?.damageType)) return null;
+  return {
+    benchmarkSlot: slot,
+    damageType: action.damageType,
+    multiplier,
+    target: coverage,
+    energyGain: slot === 'basic' ? (Number.isFinite(action.energyGain) ? action.energyGain : 0)
+      : slot === 'skill' ? COMBAT_PERFORMANCE_STANDARD.referenceSkillEnergyGain : 0,
+    skillPointGain: slot === 'basic' ? COMBAT_PERFORMANCE_STANDARD.referenceBasicSkillPointGain : 0,
+    skillPointCost: slot === 'skill' ? COMBAT_PERFORMANCE_STANDARD.referenceSkillPointCost : 0,
+    energyCost: slot === 'ultimate' ? COMBAT_PERFORMANCE_STANDARD.referenceUltimateEnergyCost : 0
+  };
+}
+function actionComparisonReference(spec, archetype) {
+  const action = archetype?.[spec.id];
+  if (spec.type === 'action' && action) {
+    const slotReference = referenceDamageAction(spec.id, action);
+    if (slotReference) return { action: slotReference, label: `standard ${spec.id} (${slotReference.target}, ${slotReference.multiplier}x)` };
+  }
+  const basicReference = referenceDamageAction('basic', archetype?.basic);
+  return basicReference ? { action: basicReference, label: `standard basic (${basicReference.target}, ${basicReference.multiplier}x)` } : null;
+}
+function comparisonReferenceFor(spec, archetype) {
+  if (spec.type === 'action') return actionComparisonReference(spec, archetype)?.label || 'standard basic reference';
+  if (spec.type === 'character-overall') return actionComparisonReference({ type: 'action', id: 'basic' }, archetype)?.label || 'standard basic reference';
+  return null;
+}
 function makeRuneBranch(base, wearer, setId) {
   // Rune candidates only change one ally's Rune slots. Keep immutable archetypes shared
   // and clone the small team/settings structures instead of deep-cloning the library.
@@ -269,7 +308,6 @@ function makeBranches(base, spec, wearer) {
   const controlled = findUnit(control, wearer);
   const treated = findUnit(treatment, wearer);
   assert(controlled && treated, `Wearer ${wearer} is absent from matchup.`);
-  let treatmentStatBudget = null;
   if (spec.type === 'upgrade') {
     const source = spec.source;
     const equipped = source.kind === 'premium_weapon_duplicate' || source.kind === 'signature_weapon';
@@ -285,20 +323,6 @@ function makeBranches(base, spec, wearer) {
     controlled.disabledUpgradeEffectIds = [...new Set([...(controlled.disabledUpgradeEffectIds || []), spec.id])];
   } else if (spec.type === 'weapon') {
     treated.weapon = { type: spec.id, potential: spec.potential, level: spec.level || 1 };
-  } else if (spec.type === 'stat') {
-    // Use the same setless four-Rune stat loadout as Rune-effect comparisons.
-    controlled.runes = makeBalancedRunes();
-    treated.runes = makeBalancedRunes();
-    const before = statBudget(treatment.archetypes[wearer].stats);
-    const stats = treatment.archetypes[wearer].stats;
-    if (spec.id === 'attack' && !Number.isFinite(stats.attack)) {
-      const physical = stats.physicalAttack || 0, magical = stats.magicalAttack || 0, total = physical + magical;
-      if (total > 0) {
-        stats.physicalAttack = physical + SVP_GAINS.attack * physical / total;
-        stats.magicalAttack = magical + SVP_GAINS.attack * magical / total;
-      } else stats.physicalAttack = SVP_GAINS.attack;
-    } else stats[spec.id] += SVP_GAINS[spec.id];
-    treatmentStatBudget = statBudget(treatment.archetypes[wearer].stats) - before;
   } else if (spec.type === 'character' || spec.type === 'character-overall') {
     const archetype = control.archetypes[wearer];
     archetype.passives = [];
@@ -306,8 +330,8 @@ function makeBranches(base, spec, wearer) {
     delete archetype.ultimate;
     control.settings.disabledPassives = [...(control.settings.disabledPassives || []), ...CHARACTER_PASSIVES.filter(passive => passive.character === wearer).map(passive => `${wearer}:${passive.id}`)];
     if (spec.type === 'character-overall') {
-      const basic = archetype.basic;
-      archetype.basic = { damageType: basic.damageType, multiplier: 1, target: 'single', energyGain: 10, skillPointGain: 1 };
+      const reference = referenceDamageAction('basic', archetype.basic);
+      if (reference) archetype.basic = reference;
     }
   } else if (spec.type === 'passive') {
     control.settings.disabledPassives = [...(control.settings.disabledPassives || []), `${wearer}:${spec.id}`];
@@ -318,19 +342,25 @@ function makeBranches(base, spec, wearer) {
       config.settings.actionOverride = { actorId: unit.id, turn: 1, action: config === treatment ? spec.id : 'basic' };
     }
     if (spec.id === 'basic') {
-      const basic = treatment.archetypes[wearer].basic;
-      control.archetypes[wearer].basic = {
-        damageType: basic.damageType,
-        multiplier: 1,
-        target: 'single',
-        energyGain: 10,
-        skillPointGain: 1
-      };
+      const reference = referenceDamageAction('basic', treatment.archetypes[wearer].basic);
+      if (reference) control.archetypes[wearer].basic = reference;
+    } else {
+      const reference = actionComparisonReference(spec, treatment.archetypes[wearer]);
+      if (reference) control.archetypes[wearer].basic = reference.action;
+    }
+  } else if (spec.type === 'effect') {
+    const effect = COMBAT_EFFECT_CATALOG[spec.id];
+    control.settings.disabledCombatEffectIds = [...(control.settings.disabledCombatEffectIds || []), spec.id];
+    for (const config of [control, treatment]) {
+      const unit = findUnit(config, wearer);
+      if (effect.slot === 'ultimate') config.archetypes[wearer].energy = { ...(config.archetypes[wearer].energy || {}), start: 100 };
+      config.settings.actionOverride = { actorId: unit.id, turn: 1, action: effect.slot };
     }
   }
-  return { control, treatment, treatmentStatBudget };
+  return { control, treatment };
 }
 function winValue(result) { return result.winner === 'allies' ? 1 : 0; }
+function outcomeRating(result) { return result.winner === 'allies' ? 100 : result.winner === 'draw' ? 50 : 0; }
 function average(values) { return values.length ? values.reduce((sum, n) => sum + n, 0) / values.length : 0; }
 function meanCI(values) {
   const mean = average(values);
@@ -338,6 +368,10 @@ function meanCI(values) {
   const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (values.length - 1);
   const margin = 1.96 * Math.sqrt(variance / values.length);
   return { mean, lower: mean - margin, upper: mean + margin };
+}
+function boundedRatingCI(values) {
+  const interval = meanCI(values);
+  return { mean: interval.mean, lower: Math.max(0, interval.lower), upper: Math.min(100, interval.upper) };
 }
 function percentCI(values) {
   const interval = meanCI(values);
@@ -391,6 +425,8 @@ function battleMetrics(control, treatment, seed) {
     seed,
     controlWin,
     treatmentWin,
+    controlRating: outcomeRating(control),
+    treatmentRating: outcomeRating(treatment),
     controlDraw: control.winner === 'draw' ? 1 : 0,
     treatmentDraw: treatment.winner === 'draw' ? 1 : 0,
     winDelta: treatmentWin - controlWin,
@@ -401,7 +437,7 @@ function battleMetrics(control, treatment, seed) {
     enemyHpDelta,
     allyHpRetainedDelta,
     hpSwing: enemyHpDelta + allyHpRetainedDelta,
-    bae: (enemyHpDelta + allyHpRetainedDelta) / 16,
+    bae: (enemyHpDelta + allyHpRetainedDelta) / BAE_REFERENCE_HP,
     impact: impactDeltas(control, treatment),
     mechanicEventDeltas: mechanicEventDeltas(control, treatment),
     mechanicEventCapture: { controlDropped: control.mechanicEvents?.dropped || 0, treatmentDropped: treatment.mechanicEvents?.dropped || 0 },
@@ -409,14 +445,12 @@ function battleMetrics(control, treatment, seed) {
       winner: control.winner, actions: control.actions, allyTurns: control.allyTurns, enemyTurns: control.enemyTurns,
       finalHp: control.finalHp, damageDealt: control.damageDealt, shields: control.alliedShieldAbsorbed,
       skillPoints: control.skillPointsRemaining, actionOverride: control.actionOverride,
-      statBudgets: control.statBudgets,
       survivors: { allies: control.survivors.allies.length, enemies: control.survivors.enemies.length }
     },
     treatment: {
       winner: treatment.winner, actions: treatment.actions, allyTurns: treatment.allyTurns, enemyTurns: treatment.enemyTurns,
       finalHp: treatment.finalHp, damageDealt: treatment.damageDealt, shields: treatment.alliedShieldAbsorbed,
       skillPoints: treatment.skillPointsRemaining, actionOverride: treatment.actionOverride,
-      statBudgets: treatment.statBudgets,
       survivors: { allies: treatment.survivors.allies.length, enemies: treatment.survivors.enemies.length }
     }
   };
@@ -460,23 +494,22 @@ function makeWinRateSvg(strataRows) {
   return parts.join('\n');
 }
 function parseArgs(args) {
-  const options = { candidates: [], preset: 'quick', runs: 5, seed: 1, output: 'Documentation/combat-simulator/performance-results.jsonl', limitScenarios: 180, maxActions: 2000, compact: true, runeRating: false, mechanicRating: false };
+  const options = { candidates: [], preset: 'balanced', runs: 10, seed: 1, output: 'Documentation/combat-simulator/performance-results.jsonl', limitScenarios: 500, maxActions: 2000, compact: true, runeImpactReport: false, mechanicRating: false };
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
     if (arg === '--preset') {
       const preset = args[++index];
       options.preset = preset;
-      if (preset === 'quick') Object.assign(options, { runs: 5, limitScenarios: 180, compact: true });
-      else if (preset === 'balanced') Object.assign(options, { runs: 10, limitScenarios: 360, compact: true });
-      else if (preset === 'deep') Object.assign(options, { runs: 20, limitScenarios: 1000, compact: true });
-      else if (preset === 'full') Object.assign(options, { runs: 100, limitScenarios: 0, compact: true });
-      else fail(`Unknown preset ${preset}. Choose quick, balanced, deep, or full.`);
+      if (preset === 'quick') Object.assign(options, { runs: 5, limitScenarios: 250, compact: true });
+      else if (preset === 'balanced') Object.assign(options, { runs: 10, limitScenarios: 500, compact: true });
+      else if (preset === 'full') Object.assign(options, { runs: 20, limitScenarios: 1000, compact: true });
+      else fail(`Unknown preset ${preset}. Choose quick, balanced, or full.`);
     }
     else if (arg === '--candidate') {
       const raw = args[++index];
       options.candidates.push(...candidateSpecs(raw));
-      if (raw === 'all-rune-ratings') options.runeRating = true;
-      if (['all-character-mechanics', 'all-actions', 'all-passives', 'all-upgrade-effects'].includes(raw) || raw.startsWith('upgrade:')) options.mechanicRating = true;
+      if (raw === 'all-rune-impact' || raw === 'all-rune-ratings') options.runeImpactReport = true;
+      if (['all-character-mechanics', 'all-actions', 'all-passives', 'all-effects', 'all-upgrade-effects'].includes(raw) || /^(upgrade|action|passive|effect|character-overall):/.test(raw)) options.mechanicRating = true;
     }
     else if (arg === '--character') options.character = args[++index];
     else if (arg === '--runs') options.runs = Number(args[++index]);
@@ -490,8 +523,8 @@ function parseArgs(args) {
     else fail(`Unknown option: ${arg}`);
   }
   if (!options.candidates.length && !options.help) {
-    options.candidates = candidateSpecs('all-rune-ratings');
-    options.runeRating = true;
+    options.candidates = candidateSpecs('all-rune-impact');
+    options.runeImpactReport = true;
   }
   if (options.character && !CHARACTER_IDS.includes(options.character)) fail(`Unknown character ${options.character}.`);
   assert(Number.isInteger(options.runs) && options.runs > 0, '--runs must be a positive integer.');
@@ -501,7 +534,7 @@ function parseArgs(args) {
   return options;
 }
 function help() {
-  return `Two-Tone matched combat performance runner\n\nUsage: node tools/combat-performance.mjs [options]\n\nOptions:\n  --preset quick|balanced|deep|full  Select a coverage/run-count preset (default quick)\n  --candidate all-rune-ratings|all-runes|all-stats|all-weapons\n  --candidate all-actions|all-passives|all-character-mechanics|all-upgrade-effects\n  --candidate rune:<id>|character:<id>|passive:<character>/<id>|stat:<id>\n  --candidate upgrade:<effect-id>\n  --candidate weapon:standard@P1L1|weapon:premium@P1L50\n  --candidate action:<character>/basic|skill|ultimate\n  --character <id>           Restrict item/stat tests to this eligible wearer\n  --runs <n>                  Matched seeds per matchup\n  --seed <n>                  First reproducible seed (default 1)\n  --limit-scenarios <n>       Scenario cap; use 0 for the full matrix\n  --max-actions <n>           Maximum unit actions in one battle (default 2000)\n  --output <path>             JSONL result path\n  --include-trials            Include per-seed details (larger output)\n\nWithout --candidate, tests all Runes against the average +100 SVP stat reference and writes a rating report. Presets: quick=180 scenarios × 5 seeds; balanced=360 × 10; deep=1,000 × 20; full=all 17,213,850 × 100. Limited presets balance party size, enemy count, length, and difficulty. The full position-aware matrix uses 205 ordered legal ally teams and 9,330 ordered enemy lineups.`;
+  return `Two-Tone matched combat performance runner\n\nUsage: node tools/combat-performance.mjs [options]\n\nOptions:\n  --preset quick|balanced|full  Select a coverage/run-count preset (default balanced)\n  --candidate all-rune-impact|all-rune-ratings|all-runes|all-weapons\n  --candidate all-actions|all-passives|all-effects|all-character-mechanics|all-upgrade-effects\n  --candidate rune:<id>|character:<id>|passive:<character>/<id>\n  --candidate effect:<stable-effect-id>|upgrade:<effect-id>\n  --candidate weapon:standard@P1L1|weapon:premium@P1L50\n  --candidate action:<character>/basic|skill|ultimate\n  --character <id>           Restrict item tests to this eligible wearer\n  --runs <n>                  Matched seeds per matchup\n  --seed <n>                  First reproducible seed (default 1)\n  --limit-scenarios <n>       Scenario cap; use 0 for the exhaustive matrix\n  --max-actions <n>           Maximum unit actions in one battle (default 2000)\n  --output <path>             JSONL result path\n  --include-trials            Include per-seed details (larger output)\n\nWithout --candidate, compares all Runes with the same four-Rune stat loadout and Rune set effect disabled in the control. Presets: quick=250 scenarios × 5 seeds; balanced=500 × 10; full=1,000 × 20. The default is balanced. All presets sample the standard matrix evenly across party size, enemy count, length, and difficulty. The full preset is a broad sample, not exhaustive; --limit-scenarios 0 enumerates all 17,213,850 cells (205 ordered legal ally teams × 9,330 ordered enemy lineups × 3 lengths × 3 difficulties). The 0–100 outcome rating gives a win 100, a draw 50, and a loss 0, then equally weights the sampled benchmark strata.`;
 }
 function* scenarioSamples(allyLists, enemyTeams, limit) {
   if (!limit) {
@@ -535,208 +568,36 @@ function* scenarioSamples(allyLists, enemyTeams, limit) {
     }
   }
 }
-function seededRandom(seed) {
-  let state = seed >>> 0;
-  return () => {
-    state += 0x6D2B79F5;
-    let value = state;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-  };
-}
-function quantile(sortedValues, probability) {
-  if (!sortedValues.length) return 0;
-  const position = (sortedValues.length - 1) * probability;
-  const lower = Math.floor(position), upper = Math.ceil(position);
-  if (lower === upper) return sortedValues[lower];
-  const ratio = position - lower;
-  return sortedValues[lower] * (1 - ratio) + sortedValues[upper] * ratio;
-}
-function buildRuneRatingRows(samples, runCount, seed) {
-  const scenarioGroups = new Map();
-  for (const sample of samples) {
-    const key = `${sample.wearer}|${sample.scenarioId}`;
-    if (!scenarioGroups.has(key)) scenarioGroups.set(key, { stats: new Map(), runes: [] });
-    const group = scenarioGroups.get(key);
-    if (sample.candidate.startsWith('stat:')) group.stats.set(sample.candidate.slice(5), sample);
-    else group.runes.push(sample);
+function buildRuneImpactRows(samples, runCount) {
+  // Rune performance uses the same direct, paired battle counterfactual as all
+  // other components. The wearer detail is primary; no synthetic stat score.
+  const { overallRows: wearerRows } = buildMechanicRatingRows(samples, runCount);
+  const groups = new Map();
+  for (const row of wearerRows) {
+    const rune = row.candidate.slice('rune:'.length);
+    const rows = groups.get(rune) || [];
+    rows.push(row);
+    groups.set(rune, rows);
   }
-  const formationGroups = new Map();
-  for (const scenario of scenarioGroups.values()) {
-    if (!scenario.runes.length) continue;
-    assert(scenario.stats.size === Object.keys(SVP_GAINS).length, `Rune rating requires all five 100-SVP stat controls for ${scenario.runes[0].wearer}.`);
-    for (const rune of scenario.runes) {
-      const reference = Array.from({ length: runCount }, (_, index) => average([...scenario.stats.values()].map(stat => stat.winDeltas[index])));
-      const referenceBae = Array.from({ length: runCount }, (_, index) => average([...scenario.stats.values()].map(stat => stat.baeValues[index])));
-      const gap = rune.winDeltas.map((value, index) => value - reference[index]);
-      const stratum = [rune.difficulty, rune.length, rune.allyCount, rune.enemyCount, rune.enemyCategory].join('|');
-      const composition = `${rune.partyComposition}|${rune.enemyComposition}`;
-      const key = `${rune.candidate}|${rune.wearer}|${stratum}|${composition}`;
-      if (!formationGroups.has(key)) formationGroups.set(key, {
-        rune: rune.candidate.slice(5), wearer: rune.wearer, stratum, composition,
-        deltas: Array(runCount).fill(0), references: Array(runCount).fill(0), gaps: Array(runCount).fill(0),
-        bae: Array(runCount).fill(0), referenceBae: Array(runCount).fill(0), formations: 0
-      });
-      const aggregate = formationGroups.get(key);
-      aggregate.formations++;
-      for (let index = 0; index < runCount; index++) {
-        aggregate.deltas[index] += rune.winDeltas[index];
-        aggregate.references[index] += reference[index];
-        aggregate.gaps[index] += gap[index];
-        aggregate.bae[index] += rune.baeValues[index];
-        aggregate.referenceBae[index] += referenceBae[index];
-      }
-    }
-  }
-  const runes = new Map();
-  for (const group of formationGroups.values()) {
-    for (const field of ['deltas', 'references', 'gaps', 'bae', 'referenceBae']) group[field] = group[field].map(value => value / group.formations);
-    if (!runes.has(group.rune)) runes.set(group.rune, new Map());
-    const byWearer = runes.get(group.rune);
-    if (!byWearer.has(group.wearer)) byWearer.set(group.wearer, new Map());
-    const strata = byWearer.get(group.wearer);
-    if (!strata.has(group.stratum)) strata.set(group.stratum, []);
-    strata.get(group.stratum).push(group);
-  }
-  function summarizeWearer(strata) {
-    const deltaBySeed = Array(runCount).fill(0), referenceBySeed = Array(runCount).fill(0), gapBySeed = Array(runCount).fill(0), baeBySeed = Array(runCount).fill(0), referenceBaeBySeed = Array(runCount).fill(0);
-    const positiveStrata = [];
-    for (const compositions of strata.values()) {
-      const delta = Array(runCount).fill(0), reference = Array(runCount).fill(0), gap = Array(runCount).fill(0), bae = Array(runCount).fill(0), referenceBae = Array(runCount).fill(0);
-      for (const composition of compositions) for (let index = 0; index < runCount; index++) {
-        delta[index] += composition.deltas[index]; reference[index] += composition.references[index];
-        gap[index] += composition.gaps[index]; bae[index] += composition.bae[index];
-        referenceBae[index] += composition.referenceBae[index];
-      }
-      for (let index = 0; index < runCount; index++) {
-        delta[index] /= compositions.length; reference[index] /= compositions.length;
-        gap[index] /= compositions.length; bae[index] /= compositions.length;
-        referenceBae[index] /= compositions.length;
-        deltaBySeed[index] += delta[index]; referenceBySeed[index] += reference[index];
-        gapBySeed[index] += gap[index]; baeBySeed[index] += bae[index]; referenceBaeBySeed[index] += referenceBae[index];
-      }
-      positiveStrata.push(average(delta) > 0 ? 1 : 0);
-    }
-    const count = strata.size;
-    for (let index = 0; index < runCount; index++) {
-      deltaBySeed[index] /= count; referenceBySeed[index] /= count;
-      gapBySeed[index] /= count; baeBySeed[index] /= count;
-      referenceBaeBySeed[index] /= count;
-    }
-    return { deltaBySeed, referenceBySeed, gapBySeed, baeBySeed, referenceBaeBySeed, positiveStrataPct: average(positiveStrata) * 100, strataCount: count };
-  }
-  const random = seededRandom(seed), bootstrapRuns = 1000;
-  function bootstrapCI(byWearer, selectedWearer = null) {
-    const wearers = selectedWearer ? [selectedWearer] : [...byWearer.keys()];
-    const estimates = [];
-    for (let iteration = 0; iteration < bootstrapRuns; iteration++) {
-      const sampledSeeds = Array.from({ length: runCount }, () => Math.floor(random() * runCount));
-      const wearerMeans = [];
-      for (const wearer of wearers) {
-        const strata = byWearer.get(wearer), stratumMeans = [];
-        for (const compositions of strata.values()) {
-          let stratumRune = 0, stratumReference = 0, stratumGap = 0, stratumBae = 0, stratumReferenceBae = 0;
-          for (let index = 0; index < compositions.length; index++) {
-            const composition = compositions[Math.floor(random() * compositions.length)];
-            stratumRune += average(sampledSeeds.map(seedIndex => composition.deltas[seedIndex]));
-            stratumReference += average(sampledSeeds.map(seedIndex => composition.references[seedIndex]));
-            stratumGap += average(sampledSeeds.map(seedIndex => composition.gaps[seedIndex]));
-            stratumBae += average(sampledSeeds.map(seedIndex => composition.bae[seedIndex]));
-            stratumReferenceBae += average(sampledSeeds.map(seedIndex => composition.referenceBae[seedIndex]));
-          }
-          stratumMeans.push({
-            rune: stratumRune / compositions.length,
-            reference: stratumReference / compositions.length,
-            gap: stratumGap / compositions.length,
-            bae: stratumBae / compositions.length,
-            referenceBae: stratumReferenceBae / compositions.length
-          });
-        }
-        wearerMeans.push({
-          rune: average(stratumMeans.map(value => value.rune)),
-          reference: average(stratumMeans.map(value => value.reference)),
-          gap: average(stratumMeans.map(value => value.gap)),
-          bae: average(stratumMeans.map(value => value.bae)),
-          referenceBae: average(stratumMeans.map(value => value.referenceBae))
-        });
-      }
-      const rune = average(wearerMeans.map(value => value.rune));
-      const reference = average(wearerMeans.map(value => value.reference));
-      estimates.push({
-        gap: average(wearerMeans.map(value => value.gap)),
-        runeBae: average(wearerMeans.map(value => value.bae)),
-        referenceBae: average(wearerMeans.map(value => value.referenceBae)),
-        winScore: reference > 0 ? Math.max(0, Math.min(100, 100 * rune / reference)) : 0
-      });
-    }
-    const gaps = estimates.map(value => value.gap).sort((a, b) => a - b);
-    const scores = estimates.map(value => {
-      const actionScore = value.referenceBae > 0 ? Math.max(0, Math.min(100, 100 * value.runeBae / value.referenceBae)) : 0;
-      return Math.sqrt(value.winScore * actionScore);
-    }).sort((a, b) => a - b);
-    return {
-      lower: quantile(gaps, 0.025), upper: quantile(gaps, 0.975),
-      scoreLower: quantile(scores, 0.025), scoreUpper: quantile(scores, 0.975)
-    };
-  }
-  const overallRows = [], wearerRows = [];
-  for (const rune of RUNES) {
-    const byWearer = runes.get(rune);
-    if (!byWearer?.size) continue;
-    const wearerSummaries = [...byWearer].map(([wearer, strata]) => ({ wearer, ...summarizeWearer(strata) }));
-    for (const summary of wearerSummaries) {
-      const ci = bootstrapCI(byWearer, summary.wearer);
-      wearerRows.push({ rune, wearer: summary.wearer, strata: summary.strataCount,
-        runeWinLiftPp: average(summary.deltaBySeed) * 100,
-        mean100SVPReferencePp: average(summary.referenceBySeed) * 100,
-        winLiftScore0to100: average(summary.referenceBySeed) > 0 ? Math.max(0, Math.min(100, 100 * average(summary.deltaBySeed) / average(summary.referenceBySeed))) : 0,
-        meanBAE: average(summary.baeBySeed), mean100SVPReferenceBAE: average(summary.referenceBaeBySeed),
-        actionValueScore0to100: average(summary.referenceBaeBySeed) > 0 ? Math.max(0, Math.min(100, 100 * average(summary.baeBySeed) / average(summary.referenceBaeBySeed))) : 0,
-        score0to100: Math.sqrt(
-          (average(summary.referenceBySeed) > 0 ? Math.max(0, Math.min(100, 100 * average(summary.deltaBySeed) / average(summary.referenceBySeed))) : 0) *
-          (average(summary.referenceBaeBySeed) > 0 ? Math.max(0, Math.min(100, 100 * average(summary.baeBySeed) / average(summary.referenceBaeBySeed))) : 0)
-        ),
-        score95Lower: ci.scoreLower, score95Upper: ci.scoreUpper,
-        differenceVsReferencePp: average(summary.gapBySeed) * 100,
-        ci95LowerPp: ci.lower * 100, ci95UpperPp: ci.upper * 100,
-        rating: ci.lower > 0 ? 'Above 100-SVP reference' : ci.upper < 0 ? 'Below 100-SVP reference' : 'Within reference range',
-        positiveWinLiftStrataPct: summary.positiveStrataPct,
-        meanHpSwing: average(summary.baeBySeed) * 16
-      });
-    }
-    const combined = {
-      deltaBySeed: Array.from({ length: runCount }, (_, index) => average(wearerSummaries.map(row => row.deltaBySeed[index]))),
-      referenceBySeed: Array.from({ length: runCount }, (_, index) => average(wearerSummaries.map(row => row.referenceBySeed[index]))),
-      gapBySeed: Array.from({ length: runCount }, (_, index) => average(wearerSummaries.map(row => row.gapBySeed[index]))),
-      baeBySeed: Array.from({ length: runCount }, (_, index) => average(wearerSummaries.map(row => row.baeBySeed[index]))),
-      referenceBaeBySeed: Array.from({ length: runCount }, (_, index) => average(wearerSummaries.map(row => row.referenceBaeBySeed[index]))),
-      positiveStrataPct: average(wearerSummaries.map(row => row.positiveStrataPct))
-    };
-    const ci = bootstrapCI(byWearer);
-    const winLiftScore = average(combined.referenceBySeed) > 0 ? Math.max(0, Math.min(100, 100 * average(combined.deltaBySeed) / average(combined.referenceBySeed))) : 0;
-    const actionValueScore = average(combined.referenceBaeBySeed) > 0 ? Math.max(0, Math.min(100, 100 * average(combined.baeBySeed) / average(combined.referenceBaeBySeed))) : 0;
-    overallRows.push({ rune, eligibleWearers: [...byWearer.keys()].join(';'), wearerCount: byWearer.size,
-      runeWinLiftPp: average(combined.deltaBySeed) * 100,
-      mean100SVPReferencePp: average(combined.referenceBySeed) * 100,
-      winLiftScore0to100: winLiftScore,
-      meanBAE: average(combined.baeBySeed), mean100SVPReferenceBAE: average(combined.referenceBaeBySeed),
-      actionValueScore0to100: actionValueScore,
-      score0to100: Math.sqrt(winLiftScore * actionValueScore),
-      score95Lower: ci.scoreLower, score95Upper: ci.scoreUpper,
-      differenceVsReferencePp: average(combined.gapBySeed) * 100,
-      ci95LowerPp: ci.lower * 100, ci95UpperPp: ci.upper * 100,
-      rating: ci.lower > 0 ? 'Above 100-SVP reference' : ci.upper < 0 ? 'Below 100-SVP reference' : 'Within reference range',
-      positiveWinLiftStrataPct: combined.positiveStrataPct,
-      meanHpSwing: average(combined.baeBySeed) * 16
-    });
-  }
+  const overallRows = [...groups].map(([rune, rows]) => ({
+    rune,
+    eligibleWearers: rows.map(row => row.wearer).sort().join(';'),
+    wearerCount: rows.length,
+    outcomeRating: average(rows.map(row => row.outcomeRating)),
+    controlOutcomeRating: average(rows.map(row => row.controlOutcomeRating)),
+    ratingDifference: average(rows.map(row => row.ratingDifference)),
+    winLiftPp: average(rows.map(row => row.winLiftPp)),
+    meanBAE: average(rows.map(row => row.meanBAE)),
+    meanHpSwing: average(rows.map(row => row.meanBAE * BAE_REFERENCE_HP)),
+    outcomeAssessment: rows.some(row => row.outcomeAssessment === 'positive evidence')
+      ? 'positive for at least one eligible wearer'
+      : rows.every(row => row.outcomeAssessment === 'negative evidence') ? 'negative for all eligible wearers' : 'inconclusive or wearer-dependent'
+  }));
   return { overallRows, wearerRows };
 }
 function buildMechanicRatingRows(samples, runCount) {
   const candidates = new Map();
   for (const sample of samples) {
-    if (sample.componentType === 'stat') continue;
     const candidateRows = candidates.get(sample.candidate) || { metadata: sample, wearers: new Map() };
     candidates.set(sample.candidate, candidateRows);
     const strata = candidateRows.wearers.get(sample.wearer) || new Map();
@@ -759,10 +620,14 @@ function buildMechanicRatingRows(samples, runCount) {
     if (!finite.length) return { mean: null, lower: null, upper: null };
     return asPercent ? percentCI(finite) : meanCI(finite);
   };
+  const meanFiniteRatingCI = values => {
+    const finite = values.filter(Number.isFinite);
+    return finite.length ? boundedRatingCI(finite) : { mean: null, lower: null, upper: null };
+  };
   const aggregateRows = [];
   for (const [candidate, entry] of candidates) for (const [wearer, strata] of entry.wearers) {
     const metadata = entry.metadata, isAction = metadata.componentType === 'action';
-    const fields = ['battleWin', 'battleBae', 'useWin', 'useBae'];
+    const fields = ['battleWin', 'battleBae', 'useWin', 'useBae', 'battleControlRating', 'battleTreatmentRating', 'battleRatingDelta', 'useControlRating', 'useTreatmentRating', 'useRatingDelta'];
     const stratumRows = [];
     let executedCount = 0, opportunityCount = 0;
     const statusCounts = {};
@@ -781,6 +646,8 @@ function buildMechanicRatingRows(samples, runCount) {
         }
         for (let seedIndex = 0; seedIndex < runCount; seedIndex++) {
           const battleWins = [], battleBaes = [], useWins = [], useBaes = [];
+          const battleControlRatings = [], battleTreatmentRatings = [], battleRatingDeltas = [];
+          const useControlRatings = [], useTreatmentRatings = [], useRatingDeltas = [];
           for (const formation of formations) {
             const status = formation.actionStatuses?.[seedIndex] || null;
             if (isAction) {
@@ -791,16 +658,36 @@ function buildMechanicRatingRows(samples, runCount) {
               if (executed) { activationSum++; executedCount++; }
               const delta = formation.winDeltas[seedIndex], bae = formation.baeValues[seedIndex];
               battleWins.push(delta); battleBaes.push(bae);
-              if (executed) { useWins.push(delta); useBaes.push(bae); }
+              battleControlRatings.push(formation.controlRatings[seedIndex]);
+              battleTreatmentRatings.push(formation.treatmentRatings[seedIndex]);
+              battleRatingDeltas.push(formation.ratingDeltas[seedIndex]);
+              if (executed) {
+                useWins.push(delta); useBaes.push(bae);
+                useControlRatings.push(formation.controlRatings[seedIndex]);
+                useTreatmentRatings.push(formation.treatmentRatings[seedIndex]);
+                useRatingDeltas.push(formation.ratingDeltas[seedIndex]);
+              }
             } else {
               battleWins.push(formation.winDeltas[seedIndex]); battleBaes.push(formation.baeValues[seedIndex]);
               useWins.push(formation.winDeltas[seedIndex]); useBaes.push(formation.baeValues[seedIndex]);
+              battleControlRatings.push(formation.controlRatings[seedIndex]);
+              battleTreatmentRatings.push(formation.treatmentRatings[seedIndex]);
+              battleRatingDeltas.push(formation.ratingDeltas[seedIndex]);
+              useControlRatings.push(formation.controlRatings[seedIndex]);
+              useTreatmentRatings.push(formation.treatmentRatings[seedIndex]);
+              useRatingDeltas.push(formation.ratingDeltas[seedIndex]);
             }
           }
           values.battleWin[seedIndex] = meanFinite(battleWins);
           values.battleBae[seedIndex] = meanFinite(battleBaes);
           values.useWin[seedIndex] = meanFinite(useWins);
           values.useBae[seedIndex] = meanFinite(useBaes);
+          values.battleControlRating[seedIndex] = meanFinite(battleControlRatings);
+          values.battleTreatmentRating[seedIndex] = meanFinite(battleTreatmentRatings);
+          values.battleRatingDelta[seedIndex] = meanFinite(battleRatingDeltas);
+          values.useControlRating[seedIndex] = meanFinite(useControlRatings);
+          values.useTreatmentRating[seedIndex] = meanFinite(useTreatmentRatings);
+          values.useRatingDelta[seedIndex] = meanFinite(useRatingDeltas);
         }
         compositionRows.push({ values, activationRate: activationOpportunities ? activationSum / activationOpportunities : null });
       }
@@ -813,10 +700,19 @@ function buildMechanicRatingRows(samples, runCount) {
     const perSeed = Object.fromEntries(fields.map(field => [field, Array.from({ length: runCount }, (_, i) => meanFinite(stratumRows.map(row => row.values[field][i])))]));
     const primaryWin = isAction ? perSeed.useWin : perSeed.battleWin;
     const primaryBae = isAction ? perSeed.useBae : perSeed.battleBae;
+    const primaryControlRating = isAction ? perSeed.useControlRating : perSeed.battleControlRating;
+    const primaryTreatmentRating = isAction ? perSeed.useTreatmentRating : perSeed.battleTreatmentRating;
+    const primaryRatingDelta = isAction ? perSeed.useRatingDelta : perSeed.battleRatingDelta;
     const winCI = meanFiniteCI(primaryWin, true);
     const baeCI = meanFiniteCI(primaryBae);
+    const ratingCI = meanFiniteRatingCI(primaryTreatmentRating);
+    const controlRatingCI = meanFiniteRatingCI(primaryControlRating);
+    const ratingDeltaCI = meanFiniteCI(primaryRatingDelta);
     const realizedWinCI = meanFiniteCI(perSeed.battleWin, true);
     const realizedBaeCI = meanFiniteCI(perSeed.battleBae);
+    const realizedRatingCI = meanFiniteRatingCI(perSeed.battleTreatmentRating);
+    const realizedControlRatingCI = meanFiniteRatingCI(perSeed.battleControlRating);
+    const realizedRatingDeltaCI = meanFiniteCI(perSeed.battleRatingDelta);
     const executionRate = isAction ? meanFinite(stratumRows.map(row => row.activationRate)) : null;
     const activationRatePct = Number.isFinite(executionRate) ? executionRate * 100 : null;
     const assessment = !Number.isFinite(winCI.mean) ? 'no eligible comparisons'
@@ -826,11 +722,17 @@ function buildMechanicRatingRows(samples, runCount) {
       .map(([tag, counts]) => `${tag}:${counts.observed}/${counts.comparisons}`).join(';');
     const base = {
       candidate, wearer, componentType: metadata.componentType,
+      comparisonReference: metadata.comparisonReference || null,
       comparisonScope: isAction ? 'per executed action; realized impact also shown' : 'full battle counterfactual',
       mechanicTags: metadata.mechanicTags, measurementPlan: metadata.measurementPlan,
       eventEvidence, requiredCoverage: metadata.requiredCoverage,
       strata: stratumRows.length,
       sampledCompositions: stratumRows.reduce((sum, row) => sum + row.compositionCount, 0),
+      outcomeRating: ratingCI.mean, outcomeRating95Lower: ratingCI.lower, outcomeRating95Upper: ratingCI.upper,
+      controlOutcomeRating: controlRatingCI.mean, ratingDifference: ratingDeltaCI.mean,
+      ratingDifference95Lower: ratingDeltaCI.lower, ratingDifference95Upper: ratingDeltaCI.upper,
+      realizedOutcomeRating: realizedRatingCI.mean, realizedControlOutcomeRating: realizedControlRatingCI.mean,
+      realizedRatingDifference: realizedRatingDeltaCI.mean,
       winLiftPp: winCI.mean, winLift95LowerPp: winCI.lower, winLift95UpperPp: winCI.upper,
       meanBAE: baeCI.mean, bae95Lower: baeCI.lower, bae95Upper: baeCI.upper,
       realizedWinLiftPp: realizedWinCI.mean, realizedWin95LowerPp: realizedWinCI.lower, realizedWin95UpperPp: realizedWinCI.upper,
@@ -870,7 +772,7 @@ async function main() {
       for (const spec of options.candidates) {
         const wearers = wearersFor(spec, party).filter(wearer => !options.character || wearer === options.character);
         for (const wearer of wearers) {
-          let controlConfig, treatmentConfig, treatmentStatBudget = null;
+          let controlConfig, treatmentConfig;
           if (spec.type === 'rune') {
             controlConfig = neutralControlConfigs.get(wearer);
             if (!controlConfig) {
@@ -878,21 +780,23 @@ async function main() {
               neutralControlConfigs.set(wearer, controlConfig);
             }
             treatmentConfig = makeRuneBranch(base, wearer, spec.id);
-          } else if (spec.type === 'stat') {
-            const branches = makeBranches(base, spec, wearer);
-            controlConfig = neutralControlConfigs.get(wearer) || branches.control;
-            neutralControlConfigs.set(wearer, controlConfig);
-            treatmentConfig = branches.treatment;
-            treatmentStatBudget = branches.treatmentStatBudget;
           } else {
-            ({ control: controlConfig, treatment: treatmentConfig, treatmentStatBudget } = makeBranches(base, spec, wearer));
+            ({ control: controlConfig, treatment: treatmentConfig } = makeBranches(base, spec, wearer));
           }
           const trials = [];
+          const effectTargets = selectedAllyTargetIds(spec, base);
+          const effectTargetCoverage = Object.fromEntries(effectTargets.map(id => [id, 0]));
           let controlRuns = neutralControlResults.get(wearer);
-          const shouldCacheControl = (spec.type === 'rune' || spec.type === 'stat') && !controlRuns;
+          const shouldCacheControl = spec.type === 'rune' && !controlRuns;
           if (shouldCacheControl) controlRuns = [];
           for (let run = 0; run < options.runs; run++) {
             const seed = options.seed + run;
+            if (effectTargets.length) {
+              const targetId = effectTargets[(run + scenarios - 1) % effectTargets.length];
+              controlConfig.settings.actionOverride.targetId = targetId;
+              treatmentConfig.settings.actionOverride.targetId = targetId;
+              effectTargetCoverage[targetId]++;
+            }
             const controlResult = controlRuns?.[run] || simulateBattle(controlConfig, seed, options.maxActions);
             if (shouldCacheControl) controlRuns.push(controlResult);
             const treatmentResult = simulateBattle(treatmentConfig, seed, options.maxActions);
@@ -902,16 +806,18 @@ async function main() {
           const winsControl = trials.reduce((sum, trial) => sum + trial.controlWin, 0);
           const winsTreatment = trials.reduce((sum, trial) => sum + trial.treatmentWin, 0);
           const mechanicEvaluation = evaluationPlan(spec);
+          const comparisonReference = comparisonReferenceFor(spec, base.archetypes[wearer]);
           const tagMeasurements = summarizeMechanicEventDeltas(trials, mechanicEvaluation,
             trials.reduce((sum, trial) => sum + trial.mechanicEventCapture.controlDropped, 0),
             trials.reduce((sum, trial) => sum + trial.mechanicEventCapture.treatmentDropped, 0));
           const summary = {
             candidate: candidateLabel(spec),
             wearer, party, enemies,
+            comparisonReference,
+            performanceStandard: { baseStats: COMBAT_PERFORMANCE_STANDARD.baseStats,
+              damageMultipliers: COMBAT_PERFORMANCE_STANDARD.damageMultipliers, baeReferenceHp: BAE_REFERENCE_HP },
             enemyCategories: [...new Set(enemies.map(id => library[id].tags?.type || 'unknown'))].sort(),
             difficulty, length, runs: options.runs, seed: options.seed,
-            statBudgets: { wearer: statBudget(library[wearer].stats), enemies: enemies.map(id => ({ archetype: id, svp: statBudget(library[id].stats) })) },
-            treatmentStatBudget,
             mechanicEvaluation,
             tagMeasurements,
             winRate: { control: winsControl / options.runs * 100, treatment: winsTreatment / options.runs * 100,
@@ -921,6 +827,11 @@ async function main() {
               treatmentDrawRatePct: average(trials.map(row => row.treatmentDraw)) * 100,
               differencePercentagePoints: average(trials.map(row => row.winDelta)) * 100,
               paired95CI: percentCI(trials.map(row => row.winDelta)) },
+            outcomeRating: { control: average(trials.map(row => row.controlRating)), treatment: average(trials.map(row => row.treatmentRating)),
+              control95CI: boundedRatingCI(trials.map(row => row.controlRating)),
+              treatment95CI: boundedRatingCI(trials.map(row => row.treatmentRating)),
+              difference: average(trials.map(row => row.treatmentRating - row.controlRating)),
+              paired95CI: meanCI(trials.map(row => row.treatmentRating - row.controlRating)) },
             hpSwing: meanCI(trials.map(row => row.hpSwing)),
             bae: meanCI(trials.map(row => row.bae)),
             impact: Object.fromEntries(Object.keys(trials[0]?.impact || {}).map(key => [key, meanCI(trials.map(row => row.impact[key]))])),
@@ -929,6 +840,7 @@ async function main() {
             averageShieldAbsorbed: { control: average(trials.map(row => row.control.shields)), treatment: average(trials.map(row => row.treatment.shields)) },
             averageTurns: { alliesControl: average(trials.map(row => row.control.allyTurns)), alliesTreatment: average(trials.map(row => row.treatment.allyTurns)), enemiesControl: average(trials.map(row => row.control.enemyTurns)), enemiesTreatment: average(trials.map(row => row.treatment.enemyTurns)) },
             actionOverride: trials.find(row => row.treatment.actionOverride)?.treatment.actionOverride || null,
+            supportTargetCoverage: effectTargetCoverage,
             runeDiagnostics: { averageActivations: average(trials.map(row => row.wearerDamageTreatment[wearer]?.runeActivations || 0)), averageEnergyRestored: average(trials.map(row => row.wearerDamageTreatment[wearer]?.runeEnergyRestored || 0)) },
             trials
           };
@@ -936,14 +848,17 @@ async function main() {
           else summary.trials = trials.map(({ mechanicEventDeltas, ...trial }) => ({ ...trial, mechanicEventDeltas: Object.values(mechanicEventDeltas).filter(row => mechanicEvaluation.tags.includes(row.tag)) }));
           out.write(JSON.stringify(summary) + '\n');
           comparisons++;
-          if ((options.runeRating && (spec.type === 'rune' || spec.type === 'stat')) ||
-              (options.mechanicRating && ['passive', 'action', 'character-overall', 'upgrade'].includes(spec.type))) ratingSamples.push({
+          if ((options.runeImpactReport && spec.type === 'rune') ||
+              (options.mechanicRating && ['passive', 'action', 'effect', 'character-overall', 'upgrade'].includes(spec.type))) ratingSamples.push({
             candidate: candidateLabel(spec), wearer, scenarioId: scenarios,
+            comparisonReference,
             difficulty, length, partyComposition: party.slice().sort().join('+'),
             enemyComposition: enemies.slice().sort().join('+'), allyCount: party.length,
             enemyCount: enemies.length, enemyCategory: summary.enemyCategories.join('+'),
             componentType: spec.type,
             winDeltas: trials.map(trial => trial.winDelta), baeValues: trials.map(trial => trial.bae),
+            controlRatings: trials.map(trial => trial.controlRating), treatmentRatings: trials.map(trial => trial.treatmentRating),
+            ratingDeltas: trials.map(trial => trial.treatmentRating - trial.controlRating),
             actionStatuses: spec.type === 'action' ? trials.map(trial => trial.treatment.actionOverride?.status || 'missing_status') : null,
             eventObserved: Object.fromEntries(tagMeasurements.map(entry => [entry.tag, entry.evidenceStatus === 'event_observed'])),
             mechanicTags: mechanicEvaluation.tags.join(';'), measurementPlan: measurementPlanLabel(mechanicEvaluation),
@@ -953,8 +868,8 @@ async function main() {
           const partyComposition = party.slice().sort().join('+');
           const enemyComposition = enemies.slice().sort().join('+');
           const key = `${summary.candidate}|${wearer}|${difficulty}|${length}|${partyComposition}|${enemyComposition}`;
-          if (!accumulated.has(key)) accumulated.set(key, { candidate: summary.candidate, wearer, mechanicTags: mechanicEvaluation.tags.join(';'), measurementPlan: measurementPlanLabel(mechanicEvaluation), unobservedTags: tagMeasurements.filter(entry => entry.evidenceStatus !== 'event_observed').map(entry => entry.tag).join(';'), requiredCoverage: [...new Set(mechanicEvaluation.byTag.map(entry => entry.coverage))].join(';'), difficulty, length, partyComposition, enemyComposition, enemyCategory: summary.enemyCategories.join('+'), allyCount: party.length, enemyCount: enemies.length, formations: 0, controlWin: 0, treatmentWin: 0, controlDraw: 0, treatmentDraw: 0, winDelta: 0, hpSwing: 0, bae: 0, impact: {} });
-          const aggregate = accumulated.get(key); aggregate.formations++; aggregate.controlWin += summary.winRate.control / 100; aggregate.treatmentWin += summary.winRate.treatment / 100; aggregate.controlDraw += summary.winRate.controlDrawRatePct / 100; aggregate.treatmentDraw += summary.winRate.treatmentDrawRatePct / 100; aggregate.winDelta += summary.winRate.differencePercentagePoints; aggregate.hpSwing += summary.hpSwing.mean; aggregate.bae += summary.bae.mean;
+          if (!accumulated.has(key)) accumulated.set(key, { candidate: summary.candidate, wearer, mechanicTags: mechanicEvaluation.tags.join(';'), measurementPlan: measurementPlanLabel(mechanicEvaluation), unobservedTags: tagMeasurements.filter(entry => entry.evidenceStatus !== 'event_observed').map(entry => entry.tag).join(';'), requiredCoverage: [...new Set(mechanicEvaluation.byTag.map(entry => entry.coverage))].join(';'), difficulty, length, partyComposition, enemyComposition, enemyCategory: summary.enemyCategories.join('+'), allyCount: party.length, enemyCount: enemies.length, formations: 0, controlWin: 0, treatmentWin: 0, controlDraw: 0, treatmentDraw: 0, controlRating: 0, treatmentRating: 0, ratingDelta: 0, winDelta: 0, hpSwing: 0, bae: 0, impact: {} });
+          const aggregate = accumulated.get(key); aggregate.formations++; aggregate.controlWin += summary.winRate.control / 100; aggregate.treatmentWin += summary.winRate.treatment / 100; aggregate.controlDraw += summary.winRate.controlDrawRatePct / 100; aggregate.treatmentDraw += summary.winRate.treatmentDrawRatePct / 100; aggregate.controlRating += summary.outcomeRating.control; aggregate.treatmentRating += summary.outcomeRating.treatment; aggregate.ratingDelta += summary.outcomeRating.difference; aggregate.winDelta += summary.winRate.differencePercentagePoints; aggregate.hpSwing += summary.hpSwing.mean; aggregate.bae += summary.bae.mean;
           for (const [metric, estimate] of Object.entries(summary.impact)) aggregate.impact[metric] = (aggregate.impact[metric] || 0) + estimate.mean;
         }
       }
@@ -965,33 +880,34 @@ async function main() {
   const summaryFile = options.output.replace(/\.jsonl$/i, '') + '-summary.csv';
   const compositionMeans = [...accumulated.values()].map(row => ({ ...row,
     controlWin: row.controlWin / row.formations, treatmentWin: row.treatmentWin / row.formations, controlDraw: row.controlDraw / row.formations, treatmentDraw: row.treatmentDraw / row.formations,
+    controlRating: row.controlRating / row.formations, treatmentRating: row.treatmentRating / row.formations, ratingDelta: row.ratingDelta / row.formations,
     winDelta: row.winDelta / row.formations, hpSwing: row.hpSwing / row.formations, bae: row.bae / row.formations,
     impact: Object.fromEntries(Object.entries(row.impact).map(([metric, value]) => [metric, value / row.formations])) }));
   const strata = new Map();
   for (const row of compositionMeans) {
     const key = `${row.candidate}|${row.wearer}|${row.difficulty}|${row.length}|${row.allyCount}|${row.enemyCount}|${row.enemyCategory}`;
-    if (!strata.has(key)) strata.set(key, { candidate: row.candidate, wearer: row.wearer, difficulty: row.difficulty, length: row.length, allyCount: row.allyCount, enemyCount: row.enemyCount, enemyCategory: row.enemyCategory, compositionPairs: 0, controlWin: 0, treatmentWin: 0, controlDraw: 0, treatmentDraw: 0, winDelta: 0, hpSwing: 0, bae: 0, impact: {} });
-    const aggregate = strata.get(key); aggregate.compositionPairs++; aggregate.controlWin += row.controlWin; aggregate.treatmentWin += row.treatmentWin; aggregate.controlDraw += row.controlDraw; aggregate.treatmentDraw += row.treatmentDraw; aggregate.winDelta += row.winDelta; aggregate.hpSwing += row.hpSwing; aggregate.bae += row.bae;
+    if (!strata.has(key)) strata.set(key, { candidate: row.candidate, wearer: row.wearer, difficulty: row.difficulty, length: row.length, allyCount: row.allyCount, enemyCount: row.enemyCount, enemyCategory: row.enemyCategory, compositionPairs: 0, controlWin: 0, treatmentWin: 0, controlDraw: 0, treatmentDraw: 0, controlRating: 0, treatmentRating: 0, ratingDelta: 0, winDelta: 0, hpSwing: 0, bae: 0, impact: {} });
+    const aggregate = strata.get(key); aggregate.compositionPairs++; aggregate.controlWin += row.controlWin; aggregate.treatmentWin += row.treatmentWin; aggregate.controlDraw += row.controlDraw; aggregate.treatmentDraw += row.treatmentDraw; aggregate.controlRating += row.controlRating; aggregate.treatmentRating += row.treatmentRating; aggregate.ratingDelta += row.ratingDelta; aggregate.winDelta += row.winDelta; aggregate.hpSwing += row.hpSwing; aggregate.bae += row.bae;
     for (const [metric, value] of Object.entries(row.impact)) aggregate.impact[metric] = (aggregate.impact[metric] || 0) + value;
   }
   const rows = [...strata.values()];
   fs.writeFileSync(summaryFile, [
-    'candidate,wearer,mechanicTags,measurementPlan,unobservedTags,requiredCoverage,difficulty,length,allyCount,enemyCount,enemyCategory,equallyWeightedCompositionPairs,winRateBeforePct,winRateAfterPct,drawRateBeforePct,drawRateAfterPct,differencePercentagePoints,meanHpSwing,meanBAE,enemyHpRemovedDelta,allyHpRetainedDelta,allyDamageDealtDelta,allyDamageTakenDelta,allyHealingDelta,allyShieldGrantedDelta,allyShieldAbsorbedDelta,allyEnergyGrantedDelta,allyEnergyGainedDelta,allyEnergySpentDelta,allyEnergyRemainingDelta,allySkillPointsGrantedDelta,allyTurnsDelta,enemyTurnsDelta',
-    ...rows.map(row => [row.candidate, row.wearer, row.mechanicTags, row.measurementPlan, row.unobservedTags, row.requiredCoverage, row.difficulty, row.length, row.allyCount, row.enemyCount, row.enemyCategory, row.compositionPairs, row.controlWin / row.compositionPairs * 100, row.treatmentWin / row.compositionPairs * 100, row.controlDraw / row.compositionPairs * 100, row.treatmentDraw / row.compositionPairs * 100, row.winDelta / row.compositionPairs, row.hpSwing / row.compositionPairs, row.bae / row.compositionPairs, row.impact.enemyHpRemoved / row.compositionPairs, row.impact.allyHpRetained / row.compositionPairs, row.impact.damageDealt / row.compositionPairs, row.impact.damageTaken / row.compositionPairs, row.impact.healing / row.compositionPairs, row.impact.shieldsGranted / row.compositionPairs, row.impact.shieldsAbsorbed / row.compositionPairs, row.impact.energyGranted / row.compositionPairs, row.impact.energyGained / row.compositionPairs, row.impact.energySpent / row.compositionPairs, row.impact.energyRemaining / row.compositionPairs, row.impact.skillPointsGranted / row.compositionPairs, row.impact.allyTurns / row.compositionPairs, row.impact.enemyTurns / row.compositionPairs].map(csvEscape).join(','))
+    'candidate,wearer,comparisonReference,mechanicTags,measurementPlan,unobservedTags,requiredCoverage,difficulty,length,allyCount,enemyCount,enemyCategory,equallyWeightedCompositionPairs,outcomeRatingBefore,outcomeRatingAfter,outcomeRatingDifference,winRateBeforePct,winRateAfterPct,drawRateBeforePct,drawRateAfterPct,differencePercentagePoints,meanHpSwing,meanBAE,enemyHpRemovedDelta,allyHpRetainedDelta,allyDamageDealtDelta,allyDamageTakenDelta,allyHealingDelta,allyShieldGrantedDelta,allyShieldAbsorbedDelta,allyEnergyGrantedDelta,allyEnergyGainedDelta,allyEnergySpentDelta,allyEnergyRemainingDelta,allySkillPointsGrantedDelta,allyTurnsDelta,enemyTurnsDelta',
+    ...rows.map(row => [row.candidate, row.wearer, row.comparisonReference, row.mechanicTags, row.measurementPlan, row.unobservedTags, row.requiredCoverage, row.difficulty, row.length, row.allyCount, row.enemyCount, row.enemyCategory, row.compositionPairs, row.controlRating / row.compositionPairs, row.treatmentRating / row.compositionPairs, row.ratingDelta / row.compositionPairs, row.controlWin / row.compositionPairs * 100, row.treatmentWin / row.compositionPairs * 100, row.controlDraw / row.compositionPairs * 100, row.treatmentDraw / row.compositionPairs * 100, row.winDelta / row.compositionPairs, row.hpSwing / row.compositionPairs, row.bae / row.compositionPairs, row.impact.enemyHpRemoved / row.compositionPairs, row.impact.allyHpRetained / row.compositionPairs, row.impact.damageDealt / row.compositionPairs, row.impact.damageTaken / row.compositionPairs, row.impact.healing / row.compositionPairs, row.impact.shieldsGranted / row.compositionPairs, row.impact.shieldsAbsorbed / row.compositionPairs, row.impact.energyGranted / row.compositionPairs, row.impact.energyGained / row.compositionPairs, row.impact.energySpent / row.compositionPairs, row.impact.energyRemaining / row.compositionPairs, row.impact.skillPointsGranted / row.compositionPairs, row.impact.allyTurns / row.compositionPairs, row.impact.enemyTurns / row.compositionPairs].map(csvEscape).join(','))
   ].join('\n') + '\n');
   const chartFile = options.output.replace(/\.jsonl$/i, '') + '-winrate.svg';
   fs.writeFileSync(chartFile, makeWinRateSvg(rows));
-  if (options.runeRating) {
-    const { overallRows, wearerRows } = buildRuneRatingRows(ratingSamples, options.runs, options.seed + 42017);
-    const ratingFile = options.output.replace(/\.jsonl$/i, '') + '-rune-rating.csv';
-    const wearerRatingFile = options.output.replace(/\.jsonl$/i, '') + '-rune-rating-by-wearer.csv';
+  if (options.runeImpactReport) {
+    const { overallRows, wearerRows } = buildRuneImpactRows(ratingSamples, options.runs);
+    const impactFile = options.output.replace(/\.jsonl$/i, '') + '-rune-impact.csv';
+    const wearerImpactFile = options.output.replace(/\.jsonl$/i, '') + '-rune-impact-by-wearer.csv';
     const columns = Object.keys(overallRows[0] || {});
-    fs.writeFileSync(ratingFile, [columns.join(','), ...overallRows.map(row => columns.map(column => csvEscape(row[column])).join(','))].join('\n') + '\n');
+    fs.writeFileSync(impactFile, [columns.join(','), ...overallRows.map(row => columns.map(column => csvEscape(row[column])).join(','))].join('\n') + '\n');
     const wearerColumns = Object.keys(wearerRows[0] || {});
-    fs.writeFileSync(wearerRatingFile, [wearerColumns.join(','), ...wearerRows.map(row => wearerColumns.map(column => csvEscape(row[column])).join(','))].join('\n') + '\n');
-    console.log(`Rune ratings (compared with average +100-SVP controls): ${ratingFile}`);
-    console.log(`Rune ratings by wearer: ${wearerRatingFile}`);
-    for (const row of overallRows) console.log(`  ${row.rune}: ${row.score0to100.toFixed(0)}/100 (win ${row.winLiftScore0to100.toFixed(0)}, action ${row.actionValueScore0to100.toFixed(0)}; 95% CI ${row.score95Lower.toFixed(0)} to ${row.score95Upper.toFixed(0)}); ${row.rating} (${row.differenceVsReferencePp >= 0 ? '+' : ''}${row.differenceVsReferencePp.toFixed(2)} pp vs reference).`);
+    fs.writeFileSync(wearerImpactFile, [wearerColumns.join(','), ...wearerRows.map(row => wearerColumns.map(column => csvEscape(row[column])).join(','))].join('\n') + '\n');
+    console.log(`Rune impact estimates: ${impactFile}`);
+    console.log(`Rune impact by wearer: ${wearerImpactFile}`);
+    for (const row of overallRows) console.log(`  ${row.rune}: ${row.outcomeRating.toFixed(1)}/100 (${row.ratingDifference >= 0 ? '+' : ''}${row.ratingDifference.toFixed(1)} vs control); ${row.winLiftPp >= 0 ? '+' : ''}${row.winLiftPp.toFixed(2)} pp; ${row.meanBAE >= 0 ? '+' : ''}${row.meanBAE.toFixed(2)} BAE; ${row.outcomeAssessment}.`);
   }
   if (options.mechanicRating) {
     const { overallRows, wearerRows } = buildMechanicRatingRows(ratingSamples, options.runs);
@@ -1000,12 +916,14 @@ async function main() {
     const columns = Object.keys(overallRows[0] || {}), characterColumns = Object.keys(wearerRows[0] || {});
     fs.writeFileSync(ratingFile, [columns.join(','), ...overallRows.map(row => columns.map(column => csvEscape(row[column])).join(','))].join('\n') + '\n');
     fs.writeFileSync(characterFile, [characterColumns.join(','), ...wearerRows.map(row => characterColumns.map(column => csvEscape(row[column])).join(','))].join('\n') + '\n');
-    console.log(`Mechanic impact estimates (paired win-rate change; BAE is diagnostic): ${ratingFile}`);
+    console.log(`0–100 outcome ratings and paired mechanic impact: ${ratingFile}`);
     console.log(`Character-specific component estimates: ${characterFile}`);
     for (const row of overallRows) {
       const interval = Number.isFinite(row.winLift95LowerPp) ? `95% CI ${row.winLift95LowerPp.toFixed(2)} to ${row.winLift95UpperPp.toFixed(2)} pp` : 'no eligible comparisons';
       const execution = Number.isFinite(row.executionRatePct) ? `; executed ${row.executionRatePct.toFixed(1)}% of opportunities` : '';
-      console.log(`  ${row.candidate}: ${Number.isFinite(row.winLiftPp) ? `${row.winLiftPp >= 0 ? '+' : ''}${row.winLiftPp.toFixed(2)} pp` : 'N/A'} (${row.outcomeAssessment}; ${interval}${execution}).`);
+      const rating = Number.isFinite(row.outcomeRating) ? `${row.outcomeRating.toFixed(1)}/100` : 'N/A';
+      const change = Number.isFinite(row.ratingDifference) ? `; ${row.ratingDifference >= 0 ? '+' : ''}${row.ratingDifference.toFixed(1)} rating points vs control` : '';
+      console.log(`  ${row.candidate}: ${rating}${change}; ${Number.isFinite(row.winLiftPp) ? `${row.winLiftPp >= 0 ? '+' : ''}${row.winLiftPp.toFixed(2)} pp` : 'N/A'} win-rate lift (${row.outcomeAssessment}; ${interval}${execution}).`);
     }
   }
   console.log(`Completed ${scenarios.toLocaleString()} scenario cells and ${comparisons.toLocaleString()} candidate/wearer comparisons.`);
@@ -1016,4 +934,4 @@ async function main() {
 const invoked = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : '';
 if (invoked === import.meta.url) main().catch(error => { console.error(error.stack || error.message); process.exitCode = 1; });
 
-export { archetypeLibrary, candidateSpecs, enemyLineups, impactDeltas, makeBaseConfig, makeBranches, orderedUniqueTeams, statBudget };
+export { archetypeLibrary, candidateSpecs, enemyLineups, impactDeltas, makeBaseConfig, makeBranches, orderedUniqueTeams };

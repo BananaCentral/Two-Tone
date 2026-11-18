@@ -1,0 +1,24 @@
+{
+  "report": "Character performance benchmark",
+  "generatedOn": "2026-11-18",
+  "candidate": "all-character-mechanics",
+  "preset": "full",
+  "scenarioCellsSampled": 1000,
+  "scenarioCellsInCompleteMatrix": 17213850,
+  "matchedSeedsPerComparison": 20,
+  "seedStart": 20261118,
+  "rating": {
+    "win": 100,
+    "draw": 50,
+    "loss": 0,
+    "interpretation": "Mean benchmark battle outcome score. Read alongside the paired rating difference, win-rate change, and HP/BAE diagnostics."
+  },
+  "outputs": [
+    "character-performance-full-2026-11-18-mechanic-rating.csv",
+    "character-performance-full-2026-11-18-mechanic-rating-by-character.csv",
+    "character-performance-full-2026-11-18-summary.csv",
+    "character-performance-full-2026-11-18-winrate.svg",
+    "character-performance-full-2026-11-18.jsonl.gz"
+  ],
+  "confidenceIntervalNote": "Intervals are based on matched seed variation for the fixed sampled scenario set; they do not estimate scenario-cell sampling uncertainty."
+}

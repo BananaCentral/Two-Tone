@@ -10,7 +10,7 @@ export function roundCombatStatQuarter(value) {
 // effect factors; hit application (shield, barriers, reflect, Echo, etc.) stays
 // in the combat engine.
 export function calculateCombatHit({
-  type, attack, physicalAttack = 0, magicalAttack = 0,
+  type, attack,
   physicalDefense, magicalDefense, multiplier,
   physicalDefenseIgnore = 0, magicalDefenseIgnore = 0,
   damageMultiplier = 1, defenseMultiplier = 1, exposedStacks = 0
@@ -26,9 +26,8 @@ export function calculateCombatHit({
   const magicalEffectiveDefense = magicalDefense * defenseMultiplier * (1 - Math.min(1, Math.max(0, magicalDefenseIgnore))) * exposedMultiplier;
   let reduction;
   if (type === 'true') {
-    if (!Number.isFinite(physicalAttack) || physicalAttack < 0 || !Number.isFinite(magicalAttack) || magicalAttack < 0) return null;
-    const physicalReduction = physicalAttack > 0 ? 0.5 * Math.min(physicalEffectiveDefense / physicalAttack, 1) : 0;
-    const magicalReduction = magicalAttack > 0 ? 0.5 * Math.min(magicalEffectiveDefense / magicalAttack, 1) : 0;
+    const physicalReduction = 0.5 * Math.min(physicalEffectiveDefense / attack, 1);
+    const magicalReduction = 0.5 * Math.min(magicalEffectiveDefense / attack, 1);
     reduction = physicalReduction + magicalReduction;
   } else {
     const typedDefense = type === 'physical' ? physicalEffectiveDefense : magicalEffectiveDefense;

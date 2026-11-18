@@ -42,7 +42,7 @@ Premium weapon effects require the weapon to be owned and equipped. The game's c
 
 ## Damage and targeting rules
 
-- Physical damage uses the Physical Attack stat and target Physical Defense. Premium weapon Duplicate 3 ignores 20% of the target Physical Defense for Zero's attacks.
+- Physical damage uses Attack and target Physical Defense. Premium weapon Duplicate 3 ignores 20% of the target Physical Defense for Zero's attacks.
 - Blast hits the selected enemy and up to two adjacent enemies in formation, with full damage to each. AoE hits every living enemy.
 - Critical strikes follow the shared Critical Hit Standard. Zero's Cutthroat bonuses are percentage-point additions, so the default 10% Critical Rate and 50% Critical Damage become 20% and 75% before Premium Weapon Duplicate 4.
 - First Strike's per-enemy first-hit record resets when a new battle starts.

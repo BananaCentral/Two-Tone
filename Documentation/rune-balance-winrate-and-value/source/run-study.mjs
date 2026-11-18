@@ -43,7 +43,7 @@ function configFor(partyId,profile,length,difficulty,subject=null,setId=null){
  const ids=parties[partyId],wanted=new Set(ids);c.teams.allies=c.teams.allies.filter(u=>wanted.has(u.id));for(const id of ids)if(!c.teams.allies.some(u=>u.id===id)){const archetype=id.replace(/-\d+$/,'');c.teams.allies.push({id,archetype});}
  c.teams.enemies=profile.enemies.map(([id,archetype,slot])=>({id,archetype,slot}));
  const archetypes=new Set(c.teams.enemies.map(e=>e.archetype));
- for(const id of archetypes){const a=c.archetypes[id];a.stats.hp*=hpByCategory[profile.category][length.id];for(const k of ['attack','physicalAttack','magicalAttack'])if(Number.isFinite(a.stats[k]))a.stats[k]*=attackByCategory[profile.category][difficulty.id];for(const k of ['physicalDefense','magicalDefense'])if(Number.isFinite(a.stats[k]))a.stats[k]*=difficulty.defense;}
+ for(const id of archetypes){const a=c.archetypes[id];a.stats.hp*=hpByCategory[profile.category][length.id];for(const k of ['attack'])if(Number.isFinite(a.stats[k]))a.stats[k]*=attackByCategory[profile.category][difficulty.id];for(const k of ['physicalDefense','magicalDefense'])if(Number.isFinite(a.stats[k]))a.stats[k]*=difficulty.defense;}
  for(const ally of c.teams.allies)ally.runes=runeLoadout(ally.id===subject?setId:null);
  return c;
 }
