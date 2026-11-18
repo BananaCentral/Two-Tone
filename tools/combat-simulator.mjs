@@ -630,6 +630,7 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
     actionOverride:settings.actionOverride??null,
     actionOverrideObserved:false,
     actionOverrideResolved:null,
+    actionOverrideStatus:settings.actionOverride ? 'pending' : null,
     skillPointCap: (settings.skillPointCap ?? 5)+(allies.some(unit=>unit.passives.some(passive=>passive.type==='resourceful'))?2:0),
     skillPoints: 0,
     skillUses: 0,
@@ -665,7 +666,13 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
       const priorSkills=actor.skillUses,priorUltimates=actor.ultimateCount;
       if(isOverriddenActor)state.actionOverrideObserved=true;
       resolveAllyAction(state, actor);
-      if(isOverriddenActor)state.actionOverrideResolved=actor.ultimateCount>priorUltimates?'ultimate':actor.skillUses>priorSkills?'skill':'basic';
+      if(isOverriddenActor){
+        state.actionOverrideResolved=actor.ultimateCount>priorUltimates?'ultimate':actor.skillUses>priorSkills?'skill':'basic';
+        if(state.actionOverrideResolved===state.actionOverride.action)state.actionOverrideStatus='executed';
+        else if(state.actionOverride.action==='skill'&&actor.skillUses===priorSkills)state.actionOverrideStatus='insufficient_skill_points';
+        else if(state.actionOverride.action==='ultimate'&&actor.ultimateCount===priorUltimates)state.actionOverrideStatus='insufficient_energy';
+        else state.actionOverrideStatus='action_unavailable';
+      }
     } else {
       state.enemyTurns++;
       resolveBleedTick(state,actor);
@@ -683,10 +690,15 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
     if(actor.side==='allies')state.engine.ageRuneCooldowns(actor.runeCooldownState,actor.turns,['recycle','amplify','celestial-star','united']);
   }
   const outcome=state.engine.resolveBattleOutcome({allies,enemies,actionLimitReached:state.actions>=state.maxActions}),winner=outcome==='defeat'?'enemies':outcome==='victory'?'allies':'draw';
+  if(state.actionOverride&&state.actionOverrideStatus==='pending'){
+    const requestedActor=allies.find(unit=>unit.id===state.actionOverride.actorId);
+    state.actionOverrideStatus=!requestedActor||requestedActor.hp<=0?'actor_defeated_before_action'
+      :requestedActor.turns<state.actionOverride.turn?'battle_ended_before_action':'actor_unable_to_take_action';
+  }
   const unitDetails=allies.filter(unit=>!unit.isHauntling).map(unit=>({id:unit.id,archetype:unit.archetypeId,role:unit.role,stats:{...unit.stats},statBudget:unit.statBudget,hp:unit.hp,maxHp:unit.maxHp,shield:unit.shield||0,damage:unit.damageDealt,damageBreakdown:{...unit.damageBreakdown},damageTaken:unit.damageTaken,criticalHits:unit.criticalHits||0,supportDamageAmplified:unit.supportDamageAmplified,shieldGranted:unit.shieldGranted,shieldReceived:unit.shieldReceived,shieldAbsorbed:unit.shieldAbsorbed,hpSpent:unit.hpSpent,lifestealHealing:unit.lifestealHealing||0,turns:unit.turns,skills:unit.skillUses,ultimates:unit.ultimateCount,followUps:unit.followUpCount,tuneUses:unit.tuneUses,tunesReceived:unit.tunesReceived,turnsAdvanced:unit.turnsAdvanced,skillPointsSpent:unit.skillPointsSpent,skillPointsGenerated:unit.skillPointsGenerated,skillPointsGranted:unit.skillPointsGranted,energy:unit.energy,energySpent:unit.energySpent,energyGained:unit.energyGained,energyGranted:unit.energyGranted,runeEnergyRestored:unit.runeEnergyRestored,runeActivations:unit.runeActivations,tauntRedirectedHits:unit.tauntRedirectedHits}));
   return {
     winner, actions: state.actions, allyTurns: state.allyTurns, enemyTurns: state.enemyTurns, elapsedTime:state.currentTime,
-    actionOverride:state.actionOverride?{...state.actionOverride,observed:state.actionOverrideObserved,resolved:state.actionOverrideResolved}:null,
+    actionOverride:state.actionOverride?{...state.actionOverride,observed:state.actionOverrideObserved,resolved:state.actionOverrideResolved,status:state.actionOverrideStatus}:null,
     finalHp:{allies:allies.reduce((sum,unit)=>sum+unit.hp,0),enemies:enemies.reduce((sum,unit)=>sum+unit.hp,0)},
     statBudgets:{allies:allies.filter(unit=>!unit.isHauntling).map(unit=>({id:unit.id,archetype:unit.archetypeId,value:unit.statBudget})),enemies:enemies.map(unit=>({id:unit.id,archetype:unit.archetypeId,value:unit.statBudget}))},
     skillUses: state.skillUses, skillPointsRemaining: state.skillPoints,criticalHits:state.criticalHits,

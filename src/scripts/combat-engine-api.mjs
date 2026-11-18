@@ -239,7 +239,8 @@ export class TwoToneBattleEngine {
       ? kit?.passives?.find(entry => (entry.id || entry.type) === effectId || entry.type === effectId)
       : kit?.[slot];
     if (!effect?.mechanicTags?.length) return null;
-    return this.recordMechanicEvent({ componentId: `${slot}:${ownerId}/${effectId || slot}`,
+    const componentSlot = ['basic', 'skill', 'ultimate'].includes(slot) ? 'action' : slot;
+    return this.recordMechanicEvent({ componentId: `${componentSlot}:${ownerId}/${effectId || slot}`,
       mechanicTags: effect.mechanicTags, trigger: trigger || effect.mechanicTriggers?.[effect.mechanicTags[0]] || 'event_defined',
       status, actorId: actorId || ownerId, targetIds, actionId, values });
   }

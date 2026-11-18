@@ -124,13 +124,12 @@ function makeBaseConfig(library, allies, enemies, difficulty, length, archetypeC
 }
 function candidateSpecs(raw) {
   if (raw === 'all-upgrade-effects') return Object.values(CHARACTER_UPGRADE_EFFECTS).map(effect => ({ type: 'upgrade', id: effect.id, character: effect.character, source: effect.source }));
-  if (raw === 'all-actions') return [...CHARACTER_IDS.flatMap(character => ['basic', 'skill', 'ultimate'].map(id => ({ type: 'action', id, character }))), ...Object.keys(SVP_GAINS).map(id => ({ type: 'stat', id }))];
-  if (raw === 'all-passives') return [...CHARACTER_PASSIVES.map(spec => ({ type: 'passive', ...spec })), ...Object.keys(SVP_GAINS).map(id => ({ type: 'stat', id }))];
+  if (raw === 'all-actions') return CHARACTER_IDS.flatMap(character => ['basic', 'skill', 'ultimate'].map(id => ({ type: 'action', id, character })));
+  if (raw === 'all-passives') return CHARACTER_PASSIVES.map(spec => ({ type: 'passive', ...spec }));
   if (raw === 'all-character-mechanics') return [
     ...CHARACTER_PASSIVES.map(spec => ({ type: 'passive', ...spec })),
     ...CHARACTER_IDS.flatMap(character => ['basic', 'skill', 'ultimate'].map(id => ({ type: 'action', id, character }))),
-    ...CHARACTER_IDS.map(character => ({ type: 'character-overall', id: character, character })),
-    ...Object.keys(SVP_GAINS).map(id => ({ type: 'stat', id }))
+    ...CHARACTER_IDS.map(character => ({ type: 'character-overall', id: character, character }))
   ];
   if (raw === 'all-rune-ratings') return [...RUNES.map(id => ({ type: 'rune', id })), ...Object.keys(SVP_GAINS).map(id => ({ type: 'stat', id }))];
   if (raw === 'all-runes') return RUNES.map(id => ({ type: 'rune', id }));
@@ -734,126 +733,117 @@ function buildRuneRatingRows(samples, runCount, seed) {
   }
   return { overallRows, wearerRows };
 }
-function buildMechanicRatingRows(samples, runCount, seed) {
-  // Same matched, stratified reference score used for Runes. Candidate controls
-  // are five +100-SVP investments; each mechanic is paired against the same
-  // wearer, matchup, and seeds. This scores impact, not standalone damage.
-  const scenarioGroups = new Map(), candidateMetadata = new Map();
-  for (const sample of samples) {
-    if (!sample.candidate.startsWith('stat:') && !candidateMetadata.has(sample.candidate)) candidateMetadata.set(sample.candidate, {
-      mechanicTags: sample.mechanicTags, measurementPlan: sample.measurementPlan,
-      requiredCoverage: sample.requiredCoverage, unobservedTags: sample.unobservedTags
-    });
-    const key = `${sample.wearer}|${sample.scenarioId}`;
-    if (!scenarioGroups.has(key)) scenarioGroups.set(key, { stats: new Map(), candidates: [] });
-    const group = scenarioGroups.get(key);
-    if (sample.candidate.startsWith('stat:')) group.stats.set(sample.candidate.slice(5), sample);
-    else group.candidates.push(sample);
-  }
-  const formationGroups = new Map();
-  for (const scenario of scenarioGroups.values()) {
-    if (!scenario.candidates.length) continue;
-    assert(scenario.stats.size === Object.keys(SVP_GAINS).length, `Mechanic rating requires all five 100-SVP stat controls for ${scenario.candidates[0].wearer}.`);
-    const reference = Array.from({ length: runCount }, (_, index) => average([...scenario.stats.values()].map(stat => stat.winDeltas[index])));
-    const referenceBae = Array.from({ length: runCount }, (_, index) => average([...scenario.stats.values()].map(stat => stat.baeValues[index])));
-    for (const candidate of scenario.candidates) {
-      const stratum = [candidate.difficulty, candidate.length, candidate.allyCount, candidate.enemyCount, candidate.enemyCategory].join('|');
-      const composition = `${candidate.partyComposition}|${candidate.enemyComposition}`;
-      const key = `${candidate.candidate}|${candidate.wearer}|${stratum}|${composition}`;
-      if (!formationGroups.has(key)) formationGroups.set(key, {
-        candidate: candidate.candidate, wearer: candidate.wearer, stratum, composition,
-        deltas: Array(runCount).fill(0), references: Array(runCount).fill(0), gaps: Array(runCount).fill(0),
-        bae: Array(runCount).fill(0), referenceBae: Array(runCount).fill(0), formations: 0
-      });
-      const aggregate = formationGroups.get(key);
-      aggregate.formations++;
-      for (let index = 0; index < runCount; index++) {
-        aggregate.deltas[index] += candidate.winDeltas[index]; aggregate.references[index] += reference[index];
-        aggregate.gaps[index] += candidate.winDeltas[index] - reference[index];
-        aggregate.bae[index] += candidate.baeValues[index]; aggregate.referenceBae[index] += referenceBae[index];
-      }
-    }
-  }
+function buildMechanicRatingRows(samples, runCount) {
   const candidates = new Map();
-  for (const group of formationGroups.values()) {
-    for (const field of ['deltas', 'references', 'gaps', 'bae', 'referenceBae']) group[field] = group[field].map(value => value / group.formations);
-    if (!candidates.has(group.candidate)) candidates.set(group.candidate, new Map());
-    const byWearer = candidates.get(group.candidate);
-    if (!byWearer.has(group.wearer)) byWearer.set(group.wearer, new Map());
-    const strata = byWearer.get(group.wearer);
-    if (!strata.has(group.stratum)) strata.set(group.stratum, []);
-    strata.get(group.stratum).push(group);
+  for (const sample of samples) {
+    if (sample.componentType === 'stat') continue;
+    const candidateRows = candidates.get(sample.candidate) || { metadata: sample, wearers: new Map() };
+    candidates.set(sample.candidate, candidateRows);
+    const strata = candidateRows.wearers.get(sample.wearer) || new Map();
+    candidateRows.wearers.set(sample.wearer, strata);
+    const stratum = [sample.difficulty, sample.length, sample.allyCount, sample.enemyCount, sample.enemyCategory].join('|');
+    const compositions = strata.get(stratum) || new Map();
+    strata.set(stratum, compositions);
+    const composition = `${sample.partyComposition}|${sample.enemyComposition}`;
+    const formations = compositions.get(composition) || [];
+    formations.push(sample);
+    compositions.set(composition, formations);
   }
-  function summarize(strata) {
-    const fields = ['deltas', 'references', 'gaps', 'bae', 'referenceBae'];
-    const bySeed = Object.fromEntries(fields.map(field => [field, Array(runCount).fill(0)]));
-    const positive = [];
-    for (const compositions of strata.values()) {
-      const means = Object.fromEntries(fields.map(field => [field, Array(runCount).fill(0)]));
-      for (const composition of compositions) for (const field of fields) for (let i = 0; i < runCount; i++) means[field][i] += composition[field][i];
-      for (const field of fields) for (let i = 0; i < runCount; i++) bySeed[field][i] += means[field][i] / compositions.length;
-      positive.push(average(means.deltas) > 0 ? 1 : 0);
-    }
-    for (const field of fields) for (let i = 0; i < runCount; i++) bySeed[field][i] /= strata.size;
-    return { ...bySeed, positiveStrataPct: average(positive) * 100, strataCount: strata.size };
-  }
-  const random = seededRandom(seed), bootstrapRuns = 1000;
-  function scoreOf(runeLift, referenceLift, bae, referenceBae) {
-    const win = referenceLift > 0 ? Math.max(0, Math.min(100, 100 * runeLift / referenceLift)) : 0;
-    const action = referenceBae > 0 ? Math.max(0, Math.min(100, 100 * bae / referenceBae)) : 0;
-    return { win, action, overall: Math.sqrt(win * action) };
-  }
-  function bootstrap(byWearer, selectedWearer = null) {
-    const wearers = selectedWearer ? [selectedWearer] : [...byWearer.keys()], estimates = [];
-    for (let b = 0; b < bootstrapRuns; b++) {
-      const seeds = Array.from({ length: runCount }, () => Math.floor(random() * runCount)), wearerStats = [];
-      for (const wearer of wearers) {
-        const strataStats = [];
-        for (const compositions of byWearer.get(wearer).values()) {
-          const sums = { delta: 0, reference: 0, gap: 0, bae: 0, referenceBae: 0 };
-          for (let i = 0; i < compositions.length; i++) {
-            const row = compositions[Math.floor(random() * compositions.length)];
-            sums.delta += average(seeds.map(s => row.deltas[s])); sums.reference += average(seeds.map(s => row.references[s]));
-            sums.gap += average(seeds.map(s => row.gaps[s])); sums.bae += average(seeds.map(s => row.bae[s]));
-            sums.referenceBae += average(seeds.map(s => row.referenceBae[s]));
-          }
-          strataStats.push(Object.fromEntries(Object.entries(sums).map(([key, value]) => [key, value / compositions.length])));
+
+  const meanFinite = values => {
+    const finite = values.filter(Number.isFinite);
+    return finite.length ? average(finite) : null;
+  };
+  const meanFiniteCI = (values, asPercent = false) => {
+    const finite = values.filter(Number.isFinite);
+    if (!finite.length) return { mean: null, lower: null, upper: null };
+    return asPercent ? percentCI(finite) : meanCI(finite);
+  };
+  const aggregateRows = [];
+  for (const [candidate, entry] of candidates) for (const [wearer, strata] of entry.wearers) {
+    const metadata = entry.metadata, isAction = metadata.componentType === 'action';
+    const fields = ['battleWin', 'battleBae', 'useWin', 'useBae'];
+    const stratumRows = [];
+    let executedCount = 0, opportunityCount = 0;
+    const statusCounts = {};
+    const evidence = new Map();
+
+    for (const [stratum, compositions] of strata) {
+      const compositionRows = [];
+      for (const formations of compositions.values()) {
+        const values = Object.fromEntries(fields.map(field => [field, Array(runCount).fill(null)]));
+        let activationSum = 0, activationOpportunities = 0;
+        for (const formation of formations) for (const [tag, observed] of Object.entries(formation.eventObserved || {})) {
+          const row = evidence.get(tag) || { observed: 0, comparisons: 0 };
+          row.comparisons++;
+          if (observed) row.observed++;
+          evidence.set(tag, row);
         }
-        wearerStats.push(Object.fromEntries(['delta', 'reference', 'gap', 'bae', 'referenceBae'].map(key => [key, average(strataStats.map(row => row[key]))])));
+        for (let seedIndex = 0; seedIndex < runCount; seedIndex++) {
+          const battleWins = [], battleBaes = [], useWins = [], useBaes = [];
+          for (const formation of formations) {
+            const status = formation.actionStatuses?.[seedIndex] || null;
+            if (isAction) {
+              activationOpportunities++;
+              opportunityCount++;
+              statusCounts[status || 'missing_status'] = (statusCounts[status || 'missing_status'] || 0) + 1;
+              const executed = status === 'executed';
+              if (executed) { activationSum++; executedCount++; }
+              const delta = formation.winDeltas[seedIndex], bae = formation.baeValues[seedIndex];
+              battleWins.push(delta); battleBaes.push(bae);
+              if (executed) { useWins.push(delta); useBaes.push(bae); }
+            } else {
+              battleWins.push(formation.winDeltas[seedIndex]); battleBaes.push(formation.baeValues[seedIndex]);
+              useWins.push(formation.winDeltas[seedIndex]); useBaes.push(formation.baeValues[seedIndex]);
+            }
+          }
+          values.battleWin[seedIndex] = meanFinite(battleWins);
+          values.battleBae[seedIndex] = meanFinite(battleBaes);
+          values.useWin[seedIndex] = meanFinite(useWins);
+          values.useBae[seedIndex] = meanFinite(useBaes);
+        }
+        compositionRows.push({ values, activationRate: activationOpportunities ? activationSum / activationOpportunities : null });
       }
-      const combined = Object.fromEntries(['delta', 'reference', 'gap', 'bae', 'referenceBae'].map(key => [key, average(wearerStats.map(row => row[key]))]));
-      estimates.push({ gap: combined.gap, score: scoreOf(combined.delta, combined.reference, combined.bae, combined.referenceBae).overall });
+      const weighted = Object.fromEntries(fields.map(field => [field, Array.from({ length: runCount }, (_, i) => meanFinite(compositionRows.map(row => row.values[field][i])))]));
+      stratumRows.push({ stratum, values: weighted,
+        activationRate: meanFinite(compositionRows.map(row => row.activationRate)), compositionCount: compositionRows.length,
+        onUseCompositionCount: compositionRows.filter(row => row.values.useWin.some(Number.isFinite)).length });
     }
-    const scores = estimates.map(row => row.score).sort((a, b) => a - b), gaps = estimates.map(row => row.gap).sort((a, b) => a - b);
-    return { scoreLower: quantile(scores, 0.025), scoreUpper: quantile(scores, 0.975), gapLower: quantile(gaps, 0.025), gapUpper: quantile(gaps, 0.975) };
+
+    const perSeed = Object.fromEntries(fields.map(field => [field, Array.from({ length: runCount }, (_, i) => meanFinite(stratumRows.map(row => row.values[field][i])))]));
+    const primaryWin = isAction ? perSeed.useWin : perSeed.battleWin;
+    const primaryBae = isAction ? perSeed.useBae : perSeed.battleBae;
+    const winCI = meanFiniteCI(primaryWin, true);
+    const baeCI = meanFiniteCI(primaryBae);
+    const realizedWinCI = meanFiniteCI(perSeed.battleWin, true);
+    const realizedBaeCI = meanFiniteCI(perSeed.battleBae);
+    const executionRate = isAction ? meanFinite(stratumRows.map(row => row.activationRate)) : null;
+    const activationRatePct = Number.isFinite(executionRate) ? executionRate * 100 : null;
+    const assessment = !Number.isFinite(winCI.mean) ? 'no eligible comparisons'
+      : winCI.lower > 0 ? 'positive evidence'
+        : winCI.upper < 0 ? 'negative evidence' : 'inconclusive';
+    const eventEvidence = [...evidence].sort(([a], [b]) => a.localeCompare(b))
+      .map(([tag, counts]) => `${tag}:${counts.observed}/${counts.comparisons}`).join(';');
+    const base = {
+      candidate, wearer, componentType: metadata.componentType,
+      comparisonScope: isAction ? 'per executed action; realized impact also shown' : 'full battle counterfactual',
+      mechanicTags: metadata.mechanicTags, measurementPlan: metadata.measurementPlan,
+      eventEvidence, requiredCoverage: metadata.requiredCoverage,
+      strata: stratumRows.length,
+      sampledCompositions: stratumRows.reduce((sum, row) => sum + row.compositionCount, 0),
+      winLiftPp: winCI.mean, winLift95LowerPp: winCI.lower, winLift95UpperPp: winCI.upper,
+      meanBAE: baeCI.mean, bae95Lower: baeCI.lower, bae95Upper: baeCI.upper,
+      realizedWinLiftPp: realizedWinCI.mean, realizedWin95LowerPp: realizedWinCI.lower, realizedWin95UpperPp: realizedWinCI.upper,
+      realizedMeanBAE: realizedBaeCI.mean, realizedBAE95Lower: realizedBaeCI.lower, realizedBAE95Upper: realizedBaeCI.upper,
+      outcomeAssessment: assessment,
+      executionRatePct: activationRatePct,
+      executedComparisons: isAction ? executedCount : null,
+      actionOpportunities: isAction ? opportunityCount : null,
+      executionStatuses: isAction ? JSON.stringify(statusCounts) : null
+    };
+    aggregateRows.push(base);
   }
-  const overallRows = [], wearerRows = [];
-  for (const [candidate, byWearer] of candidates) {
-    const metadata = candidateMetadata.get(candidate) || {};
-    const summaries = [...byWearer].map(([wearer, strata]) => ({ wearer, ...summarize(strata) }));
-    for (const summary of summaries) {
-      const ci = bootstrap(byWearer, summary.wearer), score = scoreOf(average(summary.deltas), average(summary.references), average(summary.bae), average(summary.referenceBae));
-      wearerRows.push({ candidate, ...metadata, wearer: summary.wearer, strata: summary.strataCount, winLiftPp: average(summary.deltas) * 100,
-        mean100SVPReferencePp: average(summary.references) * 100, winLiftScore0to100: score.win, meanBAE: average(summary.bae),
-        mean100SVPReferenceBAE: average(summary.referenceBae), actionValueScore0to100: score.action, score0to100: score.overall,
-        score95Lower: ci.scoreLower, score95Upper: ci.scoreUpper, differenceVsReferencePp: average(summary.gaps) * 100,
-        ci95LowerPp: ci.gapLower * 100, ci95UpperPp: ci.gapUpper * 100,
-        rating: ci.gapLower > 0 ? 'Above 100-SVP reference' : ci.gapUpper < 0 ? 'Below 100-SVP reference' : 'Within reference range',
-        positiveWinLiftStrataPct: summary.positiveStrataPct, meanHpSwing: average(summary.bae) * 16 });
-    }
-    const combined = Object.fromEntries(['deltas', 'references', 'gaps', 'bae', 'referenceBae'].map(field => [field,
-      Array.from({ length: runCount }, (_, i) => average(summaries.map(row => row[field][i])))]));
-    const ci = bootstrap(byWearer), score = scoreOf(average(combined.deltas), average(combined.references), average(combined.bae), average(combined.referenceBae));
-    overallRows.push({ candidate, ...metadata, eligibleCharacters: [...byWearer.keys()].join(';'), characterCount: byWearer.size,
-      winLiftPp: average(combined.deltas) * 100, mean100SVPReferencePp: average(combined.references) * 100,
-      winLiftScore0to100: score.win, meanBAE: average(combined.bae), mean100SVPReferenceBAE: average(combined.referenceBae),
-      actionValueScore0to100: score.action, score0to100: score.overall, score95Lower: ci.scoreLower, score95Upper: ci.scoreUpper,
-      differenceVsReferencePp: average(combined.gaps) * 100, ci95LowerPp: ci.gapLower * 100, ci95UpperPp: ci.gapUpper * 100,
-      rating: ci.gapLower > 0 ? 'Above 100-SVP reference' : ci.gapUpper < 0 ? 'Below 100-SVP reference' : 'Within reference range',
-      positiveWinLiftStrataPct: average(summaries.map(row => row.positiveStrataPct)),
-      meanHpSwing: average(combined.bae) * 16 });
-  }
-  return { overallRows, wearerRows };
+  return { overallRows: aggregateRows, wearerRows: aggregateRows };
 }
 async function main() {
   const options = parseArgs(process.argv.slice(2));
@@ -947,12 +937,15 @@ async function main() {
           out.write(JSON.stringify(summary) + '\n');
           comparisons++;
           if ((options.runeRating && (spec.type === 'rune' || spec.type === 'stat')) ||
-              (options.mechanicRating && ['passive', 'action', 'character-overall', 'stat', 'upgrade'].includes(spec.type))) ratingSamples.push({
+              (options.mechanicRating && ['passive', 'action', 'character-overall', 'upgrade'].includes(spec.type))) ratingSamples.push({
             candidate: candidateLabel(spec), wearer, scenarioId: scenarios,
             difficulty, length, partyComposition: party.slice().sort().join('+'),
             enemyComposition: enemies.slice().sort().join('+'), allyCount: party.length,
             enemyCount: enemies.length, enemyCategory: summary.enemyCategories.join('+'),
+            componentType: spec.type,
             winDeltas: trials.map(trial => trial.winDelta), baeValues: trials.map(trial => trial.bae),
+            actionStatuses: spec.type === 'action' ? trials.map(trial => trial.treatment.actionOverride?.status || 'missing_status') : null,
+            eventObserved: Object.fromEntries(tagMeasurements.map(entry => [entry.tag, entry.evidenceStatus === 'event_observed'])),
             mechanicTags: mechanicEvaluation.tags.join(';'), measurementPlan: measurementPlanLabel(mechanicEvaluation),
             requiredCoverage: [...new Set(mechanicEvaluation.byTag.map(entry => entry.coverage))].join(';'),
             unobservedTags: tagMeasurements.filter(entry => entry.evidenceStatus !== 'event_observed').map(entry => entry.tag).join(';')
@@ -1001,15 +994,19 @@ async function main() {
     for (const row of overallRows) console.log(`  ${row.rune}: ${row.score0to100.toFixed(0)}/100 (win ${row.winLiftScore0to100.toFixed(0)}, action ${row.actionValueScore0to100.toFixed(0)}; 95% CI ${row.score95Lower.toFixed(0)} to ${row.score95Upper.toFixed(0)}); ${row.rating} (${row.differenceVsReferencePp >= 0 ? '+' : ''}${row.differenceVsReferencePp.toFixed(2)} pp vs reference).`);
   }
   if (options.mechanicRating) {
-    const { overallRows, wearerRows } = buildMechanicRatingRows(ratingSamples, options.runs, options.seed + 82031);
+    const { overallRows, wearerRows } = buildMechanicRatingRows(ratingSamples, options.runs);
     const ratingFile = options.output.replace(/\.jsonl$/i, '') + '-mechanic-rating.csv';
     const characterFile = options.output.replace(/\.jsonl$/i, '') + '-mechanic-rating-by-character.csv';
     const columns = Object.keys(overallRows[0] || {}), characterColumns = Object.keys(wearerRows[0] || {});
     fs.writeFileSync(ratingFile, [columns.join(','), ...overallRows.map(row => columns.map(column => csvEscape(row[column])).join(','))].join('\n') + '\n');
     fs.writeFileSync(characterFile, [characterColumns.join(','), ...wearerRows.map(row => characterColumns.map(column => csvEscape(row[column])).join(','))].join('\n') + '\n');
-    console.log(`Mechanic and character ratings (vs average +100-SVP controls): ${ratingFile}`);
-    console.log(`Character-specific component ratings: ${characterFile}`);
-    for (const row of overallRows) console.log(`  ${row.candidate}: ${row.score0to100.toFixed(0)}/100 (win ${row.winLiftScore0to100.toFixed(0)}, action ${row.actionValueScore0to100.toFixed(0)}; 95% CI ${row.score95Lower.toFixed(0)} to ${row.score95Upper.toFixed(0)}); ${row.rating}.`);
+    console.log(`Mechanic impact estimates (paired win-rate change; BAE is diagnostic): ${ratingFile}`);
+    console.log(`Character-specific component estimates: ${characterFile}`);
+    for (const row of overallRows) {
+      const interval = Number.isFinite(row.winLift95LowerPp) ? `95% CI ${row.winLift95LowerPp.toFixed(2)} to ${row.winLift95UpperPp.toFixed(2)} pp` : 'no eligible comparisons';
+      const execution = Number.isFinite(row.executionRatePct) ? `; executed ${row.executionRatePct.toFixed(1)}% of opportunities` : '';
+      console.log(`  ${row.candidate}: ${Number.isFinite(row.winLiftPp) ? `${row.winLiftPp >= 0 ? '+' : ''}${row.winLiftPp.toFixed(2)} pp` : 'N/A'} (${row.outcomeAssessment}; ${interval}${execution}).`);
+    }
   }
   console.log(`Completed ${scenarios.toLocaleString()} scenario cells and ${comparisons.toLocaleString()} candidate/wearer comparisons.`);
   console.log(`Detailed pairs: ${options.output}`);
