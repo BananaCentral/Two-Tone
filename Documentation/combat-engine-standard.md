@@ -11,6 +11,7 @@ Combat balance reports must execute the same combat rules and authored combat da
 - `src/scripts/combat-engine-api.mjs` is the shared runtime API boundary. Both live battles and the runner use its action intents (authored action plan plus resource commitment), typed-hit calculation, target plans, enemy basic-attack plans, Rune triggers, complete direct/Reflect/Echo damage sequences, bleed ticks, Shield/healing application, character-specific effect handlers, shared status application and aging, Follow-Up/Ricochet allocation, summon lifetime, battle outcomes, and turn timeline.
 - `Documentation/combat-effect-lifecycle-standard.md` and `COMBAT_EFFECT_LIFECYCLE` define reapplication, turn clocks, stack consumption, cooldown timing, summon lifetime, cleanse, and defeat cleanup. The shared engine owns these transitions.
 - `Documentation/combat-trigger-eligibility-standard.md` and the shared `COMBAT_DAMAGE_EVENT_TYPES` / `COMBAT_TRIGGER_ELIGIBILITY` catalogs define damage-event provenance and which event types can activate Echo, Reflect, attack effects, Follow-Up, Ricochet, and Lifesteal.
+- The engine's bounded mechanic-event ledger supplies source attribution for performance diagnostics. It uses the canonical tags on shared definitions and records resolved effects from the same runtime used by live battles and simulations.
 - Simulation-only scenario settings may select lineups, scale encounter profiles, choose AI policies, and seed randomness. They must not redefine a character's stats, abilities, passives, enemy attacks, or damage rules.
 
 ## Required architecture for trusted results
@@ -33,6 +34,12 @@ Timed effects advance on explicit lifecycle clocks. Both live battles and simula
 ## Runtime boundary
 
 The player controller and simulator policy choose different actions by design. They submit those intents to `TwoToneBattleEngine`, which owns action planning and resource commitment, typed damage and intake, character hit effects, support actions, ultimate effects, Rune cooldowns, Follow-Up and Ricochet allocation, summon duration, enemy attack plans, status state, turn scheduling, and battle outcome decisions. The browser retains animation, input, and wave presentation; the simulator retains its AI policy, scenario loop, and metrics collection. Adapters may choose targets or attach presentation/metrics, but must not add alternate damage, resource, status, or ability-effect rules.
+
+## Mechanic event attribution
+
+`recordMechanicEvent` is the shared runtime path for performance evidence. An event includes a stable `componentId`, canonical `mechanicTags`, trigger and resolution status, actor/target IDs, optional combat `eventType` and `actionId`, and finite resolved numeric `values`. `recordAuthoredEffect` reads tags from the shared character/enemy definition. Damage, timed status applications and ticks, resource changes, shields, healing, action movement, Rune activations, and summon lifecycle/attacks retain component provenance where those effects resolve.
+
+The default event cap is 10,000 per battle. `mechanicEventSnapshot()` returns the captured events, count dropped, and a truncation flag. Consumers must preserve that flag and must not treat truncated event totals as complete. The cap is configurable when constructing the engine. Event recording is diagnostic: it does not alter combat resolution or add weights to balance ratings. The tag-to-measurement registry and paired comparison policy are specified in the [Action Value Standard](action-value-standard.md) and [Combat Mechanic Tags](combat-mechanic-tags.md).
 
 Performance reports should still be treated as provisional until parity coverage exercises every authored action/effect family against the same initial state and seed. Add a shared-engine handler and parity coverage whenever a mechanic changes or a new one is added.
 

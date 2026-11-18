@@ -1,6 +1,6 @@
 // Shared deterministic combat runtime primitives.
 import { calculateCombatHit, roundCombatHp, roundCombatStatQuarter } from './combat-math.mjs';
-import { COMBAT_DAMAGE_EVENT_TYPES, COMBAT_EFFECT_LIFECYCLE, COMBAT_EFFECT_LIFECYCLE_EVENTS, COMBAT_TRIGGER_ELIGIBILITY, getActiveCharacterUpgradeEffect, getCharacterUpgradeEffect, RUNE_COMBAT_RULES } from './combat-definitions.mjs';
+import { CHARACTER_COMBAT_DATA, CHARACTER_UPGRADE_EFFECTS, COMBAT_DAMAGE_EVENT_TYPES, COMBAT_EFFECT_LIFECYCLE, COMBAT_EFFECT_LIFECYCLE_EVENTS, COMBAT_MECHANIC_TAGS, COMBAT_TRIGGER_ELIGIBILITY, ENEMY_COMBAT_DATA, getActiveCharacterUpgradeEffect, getCharacterUpgradeEffect, RUNE_COMBAT_RULES } from './combat-definitions.mjs';
 export { roundCombatHp, roundCombatStatQuarter };
 
 function activeUpgradeEffect(id, state = {}) {
@@ -99,11 +99,36 @@ export class TwoToneTurnTimeline {
 
 // Shared combat decision primitives used by live battles and headless analysis.
 export class TwoToneBattleEngine {
-  constructor() {
+  constructor({ maxMechanicEvents = 10000 } = {}) {
     this.timeline = new TwoToneTurnTimeline();
     this.turnCount = 0;
+    this.maxMechanicEvents = Number.isInteger(maxMechanicEvents) && maxMechanicEvents > 0 ? maxMechanicEvents : 10000;
+    this.mechanicEvents = [];
+    this.droppedMechanicEvents = 0;
   }
-  resetBattle() { this.timeline.reset(); this.turnCount = 0; }
+  resetBattle() { this.timeline.reset(); this.turnCount = 0; this.mechanicEvents = []; this.droppedMechanicEvents = 0; }
+  recordMechanicEvent({ componentId, mechanicTags = [], trigger = 'event_defined', status = 'resolved', actorId = null,
+    targetIds = [], eventType = null, actionId = null, values = {}, metadata = {} } = {}) {
+    if (typeof componentId !== 'string' || !componentId || !Array.isArray(mechanicTags) ||
+        mechanicTags.length === 0 || mechanicTags.some(tag => !COMBAT_MECHANIC_TAGS.includes(tag)) ||
+        typeof trigger !== 'string' || !trigger || !['attempted', 'triggered', 'applied', 'resolved', 'prevented', 'dodged'].includes(status) ||
+        !Array.isArray(targetIds) || !values || typeof values !== 'object' || Array.isArray(values)) return null;
+    const numericValues = Object.fromEntries(Object.entries(values).filter(([, value]) => Number.isFinite(value)));
+    const event = Object.freeze({
+      sequence: this.mechanicEvents.length + this.droppedMechanicEvents,
+      componentId, mechanicTags: Object.freeze([...new Set(mechanicTags)]), trigger, status,
+      actorId: actorId == null ? null : String(actorId), targetIds: Object.freeze(targetIds.map(String)),
+      ...(eventType ? { eventType } : {}), ...(actionId != null ? { actionId: String(actionId) } : {}),
+      values: Object.freeze(numericValues), metadata: Object.freeze({ ...metadata })
+    });
+    if (this.mechanicEvents.length < this.maxMechanicEvents) this.mechanicEvents.push(event);
+    else this.droppedMechanicEvents++;
+    return event;
+  }
+  mechanicEventSnapshot() {
+    return Object.freeze({ events: Object.freeze(this.mechanicEvents.slice()), dropped: this.droppedMechanicEvents,
+      truncated: this.droppedMechanicEvents > 0 });
+  }
   resolveBattleOutcome({ allies = [], enemies = [], encounterComplete = false,
     actionLimitReached = false, noEnemyMeansVictory = true } = {}) {
     if (!Array.isArray(allies) || !Array.isArray(enemies)) return 'invalid';
@@ -197,13 +222,65 @@ export class TwoToneBattleEngine {
     }
     return true;
   }
-  applyBleed({ target, sourceId, stacks = 1, maxStacks = COMBAT_EFFECT_LIFECYCLE.bleed.defaultMaxStacks } = {}) {
+  applyBleed({ target, sourceId, stacks = 1, maxStacks = COMBAT_EFFECT_LIFECYCLE.bleed.defaultMaxStacks,
+    sourceComponentId = null, mechanicTags = ['status.bleed', 'damage.over_time', 'trigger.per_hit', 'limit.stacks'] } = {}) {
     if (COMBAT_EFFECT_LIFECYCLE.bleed.reapply !== 'add_to_cap' || !target || target.hp <= 0 || typeof sourceId !== 'string' || !sourceId || !Number.isInteger(stacks) || stacks < 1 || !Number.isInteger(maxStacks) || maxStacks < 1) return 0;
     target.bleedStacks = Array.isArray(target.bleedStacks) ? target.bleedStacks : [];
     target.bleedMaxStacks = maxStacks;
     const added = Math.min(stacks, Math.max(0, maxStacks - target.bleedStacks.length));
-    for (let index = 0; index < added; index++) target.bleedStacks.push({ sourceId });
+    for (let index = 0; index < added; index++) target.bleedStacks.push({ sourceId, sourceComponentId, mechanicTags: [...mechanicTags] });
+    if (added && sourceComponentId) this.recordMechanicEvent({ componentId: sourceComponentId, mechanicTags,
+      trigger: 'on_successful_hit', status: 'applied', actorId: sourceId, targetIds: [target.id], values: { stacks: added } });
     return added;
+  }
+  recordAuthoredEffect({ ownerId, slot, effectId, trigger, status = 'applied', actorId, targetIds = [], actionId = null, values = {} } = {}) {
+    const kit = CHARACTER_COMBAT_DATA[ownerId] || ENEMY_COMBAT_DATA[ownerId];
+    const effect = slot === 'passive'
+      ? kit?.passives?.find(entry => (entry.id || entry.type) === effectId || entry.type === effectId)
+      : kit?.[slot];
+    if (!effect?.mechanicTags?.length) return null;
+    return this.recordMechanicEvent({ componentId: `${slot}:${ownerId}/${effectId || slot}`,
+      mechanicTags: effect.mechanicTags, trigger: trigger || effect.mechanicTriggers?.[effect.mechanicTags[0]] || 'event_defined',
+      status, actorId: actorId || ownerId, targetIds, actionId, values });
+  }
+  recordBattleStartEffects(units = [], runeSetForUnit = unit => unit.runeSetId) {
+    if (!Array.isArray(units)) return 0;
+    let recorded = 0;
+    for (const unit of units) {
+      if (!unit || unit.hp <= 0) continue;
+      const ownerId = unit.archetypeId || unit.id, kit = CHARACTER_COMBAT_DATA[ownerId] || ENEMY_COMBAT_DATA[ownerId];
+      for (const passive of kit?.passives || []) {
+        const effectId = passive.id || passive.type;
+        const definition = kit.passives.find(entry => (entry.id || entry.type) === effectId) || passive;
+        const tags = (definition.mechanicTags || []).filter(tag => definition.mechanicTriggers?.[tag] === 'always_on');
+        if (!tags.length) continue;
+        const values = Object.fromEntries(Object.entries(definition).filter(([, value]) => Number.isFinite(value)));
+        if (this.recordMechanicEvent({ componentId: `passive:${ownerId}/${effectId}`, mechanicTags: tags,
+          trigger: 'always_on', status: 'applied', actorId: unit.id, targetIds: [unit.id], values })) recorded++;
+      }
+      for (const trait of kit?.traitMechanics || []) {
+        const tags = (trait.mechanicTags || []).filter(tag => trait.mechanicTriggers?.[tag] === 'always_on');
+        if (tags.length && this.recordMechanicEvent({ componentId: `trait:${ownerId}/${trait.id}`, mechanicTags: tags,
+          trigger: 'always_on', status: 'applied', actorId: unit.id, targetIds: [unit.id],
+          values: Object.fromEntries(Object.entries(trait).filter(([, value]) => Number.isFinite(value))) })) recorded++;
+      }
+      const setId = runeSetForUnit?.(unit) || unit.runeSetId, rule = RUNE_COMBAT_RULES[setId];
+      const runeTags = rule?.mechanicTags?.filter(tag => rule.mechanicTriggers?.[tag] === 'always_on') || [];
+      if (runeTags.length) {
+        const effect = this.resolveRuneEffect({ setId, trigger: 'passive' }) || {};
+        const values = Object.fromEntries(Object.entries(effect).filter(([, value]) => Number.isFinite(value)));
+        if (this.recordMechanicEvent({ componentId: `rune:${setId}`, mechanicTags: runeTags,
+          trigger: 'always_on', status: 'applied', actorId: unit.id, targetIds: [unit.id], values })) recorded++;
+      }
+    }
+    return recorded;
+  }
+  recordUpgradeEffect(effectId, { actorId = null, targetIds = [], trigger, status = 'applied', actionId = null, values = {} } = {}) {
+    const effect = CHARACTER_UPGRADE_EFFECTS[effectId];
+    if (!effect?.mechanicTags?.length) return null;
+    return this.recordMechanicEvent({ componentId: `upgrade:${effectId}`, mechanicTags: effect.mechanicTags,
+      trigger: trigger || effect.mechanicTriggers?.[effect.mechanicTags[0]] || 'event_defined', status,
+      actorId, targetIds, actionId, values });
   }
   // Per-hit authored effects live here so the browser and simulator cannot
   // disagree about Bleed, Exposed, Ricochet marks, or character-duplicate
@@ -213,6 +290,21 @@ export class TwoToneBattleEngine {
     hasPremiumWeapon = false, allies = [], isEnemyTarget = actor?.side !== target?.side } = {}) {
     if (!actor || !target || !hit || hit.dodged || !eventCanTrigger('attackEffects', eventType) || !Array.isArray(passives)) return Object.freeze([]);
     const results = [], archetypeId = actor.archetypeId || actor.id;
+    const passiveSource = passive => {
+      const definition = (CHARACTER_COMBAT_DATA[archetypeId] || ENEMY_COMBAT_DATA[archetypeId])?.passives?.find(entry => entry.type === passive.type || entry.id === (passive.id || passive.type));
+      return { sourceComponentId: `passive:${archetypeId}/${passive.id || passive.type}`,
+        mechanicTags: definition?.mechanicTags || passive.mechanicTags || ['status.bleed', 'damage.over_time', 'trigger.per_hit', 'limit.stacks'] };
+    };
+    const record = (type, slot, id, trigger, targetIds = [target.id], values = {}, componentId = null) => {
+      const event = this.recordAuthoredEffect({ ownerId: archetypeId, slot, effectId: id || type, trigger,
+        actorId: actor.id, targetIds, actionId: hit.actionId, values });
+      if (!event && componentId) this.recordMechanicEvent({ componentId, mechanicTags: type === 'bleed'
+        ? ['status.bleed', 'damage.over_time', 'trigger.per_hit', 'limit.stacks']
+        : type === 'exposed' ? ['status.exposed', 'debuff.mark', 'debuff.defense', 'limit.duration']
+          : type === 'ricochet-mark' ? ['status.ricochet', 'debuff.mark', 'damage.true', 'trigger.per_source', 'limit.duration']
+            : ['debuff.damage', 'limit.duration'], trigger, status: 'applied', actorId: actor.id, targetIds, actionId: hit.actionId, values });
+      return event;
+    };
     const upgradeState = { characterDuplicates, premiumWeaponDuplicates,
       weaponType: hasPremiumWeapon ? 'premium' : actor.weapon?.type || null,
       disabledUpgradeEffectIds: actor.disabledUpgradeEffectIds };
@@ -228,7 +320,10 @@ export class TwoToneBattleEngine {
         const before = lily.energy;
         lily.energy = Math.min(Number.isFinite(lily.maxEnergy) ? lily.maxEnergy : 120, lily.energy + energy);
         const gained = lily.energy - before;
-        if (gained > 0) results.push(Object.freeze({ type: 'lily-exposed-energy', target: lily, energyGained: gained }));
+        if (gained > 0) {
+          results.push(Object.freeze({ type: 'lily-exposed-energy', target: lily, energyGained: gained }));
+          this.recordMechanicEvent({ componentId: 'upgrade:lily.signature.exposed-energy', mechanicTags: ['resource.energy'], trigger: 'on_ally_damage_to_enemy', status: 'applied', actorId: lily.id, targetIds: [lily.id], actionId: hit.actionId, values: { energy: gained } });
+        }
       }
     }
     if (target.hp <= 0) return Object.freeze(results);
@@ -236,7 +331,7 @@ export class TwoToneBattleEngine {
       if (!passive || actor.disabledPassiveIds?.has?.(passive.id || passive.type)) continue;
       if (passive.type === 'bleed' && isEnemyTarget) {
         const stacks = this.applyBleed({ target, sourceId: actor.id,
-          stacks: passive.stacksPerHit ?? 1, maxStacks: passive.maxStacks ?? 5 });
+          stacks: passive.stacksPerHit ?? 1, maxStacks: passive.maxStacks ?? 5, ...passiveSource(passive) });
         if (stacks) results.push(Object.freeze({ type: 'bleed', stacks }));
       }
       if (passive.type === 'exposed' && isEnemyTarget) {
@@ -245,25 +340,33 @@ export class TwoToneBattleEngine {
         const stacks = this.applyStackingTimedMark({ target, id: 'exposed',
           turns: exposedUpgrade?.values.exposedDuration ?? passive.duration ?? 2,
           maxStacks: exposedUpgrade?.values.exposedMaxStacks ?? 1 });
-        if (stacks) results.push(Object.freeze({ type: 'exposed', stacks }));
+        if (stacks) { results.push(Object.freeze({ type: 'exposed', stacks })); record('exposed', 'passive', passive.id || passive.type, 'on_ability_hit', [target.id], { stacks, duration: exposedUpgrade?.values.exposedDuration ?? passive.duration ?? 2 }); }
       }
     }
     if (isEnemyTarget && archetypeId === 'logan' && ['basic', 'ultimate'].includes(action)) {
       const stacks = action === 'basic'
         ? upgradeValue('logan.duplicate.1.double-bleed', 'basicBleedStacks', upgradeState, 1)
         : upgradeValue('logan.duplicate.3.ultimate-bleed-and-skill-point', 'ultimateBleedStacks', upgradeState, 1);
-      const added = this.applyBleed({ target, sourceId: actor.id, stacks, maxStacks: target.bleedMaxStacks ?? 5 });
-      if (added) results.push(Object.freeze({ type: 'bleed', stacks: added }));
+      const definition = CHARACTER_COMBAT_DATA.logan?.[action];
+      const added = this.applyBleed({ target, sourceId: actor.id, stacks, maxStacks: target.bleedMaxStacks ?? 5,
+        sourceComponentId: `action:logan/${action}`, mechanicTags: definition?.mechanicTags || ['status.bleed', 'damage.over_time', 'trigger.per_hit', 'limit.stacks'] });
+      if (added) {
+        results.push(Object.freeze({ type: 'bleed', stacks: added }));
+        const effectId = action === 'basic' ? 'logan.duplicate.1.double-bleed' : 'logan.duplicate.3.ultimate-bleed-and-skill-point';
+        if (activeUpgradeEffect(effectId, upgradeState)) this.recordUpgradeEffect(effectId, { actorId: actor.id,
+          targetIds: [target.id], trigger: 'on_successful_hit', actionId: hit.actionId, values: { bleedStacks: added } });
+      }
     }
     if (isEnemyTarget && archetypeId === 'zero' && action === 'basic' &&
         activeUpgradeEffect('zero.premium-duplicate.1.basic-bleed', upgradeState)) {
       const stacks = upgradeValue('zero.premium-duplicate.1.basic-bleed', 'basicBleedStacks', upgradeState, 1);
-      const added = this.applyBleed({ target, sourceId: actor.id, stacks, maxStacks: target.bleedMaxStacks ?? 5 });
+      const added = this.applyBleed({ target, sourceId: actor.id, stacks, maxStacks: target.bleedMaxStacks ?? 5,
+        sourceComponentId: 'upgrade:zero.premium-duplicate.1.basic-bleed', mechanicTags: ['status.bleed', 'damage.over_time', 'trigger.per_hit', 'limit.stacks'] });
       if (added) results.push(Object.freeze({ type: 'bleed', stacks: added }));
     }
     if (isEnemyTarget && archetypeId === 'lily' && ['skill', 'summon'].includes(action)) {
       this.setTimedMark({ target, mark: { id: 'ricochet', turns: 2, sources: [] } });
-      results.push(Object.freeze({ type: 'ricochet-mark' }));
+      results.push(Object.freeze({ type: 'ricochet-mark' })); record('ricochet-mark', 'skill', 'skill', 'on_successful_hit', [target.id], { duration: 2 }, `action:${archetypeId}/skill`);
     }
     if (isEnemyTarget && archetypeId === 'lily' && ['ultimate', 'summon'].includes(action) &&
         activeUpgradeEffect('lily.duplicate.1.ultimate-weakening', upgradeState)) {
@@ -271,6 +374,7 @@ export class TwoToneBattleEngine {
       this.setTimedDebuff({ target, debuff: { id: 'lily-weakened',
         turns: effect.values.duration, damageMultiplier: effect.values.enemyDamageMultiplier } });
       results.push(Object.freeze({ type: 'lily-weakened' }));
+      this.recordMechanicEvent({ componentId: 'upgrade:lily.duplicate.1.ultimate-weakening', mechanicTags: ['debuff.damage', 'limit.duration'], trigger: 'on_ultimate', status: 'applied', actorId: actor.id, targetIds: [target.id], actionId: hit.actionId, values: { duration: effect.values.duration, damageMultiplier: effect.values.enemyDamageMultiplier } });
     }
     return Object.freeze(results);
   }
@@ -343,7 +447,8 @@ export class TwoToneBattleEngine {
     return Object.freeze({ ...charge, totalDamage, targets: Object.freeze(allocations) });
   }
   resolveFollowUpEvent({ passive, ownerId, sourceActorId, sourceId, hits = [], enemies = [],
-    totalDamage, maxCharges = passive?.charges ?? 5, refundEvery = 0 } = {}) {
+    totalDamage, maxCharges = passive?.charges ?? 5, refundEvery = 0, characterDuplicates = 0,
+    premiumWeaponDuplicates = 0, weaponType = null, disabledUpgradeEffectIds = null } = {}) {
     if (!passive || passive.type !== 'followUp' || ownerId === sourceActorId ||
         !Array.isArray(hits) || !Array.isArray(enemies)) return null;
     const targets = [...new Set(hits.filter(hit => hit &&
@@ -356,8 +461,21 @@ export class TwoToneBattleEngine {
       .filter(target => target && target.hp > 0 && enemies.some(enemy => enemy.id === target.id)))];
     const allocation = this.resolveFollowUpAllocation({ passive, sourceId, targets, totalDamage,
       maxCharges, refundEvery });
-    return allocation ? Object.freeze({ ...allocation, targets: allocation.targets,
-      affectedTargets: Object.freeze(targets) }) : null;
+    if (!allocation) return null;
+    this.recordAuthoredEffect({ ownerId: 'soul', slot: 'passive', effectId: passive.id || passive.type,
+      trigger: 'on_ally_damage_to_enemy', actorId: ownerId, targetIds: targets.map(target => target.id),
+      actionId: sourceId, values: { damage: allocation.totalDamage, chargesRemaining: allocation.remaining, activations: allocation.activations } });
+    const upgradeState = { characterDuplicates, premiumWeaponDuplicates, weaponType, disabledUpgradeEffectIds };
+    if (activeUpgradeEffect('soul.duplicate.1.follow-up-charges', upgradeState)) this.recordUpgradeEffect('soul.duplicate.1.follow-up-charges', {
+      actorId: ownerId, targetIds: targets.map(target => target.id), trigger: 'on_ally_damage_to_enemy', actionId: sourceId,
+      values: { maxCharges, chargesRemaining: allocation.remaining } });
+    if (activeUpgradeEffect('soul.duplicate.2.follow-up-damage', upgradeState)) this.recordUpgradeEffect('soul.duplicate.2.follow-up-damage', {
+      actorId: ownerId, targetIds: targets.map(target => target.id), trigger: 'on_ally_damage_to_enemy', actionId: sourceId,
+      values: { damage: allocation.totalDamage } });
+    if (refundEvery > 0 && allocation.activations % refundEvery === 0 && activeUpgradeEffect('soul.premium-duplicate.4.follow-up-refund', upgradeState)) this.recordUpgradeEffect('soul.premium-duplicate.4.follow-up-refund', {
+      actorId: ownerId, targetIds: targets.map(target => target.id), trigger: 'on_ally_damage_to_enemy', actionId: sourceId,
+      values: { chargesRefunded: 1, chargesRemaining: allocation.remaining, activations: allocation.activations } });
+    return Object.freeze({ ...allocation, targets: allocation.targets, affectedTargets: Object.freeze(targets) });
   }
   refillFollowUps({ passive, maxCharges = passive?.charges ?? 5 } = {}) {
     if (!passive || !Number.isInteger(maxCharges) || maxCharges < 0) return false;
@@ -407,6 +525,19 @@ export class TwoToneBattleEngine {
     if (!this.applyTune({ target, tune })) return null;
     const actionAdvance = upgradeValue('dawn.premium-duplicate.3.tune-action-advance', 'tuneActionAdvance', upgradeState);
     if (actionAdvance) this.timeline.modify(target.id, actionAdvance);
+    this.recordAuthoredEffect({ ownerId: 'dawn', slot: 'skill', effectId: 'skill', trigger: 'on_skill', actorId: actor.id,
+      targetIds: [target.id], values: { damageBonus: tune.damageBonus, duration: tune.turns, actionAdvance } });
+    const tuneUpgradeEvidence = [
+      ['dawn.duplicate.3.tune-duration-and-attack', { duration: tune.turns, attackBonus: tune.attackBonus }],
+      ['dawn.duplicate.4.tune-damage', { damageBonus: tune.damageBonus }],
+      ['dawn.signature.tune-defense-ignore', { defenseIgnore: tune.defenseIgnore }],
+      ['dawn.premium-duplicate.1.tune-damage-reduction', { damageReduction: tune.damageReduction }],
+      ['dawn.premium-duplicate.2.tune-barrier-damage', { barrierDamageBonus: tune.barrierDamageBonus }],
+      ['dawn.premium-duplicate.3.tune-action-advance', { actionAdvance }],
+      ['dawn.premium-duplicate.4.tune-critical', { criticalRateBonus: tune.criticalRateBonus, criticalDamageBonus: tune.criticalDamageBonus }]
+    ];
+    for (const [effectId, values] of tuneUpgradeEvidence) if (activeUpgradeEffect(effectId, upgradeState))
+      this.recordUpgradeEffect(effectId, { actorId: actor.id, targetIds: [target.id], trigger: 'on_skill', values });
     return Object.freeze({ tune: Object.freeze({ ...tune }), actionAdvance });
   }
   resolveLoganBloodShield({ actor, allies = [], enemies = [], plan,
@@ -428,6 +559,18 @@ export class TwoToneBattleEngine {
     const taunts = enemies.filter(enemy => enemy?.hp > 0).map(enemy => this.applyTaunt({
       target: enemy, sourceId: actor.id, targetId: actor.id, rate: tauntRate, turns: tauntTurns
     }));
+    this.recordAuthoredEffect({ ownerId: 'logan', slot: 'skill', effectId: 'skill', trigger: 'on_skill', actorId: actor.id,
+      targetIds: [...shields.map(entry => entry.target.id), ...enemies.filter(enemy => enemy?.hp > 0).map(enemy => enemy.id)],
+      values: { hpSpent: healthCost, shieldGranted: shields.reduce((sum, entry) => sum + entry.amount, 0), tauntsApplied: taunts.filter(Boolean).length, tauntRate, duration: tauntTurns } });
+    if (activeUpgradeEffect('logan.duplicate.2.shield-strength', upgradeState)) this.recordUpgradeEffect('logan.duplicate.2.shield-strength', {
+      actorId: actor.id, targetIds: shields.map(entry => entry.target.id), trigger: 'on_skill',
+      values: { shieldGranted: shields.reduce((sum, entry) => sum + entry.amount, 0), shieldPerAlly: shields[0]?.amount || 0 } });
+    if (activeUpgradeEffect('logan.premium-duplicate.2.taunt', upgradeState)) this.recordUpgradeEffect('logan.premium-duplicate.2.taunt', {
+      actorId: actor.id, targetIds: enemies.filter(enemy => enemy?.hp > 0).map(enemy => enemy.id), trigger: 'on_skill',
+      values: { tauntRate, duration: tauntTurns, tauntsApplied: taunts.filter(Boolean).length } });
+    if (activeUpgradeEffect('logan.premium-duplicate.4.shielded-attack', upgradeState)) this.recordUpgradeEffect('logan.premium-duplicate.4.shielded-attack', {
+      actorId: actor.id, targetIds: shields.map(entry => entry.target.id), trigger: 'on_shield_applied',
+      values: { shieldedAllies: shields.length, attackBonus: upgradeValue('logan.premium-duplicate.4.shielded-attack', 'shieldedAttackBonus', upgradeState) } });
     return Object.freeze({ healthCost, shieldPerAlly, shields: Object.freeze(shields), tauntRate, tauntTurns,
       tauntsApplied: taunts.filter(Boolean).length });
   }
@@ -441,8 +584,14 @@ export class TwoToneBattleEngine {
     target.energy = Math.min(target.maxEnergy, target.energy + target.maxEnergy * energyRate);
     battle.skillPoints = Math.min(battle.skillPointCap, battle.skillPoints + upgradeValue('dawn.duplicate.2.ultimate-skill-points', 'ultimateSkillPointGain', upgradeState, plan.skillPointGain ?? 1));
     this.timeline.modify(target.id, plan.actionAdvance);
-    return Object.freeze({ energyGained: target.energy - energyBefore,
-      skillPointsGained: battle.skillPoints - skillPointsBefore, actionAdvance: plan.actionAdvance });
+    const result = { energyGained: target.energy - energyBefore, skillPointsGained: battle.skillPoints - skillPointsBefore, actionAdvance: plan.actionAdvance };
+    this.recordAuthoredEffect({ ownerId: 'dawn', slot: 'ultimate', effectId: 'ultimate', trigger: 'on_ultimate', actorId: actor.id,
+      targetIds: [target.id], values: { ...result } });
+    if (activeUpgradeEffect('dawn.duplicate.1.ultimate-energy', upgradeState)) this.recordUpgradeEffect('dawn.duplicate.1.ultimate-energy', {
+      actorId: actor.id, targetIds: [target.id], trigger: 'on_ultimate', values: { energyGained: result.energyGained } });
+    if (activeUpgradeEffect('dawn.duplicate.2.ultimate-skill-points', upgradeState)) this.recordUpgradeEffect('dawn.duplicate.2.ultimate-skill-points', {
+      actorId: actor.id, targetIds: [actor.id], trigger: 'on_ultimate', values: { skillPointsGained: result.skillPointsGained } });
+    return Object.freeze(result);
   }
   resolveZeroUltimateEffects({ actor, enemies = [], battle, characterDuplicates = 0,
     premiumWeaponDuplicates = 0, hasPremiumWeapon = false } = {}) {
@@ -458,6 +607,11 @@ export class TwoToneBattleEngine {
     if (enemyDelay) for (const enemy of enemies) if (enemy?.hp > 0 && this.timeline.modify(enemy.id, -enemyDelay)) delayed.push(enemy.id);
     const skillPointGain = upgradeValue('zero.signature.ultimate-skill-point', 'ultimateSkillPointGain', upgradeState);
     battle.skillPoints = Math.min(battle.skillPointCap, battle.skillPoints + skillPointGain);
+    this.recordAuthoredEffect({ ownerId: 'zero', slot: 'ultimate', effectId: 'ultimate', trigger: 'on_ultimate', actorId: actor.id,
+      targetIds: enemies.filter(enemy => enemy?.hp > 0).map(enemy => enemy.id), values: { actionAdvance: actorAdvance, skillPointsGained: battle.skillPoints - skillPointsBefore } });
+    if (delayed.length) this.recordMechanicEvent({ componentId: 'upgrade:zero.duplicate.1.ultimate-delay', mechanicTags: ['tempo.action_delay'], trigger: 'on_ultimate', status: 'applied', actorId: actor.id, targetIds: delayed, values: { actionDelay: enemyDelay, targetsAffected: delayed.length } });
+    if (skillPointGain) this.recordUpgradeEffect('zero.signature.ultimate-skill-point', { actorId: actor.id,
+      targetIds: [actor.id], trigger: 'on_ultimate', values: { skillPointsGained: battle.skillPoints - skillPointsBefore } });
     return Object.freeze({ actorAdvance, delayed: Object.freeze(delayed),
       skillPointsGained: battle.skillPoints - skillPointsBefore });
   }
@@ -467,6 +621,8 @@ export class TwoToneBattleEngine {
     const skillPointGain = upgradeValue('logan.duplicate.3.ultimate-bleed-and-skill-point', 'ultimateSkillPointGain', {
       characterDuplicates, disabledUpgradeEffectIds: actor.disabledUpgradeEffectIds });
     battle.skillPoints = Math.min(battle.skillPointCap, battle.skillPoints + skillPointGain);
+    if (skillPointGain) this.recordUpgradeEffect('logan.duplicate.3.ultimate-bleed-and-skill-point', { actorId: actor.id,
+      targetIds: [actor.id], trigger: 'on_ultimate', values: { skillPoints: battle.skillPoints - before } });
     return Object.freeze({ skillPointsGained: battle.skillPoints - before });
   }
   resolveLilyPremiumUltimateEffects({ actor, allies = [], battle, premiumWeaponDuplicates = 0,
@@ -487,17 +643,28 @@ export class TwoToneBattleEngine {
       if (actionAdvance) this.timeline.modify(ally.id, actionAdvance);
       energy.push(Object.freeze({ id: ally.id, energyGained: ally.energy - energyBefore, actionAdvance }));
     }
+    if (skillPointGain) this.recordUpgradeEffect('lily.signature.ultimate-skill-point', { actorId: actor.id,
+      targetIds: [actor.id], trigger: 'on_ultimate', values: { skillPointsGained: battle.skillPoints - skillPointsBefore } });
+    if (teamEnergy || actionAdvance) this.recordUpgradeEffect('lily.premium-duplicate.4.ultimate-team-boost', { actorId: actor.id,
+      targetIds: energy.map(entry => entry.id), trigger: 'on_ultimate', values: { energy: energy.reduce((sum, entry) => sum + entry.energyGained, 0), actionAdvance: energy.reduce((sum, entry) => sum + entry.actionAdvance, 0) } });
     return Object.freeze({ skillPointsGained: battle.skillPoints - skillPointsBefore, energy: Object.freeze(energy) });
   }
   resolveSummonPlan({ owner, characterDuplicates = 0, sourceId } = {}) {
     if (!owner || owner.hp <= 0 || sourceId === undefined || sourceId === null) return null;
+    const upgradeState = { characterDuplicates, disabledUpgradeEffectIds: owner.disabledUpgradeEffectIds };
     const ability = owner.ultimate || {};
     const durationTurns = upgradeValue('lily.duplicate.3.ultimate-and-summon', 'summonDuration', {
-      characterDuplicates, disabledUpgradeEffectIds: owner.disabledUpgradeEffectIds }, ability.summonDuration ?? 3);
-    return Object.freeze({ id: `hauntling-${sourceId}`, ownerId: owner.id, name: 'Hauntling',
+      ...upgradeState }, ability.summonDuration ?? 3);
+    const plan = Object.freeze({ id: `hauntling-${sourceId}`, ownerId: owner.id, name: 'Hauntling',
       durationTurns, speed: ability.summonSpeed ?? 30, hp: ability.summonHp ?? 1, maxHp: ability.summonHp ?? 1,
       damageType: ability.summonDamageType ?? 'true', multiplier: ability.summonMultiplier ?? 1,
       target: ability.summonTarget ?? 'aoe', immediateOnSpawn: true });
+    this.recordMechanicEvent({ componentId: 'action:lily/ultimate', mechanicTags: ['summon.create', 'summon.action', 'limit.duration'],
+      trigger: 'on_ultimate', status: 'applied', actorId: owner.id, targetIds: [plan.id], actionId: sourceId,
+      values: { duration: durationTurns, multiplier: plan.multiplier } });
+    if (activeUpgradeEffect('lily.duplicate.3.ultimate-and-summon', upgradeState)) this.recordUpgradeEffect('lily.duplicate.3.ultimate-and-summon', {
+      actorId: owner.id, targetIds: [plan.id], trigger: 'on_ultimate', actionId: sourceId, values: { summonDuration: durationTurns } });
+    return plan;
   }
   advanceSummonTurn(summon) {
     if (COMBAT_EFFECT_LIFECYCLE.summonLifetime.clock !== 'summon_action_end' || !summon || typeof summon !== 'object') return null;
@@ -508,6 +675,10 @@ export class TwoToneBattleEngine {
     summon[field] = Math.max(0, summon[field] - 1);
     summon.expired = summon[field] === 0;
     if (summon.expired && Number.isFinite(summon.hp)) summon.hp = 0;
+    if (summon.isHauntling || summon.ownerId) this.recordMechanicEvent({ componentId: 'action:lily/ultimate',
+      mechanicTags: ['summon.action', 'limit.duration'], trigger: 'on_summon_action_end',
+      status: summon.expired ? 'resolved' : 'applied', actorId: summon.ownerId || summon.id, targetIds: [summon.id],
+      values: { remainingTurns: summon[field], expired: Number(summon.expired) } });
     return Object.freeze({ remainingTurns: summon[field], expired: summon.expired });
   }
   resolveHit(input) { return calculateCombatHit(input); }
@@ -589,6 +760,7 @@ export class TwoToneBattleEngine {
     }
     const events = [];
     for (const [source, rawDamage] of grouped) {
+      const stackSource = target.bleedStacks.find(stack => stack.sourceId === source.id && stack.sourceComponentId);
       const result = this.resolveDamageOverTime({ target, rawDamage, sourceId: source.id,
         actionId: `bleed:${target.id}:${source.id}`, damageReduction: target.tune?.damageReduction || 0,
         vulnerabilityMultiplier: target.brokenTurns > 0 ? 1.5 : 1 });
@@ -596,6 +768,9 @@ export class TwoToneBattleEngine {
       target.damageTaken = (target.damageTaken || 0) + result.healthDamage;
       source.damageDealt = (source.damageDealt || 0) + result.healthDamage;
       if (source.damageBreakdown?.bleed !== undefined) source.damageBreakdown.bleed += result.healthDamage;
+      if (stackSource) this.recordMechanicEvent({ componentId: stackSource.sourceComponentId, mechanicTags: stackSource.mechanicTags,
+        trigger: 'on_turn_start', status: 'resolved', actorId: source.id, targetIds: [target.id], eventType: 'damage_over_time',
+        actionId: `bleed:${target.id}:${source.id}`, values: { damage: result.damage, healthDamage: result.healthDamage, shieldDamage: result.shieldDamage } });
       events.push(Object.freeze({ source, rawDamage, ...result }));
       if (target.hp <= 0) break;
     }
@@ -604,10 +779,29 @@ export class TwoToneBattleEngine {
   }
   resolveDamageSequence({ target, attacker = null, rawDamage, damageType, primary = {},
     eventType = 'direct_hit', sourceId = attacker?.id || null, actionId = null,
-    calculateReflectDamage = null, reflect = {}, echo = {} } = {}) {
+    calculateReflectDamage = null, reflect = {}, echo = {}, mechanicSource = null, additionalMechanicSources = [], defenseMechanicSource = null,
+    reflectMechanicSource = null, echoMechanicSource = null } = {}) {
     if (!COMBAT_DAMAGE_EVENT_TYPES.includes(eventType)) return null;
     const direct = this.resolveDamageEvent({ target, rawDamage, ...primary, eventType, sourceId, actionId });
-    if (!direct || direct.dodged) return direct ? Object.freeze({ ...direct, reflect: null, echo: null }) : null;
+    if (!direct || direct.dodged) {
+      if (direct?.dodged && mechanicSource?.componentId) this.recordMechanicEvent({ ...mechanicSource, actorId: attacker?.id,
+        targetIds: [target?.id].filter(Boolean), trigger: mechanicSource.trigger || eventType, status: 'dodged', eventType, actionId,
+        values: { attemptedDamage: rawDamage, damage: 0, healthDamage: 0 } });
+      if (direct?.dodged && defenseMechanicSource?.componentId) this.recordMechanicEvent({ ...defenseMechanicSource,
+        actorId: target?.id, targetIds: [target?.id].filter(Boolean), trigger: defenseMechanicSource.trigger || 'on_incoming_attack',
+        status: 'prevented', eventType, actionId, values: { preventedDamage: rawDamage } });
+      return direct ? Object.freeze({ ...direct, reflect: null, echo: null }) : null;
+    }
+    if (mechanicSource?.componentId) this.recordMechanicEvent({ ...mechanicSource, actorId: attacker?.id,
+      targetIds: [target?.id].filter(Boolean), trigger: mechanicSource.trigger || eventType, status: 'resolved', eventType, actionId,
+      values: { damage: direct.damage, healthDamage: direct.healthDamage, shieldDamage: direct.shieldDamage,
+        barrierDamage: direct.barrierDamage, breakDamage: direct.breakDamage, critical: Number(direct.critical) } });
+    if (defenseMechanicSource?.componentId) this.recordMechanicEvent({ ...defenseMechanicSource, actorId: target?.id,
+      targetIds: [target?.id].filter(Boolean), trigger: defenseMechanicSource.trigger || 'on_incoming_attack', status: 'resolved', eventType, actionId,
+      values: { attemptedDamage: rawDamage, preventedDamage: 0, damageTaken: direct.healthDamage, dodgeChance: primary.stealthChance || 0 } });
+    for (const source of additionalMechanicSources) if (source?.componentId) this.recordMechanicEvent({ ...source,
+      actorId: attacker?.id, targetIds: [target?.id].filter(Boolean), trigger: source.trigger || eventType, status: 'resolved', eventType, actionId,
+      values: { damage: direct.damage, healthDamage: direct.healthDamage, shieldDamage: direct.shieldDamage, barrierDamage: direct.barrierDamage, breakDamage: direct.breakDamage } });
     let reflected = null;
     if (direct.reflectRawDamage > 0 && attacker?.hp > 0 && typeof calculateReflectDamage === 'function') {
       const reflectedRawDamage = calculateReflectDamage(direct.reflectRawDamage, target, attacker);
@@ -617,6 +811,10 @@ export class TwoToneBattleEngine {
           reflectPercent: 0, echoPercent: 0 });
       }
     }
+    if (reflected && reflectMechanicSource?.componentId) this.recordMechanicEvent({ ...reflectMechanicSource,
+      actorId: target?.id, targetIds: [attacker?.id].filter(Boolean), trigger: reflectMechanicSource.trigger || 'on_incoming_attack',
+      status: reflected.dodged ? 'dodged' : 'resolved', eventType: reflected.eventType, actionId,
+      values: { damage: reflected.damage, healthDamage: reflected.healthDamage, shieldDamage: reflected.shieldDamage } });
     let echoed = null;
     if (direct.echoRawDamage > 0 && target.hp > 0) {
       echoed = this.resolveDamageEvent({ target, rawDamage: direct.echoRawDamage,
@@ -631,6 +829,14 @@ export class TwoToneBattleEngine {
         }
       }
     }
+    if (echoed && echoMechanicSource?.componentId) this.recordMechanicEvent({ ...echoMechanicSource,
+      actorId: attacker?.id, targetIds: [target?.id].filter(Boolean), trigger: echoMechanicSource.trigger || 'on_direct_damage',
+      status: 'resolved', eventType: echoed.eventType, actionId,
+      values: { damage: echoed.damage, healthDamage: echoed.healthDamage, shieldDamage: echoed.shieldDamage } });
+    if (echoed?.reflect && reflectMechanicSource?.componentId) this.recordMechanicEvent({ ...reflectMechanicSource,
+      actorId: target?.id, targetIds: [attacker?.id].filter(Boolean), trigger: reflectMechanicSource.trigger || 'on_incoming_attack',
+      status: echoed.reflect.dodged ? 'dodged' : 'resolved', eventType: echoed.reflect.eventType, actionId,
+      values: { damage: echoed.reflect.damage, healthDamage: echoed.reflect.healthDamage, shieldDamage: echoed.reflect.shieldDamage } });
     return Object.freeze({ ...direct, reflect: reflected, echo: echoed,
       echoDamageType: echoed ? (damageType || null) : null });
   }
@@ -647,10 +853,14 @@ export class TwoToneBattleEngine {
     target.hp = allowOverMax ? target.hp + rounded : Math.min(target.maxHp, target.hp + rounded);
     return Object.freeze({ requested: rounded, applied: Math.max(0, target.hp - before), hp: target.hp });
   }
-  resolveLifesteal({ attacker, damage, rate, eventType = 'direct_hit' } = {}) {
+  resolveLifesteal({ attacker, damage, rate, eventType = 'direct_hit', mechanicSource = null, sourceActorId = attacker?.id } = {}) {
     if (!attacker || attacker.hp <= 0 || !eventCanTrigger('lifesteal', eventType) || !Number.isFinite(damage) || damage <= 0 ||
         !Number.isFinite(rate) || rate <= 0) return null;
-    return this.resolveHealing({ target: attacker, amount: roundCombatHp(damage * rate) });
+    const healing = this.resolveHealing({ target: attacker, amount: roundCombatHp(damage * rate) });
+    if (healing?.applied > 0 && mechanicSource?.componentId) this.recordMechanicEvent({ ...mechanicSource,
+      trigger: mechanicSource.trigger || 'on_ally_damage', status: 'applied', actorId: sourceActorId,
+      targetIds: [attacker.id], eventType, values: { healing: healing.applied, damageBasis: damage } });
+    return healing;
   }
   roundHp(value) { return roundCombatHp(value); }
   roundStatQuarter(value) { return roundCombatStatQuarter(value); }
@@ -695,11 +905,17 @@ export class TwoToneBattleEngine {
     }
     return true;
   }
-  resolveRuneTrigger({ setId, trigger, state = null, effectId = null, turn = 0, ...options } = {}) {
+  resolveRuneTrigger({ setId, trigger, state = null, effectId = null, turn = 0, actorId = null, targetIds = [], ...options } = {}) {
     const ready = effectId ? this.isRuneReady(state, effectId) : true;
     if (!ready) return null;
     const effect = this.resolveRuneEffect({ setId, trigger, ...options, ready });
     if (effect && effectId && effect.cooldownTurns) this.startRuneCooldown(state, effectId, turn, effect.cooldownTurns);
+    const rule = RUNE_COMBAT_RULES[setId];
+    const eventTrigger = String(trigger || '').replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+    const authoredTrigger = Object.values(rule?.mechanicTriggers || {}).find(value => value === `on_${eventTrigger}`) || Object.values(rule?.mechanicTriggers || {})[0] || `on_${eventTrigger}`;
+    if (effect && rule?.mechanicTags?.length) this.recordMechanicEvent({ componentId: `rune:${setId}`,
+      mechanicTags: rule.mechanicTags, trigger: authoredTrigger, status: 'triggered',
+      actorId, targetIds, values: effect });
     return effect;
   }
   resolveActionPlan({ kit, action, characterId, characterDuplicates = 0, premiumWeaponDuplicates = 0,
@@ -768,9 +984,22 @@ export class TwoToneBattleEngine {
     const energyBefore = actor.energy, skillPointsBefore = battle.skillPoints;
     actor.energy = Math.min(maxEnergy, actor.energy - energyCost + energyGain);
     battle.skillPoints = Math.max(0, Math.min(battle.skillPointCap, battle.skillPoints - skillPointCost + skillPointGain));
-    return Object.freeze({ energyBefore, energyAfter: actor.energy, energySpent: Math.min(energyCost, energyBefore), energyGained: Math.max(0, actor.energy - (energyBefore - energyCost)),
+    const result = { energyBefore, energyAfter: actor.energy, energySpent: Math.min(energyCost, energyBefore), energyGained: Math.max(0, actor.energy - (energyBefore - energyCost)),
       skillPointsBefore, skillPointsAfter: battle.skillPoints, skillPointsSpent: Math.min(skillPointCost, skillPointsBefore),
-      skillPointsGained: Math.max(0, battle.skillPoints - Math.max(0, skillPointsBefore - skillPointCost)) });
+      skillPointsGained: Math.max(0, battle.skillPoints - Math.max(0, skillPointsBefore - skillPointCost)) };
+    const resourceTags = [];
+    if (result.energySpent || result.energyGained) resourceTags.push('resource.energy');
+    if (result.skillPointsSpent || result.skillPointsGained) resourceTags.push('resource.skill_point');
+    if (resourceTags.length) this.recordMechanicEvent({ componentId: `action:${actor.archetypeId || actor.id}/${plan.action}`,
+      mechanicTags: resourceTags, trigger: `on_${plan.action}`, status: 'applied', actorId: actor.id, targetIds: [actor.id], values: result });
+    const upgradeState = { characterDuplicates: actor.characterDuplicates || 0, premiumWeaponDuplicates: actor.premiumWeaponDuplicates || 0,
+      weaponType: actor.weapon?.type || null, disabledUpgradeEffectIds: actor.disabledUpgradeEffectIds };
+    if (plan.action === 'ultimate' && (actor.archetypeId || actor.id) === 'zero' && activeUpgradeEffect('zero.premium-duplicate.2.ultimate-energy-cost', upgradeState))
+      this.recordUpgradeEffect('zero.premium-duplicate.2.ultimate-energy-cost', { actorId: actor.id, targetIds: [actor.id],
+        trigger: 'on_ultimate', values: { energySpent: result.energySpent, energyBefore: result.energyBefore, energyAfter: result.energyAfter } });
+    if (plan.action === 'basic' && (actor.archetypeId || actor.id) === 'soul' && plan.target === 'aoe' && activeUpgradeEffect('soul.premium-duplicate.3.enhanced-aoe', upgradeState))
+      this.recordUpgradeEffect('soul.premium-duplicate.3.enhanced-aoe', { actorId: actor.id, targetIds: [actor.id], trigger: 'on_basic', values: { enhancedStacks } });
+    return Object.freeze(result);
   }
   // Shared boundary for action plans and resource commitment. A caller may
   // pass a previously previewed plan, but cannot settle it outside the engine.
@@ -806,17 +1035,26 @@ export class TwoToneBattleEngine {
       battle.skillPoints = Math.min(battle.skillPointCap, battle.skillPoints + refundAmount);
       refundedSkillPoints = battle.skillPoints - before;
     }
+    this.recordAuthoredEffect({ ownerId: 'soul', slot: 'skill', effectId: 'skill', trigger: 'on_skill', actorId: actor?.id,
+      targetIds: [actor?.id].filter(Boolean), values: { skillPointsSpent: intent.resources.skillPointsSpent,
+        skillPointsGained: intent.resources.skillPointsGained + refundedSkillPoints, enhanceStacks: currentStacks + 1,
+        refundedSkillPoints } });
+    if (activeUpgradeEffect('soul.duplicate.4.enhance-scaling', upgradeState)) this.recordUpgradeEffect('soul.duplicate.4.enhance-scaling', {
+      actorId: actor?.id, targetIds: [actor?.id].filter(Boolean), trigger: 'on_skill', values: { enhanceStacks: currentStacks + 1,
+        damagePerStackMultiplier: upgradeValue('soul.duplicate.4.enhance-scaling', 'enhanceDamagePerStackMultiplier', upgradeState, 1) } });
+    if (refundAmount > 0 && activeUpgradeEffect('soul.signature.enhance-refund', upgradeState)) this.recordUpgradeEffect('soul.signature.enhance-refund', {
+      actorId: actor?.id, targetIds: [actor?.id].filter(Boolean), trigger: 'on_skill', values: { skillPointsGained: refundedSkillPoints } });
     return Object.freeze({ plan: intent.plan, resources: intent.resources,
       enhanceStacks: currentStacks + 1, spendingRemainder: nextRemainder, refundedSkillPoints });
   }
-  resolveEnemyBasicPlan({ basic, passive = null, attackCount = 0, rampageStacks = 0, momentumStacks = 0, debuffMultiplier = 1 }) {
+  resolveEnemyBasicPlan({ ownerId = null, actorId = null, basic, passive = null, attackCount = 0, rampageStacks = 0, momentumStacks = 0, debuffMultiplier = 1 }) {
     if (!basic || !Number.isFinite(basic.multiplier) || !Number.isFinite(debuffMultiplier)) return null;
     const passiveId = passive?.id || (passive?.type === 'everyNthBasic' ? 'slimy' : passive?.type);
     const slimy = passiveId === 'slimy' && Number.isInteger(passive.every) && passive.every > 0 && (attackCount + 1) % passive.every === 0;
     const rampage = passiveId === 'rampage' ? (passive.damageBonus ?? .25) * rampageStacks : 0;
     const momentum = passiveId === 'momentum' ? (passive.damageBonus ?? .2) * momentumStacks : 0;
     const damageBonus = slimy ? (passive.damageBonus ?? .25) : 0;
-    return Object.freeze({
+    const plan = Object.freeze({
       damageType: basic.damageType,
       target: slimy ? 'aoe' : basic.targetMode || basic.target || 'single',
       multiplier: basic.multiplier * (1 + damageBonus) * (1 + rampage) * (1 + momentum) * debuffMultiplier,
@@ -828,5 +1066,11 @@ export class TwoToneBattleEngine {
       bleedPerHit: passiveId === 'ravage' ? (passive.stacksPerHit ?? 1) : 0,
       bleedCap: passiveId === 'ravage' ? (passive.maxStacks ?? 5) : 0
     });
+    if (ownerId && passive) {
+      if (plan.enhanced) this.recordAuthoredEffect({ ownerId, slot: 'passive', effectId: passiveId, trigger: 'every_nth_basic', status: 'triggered', actorId, values: { damageMultiplier: plan.multiplier / (basic.multiplier || 1), coverage: 'aoe', attackCount: attackCount + 1 } });
+      if (plan.pursuitAdvance) this.recordAuthoredEffect({ ownerId, slot: 'passive', effectId: passiveId, trigger: 'after_attack', status: 'triggered', actorId, targetIds: [actorId].filter(Boolean), values: { actionAdvance: plan.pursuitAdvance } });
+      if (passiveId === 'rampage' || passiveId === 'momentum') this.recordAuthoredEffect({ ownerId, slot: 'passive', effectId: passiveId, trigger: 'after_attack', status: 'triggered', actorId, targetIds: [actorId].filter(Boolean), values: { attackMultiplier: plan.multiplier / (basic.multiplier || 1), nextStacks: passiveId === 'rampage' ? plan.nextRampageStacks : plan.nextMomentumStacks } });
+    }
+    return plan;
   }
 }

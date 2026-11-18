@@ -103,6 +103,16 @@ The record IDs use character names only to identify ownership and provenance; th
 
 The standard also includes `buff.barrier_damage` and `buff.barrier_break_damage` for effects that change the amount of barrier-health damage or automatic damage after barrier depletion. Neither tag marks an attack as a barrier-breaking attack.
 
+## Performance evidence contract
+
+Tags are also the evaluator's measurement selectors. `tools/combat-performance.mjs` maintains a required registry mapping every canonical tag to outcome fields (for example damage, shield/survival, Energy, Skill Points, action movement, status, duration, or trigger evidence). Startup validation fails if a combat tag has no measurement rule or if the registry refers to a tag that is not canonical. A candidate's plan is derived from its shared definition, including its target, trigger, and coverage metadata. This prevents the evaluator from silently ignoring a tagged mechanic or inventing character-specific score weights.
+
+The shared `TwoToneBattleEngine` records mechanic events when effects resolve. Every event identifies its stable source component, tags, trigger, status (`attempted`, `triggered`, `applied`, `resolved`, `prevented`, or `dodged`), actor, target IDs, optional damage event/action IDs, and finite numeric values. `triggered` events confirm activation and may include an effect payload; `applied` and `resolved` values are the realized outcome. For instance, resource gains are recorded after caps and damage includes actual HP/shield/barrier resolution. The evaluator excludes `triggered` payload values from summed outcome deltas so a configured amount is not counted again alongside its resolved result. Persistent effects retain their source component and tags so later damage-over-time ticks remain attributable to the effect that applied them. Summons record creation/lifetime events and attribute their attacks to the owning Ultimate.
+
+The event ledger is capped at 10,000 events per battle to bound memory. Its snapshot includes the dropped-event count and truncation flag. Performance reports aggregate event counts/statuses/values by component and tag and compare the paired branches. A tag can be present in a candidate plan but absent from a particular matchup; reports call this `tagged_but_not_triggered_in_this_comparison`, not a zero-value result. If the capture cap is reached, reports expose truncation. An observed event with zero delta means both branches resolved the event equally.
+
+The tag registry selects evidence and interpretation only. It does not itself award score points. Component value is still measured by the standardized paired outcomes and +100 SVP controls in the [Action Value Standard](action-value-standard.md): win probability, HP swing/BAE, and relevant resolved support/resource evidence. Keep these outcome measures visible together so a trigger count or raw damage total cannot stand in for win impact.
+
 Tag coverage follows the current shared combat definitions. A change to a Rune’s values or behavior must update that definition; a new mechanic requires a catalog tag and test coverage.
 
 ## Engine-supported, currently unassigned

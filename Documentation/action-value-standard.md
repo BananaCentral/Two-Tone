@@ -8,6 +8,20 @@ Use a shared stat budget to define comparable combat tests, HP impact to explain
 
 Ability-effect tagging and the current mechanic vocabulary are standardized in [Combat Mechanic Tags](combat-mechanic-tags.md). The evaluator should use those tags and per-effect target/trigger metadata to measure ally support, enemy debuffs, resources, and damage without character-specific assumptions.
 
+### Tag-driven evidence and component scoring
+
+The evaluator builds a measurement plan from each candidate's authored tags, targeting, triggers, and stable component IDs. For every paired control/treatment battle, the shared battle engine records bounded, source-attributed mechanic events. Evidence is grouped by the candidate's own component IDs and tag, so another ability using the same tag cannot falsely count as the candidate firing. The evidence is reported beside the existing paired win-rate, HP-swing, and BAE results. A tag selects which diagnostics to inspect; it does **not** add a hand-tuned weight to the score. The score remains grounded in paired outcomes against the standard +100 SVP controls.
+
+Each event records a stable component ID, canonical mechanic tags, trigger, resolution status, actor, affected targets, optional combat event/action IDs, and numeric resolved values (such as damage, healing, shield, Energy, Skill Points, or action movement). The live game and headless runner emit events through `TwoToneBattleEngine`, so attribution follows shared combat resolutions rather than a second simulator-only interpretation. Event collection is capped at 10,000 events per battle; reports disclose dropped events and mark the evidence as truncated instead of treating missing evidence as zero.
+
+For each tag in a candidate's measurement plan, reports show the relevant fields, authored target/trigger/coverage, component-level control-to-treatment event/value deltas, and one of these evidence states:
+
+- **Event observed:** the tagged component resolved in at least one paired branch. A zero delta means it resolved equally; it does not mean the mechanic has no value.
+- **Tagged but not triggered:** the matchup did not produce a matching event. This is matchup evidence, not a zero score for the mechanic.
+- **Capture truncated:** the per-battle ledger reached its cap; event totals may be incomplete and must not be interpreted as full coverage.
+
+Use these events to explain how the component changed outcomes and to identify whether required triggers, target types, or coverage were exercised. Continue to show non-event aggregate outcomes (win rate, surviving HP, action counts and resources) because a single status application is not itself proof of combat value. Equal scenario weighting, matched seeds, and paired counterfactuals remain the fairness controls.
+
 ## Normalized stat budget
 
 The reference stat line is worth 100 normalized Stat Value Points (SVP) in each stat:

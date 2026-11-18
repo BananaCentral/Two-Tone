@@ -3,23 +3,43 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { simulateBattle } from './combat-simulator.mjs';
-import { CHARACTER_COMBAT_DATA, CHARACTER_UPGRADE_EFFECTS, ENEMY_COMBAT_DATA } from '../src/scripts/combat-definitions.mjs';
+import { CHARACTER_COMBAT_DATA, CHARACTER_UPGRADE_EFFECTS, COMBAT_MECHANIC_TAGS, ENEMY_COMBAT_DATA, RUNE_COMBAT_RULES } from '../src/scripts/combat-definitions.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CHARACTER_IDS = ['soul', 'lily', 'dawn', 'logan', 'zero'];
 const ENEMY_IDS = ['slime', 'wolf', 'hawk', 'geode', 'goblin', 'bear'];
 const RUNES = ['radiant-moon', 'eternal-sun', 'celestial-star', 'dark-matter', 'clear-skies', 'infinite-space', 'recycle', 'amplify', 'united'];
-const CHARACTER_PASSIVES = [
-  { character: 'soul', id: 'followUp' },
-  { character: 'lily', id: 'exposed' },
-  { character: 'dawn', id: 'resourceful' },
-  { character: 'logan', id: 'tasteForBlood' },
-  { character: 'zero', id: 'cutthroat' }
-];
+const CHARACTER_PASSIVES = Object.entries(CHARACTER_COMBAT_DATA).flatMap(([character, kit]) =>
+  kit.passives.map(passive => ({ character, id: passive.id || passive.type })));
 const LENGTHS = ['short', 'medium', 'long'];
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 const RUNE_MAIN = ['hp', 'attack', 'physicalDefense', 'magicalDefense'];
 const SVP_GAINS = { hp: 100, attack: 20, physicalDefense: 4, magicalDefense: 4, speed: 20 };
+
+// This registry is the contract between authored tags, event evidence, and
+// scenario coverage. It never contributes an extra score weight.
+const TAG_MEASUREMENT_RULES = Object.freeze({
+  'damage.direct': ['damage'], 'damage.physical': ['damage'], 'damage.magical': ['damage'], 'damage.true': ['damage'],
+  'damage.critical': ['damage', 'critical'], 'damage.conditional_multiplier': ['damage', 'trigger'],
+  'damage.over_time': ['damage', 'status'], 'damage.echo': ['damage'], 'damage.reflect': ['damage'],
+  'damage.follow_up': ['damage', 'trigger'], 'damage.barrier_break': ['damage', 'barrier'],
+  'buff.attack': ['damage', 'support'], 'buff.critical': ['damage', 'critical'], 'buff.next_basic': ['damage', 'support'],
+  'buff.damage': ['damage', 'support'], 'buff.barrier_damage': ['damage', 'barrier'], 'buff.barrier_break_damage': ['damage', 'barrier'],
+  'buff.defense_ignore': ['damage', 'defense'], 'debuff.defense': ['damage', 'defense'], 'debuff.damage': ['damage', 'mitigation'],
+  'debuff.mark': ['status', 'damage'], 'defense.shield': ['shield', 'survival'], 'defense.barrier': ['barrier'],
+  'defense.damage_reduction': ['mitigation', 'survival'], 'defense.stealth': ['dodge', 'survival'],
+  'recovery.healing': ['healing', 'survival'], 'recovery.lifesteal': ['healing', 'survival'],
+  'resource.energy': ['energy'], 'resource.skill_point': ['skillPoints'], 'resource.capacity': ['skillPoints'], 'resource.hp_cost': ['healthCost', 'survival'],
+  'tempo.action_advance': ['actionAdvance', 'turns'], 'tempo.action_delay': ['actionDelay', 'turns'], 'tempo.taunt': ['taunt', 'mitigation'],
+  'status.bleed': ['status', 'damage'], 'status.exposed': ['status', 'damage'], 'status.ricochet': ['status', 'damage'],
+  'status.tune': ['status', 'support'], 'status.residue': ['status', 'mitigation'], 'status.broken': ['status', 'barrier'],
+  'summon.create': ['summon', 'damage'], 'summon.action': ['summon', 'damage'],
+  'trigger.per_hit': ['trigger', 'status'], 'trigger.first_hit_per_target': ['trigger', 'damage'],
+  'trigger.per_action': ['trigger', 'turns'], 'trigger.per_source': ['trigger', 'damage'], 'trigger.periodic': ['trigger', 'damage'],
+  'limit.duration': ['duration', 'status'], 'limit.stacks': ['stacks', 'status'], 'limit.charges': ['charges', 'trigger'], 'limit.cooldown': ['cooldown', 'trigger']
+});
+assert(COMBAT_MECHANIC_TAGS.every(tag => TAG_MEASUREMENT_RULES[tag]), `Missing evaluator registration for mechanic tags: ${COMBAT_MECHANIC_TAGS.filter(tag => !TAG_MEASUREMENT_RULES[tag]).join(', ')}.`);
+assert(Object.keys(TAG_MEASUREMENT_RULES).every(tag => COMBAT_MECHANIC_TAGS.includes(tag)), 'Evaluator registry includes a non-canonical combat tag.');
 
 function fail(message) { throw new Error(message); }
 function assert(ok, message) { if (!ok) fail(message); }
@@ -142,6 +162,81 @@ function candidateLabel(spec) {
   if (spec.type === 'character-overall') return `${spec.type}:${spec.character}`;
   if (spec.type === 'action' || spec.type === 'passive') return `${spec.type}:${spec.character}/${spec.id}`;
   return `${spec.type}:${spec.id}${spec.potential ? `@P${spec.potential}L${spec.level || 1}` : ''}`;
+}
+function componentFor(spec) {
+  if (spec.type === 'action') return CHARACTER_COMBAT_DATA[spec.character]?.[spec.id] || null;
+  if (spec.type === 'passive') return CHARACTER_COMBAT_DATA[spec.character]?.passives.find(effect => (effect.id || effect.type) === spec.id) || null;
+  if (spec.type === 'upgrade') return CHARACTER_UPGRADE_EFFECTS[spec.id] || null;
+  if (spec.type === 'rune') return RUNE_COMBAT_RULES[spec.id] || null;
+  if (spec.type === 'character-overall') {
+    const kit = CHARACTER_COMBAT_DATA[spec.character];
+    if (!kit) return null;
+    const effects = [...kit.passives, kit.basic, kit.skill, kit.ultimate];
+    return { mechanicTags: [...new Set(effects.flatMap(effect => effect?.mechanicTags || []))],
+      mechanicTargets: Object.assign({}, ...effects.map(effect => effect?.mechanicTargets || {})),
+      mechanicTriggers: Object.assign({}, ...effects.map(effect => effect?.mechanicTriggers || {})) };
+  }
+  return null;
+}
+function evaluationPlan(spec) {
+  const component = componentFor(spec), tags = [...new Set(component?.mechanicTags || [])].sort();
+  const componentIds = spec.type === 'action' ? [`action:${spec.character}/${spec.id}`]
+    : spec.type === 'passive' ? [`passive:${spec.character}/${spec.id}`]
+      : spec.type === 'upgrade' ? [`upgrade:${spec.id}`]
+        : spec.type === 'rune' ? [`rune:${spec.id}`]
+          : spec.type === 'character-overall' ? [
+            ...(CHARACTER_COMBAT_DATA[spec.character]?.passives || []).map(effect => `passive:${spec.character}/${effect.id || effect.type}`),
+            ...['basic', 'skill', 'ultimate'].map(slot => `action:${spec.character}/${slot}`)
+          ] : [];
+  for (const tag of tags) assert(TAG_MEASUREMENT_RULES[tag], `No event-evidence rule for ${tag} on ${candidateLabel(spec)}.`);
+  return { tags, componentIds, byTag: tags.map(tag => ({ tag, measurementFields: TAG_MEASUREMENT_RULES[tag],
+    target: component?.mechanicTargets?.[tag] || component?.targeting || null,
+    trigger: component?.mechanicTriggers?.[tag] || null,
+    coverage: component?.mechanicTargets?.[tag]?.coverage || component?.targeting?.coverage || 'event_defined' })) };
+}
+function measurementPlanLabel(plan) {
+  return plan.byTag.map(entry => `${entry.tag}:${entry.measurementFields.join('+')}@${entry.trigger || 'event_defined'}:${entry.target?.side || 'event_defined'}/${entry.coverage}`).join(';');
+}
+function aggregateMechanicEvents(result) {
+  const rows = new Map(), events = result?.mechanicEvents?.events || [];
+  for (const event of events) for (const tag of event.mechanicTags || []) {
+    const key = `${event.componentId}|${tag}`;
+    if (!rows.has(key)) rows.set(key, { componentId: event.componentId, tag, events: 0, statuses: {}, values: {} });
+    const row = rows.get(key); row.events++; row.statuses[event.status] = (row.statuses[event.status] || 0) + 1;
+    if (!['triggered', 'attempted'].includes(event.status)) for (const [name, value] of Object.entries(event.values || {}))
+      if (Number.isFinite(value)) row.values[name] = (row.values[name] || 0) + value;
+  }
+  return rows;
+}
+function mechanicEventDeltas(control, treatment) {
+  const before = aggregateMechanicEvents(control), after = aggregateMechanicEvents(treatment), output = {};
+  for (const key of new Set([...before.keys(), ...after.keys()])) {
+    const a = before.get(key) || { events: 0, statuses: {}, values: {} }, b = after.get(key) || { events: 0, statuses: {}, values: {} };
+    const [componentId, tag] = key.split('|');
+    output[key] = { componentId, tag, eventCountDelta: b.events - a.events,
+      statusCountDeltas: Object.fromEntries([...new Set([...Object.keys(a.statuses), ...Object.keys(b.statuses)])].map(status => [status, (b.statuses[status] || 0) - (a.statuses[status] || 0)])),
+      valueDeltas: Object.fromEntries([...new Set([...Object.keys(a.values), ...Object.keys(b.values)])].map(name => [name, (b.values[name] || 0) - (a.values[name] || 0)])) };
+  }
+  return output;
+}
+function summarizeMechanicEventDeltas(trials, plan, controlDropped, treatmentDropped) {
+  return plan.byTag.map(({ tag, measurementFields, target, trigger, coverage }) => {
+    const perTrial = trials.map(trial => Object.values(trial.mechanicEventDeltas).filter(row => row.tag === tag && plan.componentIds.includes(row.componentId)));
+    const componentIds = [...new Set(perTrial.flatMap(rows => rows.map(row => row.componentId)))].sort();
+    const components = componentIds.map(componentId => {
+      const rows = perTrial.map(events => events.find(event => event.componentId === componentId));
+      const metricFields = [...new Set(rows.flatMap(row => Object.keys(row?.valueDeltas || {})))].sort();
+      const statusFields = [...new Set(rows.flatMap(row => Object.keys(row?.statusCountDeltas || {})))].sort();
+      return { componentId, eventCountDelta: meanCI(rows.map(row => row?.eventCountDelta || 0)),
+        statusCountDeltas: Object.fromEntries(statusFields.map(status => [status, meanCI(rows.map(row => row?.statusCountDeltas?.[status] || 0))])),
+        valueDeltas: Object.fromEntries(metricFields.map(metric => [metric, meanCI(rows.map(row => row?.valueDeltas?.[metric] || 0))])) };
+    });
+    const observed = perTrial.some(rows => rows.length > 0);
+    return { tag, measurementFields, target, trigger, requiredCoverage: coverage,
+      evidenceStatus: observed ? 'event_observed' : 'tagged_but_not_triggered_in_this_comparison',
+      components, eventCapture: { truncated: controlDropped > 0 || treatmentDropped > 0,
+        droppedControl: controlDropped, droppedTreatment: treatmentDropped } };
+  });
 }
 function wearersFor(spec, party) {
   if (spec.type === 'upgrade') return party.includes(spec.character) ? [spec.character] : [];
@@ -309,6 +404,8 @@ function battleMetrics(control, treatment, seed) {
     hpSwing: enemyHpDelta + allyHpRetainedDelta,
     bae: (enemyHpDelta + allyHpRetainedDelta) / 16,
     impact: impactDeltas(control, treatment),
+    mechanicEventDeltas: mechanicEventDeltas(control, treatment),
+    mechanicEventCapture: { controlDropped: control.mechanicEvents?.dropped || 0, treatmentDropped: treatment.mechanicEvents?.dropped || 0 },
     control: {
       winner: control.winner, actions: control.actions, allyTurns: control.allyTurns, enemyTurns: control.enemyTurns,
       finalHp: control.finalHp, damageDealt: control.damageDealt, shields: control.alliedShieldAbsorbed,
@@ -641,8 +738,12 @@ function buildMechanicRatingRows(samples, runCount, seed) {
   // Same matched, stratified reference score used for Runes. Candidate controls
   // are five +100-SVP investments; each mechanic is paired against the same
   // wearer, matchup, and seeds. This scores impact, not standalone damage.
-  const scenarioGroups = new Map();
+  const scenarioGroups = new Map(), candidateMetadata = new Map();
   for (const sample of samples) {
+    if (!sample.candidate.startsWith('stat:') && !candidateMetadata.has(sample.candidate)) candidateMetadata.set(sample.candidate, {
+      mechanicTags: sample.mechanicTags, measurementPlan: sample.measurementPlan,
+      requiredCoverage: sample.requiredCoverage, unobservedTags: sample.unobservedTags
+    });
     const key = `${sample.wearer}|${sample.scenarioId}`;
     if (!scenarioGroups.has(key)) scenarioGroups.set(key, { stats: new Map(), candidates: [] });
     const group = scenarioGroups.get(key);
@@ -728,10 +829,11 @@ function buildMechanicRatingRows(samples, runCount, seed) {
   }
   const overallRows = [], wearerRows = [];
   for (const [candidate, byWearer] of candidates) {
+    const metadata = candidateMetadata.get(candidate) || {};
     const summaries = [...byWearer].map(([wearer, strata]) => ({ wearer, ...summarize(strata) }));
     for (const summary of summaries) {
       const ci = bootstrap(byWearer, summary.wearer), score = scoreOf(average(summary.deltas), average(summary.references), average(summary.bae), average(summary.referenceBae));
-      wearerRows.push({ candidate, wearer: summary.wearer, strata: summary.strataCount, winLiftPp: average(summary.deltas) * 100,
+      wearerRows.push({ candidate, ...metadata, wearer: summary.wearer, strata: summary.strataCount, winLiftPp: average(summary.deltas) * 100,
         mean100SVPReferencePp: average(summary.references) * 100, winLiftScore0to100: score.win, meanBAE: average(summary.bae),
         mean100SVPReferenceBAE: average(summary.referenceBae), actionValueScore0to100: score.action, score0to100: score.overall,
         score95Lower: ci.scoreLower, score95Upper: ci.scoreUpper, differenceVsReferencePp: average(summary.gaps) * 100,
@@ -742,7 +844,7 @@ function buildMechanicRatingRows(samples, runCount, seed) {
     const combined = Object.fromEntries(['deltas', 'references', 'gaps', 'bae', 'referenceBae'].map(field => [field,
       Array.from({ length: runCount }, (_, i) => average(summaries.map(row => row[field][i])))]));
     const ci = bootstrap(byWearer), score = scoreOf(average(combined.deltas), average(combined.references), average(combined.bae), average(combined.referenceBae));
-    overallRows.push({ candidate, eligibleCharacters: [...byWearer.keys()].join(';'), characterCount: byWearer.size,
+    overallRows.push({ candidate, ...metadata, eligibleCharacters: [...byWearer.keys()].join(';'), characterCount: byWearer.size,
       winLiftPp: average(combined.deltas) * 100, mean100SVPReferencePp: average(combined.references) * 100,
       winLiftScore0to100: score.win, meanBAE: average(combined.bae), mean100SVPReferenceBAE: average(combined.referenceBae),
       actionValueScore0to100: score.action, score0to100: score.overall, score95Lower: ci.scoreLower, score95Upper: ci.scoreUpper,
@@ -809,6 +911,10 @@ async function main() {
           if (shouldCacheControl) neutralControlResults.set(wearer, controlRuns);
           const winsControl = trials.reduce((sum, trial) => sum + trial.controlWin, 0);
           const winsTreatment = trials.reduce((sum, trial) => sum + trial.treatmentWin, 0);
+          const mechanicEvaluation = evaluationPlan(spec);
+          const tagMeasurements = summarizeMechanicEventDeltas(trials, mechanicEvaluation,
+            trials.reduce((sum, trial) => sum + trial.mechanicEventCapture.controlDropped, 0),
+            trials.reduce((sum, trial) => sum + trial.mechanicEventCapture.treatmentDropped, 0));
           const summary = {
             candidate: candidateLabel(spec),
             wearer, party, enemies,
@@ -816,6 +922,8 @@ async function main() {
             difficulty, length, runs: options.runs, seed: options.seed,
             statBudgets: { wearer: statBudget(library[wearer].stats), enemies: enemies.map(id => ({ archetype: id, svp: statBudget(library[id].stats) })) },
             treatmentStatBudget,
+            mechanicEvaluation,
+            tagMeasurements,
             winRate: { control: winsControl / options.runs * 100, treatment: winsTreatment / options.runs * 100,
               control95CI: percentCI(trials.map(row => row.controlWin)),
               treatment95CI: percentCI(trials.map(row => row.treatmentWin)),
@@ -835,6 +943,7 @@ async function main() {
             trials
           };
           if (options.compact) delete summary.trials;
+          else summary.trials = trials.map(({ mechanicEventDeltas, ...trial }) => ({ ...trial, mechanicEventDeltas: Object.values(mechanicEventDeltas).filter(row => mechanicEvaluation.tags.includes(row.tag)) }));
           out.write(JSON.stringify(summary) + '\n');
           comparisons++;
           if ((options.runeRating && (spec.type === 'rune' || spec.type === 'stat')) ||
@@ -843,12 +952,15 @@ async function main() {
             difficulty, length, partyComposition: party.slice().sort().join('+'),
             enemyComposition: enemies.slice().sort().join('+'), allyCount: party.length,
             enemyCount: enemies.length, enemyCategory: summary.enemyCategories.join('+'),
-            winDeltas: trials.map(trial => trial.winDelta), baeValues: trials.map(trial => trial.bae)
+            winDeltas: trials.map(trial => trial.winDelta), baeValues: trials.map(trial => trial.bae),
+            mechanicTags: mechanicEvaluation.tags.join(';'), measurementPlan: measurementPlanLabel(mechanicEvaluation),
+            requiredCoverage: [...new Set(mechanicEvaluation.byTag.map(entry => entry.coverage))].join(';'),
+            unobservedTags: tagMeasurements.filter(entry => entry.evidenceStatus !== 'event_observed').map(entry => entry.tag).join(';')
           });
           const partyComposition = party.slice().sort().join('+');
           const enemyComposition = enemies.slice().sort().join('+');
           const key = `${summary.candidate}|${wearer}|${difficulty}|${length}|${partyComposition}|${enemyComposition}`;
-          if (!accumulated.has(key)) accumulated.set(key, { candidate: summary.candidate, wearer, difficulty, length, partyComposition, enemyComposition, enemyCategory: summary.enemyCategories.join('+'), allyCount: party.length, enemyCount: enemies.length, formations: 0, controlWin: 0, treatmentWin: 0, controlDraw: 0, treatmentDraw: 0, winDelta: 0, hpSwing: 0, bae: 0, impact: {} });
+          if (!accumulated.has(key)) accumulated.set(key, { candidate: summary.candidate, wearer, mechanicTags: mechanicEvaluation.tags.join(';'), measurementPlan: measurementPlanLabel(mechanicEvaluation), unobservedTags: tagMeasurements.filter(entry => entry.evidenceStatus !== 'event_observed').map(entry => entry.tag).join(';'), requiredCoverage: [...new Set(mechanicEvaluation.byTag.map(entry => entry.coverage))].join(';'), difficulty, length, partyComposition, enemyComposition, enemyCategory: summary.enemyCategories.join('+'), allyCount: party.length, enemyCount: enemies.length, formations: 0, controlWin: 0, treatmentWin: 0, controlDraw: 0, treatmentDraw: 0, winDelta: 0, hpSwing: 0, bae: 0, impact: {} });
           const aggregate = accumulated.get(key); aggregate.formations++; aggregate.controlWin += summary.winRate.control / 100; aggregate.treatmentWin += summary.winRate.treatment / 100; aggregate.controlDraw += summary.winRate.controlDrawRatePct / 100; aggregate.treatmentDraw += summary.winRate.treatmentDrawRatePct / 100; aggregate.winDelta += summary.winRate.differencePercentagePoints; aggregate.hpSwing += summary.hpSwing.mean; aggregate.bae += summary.bae.mean;
           for (const [metric, estimate] of Object.entries(summary.impact)) aggregate.impact[metric] = (aggregate.impact[metric] || 0) + estimate.mean;
         }
@@ -871,8 +983,8 @@ async function main() {
   }
   const rows = [...strata.values()];
   fs.writeFileSync(summaryFile, [
-    'candidate,wearer,difficulty,length,allyCount,enemyCount,enemyCategory,equallyWeightedCompositionPairs,winRateBeforePct,winRateAfterPct,drawRateBeforePct,drawRateAfterPct,differencePercentagePoints,meanHpSwing,meanBAE,enemyHpRemovedDelta,allyHpRetainedDelta,allyDamageDealtDelta,allyDamageTakenDelta,allyHealingDelta,allyShieldGrantedDelta,allyShieldAbsorbedDelta,allyEnergyGrantedDelta,allyEnergyGainedDelta,allyEnergySpentDelta,allyEnergyRemainingDelta,allySkillPointsGrantedDelta,allyTurnsDelta,enemyTurnsDelta',
-    ...rows.map(row => [row.candidate, row.wearer, row.difficulty, row.length, row.allyCount, row.enemyCount, row.enemyCategory, row.compositionPairs, row.controlWin / row.compositionPairs * 100, row.treatmentWin / row.compositionPairs * 100, row.controlDraw / row.compositionPairs * 100, row.treatmentDraw / row.compositionPairs * 100, row.winDelta / row.compositionPairs, row.hpSwing / row.compositionPairs, row.bae / row.compositionPairs, row.impact.enemyHpRemoved / row.compositionPairs, row.impact.allyHpRetained / row.compositionPairs, row.impact.damageDealt / row.compositionPairs, row.impact.damageTaken / row.compositionPairs, row.impact.healing / row.compositionPairs, row.impact.shieldsGranted / row.compositionPairs, row.impact.shieldsAbsorbed / row.compositionPairs, row.impact.energyGranted / row.compositionPairs, row.impact.energyGained / row.compositionPairs, row.impact.energySpent / row.compositionPairs, row.impact.energyRemaining / row.compositionPairs, row.impact.skillPointsGranted / row.compositionPairs, row.impact.allyTurns / row.compositionPairs, row.impact.enemyTurns / row.compositionPairs].map(csvEscape).join(','))
+    'candidate,wearer,mechanicTags,measurementPlan,unobservedTags,requiredCoverage,difficulty,length,allyCount,enemyCount,enemyCategory,equallyWeightedCompositionPairs,winRateBeforePct,winRateAfterPct,drawRateBeforePct,drawRateAfterPct,differencePercentagePoints,meanHpSwing,meanBAE,enemyHpRemovedDelta,allyHpRetainedDelta,allyDamageDealtDelta,allyDamageTakenDelta,allyHealingDelta,allyShieldGrantedDelta,allyShieldAbsorbedDelta,allyEnergyGrantedDelta,allyEnergyGainedDelta,allyEnergySpentDelta,allyEnergyRemainingDelta,allySkillPointsGrantedDelta,allyTurnsDelta,enemyTurnsDelta',
+    ...rows.map(row => [row.candidate, row.wearer, row.mechanicTags, row.measurementPlan, row.unobservedTags, row.requiredCoverage, row.difficulty, row.length, row.allyCount, row.enemyCount, row.enemyCategory, row.compositionPairs, row.controlWin / row.compositionPairs * 100, row.treatmentWin / row.compositionPairs * 100, row.controlDraw / row.compositionPairs * 100, row.treatmentDraw / row.compositionPairs * 100, row.winDelta / row.compositionPairs, row.hpSwing / row.compositionPairs, row.bae / row.compositionPairs, row.impact.enemyHpRemoved / row.compositionPairs, row.impact.allyHpRetained / row.compositionPairs, row.impact.damageDealt / row.compositionPairs, row.impact.damageTaken / row.compositionPairs, row.impact.healing / row.compositionPairs, row.impact.shieldsGranted / row.compositionPairs, row.impact.shieldsAbsorbed / row.compositionPairs, row.impact.energyGranted / row.compositionPairs, row.impact.energyGained / row.compositionPairs, row.impact.energySpent / row.compositionPairs, row.impact.energyRemaining / row.compositionPairs, row.impact.skillPointsGranted / row.compositionPairs, row.impact.allyTurns / row.compositionPairs, row.impact.enemyTurns / row.compositionPairs].map(csvEscape).join(','))
   ].join('\n') + '\n');
   const chartFile = options.output.replace(/\.jsonl$/i, '') + '-winrate.svg';
   fs.writeFileSync(chartFile, makeWinRateSvg(rows));
