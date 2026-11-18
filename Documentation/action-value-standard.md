@@ -4,7 +4,9 @@
 
 Use a shared stat budget to define comparable combat tests, HP impact to explain an action's effect, and win probability to measure whether it improves the chance of victory. Do not combine stat points, HP, and win rate into one arbitrary sum.
 
-**Validity note:** The documented scenario and scoring standards do not make a separate combat model accurate. Until the [shared combat engine](combat-engine-standard.md) owns all action, passive, Rune, and effect resolution used by both the game and runner, simulator scores are provisional and should not drive balance decisions.
+**Validity note:** The game and runner now call the [shared combat engine](combat-engine-standard.md), and parity checks guard their shared definitions and core handlers. Scores remain provisional until coverage includes paired in-game and headless outcomes for every supported action/effect family; identical engine imports alone do not prove end-to-end parity.
+
+Ability-effect tagging and the current mechanic vocabulary are standardized in [Combat Mechanic Tags](combat-mechanic-tags.md). The evaluator should use those tags and per-effect target/trigger metadata to measure ally support, enemy debuffs, resources, and damage without character-specific assumptions.
 
 ## Normalized stat budget
 
@@ -79,7 +81,19 @@ Use a paired counterfactual suited to the component; do not give every component
 
 For each component, use the balanced scenario matrix, paired seeds, equal formation/composition/stratum weights, and equal wearer weights where pooling is appropriate. Show per-character and per-scenario results before the pooled result. Record win-rate change and BAE/HP swing together with relevant effects and resources—damage by source, buffs applied/consumed, shields granted/absorbed, healing, action changes, Energy, and Skill Points. For an effect with no damage, such as capacity or action manipulation, BAE may be zero while win-rate or resource value is positive; do not label it worthless from BAE alone.
 
-The runner provides `--candidate all-passives`, `--candidate all-actions`, and `--candidate all-character-mechanics`. These commands append the five +100-SVP stat controls and write score reports. Individual passive comparisons disable only the selected passive in the control. Basic action comparisons use the shared 1.0× single-target reference above; Skill and Ultimate comparisons use the character's actual Basic Attack. Full character-kit comparisons disable passive effects, Skills, and Ultimates while retaining stats, and replace the Basic Attack with the shared reference. These are controlled first-action/full-battle comparisons under the documented fixed policy, not estimates of optimal player choices.
+### Support, debuff, and non-damage value
+
+Use the same paired full-battle comparison for effects that help allies or weaken enemies. Keep the battle state, AI/action policy, target policy, and random seed the same; enable the effect in the treatment and disable only that effect in the control. Let both branches continue to battle end. This naturally counts a buff or debuff through every later hit, and counts mitigation when it prevents a defeat.
+
+For each pair, record the win-rate change and HP swing, then show these supporting deltas (treatment minus control):
+
+- Enemy HP removed and allied damage dealt, split into direct, bleed, follow-up, ricochet, summon, Echo, and Reflect damage, so ally buffs and enemy vulnerability can be seen even when the effect itself deals no damage.
+- Allied HP retained and damage taken, plus healing, shields granted, shields absorbed, and remaining shield, to show protection and recovery.
+- Skill Points and Energy gained, granted, spent, and remaining; allied/enemy turns; and action advances, to show resource and turn-economy effects.
+
+Interpret each delta in its own direction: more enemy HP removed, more allied HP retained, more healing/shielding/resources, and fewer enemy turns generally help; less allied damage taken is favorable. Allied turns are context, not automatically a benefit; extra turns can help, while a longer battle can also create extra turns. These fields explain *how* the result changed. They are not extra scores to add together: damage dealt overlaps enemy HP removed, and shields/healing can affect final HP and win rate. HP swing remains the single HP-based BAE measure; paired win-rate change remains the main effectiveness measure. A support effect can therefore be valuable with little personal damage, and a debuff can receive credit for damage allies deal while it is active.
+
+The runner provides `--candidate all-passives`, `--candidate all-actions`, and `--candidate all-character-mechanics`. These commands append the five +100-SVP stat controls and write score reports. Individual passive comparisons disable only the selected passive in the control. Basic action comparisons use the shared 1.0× single-target reference above; Skill and Ultimate comparisons use the character's actual Basic Attack. Full character-kit comparisons disable passive effects, Skills, and Ultimates while retaining stats, and replace the Basic Attack with the shared reference. Each paired trial records the supporting impact deltas above in JSONL; the stratified CSV includes the core damage, survival, healing, shield, resource, and turn deltas. These are controlled first-action/full-battle comparisons under the documented fixed policy, not estimates of optimal player choices.
 
 ## Balanced Scenario Matrix
 

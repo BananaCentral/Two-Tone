@@ -26,6 +26,7 @@
       },
       "skill": {
         "type": "enhanceBasic",
+        "target": "self",
         "damagePerStack": 1,
         "energyPerStack": 10,
         "blastAtStacks": 3
@@ -60,18 +61,19 @@
       "energy": {
         "start": 20
       },
-      "characterDuplicates": 0
+      "characterDuplicates": 0,
+      "role": "mainDps"
     },
     "lily": {
       "name": "Lily",
       "level": 1,
       "stats": {
         "hp": 100,
-        "physicalAttack": 0,
-        "magicalAttack": 20,
         "physicalDefense": 4,
         "magicalDefense": 4,
-        "speed": 20
+        "speed": 20,
+        "physicalAttack": 0,
+        "magicalAttack": 20
       },
       "basic": {
         "damageType": "magical",
@@ -115,10 +117,11 @@
       "energy": {
         "start": 20
       },
-      "characterDuplicates": 0
+      "characterDuplicates": 0,
+      "role": "subDps"
     },
     "slime": {
-      "name": "Slime",
+      "name": "SLIME",
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
@@ -141,7 +144,22 @@
           "damageBonus": 0.25,
           "target": "aoe"
         }
-      ]
+      ],
+      "role": "common",
+      "tags": {
+        "area": "One",
+        "type": "common",
+        "strengths": [
+          "Magical Attacker",
+          "Magical Resistant",
+          "Defensive"
+        ],
+        "weaknesses": [
+          "Physically Fragile",
+          "Slow"
+        ]
+      },
+      "stealth": 0
     }
   },
   "teams": {

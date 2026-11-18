@@ -27,6 +27,7 @@
       },
       "skill": {
         "type": "enhanceBasic",
+        "target": "self",
         "damagePerStack": 1,
         "energyPerStack": 10,
         "blastAtStacks": 3
@@ -69,11 +70,11 @@
       "level": 1,
       "stats": {
         "hp": 100,
-        "physicalAttack": 0,
-        "magicalAttack": 20,
         "physicalDefense": 4,
         "magicalDefense": 4,
-        "speed": 20
+        "speed": 20,
+        "physicalAttack": 0,
+        "magicalAttack": 20
       },
       "basic": {
         "damageType": "magical",
@@ -139,15 +140,23 @@
       },
       "skill": {
         "type": "tune",
-        "energyGain": 20
+        "target": "ally",
+        "energyGain": 20,
+        "damageBonus": 0.4,
+        "duration": 1
       },
       "ultimate": {
         "type": "dawnSupport",
-        "energyCost": 100
+        "target": "ally",
+        "energyCost": 100,
+        "energyRestore": 0.5,
+        "actionAdvance": 100
       },
       "passives": [
         {
-          "type": "resourceful"
+          "type": "resourceful",
+          "skillPointCapBonus": 2,
+          "startingSkillPointBonus": 2
         }
       ],
       "weapon": {
@@ -167,7 +176,7 @@
       "characterDuplicates": 0
     },
     "slime": {
-      "name": "Slime",
+      "name": "SLIME",
       "tags": {
         "area": "One",
         "type": "common",
@@ -203,10 +212,12 @@
           "damageBonus": 0.25,
           "target": "aoe"
         }
-      ]
+      ],
+      "role": "common",
+      "stealth": 0
     },
     "hawk": {
-      "name": "Hawk",
+      "name": "HAWK",
       "tags": {
         "area": "One",
         "type": "common",
@@ -236,10 +247,11 @@
         "multiplier": 1,
         "target": "random"
       },
-      "passives": []
+      "passives": [],
+      "role": "common"
     },
     "goblin": {
-      "name": "Goblin",
+      "name": "GOBLIN",
       "tags": {
         "area": "One",
         "type": "elite",
@@ -255,11 +267,11 @@
       "barrierPercent": 0.2,
       "stats": {
         "hp": 200,
-        "physicalAttack": 40,
-        "magicalAttack": 0,
         "physicalDefense": 12,
         "magicalDefense": 4,
-        "speed": 40
+        "speed": 40,
+        "physicalAttack": 40,
+        "magicalAttack": 0
       },
       "basic": {
         "damageType": "physical",
@@ -271,10 +283,12 @@
           "type": "pursuit",
           "actionAdvance": 20
         }
-      ]
+      ],
+      "role": "elite",
+      "stealth": 0
     },
     "geode": {
-      "name": "Geode",
+      "name": "GEODE",
       "tags": {
         "area": "One",
         "type": "elite",
@@ -308,10 +322,12 @@
           "damageBonus": 0.2,
           "maxStacks": 10
         }
-      ]
+      ],
+      "role": "elite",
+      "stealth": 0
     },
     "bear": {
-      "name": "Bear",
+      "name": "BEAR",
       "tags": {
         "area": "One",
         "type": "boss",
@@ -329,11 +345,11 @@
       "barrierPercent": 0.2,
       "stats": {
         "hp": 450,
-        "physicalAttack": 90,
-        "magicalAttack": 0,
         "physicalDefense": 6,
         "magicalDefense": 6,
-        "speed": 60
+        "speed": 60,
+        "physicalAttack": 90,
+        "magicalAttack": 0
       },
       "basic": {
         "damageType": "true",
@@ -345,7 +361,9 @@
           "type": "sharpClaws",
           "defenseIgnore": 0.25
         }
-      ]
+      ],
+      "role": "boss",
+      "stealth": 0
     },
     "logan": {
       "name": "Logan",
@@ -367,7 +385,12 @@
       },
       "skill": {
         "type": "bloodShield",
-        "energyGain": 20
+        "target": "allAllies",
+        "energyGain": 20,
+        "healthCost": 0.25,
+        "shieldDistribution": "perAlly",
+        "tauntChance": 0.25,
+        "tauntTurns": 2
       },
       "ultimate": {
         "damageType": "physical",
@@ -375,7 +398,12 @@
         "target": "aoe",
         "energyCost": 100
       },
-      "passives": [],
+      "passives": [
+        {
+          "type": "tasteForBlood",
+          "lifesteal": 0.1
+        }
+      ],
       "weapon": {
         "type": "standard",
         "potential": 1,
@@ -393,7 +421,7 @@
       "characterDuplicates": 0
     },
     "wolf": {
-      "name": "Wolf",
+      "name": "WOLF",
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
@@ -429,7 +457,9 @@
           "Magically Fragile",
           "Fragile"
         ]
-      }
+      },
+      "role": "common",
+      "stealth": 0
     }
   },
   "teams": {

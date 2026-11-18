@@ -27,14 +27,15 @@
       },
       "skill": {
         "type": "firstStrike",
+        "target": "single",
         "damageType": "physical",
-        "multiplier": 1.0,
+        "multiplier": 1,
         "firstHitMultiplier": 1.5,
         "energyGain": 20
       },
       "ultimate": {
         "damageType": "physical",
-        "multiplier": 1.0,
+        "multiplier": 1,
         "target": "aoe",
         "energyCost": 100
       },
@@ -62,8 +63,8 @@
       }
     },
     "slime": {
-      "name": "Slime",
-      "role": "enemy",
+      "name": "SLIME",
+      "role": "common",
       "level": 1,
       "stats": {
         "hp": 150,
@@ -75,9 +76,32 @@
       "basic": {
         "damageType": "magical",
         "multiplier": 1,
-        "target": "single"
+        "target": "random"
       },
-      "passives": []
+      "passives": [
+        {
+          "type": "everyNthBasic",
+          "id": "slimy",
+          "every": 3,
+          "damageBonus": 0.25,
+          "target": "aoe"
+        }
+      ],
+      "tags": {
+        "area": "One",
+        "type": "common",
+        "strengths": [
+          "Magical Attacker",
+          "Magical Resistant",
+          "Defensive"
+        ],
+        "weaknesses": [
+          "Physically Fragile",
+          "Slow"
+        ]
+      },
+      "barrierPercent": 0.2,
+      "stealth": 0
     }
   },
   "teams": {

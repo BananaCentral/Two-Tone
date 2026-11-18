@@ -30,7 +30,13 @@ Run the standard four-character encounter matrix with:
 node tools/combat-simulator-benchmark.mjs --runs 1000 --seed 404
 ```
 
-Run the mechanic-coverage regressions with `node --test tests/combat-simulator.test.mjs`.
+Run combat-engine parity and simulator mechanic coverage with:
+
+```sh
+node --test tests/combat-engine-parity.test.mjs tests/combat-simulator.test.mjs
+```
+
+The parity checks ensure the live game and runner import the same engine and combat sheets, sample scenarios stay aligned with canonical data, and shared handlers resolve authored actions, enemy passives, damage sequences, character effects, resources, Runes, and battle outcomes. They verify shared-runtime parity; they do not assert that a UI-controlled battle and an AI-controlled simulation choose identical actions.
 
 The suite compares a one-bar boss, two- and three-bar boss HP benchmarks, a boss with two Elite adds, five Slimes, and three each of the Common and Elite enemies (Wolves, Hawks, Goblins, and Geodes). Pass `--config path/to/full-party.json` to use another party and its enemy archetypes. `--json` emits the full reports. Every result includes a 95% confidence interval for win rate so small batches do not look more certain than they are.
 

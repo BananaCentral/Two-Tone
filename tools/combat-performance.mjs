@@ -201,7 +201,7 @@ function makeBranches(base, spec, wearer) {
   } else if (spec.type === 'action') {
     for (const config of [control, treatment]) {
       const unit = findUnit(config, wearer);
-      if (spec.id === 'ultimate') config.archetypes[wearer].energy.start = 100;
+      if (spec.id === 'ultimate') config.archetypes[wearer].energy = { ...(config.archetypes[wearer].energy || {}), start: 100 };
       config.settings.actionOverride = { actorId: unit.id, turn: 1, action: config === treatment ? spec.id : 'basic' };
     }
     if (spec.id === 'basic') {
@@ -231,6 +231,45 @@ function percentCI(values) {
   return { mean: interval.mean * 100, lower: interval.lower * 100, upper: interval.upper * 100 };
 }
 function totalAllyHp(result) { return result.finalHp.allies; }
+function sumAllyMetric(result, key) {
+  return Object.values(result.unitStats || {}).reduce((sum, unit) => sum + (Number(unit[key]) || 0), 0);
+}
+function allyImpactSnapshot(result) {
+  const snapshot = {
+    damageDealt: result.damageDealt?.allies || 0,
+    damageTaken: sumAllyMetric(result, 'damageTaken'),
+    supportDamageAmplified: sumAllyMetric(result, 'supportDamageAmplified'),
+    healing: result.lifestealHealing?.allies || 0,
+    shieldsGranted: sumAllyMetric(result, 'shieldGranted'),
+    shieldsAbsorbed: result.alliedShieldAbsorbed || 0,
+    shieldRemaining: (result.survivors?.allies || []).reduce((sum, unit) => sum + (unit.shield || 0), 0),
+    energyGranted: sumAllyMetric(result, 'energyGranted'),
+    energyGained: sumAllyMetric(result, 'energyGained'),
+    energySpent: sumAllyMetric(result, 'energySpent'),
+    energyRemaining: sumAllyMetric(result, 'energyRemaining'),
+    skillPointsGenerated: sumAllyMetric(result, 'skillPointsGenerated'),
+    skillPointsGranted: sumAllyMetric(result, 'skillPointsGranted'),
+    skillPointsSpent: sumAllyMetric(result, 'skillPointsSpent'),
+    allyTurns: result.allyTurns || 0,
+    enemyTurns: result.enemyTurns || 0,
+    turnsAdvanced: sumAllyMetric(result, 'turnsAdvanced'),
+    skills: sumAllyMetric(result, 'skills'),
+    ultimates: sumAllyMetric(result, 'ultimates')
+  };
+  for (const channel of ['direct', 'bleed', 'followUp', 'ricochet', 'summon', 'echo', 'reflect']) {
+    snapshot[`damage_${channel}`] = Object.values(result.unitStats || {}).reduce((sum, unit) => sum + (Number(unit.damageBreakdown?.[channel]) || 0), 0);
+  }
+  return snapshot;
+}
+function impactDeltas(control, treatment) {
+  const before = allyImpactSnapshot(control), after = allyImpactSnapshot(treatment);
+  return {
+    enemyHpRemoved: control.finalHp.enemies - treatment.finalHp.enemies,
+    allyHpRetained: treatment.finalHp.allies - control.finalHp.allies,
+    ...Object.fromEntries(Object.keys(before).map(key => [key, after[key] - before[key]])),
+    skillPointsRemaining: treatment.skillPointsRemaining - control.skillPointsRemaining
+  };
+}
 function battleMetrics(control, treatment, seed) {
   const controlWin = winValue(control), treatmentWin = winValue(treatment);
   const enemyHpDelta = control.finalHp.enemies - treatment.finalHp.enemies;
@@ -250,6 +289,7 @@ function battleMetrics(control, treatment, seed) {
     allyHpRetainedDelta,
     hpSwing: enemyHpDelta + allyHpRetainedDelta,
     bae: (enemyHpDelta + allyHpRetainedDelta) / 16,
+    impact: impactDeltas(control, treatment),
     control: {
       winner: control.winner, actions: control.actions, allyTurns: control.allyTurns, enemyTurns: control.enemyTurns,
       finalHp: control.finalHp, damageDealt: control.damageDealt, shields: control.alliedShieldAbsorbed,
@@ -766,6 +806,7 @@ async function main() {
               paired95CI: percentCI(trials.map(row => row.winDelta)) },
             hpSwing: meanCI(trials.map(row => row.hpSwing)),
             bae: meanCI(trials.map(row => row.bae)),
+            impact: Object.fromEntries(Object.keys(trials[0]?.impact || {}).map(key => [key, meanCI(trials.map(row => row.impact[key]))])),
             averageDamage: { control: average(trials.map(row => row.controlDamage)), treatment: average(trials.map(row => row.treatmentDamage)) },
             averageAllyHpRetained: { control: average(trials.map(row => row.control.finalHp.allies)), treatment: average(trials.map(row => row.treatment.finalHp.allies)) },
             averageShieldAbsorbed: { control: average(trials.map(row => row.control.shields)), treatment: average(trials.map(row => row.treatment.shields)) },
@@ -788,8 +829,9 @@ async function main() {
           const partyComposition = party.slice().sort().join('+');
           const enemyComposition = enemies.slice().sort().join('+');
           const key = `${summary.candidate}|${wearer}|${difficulty}|${length}|${partyComposition}|${enemyComposition}`;
-          if (!accumulated.has(key)) accumulated.set(key, { candidate: summary.candidate, wearer, difficulty, length, partyComposition, enemyComposition, enemyCategory: summary.enemyCategories.join('+'), allyCount: party.length, enemyCount: enemies.length, formations: 0, controlWin: 0, treatmentWin: 0, controlDraw: 0, treatmentDraw: 0, winDelta: 0, hpSwing: 0, bae: 0 });
+          if (!accumulated.has(key)) accumulated.set(key, { candidate: summary.candidate, wearer, difficulty, length, partyComposition, enemyComposition, enemyCategory: summary.enemyCategories.join('+'), allyCount: party.length, enemyCount: enemies.length, formations: 0, controlWin: 0, treatmentWin: 0, controlDraw: 0, treatmentDraw: 0, winDelta: 0, hpSwing: 0, bae: 0, impact: {} });
           const aggregate = accumulated.get(key); aggregate.formations++; aggregate.controlWin += summary.winRate.control / 100; aggregate.treatmentWin += summary.winRate.treatment / 100; aggregate.controlDraw += summary.winRate.controlDrawRatePct / 100; aggregate.treatmentDraw += summary.winRate.treatmentDrawRatePct / 100; aggregate.winDelta += summary.winRate.differencePercentagePoints; aggregate.hpSwing += summary.hpSwing.mean; aggregate.bae += summary.bae.mean;
+          for (const [metric, estimate] of Object.entries(summary.impact)) aggregate.impact[metric] = (aggregate.impact[metric] || 0) + estimate.mean;
         }
       }
       if (scenarios % progressEvery === 0 || scenarios === targetScenarios)
@@ -799,17 +841,19 @@ async function main() {
   const summaryFile = options.output.replace(/\.jsonl$/i, '') + '-summary.csv';
   const compositionMeans = [...accumulated.values()].map(row => ({ ...row,
     controlWin: row.controlWin / row.formations, treatmentWin: row.treatmentWin / row.formations, controlDraw: row.controlDraw / row.formations, treatmentDraw: row.treatmentDraw / row.formations,
-    winDelta: row.winDelta / row.formations, hpSwing: row.hpSwing / row.formations, bae: row.bae / row.formations }));
+    winDelta: row.winDelta / row.formations, hpSwing: row.hpSwing / row.formations, bae: row.bae / row.formations,
+    impact: Object.fromEntries(Object.entries(row.impact).map(([metric, value]) => [metric, value / row.formations])) }));
   const strata = new Map();
   for (const row of compositionMeans) {
     const key = `${row.candidate}|${row.wearer}|${row.difficulty}|${row.length}|${row.allyCount}|${row.enemyCount}|${row.enemyCategory}`;
-    if (!strata.has(key)) strata.set(key, { candidate: row.candidate, wearer: row.wearer, difficulty: row.difficulty, length: row.length, allyCount: row.allyCount, enemyCount: row.enemyCount, enemyCategory: row.enemyCategory, compositionPairs: 0, controlWin: 0, treatmentWin: 0, controlDraw: 0, treatmentDraw: 0, winDelta: 0, hpSwing: 0, bae: 0 });
+    if (!strata.has(key)) strata.set(key, { candidate: row.candidate, wearer: row.wearer, difficulty: row.difficulty, length: row.length, allyCount: row.allyCount, enemyCount: row.enemyCount, enemyCategory: row.enemyCategory, compositionPairs: 0, controlWin: 0, treatmentWin: 0, controlDraw: 0, treatmentDraw: 0, winDelta: 0, hpSwing: 0, bae: 0, impact: {} });
     const aggregate = strata.get(key); aggregate.compositionPairs++; aggregate.controlWin += row.controlWin; aggregate.treatmentWin += row.treatmentWin; aggregate.controlDraw += row.controlDraw; aggregate.treatmentDraw += row.treatmentDraw; aggregate.winDelta += row.winDelta; aggregate.hpSwing += row.hpSwing; aggregate.bae += row.bae;
+    for (const [metric, value] of Object.entries(row.impact)) aggregate.impact[metric] = (aggregate.impact[metric] || 0) + value;
   }
   const rows = [...strata.values()];
   fs.writeFileSync(summaryFile, [
-    'candidate,wearer,difficulty,length,allyCount,enemyCount,enemyCategory,equallyWeightedCompositionPairs,winRateBeforePct,winRateAfterPct,drawRateBeforePct,drawRateAfterPct,differencePercentagePoints,meanHpSwing,meanBAE',
-    ...rows.map(row => [row.candidate, row.wearer, row.difficulty, row.length, row.allyCount, row.enemyCount, row.enemyCategory, row.compositionPairs, row.controlWin / row.compositionPairs * 100, row.treatmentWin / row.compositionPairs * 100, row.controlDraw / row.compositionPairs * 100, row.treatmentDraw / row.compositionPairs * 100, row.winDelta / row.compositionPairs, row.hpSwing / row.compositionPairs, row.bae / row.compositionPairs].map(csvEscape).join(','))
+    'candidate,wearer,difficulty,length,allyCount,enemyCount,enemyCategory,equallyWeightedCompositionPairs,winRateBeforePct,winRateAfterPct,drawRateBeforePct,drawRateAfterPct,differencePercentagePoints,meanHpSwing,meanBAE,enemyHpRemovedDelta,allyHpRetainedDelta,allyDamageDealtDelta,allyDamageTakenDelta,allyHealingDelta,allyShieldGrantedDelta,allyShieldAbsorbedDelta,allyEnergyGrantedDelta,allyEnergyGainedDelta,allyEnergySpentDelta,allyEnergyRemainingDelta,allySkillPointsGrantedDelta,allyTurnsDelta,enemyTurnsDelta',
+    ...rows.map(row => [row.candidate, row.wearer, row.difficulty, row.length, row.allyCount, row.enemyCount, row.enemyCategory, row.compositionPairs, row.controlWin / row.compositionPairs * 100, row.treatmentWin / row.compositionPairs * 100, row.controlDraw / row.compositionPairs * 100, row.treatmentDraw / row.compositionPairs * 100, row.winDelta / row.compositionPairs, row.hpSwing / row.compositionPairs, row.bae / row.compositionPairs, row.impact.enemyHpRemoved / row.compositionPairs, row.impact.allyHpRetained / row.compositionPairs, row.impact.damageDealt / row.compositionPairs, row.impact.damageTaken / row.compositionPairs, row.impact.healing / row.compositionPairs, row.impact.shieldsGranted / row.compositionPairs, row.impact.shieldsAbsorbed / row.compositionPairs, row.impact.energyGranted / row.compositionPairs, row.impact.energyGained / row.compositionPairs, row.impact.energySpent / row.compositionPairs, row.impact.energyRemaining / row.compositionPairs, row.impact.skillPointsGranted / row.compositionPairs, row.impact.allyTurns / row.compositionPairs, row.impact.enemyTurns / row.compositionPairs].map(csvEscape).join(','))
   ].join('\n') + '\n');
   const chartFile = options.output.replace(/\.jsonl$/i, '') + '-winrate.svg';
   fs.writeFileSync(chartFile, makeWinRateSvg(rows));
@@ -844,4 +888,4 @@ async function main() {
 const invoked = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : '';
 if (invoked === import.meta.url) main().catch(error => { console.error(error.stack || error.message); process.exitCode = 1; });
 
-export { archetypeLibrary, candidateSpecs, enemyLineups, makeBaseConfig, orderedUniqueTeams, statBudget };
+export { archetypeLibrary, candidateSpecs, enemyLineups, impactDeltas, makeBaseConfig, orderedUniqueTeams, statBudget };

@@ -687,21 +687,22 @@ export class TwoToneBattleEngine {
   }
   resolveEnemyBasicPlan({ basic, passive = null, attackCount = 0, rampageStacks = 0, momentumStacks = 0, debuffMultiplier = 1 }) {
     if (!basic || !Number.isFinite(basic.multiplier) || !Number.isFinite(debuffMultiplier)) return null;
-    const slimy = passive?.id === 'slimy' && Number.isInteger(passive.every) && passive.every > 0 && (attackCount + 1) % passive.every === 0;
-    const rampage = passive?.id === 'rampage' ? (passive.damageBonus ?? .25) * rampageStacks : 0;
-    const momentum = passive?.id === 'momentum' ? (passive.damageBonus ?? .2) * momentumStacks : 0;
+    const passiveId = passive?.id || (passive?.type === 'everyNthBasic' ? 'slimy' : passive?.type);
+    const slimy = passiveId === 'slimy' && Number.isInteger(passive.every) && passive.every > 0 && (attackCount + 1) % passive.every === 0;
+    const rampage = passiveId === 'rampage' ? (passive.damageBonus ?? .25) * rampageStacks : 0;
+    const momentum = passiveId === 'momentum' ? (passive.damageBonus ?? .2) * momentumStacks : 0;
     const damageBonus = slimy ? (passive.damageBonus ?? .25) : 0;
     return Object.freeze({
       damageType: basic.damageType,
       target: slimy ? 'aoe' : basic.targetMode || basic.target || 'single',
       multiplier: basic.multiplier * (1 + damageBonus) * (1 + rampage) * (1 + momentum) * debuffMultiplier,
       enhanced: slimy,
-      nextAttackCount: passive?.id === 'slimy' ? attackCount + 1 : attackCount,
-      nextRampageStacks: passive?.id === 'rampage' ? Math.min(passive.maxStacks ?? 4, rampageStacks + 1) : rampageStacks,
-      nextMomentumStacks: passive?.id === 'momentum' ? Math.min(passive.maxStacks ?? 10, momentumStacks + 1) : momentumStacks,
-      pursuitAdvance: passive?.id === 'pursuit' ? (passive.actionAdvance ?? 20) : 0,
-      bleedPerHit: passive?.id === 'ravage' ? (passive.stacksPerHit ?? 1) : 0,
-      bleedCap: passive?.id === 'ravage' ? (passive.maxStacks ?? 5) : 0
+      nextAttackCount: passiveId === 'slimy' ? attackCount + 1 : attackCount,
+      nextRampageStacks: passiveId === 'rampage' ? Math.min(passive.maxStacks ?? 4, rampageStacks + 1) : rampageStacks,
+      nextMomentumStacks: passiveId === 'momentum' ? Math.min(passive.maxStacks ?? 10, momentumStacks + 1) : momentumStacks,
+      pursuitAdvance: passiveId === 'pursuit' ? (passive.actionAdvance ?? 20) : 0,
+      bleedPerHit: passiveId === 'ravage' ? (passive.stacksPerHit ?? 1) : 0,
+      bleedCap: passiveId === 'ravage' ? (passive.maxStacks ?? 5) : 0
     });
   }
 }

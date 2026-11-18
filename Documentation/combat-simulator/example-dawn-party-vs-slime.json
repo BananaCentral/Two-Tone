@@ -26,6 +26,7 @@
       },
       "skill": {
         "type": "enhanceBasic",
+        "target": "self",
         "damagePerStack": 1,
         "energyPerStack": 10,
         "blastAtStacks": 3
@@ -60,18 +61,19 @@
       "energy": {
         "start": 20
       },
-      "characterDuplicates": 0
+      "characterDuplicates": 0,
+      "role": "mainDps"
     },
     "lily": {
       "name": "Lily",
       "level": 1,
       "stats": {
         "hp": 100,
-        "physicalAttack": 0,
-        "magicalAttack": 20,
         "physicalDefense": 4,
         "magicalDefense": 4,
-        "speed": 20
+        "speed": 20,
+        "physicalAttack": 0,
+        "magicalAttack": 20
       },
       "basic": {
         "damageType": "magical",
@@ -115,7 +117,8 @@
       "energy": {
         "start": 20
       },
-      "characterDuplicates": 0
+      "characterDuplicates": 0,
+      "role": "subDps"
     },
     "dawn": {
       "name": "Dawn",
@@ -136,15 +139,23 @@
       },
       "skill": {
         "type": "tune",
-        "energyGain": 20
+        "target": "ally",
+        "energyGain": 20,
+        "damageBonus": 0.4,
+        "duration": 1
       },
       "ultimate": {
         "type": "dawnSupport",
-        "energyCost": 100
+        "target": "ally",
+        "energyCost": 100,
+        "energyRestore": 0.5,
+        "actionAdvance": 100
       },
       "passives": [
         {
-          "type": "resourceful"
+          "type": "resourceful",
+          "skillPointCapBonus": 2,
+          "startingSkillPointBonus": 2
         }
       ],
       "weapon": {
@@ -161,10 +172,11 @@
       "energy": {
         "start": 20
       },
-      "characterDuplicates": 0
+      "characterDuplicates": 0,
+      "role": "support"
     },
     "slime": {
-      "name": "Slime",
+      "name": "SLIME",
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
@@ -187,19 +199,34 @@
           "damageBonus": 0.25,
           "target": "aoe"
         }
-      ]
+      ],
+      "role": "common",
+      "tags": {
+        "area": "One",
+        "type": "common",
+        "strengths": [
+          "Magical Attacker",
+          "Magical Resistant",
+          "Defensive"
+        ],
+        "weaknesses": [
+          "Physically Fragile",
+          "Slow"
+        ]
+      },
+      "stealth": 0
     },
     "goblin": {
-      "name": "Goblin",
+      "name": "GOBLIN",
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
         "hp": 200,
-        "physicalAttack": 40,
-        "magicalAttack": 0,
         "physicalDefense": 12,
         "magicalDefense": 4,
-        "speed": 40
+        "speed": 40,
+        "physicalAttack": 40,
+        "magicalAttack": 0
       },
       "basic": {
         "damageType": "physical",
@@ -211,19 +238,32 @@
           "type": "pursuit",
           "actionAdvance": 20
         }
-      ]
+      ],
+      "role": "elite",
+      "tags": {
+        "area": "One",
+        "type": "elite",
+        "strengths": [
+          "Physical Attacker",
+          "Physically Defensive"
+        ],
+        "weaknesses": [
+          "Magically Fragile"
+        ]
+      },
+      "stealth": 0
     },
     "bear": {
-      "name": "Bear",
+      "name": "BEAR",
       "level": 1,
       "barrierPercent": 0.2,
       "stats": {
         "hp": 450,
-        "physicalAttack": 90,
-        "magicalAttack": 0,
         "physicalDefense": 6,
         "magicalDefense": 6,
-        "speed": 60
+        "speed": 60,
+        "physicalAttack": 90,
+        "magicalAttack": 0
       },
       "basic": {
         "damageType": "true",
@@ -235,7 +275,22 @@
           "type": "sharpClaws",
           "defenseIgnore": 0.25
         }
-      ]
+      ],
+      "role": "boss",
+      "tags": {
+        "area": "One",
+        "type": "boss",
+        "strengths": [
+          "Defensive",
+          "Strong",
+          "Physical Attacker"
+        ],
+        "weaknesses": [
+          "Physically Fragile",
+          "Magically Fragile"
+        ]
+      },
+      "stealth": 0
     }
   },
   "teams": {
