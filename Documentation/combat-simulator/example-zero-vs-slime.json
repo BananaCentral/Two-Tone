@@ -37,7 +37,30 @@
         "damageType": "physical",
         "multiplier": 1,
         "target": "aoe",
-        "energyCost": 100
+        "energyCost": 100,
+        "actionAdvance": 100,
+        "mechanicTargets": {
+          "damage.direct": {
+            "side": "enemy",
+            "acquisition": "all",
+            "coverage": "aoe"
+          },
+          "damage.physical": {
+            "side": "enemy",
+            "acquisition": "all",
+            "coverage": "aoe"
+          },
+          "resource.energy": {
+            "side": "enemy",
+            "acquisition": "all",
+            "coverage": "aoe"
+          },
+          "tempo.action_advance": {
+            "side": "self",
+            "acquisition": "self",
+            "coverage": "single"
+          }
+        }
       },
       "passives": [
         {

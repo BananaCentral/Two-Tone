@@ -88,13 +88,20 @@
         "multiplier": 0.5,
         "target": "aoe",
         "energyGain": 20,
-        "markTurns": 2
+        "markTurns": 2,
+        "ricochetDamageMultiplier": 0.1
       },
       "ultimate": {
         "damageType": "magical",
         "multiplier": 1,
         "target": "aoe",
-        "energyCost": 100
+        "energyCost": 100,
+        "summonDuration": 3,
+        "summonSpeed": 30,
+        "summonHp": 1,
+        "summonDamageType": "true",
+        "summonMultiplier": 1,
+        "summonTarget": "aoe"
       },
       "passives": [
         {

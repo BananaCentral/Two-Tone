@@ -9,6 +9,7 @@ Combat balance reports must execute the same combat rules and authored combat da
 - `src/scripts/combat-definitions.mjs` owns character and enemy combat sheets. The browser game and analysis tools import these definitions. Display-only art and labels remain in the live roster entries.
 - `src/scripts/combat-math.mjs` owns shared numeric primitives used by live battle code and the simulator, including HP/stat rounding and typed direct-hit damage.
 - `src/scripts/combat-engine-api.mjs` is the shared runtime API boundary. Both live battles and the runner use its action intents (authored action plan plus resource commitment), typed-hit calculation, target plans, enemy basic-attack plans, Rune triggers, complete direct/Reflect/Echo damage sequences, bleed ticks, Shield/healing application, character-specific effect handlers, shared status application and aging, Follow-Up/Ricochet allocation, summon lifetime, battle outcomes, and turn timeline.
+- `Documentation/combat-effect-lifecycle-standard.md` and `COMBAT_EFFECT_LIFECYCLE` define reapplication, turn clocks, stack consumption, cooldown timing, summon lifetime, cleanse, and defeat cleanup. The shared engine owns these transitions.
 - Simulation-only scenario settings may select lineups, scale encounter profiles, choose AI policies, and seed randomness. They must not redefine a character's stats, abilities, passives, enemy attacks, or damage rules.
 
 ## Required architecture for trusted results
@@ -25,6 +26,8 @@ The live UI should provide presentation callbacks around this runtime; it must n
 ## Current migration status
 
 The browser game and runner share authored character/enemy sheets, typed damage math, direct-hit intake, barrier damage and break resolution, complete Reflect/Echo event sequencing, Bleed stacks and tick resolution, Exposed/Bleed/Ricochet hit effects, Follow-Up charge and target allocation, Shield/healing application, Dawn Tune/Ultimate, Logan Blood Shield, Zero/Lily/Logan ultimate effects, Lily summon plans and duration, shared mark/debuff/taunt/tune/residue updates, action intents, target plans, skill-point and Energy settlement, Rune effects and cooldown timing, enemy basic-attack plans, battle outcome checks, turn scheduling, and status-duration/cleanse operations. Both call `TwoToneBattleEngine` for those state changes. The engine owns shared combat formulas and state transitions; callers provide derived equipment/stat context and retain presentation/metrics bookkeeping.
+
+Timed effects advance on explicit lifecycle clocks. Both live battles and simulations call `ageUnitEffects` once at the affected unit's turn end; Bleed separately resolves at turn start before the action. Rune cooldowns and summon lifetime use owner-turn and summon-action clocks as specified in the [Combat Effect Lifecycle Standard](combat-effect-lifecycle-standard.md).
 
 ## Runtime boundary
 

@@ -9,7 +9,7 @@ function runtimeDefinition(value) {
   if (Array.isArray(value)) return value.map(runtimeDefinition);
   if (!value || typeof value !== 'object') return value;
   return Object.fromEntries(Object.entries(value)
-    .filter(([key]) => !['mechanicTags', 'mechanicTargets', 'mechanicTriggers', 'targeting'].includes(key))
+    .filter(([key]) => !['mechanicTags', 'mechanicTargets', 'mechanicTriggers', 'targeting', 'targetingVariants'].includes(key))
     .map(([key, child]) => [key, runtimeDefinition(child)]));
 }
 

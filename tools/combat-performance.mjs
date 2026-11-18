@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { simulateBattle } from './combat-simulator.mjs';
-import { CHARACTER_COMBAT_DATA, ENEMY_COMBAT_DATA } from '../src/scripts/combat-definitions.mjs';
+import { CHARACTER_COMBAT_DATA, CHARACTER_UPGRADE_EFFECTS, ENEMY_COMBAT_DATA } from '../src/scripts/combat-definitions.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CHARACTER_IDS = ['soul', 'lily', 'dawn', 'logan', 'zero'];
@@ -103,6 +103,7 @@ function makeBaseConfig(library, allies, enemies, difficulty, length, archetypeC
   };
 }
 function candidateSpecs(raw) {
+  if (raw === 'all-upgrade-effects') return Object.values(CHARACTER_UPGRADE_EFFECTS).map(effect => ({ type: 'upgrade', id: effect.id, character: effect.character, source: effect.source }));
   if (raw === 'all-actions') return [...CHARACTER_IDS.flatMap(character => ['basic', 'skill', 'ultimate'].map(id => ({ type: 'action', id, character }))), ...Object.keys(SVP_GAINS).map(id => ({ type: 'stat', id }))];
   if (raw === 'all-passives') return [...CHARACTER_PASSIVES.map(spec => ({ type: 'passive', ...spec })), ...Object.keys(SVP_GAINS).map(id => ({ type: 'stat', id }))];
   if (raw === 'all-character-mechanics') return [
@@ -123,6 +124,10 @@ function candidateSpecs(raw) {
     const [character, id] = value.split('/');
     if (CHARACTER_PASSIVES.some(spec => spec.character === character && spec.id === id)) return [{ type, id, character }];
   }
+  if (type === 'upgrade' && CHARACTER_UPGRADE_EFFECTS[value]) {
+    const effect = CHARACTER_UPGRADE_EFFECTS[value];
+    return [{ type, id: effect.id, character: effect.character, source: effect.source }];
+  }
   if (type === 'stat' && Object.hasOwn(SVP_GAINS, value)) return [{ type, id: value }];
   if (type === 'action' && /^(soul|lily|dawn|logan|zero)\/(basic|skill|ultimate)$/.test(value)) {
     const [character, action] = value.split('/'); return [{ type, id: action, character }];
@@ -139,6 +144,7 @@ function candidateLabel(spec) {
   return `${spec.type}:${spec.id}${spec.potential ? `@P${spec.potential}L${spec.level || 1}` : ''}`;
 }
 function wearersFor(spec, party) {
+  if (spec.type === 'upgrade') return party.includes(spec.character) ? [spec.character] : [];
   if (spec.type === 'character') return party.includes(spec.id) ? [spec.id] : [];
   if (spec.type === 'action' || spec.type === 'passive' || spec.type === 'character-overall') return party.includes(spec.character) ? [spec.character] : [];
   if (spec.id === 'radiant-moon') return party.filter(id => ['lily', 'zero'].includes(id));
@@ -170,7 +176,20 @@ function makeBranches(base, spec, wearer) {
   const treated = findUnit(treatment, wearer);
   assert(controlled && treated, `Wearer ${wearer} is absent from matchup.`);
   let treatmentStatBudget = null;
-  if (spec.type === 'weapon') {
+  if (spec.type === 'upgrade') {
+    const source = spec.source;
+    const equipped = source.kind === 'premium_weapon_duplicate' || source.kind === 'signature_weapon';
+    const weapon = equipped ? { type: 'premium', potential: source.kind === 'premium_weapon_duplicate' ? source.rank + 1 : 1 } : null;
+    if (source.kind === 'character_duplicate') {
+      controlled.characterDuplicates = source.rank;
+      treated.characterDuplicates = source.rank;
+    }
+    if (equipped) {
+      controlled.weapon = { ...weapon };
+      treated.weapon = { ...weapon };
+    }
+    controlled.disabledUpgradeEffectIds = [...new Set([...(controlled.disabledUpgradeEffectIds || []), spec.id])];
+  } else if (spec.type === 'weapon') {
     treated.weapon = { type: spec.id, potential: spec.potential, level: spec.level || 1 };
   } else if (spec.type === 'stat') {
     // Use the same setless four-Rune stat loadout as Rune-effect comparisons.
@@ -361,7 +380,7 @@ function parseArgs(args) {
       const raw = args[++index];
       options.candidates.push(...candidateSpecs(raw));
       if (raw === 'all-rune-ratings') options.runeRating = true;
-      if (['all-character-mechanics', 'all-actions', 'all-passives'].includes(raw)) options.mechanicRating = true;
+      if (['all-character-mechanics', 'all-actions', 'all-passives', 'all-upgrade-effects'].includes(raw) || raw.startsWith('upgrade:')) options.mechanicRating = true;
     }
     else if (arg === '--character') options.character = args[++index];
     else if (arg === '--runs') options.runs = Number(args[++index]);
@@ -386,7 +405,7 @@ function parseArgs(args) {
   return options;
 }
 function help() {
-  return `Two-Tone matched combat performance runner\n\nUsage: node tools/combat-performance.mjs [options]\n\nOptions:\n  --preset quick|balanced|deep|full  Select a coverage/run-count preset (default quick)\n  --candidate all-rune-ratings|all-runes|all-stats|all-weapons\n  --candidate all-actions|all-passives|all-character-mechanics\n  --candidate rune:<id>|character:<id>|passive:<character>/<id>|stat:<id>\n  --candidate weapon:standard@P1L1|weapon:premium@P1L50\n  --candidate action:<character>/basic|skill|ultimate\n  --character <id>           Restrict item/stat tests to this eligible wearer\n  --runs <n>                  Matched seeds per matchup\n  --seed <n>                  First reproducible seed (default 1)\n  --limit-scenarios <n>       Scenario cap; use 0 for the full matrix\n  --max-actions <n>           Maximum unit actions in one battle (default 2000)\n  --output <path>             JSONL result path\n  --include-trials            Include per-seed details (larger output)\n\nWithout --candidate, tests all Runes against the average +100 SVP stat reference and writes a rating report. Presets: quick=180 scenarios × 5 seeds; balanced=360 × 10; deep=1,000 × 20; full=all 17,213,850 × 100. Limited presets balance party size, enemy count, length, and difficulty. The full position-aware matrix uses 205 ordered legal ally teams and 9,330 ordered enemy lineups.`;
+  return `Two-Tone matched combat performance runner\n\nUsage: node tools/combat-performance.mjs [options]\n\nOptions:\n  --preset quick|balanced|deep|full  Select a coverage/run-count preset (default quick)\n  --candidate all-rune-ratings|all-runes|all-stats|all-weapons\n  --candidate all-actions|all-passives|all-character-mechanics|all-upgrade-effects\n  --candidate rune:<id>|character:<id>|passive:<character>/<id>|stat:<id>\n  --candidate upgrade:<effect-id>\n  --candidate weapon:standard@P1L1|weapon:premium@P1L50\n  --candidate action:<character>/basic|skill|ultimate\n  --character <id>           Restrict item/stat tests to this eligible wearer\n  --runs <n>                  Matched seeds per matchup\n  --seed <n>                  First reproducible seed (default 1)\n  --limit-scenarios <n>       Scenario cap; use 0 for the full matrix\n  --max-actions <n>           Maximum unit actions in one battle (default 2000)\n  --output <path>             JSONL result path\n  --include-trials            Include per-seed details (larger output)\n\nWithout --candidate, tests all Runes against the average +100 SVP stat reference and writes a rating report. Presets: quick=180 scenarios × 5 seeds; balanced=360 × 10; deep=1,000 × 20; full=all 17,213,850 × 100. Limited presets balance party size, enemy count, length, and difficulty. The full position-aware matrix uses 205 ordered legal ally teams and 9,330 ordered enemy lineups.`;
 }
 function* scenarioSamples(allyLists, enemyTeams, limit) {
   if (!limit) {
@@ -819,7 +838,7 @@ async function main() {
           out.write(JSON.stringify(summary) + '\n');
           comparisons++;
           if ((options.runeRating && (spec.type === 'rune' || spec.type === 'stat')) ||
-              (options.mechanicRating && ['passive', 'action', 'character-overall', 'stat'].includes(spec.type))) ratingSamples.push({
+              (options.mechanicRating && ['passive', 'action', 'character-overall', 'stat', 'upgrade'].includes(spec.type))) ratingSamples.push({
             candidate: candidateLabel(spec), wearer, scenarioId: scenarios,
             difficulty, length, partyComposition: party.slice().sort().join('+'),
             enemyComposition: enemies.slice().sort().join('+'), allyCount: party.length,
@@ -888,4 +907,4 @@ async function main() {
 const invoked = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : '';
 if (invoked === import.meta.url) main().catch(error => { console.error(error.stack || error.message); process.exitCode = 1; });
 
-export { archetypeLibrary, candidateSpecs, enemyLineups, impactDeltas, makeBaseConfig, orderedUniqueTeams, statBudget };
+export { archetypeLibrary, candidateSpecs, enemyLineups, impactDeltas, makeBaseConfig, makeBranches, orderedUniqueTeams, statBudget };

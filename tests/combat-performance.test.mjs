@@ -1,6 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { impactDeltas } from '../tools/combat-performance.mjs';
+import { archetypeLibrary, candidateSpecs, impactDeltas, makeBaseConfig, makeBranches } from '../tools/combat-performance.mjs';
+
+test('upgrade performance candidates cover individually tagged duplicate and weapon effects', () => {
+  const upgrades = candidateSpecs('all-upgrade-effects');
+  assert.ok(upgrades.length >= 40);
+  assert.ok(upgrades.some(candidate => candidate.id === 'soul.duplicate.2.follow-up-damage'));
+  assert.ok(upgrades.some(candidate => candidate.id === 'dawn.signature.tune-defense-ignore'));
+  assert.ok(upgrades.some(candidate => candidate.id === 'logan.premium-duplicate.4.shielded-attack'));
+  assert.deepEqual(candidateSpecs('upgrade:soul.duplicate.2.follow-up-damage'), [
+    { type: 'upgrade', id: 'soul.duplicate.2.follow-up-damage', character: 'soul', source: { kind: 'character_duplicate', rank: 2 } }
+  ]);
+
+  const base = makeBaseConfig(archetypeLibrary(), ['soul', 'lily'], ['slime'], 'medium', 'short');
+  const spec = upgrades.find(candidate => candidate.id === 'soul.duplicate.2.follow-up-damage');
+  const { control, treatment } = makeBranches(base, spec, 'soul');
+  assert.equal(control.teams.allies[0].characterDuplicates, 2);
+  assert.equal(treatment.teams.allies[0].characterDuplicates, 2);
+  assert.deepEqual(control.teams.allies[0].disabledUpgradeEffectIds, [spec.id]);
+  assert.equal(treatment.teams.allies[0].disabledUpgradeEffectIds, undefined);
+});
 
 test('paired impact metrics expose support, damage, protection, resource, and turn deltas', () => {
   const control = {

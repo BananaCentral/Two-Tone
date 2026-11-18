@@ -4,7 +4,7 @@
 
 Mechanic tags describe what an ability or combat rule does so the performance evaluator can choose relevant measurements without identifying a character by name or role. The shared combat definitions remain authoritative for numeric values and runtime behavior. Tags add analysis metadata; they do not change damage, costs, targeting, or timing.
 
-Character and enemy actions/passives expose `mechanicTags`, per-tag `mechanicTargets`, and per-tag `mechanicTriggers`. Actions also expose `targeting` for their primary target. Rune rules expose tags, triggers, and targeting. The canonical lists are exported from `src/scripts/combat-definitions.mjs` as `COMBAT_MECHANIC_TAGS`, `COMBAT_TARGETING_SCHEMA`, and `COMBAT_TRIGGER_EVENTS`.
+Character and enemy actions/passives expose `mechanicTags`, per-tag `mechanicTargets`, and per-tag `mechanicTriggers`. Actions also expose `targeting` for their primary target and may expose `targetingVariants` when a rule changes coverage conditionally. Rune rules expose tags, triggers, and targeting. Temporary effects additionally use `COMBAT_EFFECT_LIFECYCLE`, documented in the [Combat Effect Lifecycle Standard](combat-effect-lifecycle-standard.md). The canonical lists are exported from `src/scripts/combat-definitions.mjs` as `COMBAT_MECHANIC_TAGS`, `COMBAT_TARGETING_SCHEMA`, and `COMBAT_TRIGGER_EVENTS`.
 
 ## Targeting fields
 
@@ -36,8 +36,8 @@ An ability can affect more than one side. Its primary `targeting` describes the 
 | `damage.conditional_multiplier` | Conditional or periodic damage multiplier |
 | `damage.over_time` | Damage resolved over time |
 | `damage.echo`, `damage.reflect`, `damage.follow_up` | Secondary damage mechanics |
-| `damage.barrier_break` | Damage caused by breaking an enemy barrier |
-| `buff.attack`, `buff.critical`, `buff.next_basic`, `buff.damage`, `buff.defense_ignore` | Ally or self bonuses |
+| `damage.barrier_break` | Automatic damage caused when barrier health is depleted; not an attack property |
+| `buff.attack`, `buff.critical`, `buff.next_basic`, `buff.damage`, `buff.barrier_damage`, `buff.barrier_break_damage`, `buff.defense_ignore` | Ally or self bonuses |
 | `debuff.defense`, `debuff.damage`, `debuff.mark` | Enemy weakening or a mark used by another effect |
 | `defense.shield`, `defense.barrier`, `defense.damage_reduction`, `defense.stealth` | Damage prevention or avoidance |
 | `recovery.healing`, `recovery.lifesteal` | HP recovery |
@@ -45,10 +45,10 @@ An ability can affect more than one side. Its primary `targeting` describes the 
 | `tempo.action_advance`, `tempo.action_delay`, `tempo.taunt` | Turn order or attack redirection |
 | `status.bleed`, `status.exposed`, `status.ricochet`, `status.tune`, `status.residue`, `status.broken` | Combat statuses and marks |
 | `summon.create`, `summon.action` | Summon creation and its actions |
-| `trigger.per_hit`, `trigger.per_action`, `trigger.per_source`, `trigger.periodic` | Activation conditions |
+| `trigger.per_hit`, `trigger.first_hit_per_target`, `trigger.per_action`, `trigger.per_source`, `trigger.periodic` | Activation conditions |
 | `limit.duration`, `limit.stacks`, `limit.charges`, `limit.cooldown` | Effect lifetime or activation limits |
 
-Tags identify mechanic kinds. Actual values—multipliers, chances, duration, stacks, cooldown turns, resource amounts—stay in the combat definition. `targeting.coverage` describes who gets hit; `damage.conditional_multiplier` describes a conditional damage increase.
+Tags identify mechanic kinds. Actual values—multipliers, chances, duration, stacks, cooldown turns, resource amounts—stay in the combat definition. `targeting.coverage` describes who gets hit; `damage.conditional_multiplier` describes a conditional damage increase. A trigger records when an effect resolves; its condition records what must be true for it to resolve.
 
 ## Current character tags
 
@@ -58,13 +58,15 @@ Tags identify mechanic kinds. Actual values—multipliers, chances, duration, st
 | Lily | `status.exposed`, `debuff.mark`, `debuff.defense`, `limit.duration` | `damage.direct`, `damage.magical`, `resource.energy`, `resource.skill_point` | `damage.direct`, `damage.magical`, `status.ricochet`, `debuff.mark`, `damage.true`, `trigger.per_source`, `resource.energy`, `resource.skill_point`, `limit.duration` | `damage.direct`, `damage.magical`, `summon.create`, `summon.action`, `resource.energy` |
 | Dawn | `resource.skill_point`, `resource.capacity` | `damage.direct`, `damage.magical`, `resource.energy`, `resource.skill_point` | `status.tune`, `buff.next_basic`, `buff.damage`, `resource.skill_point`, `resource.energy`, `limit.duration` | `resource.energy`, `resource.skill_point`, `tempo.action_advance` |
 | Logan | `recovery.lifesteal` | `damage.direct`, `damage.physical`, `status.bleed`, `damage.over_time`, `resource.energy`, `resource.skill_point` | `defense.shield`, `resource.hp_cost`, `tempo.taunt`, `resource.energy`, `resource.skill_point` | `damage.direct`, `damage.physical`, `status.bleed`, `damage.over_time`, `resource.energy` |
-| Zero | `buff.critical`, `damage.critical` | `damage.direct`, `damage.physical`, `resource.energy`, `resource.skill_point`; targeting coverage `blast` | `damage.direct`, `damage.physical`, `damage.conditional_multiplier`, `trigger.per_hit`, `resource.energy`, `resource.skill_point` | `damage.direct`, `damage.physical`, `tempo.action_advance`, `resource.energy` |
+| Zero | `buff.critical`, `damage.critical` | `damage.direct`, `damage.physical`, `resource.energy`, `resource.skill_point`; targeting coverage `blast` | `damage.direct`, `damage.physical`, `damage.conditional_multiplier`, `trigger.first_hit_per_target`, `resource.energy`, `resource.skill_point` | `damage.direct`, `damage.physical`, `tempo.action_advance`, `resource.energy` |
 
-The action’s numeric fields and target metadata specify its current multiplier, cost, duration, and target pattern. Tags do not repeat those values. Direct hits are also tagged `damage.barrier_break`, since the shared damage resolver applies barrier damage and break effects to eligible hits.
+The action’s numeric fields and target metadata specify its current multiplier, cost, duration, and target pattern. Tags do not repeat those values. Zero’s First Strike multiplier applies on the first hit to each enemy, so it uses `trigger.first_hit_per_target` and the `on_first_hit_per_target` event. Soul’s Enhance metadata derives a Basic Attack targeting variant from `blastAtStacks`: at three enhanced stacks the Basic is Blast, with a premium-weapon-duplicate override that makes it AoE. The threshold comes from the combat definition rather than being repeated in the tag rules.
+
+Every attack hit also reduces the target’s barrier health when it has a barrier. This is shared damage resolution, not an attack-specific barrier-break property. When barrier health reaches zero, the engine emits the barrier depletion/broken event and its automatic break damage; individual attacks are not tagged as barrier-breaking attacks.
 
 ## Current enemy tags
 
-All six enemy archetypes have `defense.barrier`, `damage.barrier_break`, and `status.broken` because enemy barriers and the broken state are part of combat. Hawk additionally has `defense.stealth`.
+All six enemy archetypes have `defense.barrier` and `status.broken` because enemy barrier health and the broken state are part of combat. The automatic barrier-depletion damage is not a tag on their attacks. Hawk additionally has `defense.stealth`.
 
 | Enemy | Basic / passive mechanics |
 |---|---|
@@ -91,6 +93,14 @@ Enemy area/type/strength/weakness descriptors remain encounter classification me
 | Amplify | `buff.damage`, `limit.cooldown` |
 | United | `tempo.action_advance`, `limit.cooldown` |
 
+## Character duplicate and weapon effects
+
+`CHARACTER_UPGRADE_EFFECTS` in the shared combat definitions contains one record per character duplicate, signature weapon effect, and premium weapon duplicate. Every record has a stable ID, its source and rank, tagged mechanics, per-tag targets and triggers, and the values the engine applies. `getActiveCharacterUpgradeEffect` uses the same source/rank/equipped-weapon state to select an active record. The engine and analysis tools should use this catalog rather than repeat rank thresholds and effect values.
+
+The record IDs use character names only to identify ownership and provenance; the mechanic tags remain shared. For example, Logan’s second duplicate is a `defense.shield` effect, while his second premium weapon duplicate is a `tempo.taunt` effect. A simulator counterfactual can disable one stable effect ID while keeping the character’s other duplicates and equipment unchanged.
+
+The standard also includes `buff.barrier_damage` and `buff.barrier_break_damage` for effects that change the amount of barrier-health damage or automatic damage after barrier depletion. Neither tag marks an attack as a barrier-breaking attack.
+
 Tag coverage follows the current shared combat definitions. A change to a Rune’s values or behavior must update that definition; a new mechanic requires a catalog tag and test coverage.
 
 ## Engine-supported, currently unassigned
@@ -99,6 +109,6 @@ The tag vocabulary also reserves mechanics supported by shared engine helpers bu
 
 ## Coverage rule
 
-Every authored action, passive, enemy trait, and Rune effect must expose its relevant mechanic tags, per-tag target, and per-tag trigger. Every tag must appear in `COMBAT_MECHANIC_TAGS`; target and trigger values must appear in their exported schemas. Performance analysis can enumerate eligible allies/enemies from target metadata and select outcome measures from the tags.
+Every authored action, passive, enemy trait, Rune effect, character duplicate, and weapon effect must expose its relevant mechanic tags, per-tag target, and per-tag trigger. Temporary effects must also have a lifecycle record that declares their clock, stack/reapplication policy, and cleanup rules. Every tag must appear in `COMBAT_MECHANIC_TAGS`; target and trigger values must appear in their exported schemas. Performance analysis can enumerate eligible allies/enemies from target metadata and select outcome measures from the tags.
 
 Adding an unregistered combat effect type requires an explicit `mechanicTags` list; definitions without one fail during shared combat data initialization. Add tests for the new tag, target, and trigger so it cannot silently receive only generic damage tags.

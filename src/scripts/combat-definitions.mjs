@@ -10,7 +10,7 @@ export const COMBAT_MECHANIC_TAGS = Object.freeze([
   'damage.direct', 'damage.physical', 'damage.magical', 'damage.true', 'damage.critical',
   'damage.conditional_multiplier', 'damage.over_time', 'damage.echo', 'damage.reflect',
   'damage.follow_up', 'damage.barrier_break',
-  'buff.attack', 'buff.critical', 'buff.next_basic', 'buff.damage', 'buff.defense_ignore',
+  'buff.attack', 'buff.critical', 'buff.next_basic', 'buff.damage', 'buff.barrier_damage', 'buff.barrier_break_damage', 'buff.defense_ignore',
   'debuff.defense', 'debuff.damage', 'debuff.mark',
   'defense.shield', 'defense.barrier', 'defense.damage_reduction', 'defense.stealth',
   'recovery.healing', 'recovery.lifesteal',
@@ -18,7 +18,7 @@ export const COMBAT_MECHANIC_TAGS = Object.freeze([
   'tempo.action_advance', 'tempo.action_delay', 'tempo.taunt',
   'status.bleed', 'status.exposed', 'status.ricochet', 'status.tune', 'status.residue', 'status.broken',
   'summon.create', 'summon.action',
-  'trigger.per_hit', 'trigger.per_action', 'trigger.per_source', 'trigger.periodic',
+  'trigger.per_hit', 'trigger.first_hit_per_target', 'trigger.per_action', 'trigger.per_source', 'trigger.periodic',
   'limit.duration', 'limit.stacks', 'limit.charges', 'limit.cooldown'
 ]);
 export const COMBAT_TARGETING_SCHEMA = Object.freeze({
@@ -30,8 +30,34 @@ export const COMBAT_TRIGGER_EVENTS = Object.freeze([
   'on_basic', 'on_skill', 'on_ultimate', 'on_successful_hit', 'on_incoming_attack',
   'on_ally_damage_to_enemy', 'on_ally_damage_dealt', 'on_tuned_basic_used',
   'every_nth_basic', 'after_attack', 'battle_start', 'always_on', 'event_defined',
-  'on_direct_damage', 'on_ally_skill', 'on_ability_hit', 'on_turn_start', 'on_ability_damage', 'on_barrier_break'
+  'on_direct_damage', 'on_ally_skill', 'on_ability_hit', 'on_turn_start', 'on_ability_damage', 'on_barrier_break', 'on_first_hit_per_target', 'on_shield_applied'
 ]);
+
+// Lifecycle rules define the clock and reapplication behavior for timed effects.
+// Numeric duration, stack cap, and magnitude values remain on authored effects.
+export const COMBAT_EFFECT_LIFECYCLE_EVENTS = Object.freeze([
+  'affected_turn_start', 'affected_turn_end', 'owner_turn_end', 'summon_action_end', 'encounter_end'
+]);
+export const COMBAT_EFFECT_LIFECYCLE = Object.freeze({
+  bleed: Object.freeze({ storage: 'bleedStacks', kind: 'stacked_damage', defaultMaxStacks: 5, damagePerStack: .02, tick: Object.freeze({ event: 'affected_turn_start', phase: 'before_action', stacksConsumed: 1 }), reapply: 'add_to_cap', removeOn: Object.freeze(['cleanse', 'defeat']) }),
+  exposed: Object.freeze({ storage: 'marks', kind: 'timed_stacks', clock: 'affected_turn_end', reapply: 'add_stack_refresh_duration', removeOn: Object.freeze(['cleanse', 'defeat']) }),
+  ricochet: Object.freeze({ storage: 'marks', kind: 'timed_mark', clock: 'affected_turn_end', reapply: 'refresh_duration_reset_source_history', consume: 'once_per_target_per_source', removeOn: Object.freeze(['cleanse', 'defeat']) }),
+  'soul-mark': Object.freeze({ storage: 'marks', kind: 'timed_mark', clock: 'affected_turn_end', reapply: 'refresh_duration', removeOn: Object.freeze(['cleanse', 'defeat']) }),
+  'lily-weakened': Object.freeze({ storage: 'debuffs', kind: 'timed_debuff', clock: 'affected_turn_end', reapply: 'replace_refresh_duration', removeOn: Object.freeze(['cleanse', 'defeat']) }),
+  tune: Object.freeze({ storage: 'tune', kind: 'timed_buff', clock: 'affected_turn_end', reapply: 'replace', consume: 'next_basic', removeOn: Object.freeze(['duration_expired', 'defeat']) }),
+  taunt: Object.freeze({ storage: 'tauntEffects', kind: 'timed_redirect', clock: 'affected_turn_end', reapply: 'replace_same_source_and_target', removeOn: Object.freeze(['duration_expired', 'cleanse', 'defeat']) }),
+  residue: Object.freeze({ storage: 'residue', kind: 'timed_stacks', defaultMaxStacks: 5, defaultDurationTurns: 2, clock: 'affected_turn_end', reapply: 'add_stack_refresh_duration', removeOn: Object.freeze(['duration_expired', 'cleanse', 'defeat']) }),
+  runeCooldown: Object.freeze({ storage: 'cooldowns', kind: 'cooldown', clock: 'owner_turn_end', startsAfterTriggerTurn: true }),
+  summonLifetime: Object.freeze({ storage: 'summon', kind: 'action_count', clock: 'summon_action_end', expiresAtZero: true }),
+  shield: Object.freeze({ storage: 'shield', kind: 'depleting_pool', expiresOn: Object.freeze(['depleted', 'encounter_end']) }),
+  barrier: Object.freeze({ storage: 'barrier', kind: 'depleting_pool', expiresOn: Object.freeze(['depleted', 'encounter_end']), recovery: 'restore_on_broken_recovery' })
+});
+for (const [id, rule] of Object.entries(COMBAT_EFFECT_LIFECYCLE)) {
+  for (const event of [rule.clock, rule.tick?.event].filter(Boolean)) {
+    if (!COMBAT_EFFECT_LIFECYCLE_EVENTS.includes(event)) throw new Error(`Unknown lifecycle event ${event} on ${id}.`);
+  }
+  if (!rule.storage || !rule.kind) throw new Error(`Incomplete lifecycle definition for ${id}.`);
+}
 
 const TYPE_MECHANIC_TAGS = Object.freeze({
   followUp: ['damage.follow_up', 'trigger.per_source', 'limit.charges'],
@@ -45,7 +71,7 @@ const TYPE_MECHANIC_TAGS = Object.freeze({
   momentum: ['buff.attack', 'limit.stacks'],
   sharpClaws: ['buff.defense_ignore'],
   enhanceBasic: ['buff.next_basic', 'buff.damage', 'resource.skill_point', 'resource.energy'],
-  firstStrike: ['damage.conditional_multiplier', 'trigger.per_hit'],
+  firstStrike: ['damage.conditional_multiplier', 'trigger.first_hit_per_target'],
   ricochet: ['status.ricochet', 'debuff.mark', 'damage.true', 'trigger.per_source', 'limit.duration'],
   tune: ['status.tune', 'buff.next_basic', 'buff.damage', 'resource.skill_point', 'resource.energy', 'limit.duration'],
   bloodShield: ['defense.shield', 'resource.hp_cost', 'tempo.taunt', 'resource.energy'],
@@ -64,7 +90,7 @@ const TYPE_MECHANIC_TARGETS = Object.freeze({
   momentum: { 'buff.attack': ['self', 'self', 'single'] },
   sharpClaws: { 'buff.defense_ignore': ['self', 'self', 'single'] },
   enhanceBasic: { 'buff.next_basic': ['self', 'self', 'single'], 'resource.skill_point': ['team', 'battle_pool', 'global'], 'resource.energy': ['self', 'self', 'single'] },
-  firstStrike: { 'damage.direct': ['opponent', 'selected', 'single'], 'damage.conditional_multiplier': ['opponent', 'selected', 'single'], 'resource.skill_point': ['team', 'battle_pool', 'global'], 'resource.energy': ['self', 'self', 'single'] },
+  firstStrike: { 'damage.direct': ['opponent', 'selected', 'single'], 'damage.conditional_multiplier': ['opponent', 'selected', 'single'], 'trigger.first_hit_per_target': ['opponent', 'selected', 'single'], 'resource.skill_point': ['team', 'battle_pool', 'global'], 'resource.energy': ['self', 'self', 'single'] },
   ricochet: { 'debuff.mark': ['opponent', 'all', 'aoe'], 'damage.true': ['opponent', 'event_defined', 'event_defined'], 'resource.skill_point': ['team', 'battle_pool', 'global'], 'resource.energy': ['self', 'self', 'single'] },
   tune: { 'buff.next_basic': ['ally', 'selected', 'single'], 'resource.skill_point': ['team', 'battle_pool', 'global'], 'resource.energy': ['self', 'self', 'single'] },
   bloodShield: { 'defense.shield': ['actor_team', 'all', 'all'], 'tempo.taunt': ['opponent', 'all', 'all'], 'resource.hp_cost': ['self', 'self', 'single'], 'resource.skill_point': ['team', 'battle_pool', 'global'], 'resource.energy': ['self', 'self', 'single'] },
@@ -83,7 +109,7 @@ const TYPE_MECHANIC_TRIGGERS = Object.freeze({
   momentum: { 'buff.attack': 'after_attack' },
   sharpClaws: { 'buff.defense_ignore': 'always_on' },
   enhanceBasic: { 'buff.next_basic': 'on_skill', 'resource.skill_point': 'on_skill', 'resource.energy': 'on_basic' },
-  firstStrike: { 'damage.direct': 'on_skill', 'damage.conditional_multiplier': 'on_skill' },
+  firstStrike: { 'damage.direct': 'on_skill', 'damage.conditional_multiplier': 'on_first_hit_per_target', 'trigger.first_hit_per_target': 'on_first_hit_per_target' },
   ricochet: { 'debuff.mark': 'on_successful_hit', 'status.ricochet': 'on_successful_hit', 'damage.true': 'on_ally_damage_to_enemy' },
   tune: { 'status.tune': 'on_skill', 'buff.next_basic': 'on_skill', 'buff.damage': 'on_skill', 'resource.skill_point': 'on_tuned_basic_used', 'resource.energy': 'on_skill' },
   bloodShield: { 'defense.shield': 'on_skill', 'tempo.taunt': 'on_skill', 'resource.hp_cost': 'on_skill', 'resource.energy': 'on_skill', 'resource.skill_point': 'on_skill' },
@@ -135,7 +161,6 @@ function tagCombatEffect(effect, slot, defaultSide = 'enemy') {
   if (effect.damageType && ['physical', 'magical', 'true'].includes(effect.damageType)) tags.add(`damage.${effect.damageType}`);
   if (Number.isFinite(effect.multiplier) && effect.multiplier > 0 && slot !== 'passive') {
     tags.add('damage.direct');
-    tags.add('damage.barrier_break');
   }
   if (Number.isFinite(effect.criticalRateBonus) || Number.isFinite(effect.criticalDamageBonus)) tags.add('damage.critical');
   if (Number.isFinite(effect.energyGain) || Number.isFinite(effect.energyCost) || Number.isFinite(effect.energyPerStack)) tags.add('resource.energy');
@@ -155,7 +180,18 @@ function tagCombatEffect(effect, slot, defaultSide = 'enemy') {
   const mechanicTags = Object.freeze([...tags].sort());
   const mechanicTargets = mechanicTargetsFor(effect, defaultSide, targeting, mechanicTags);
   const mechanicTriggers = mechanicTriggersFor(effect, slot, mechanicTags);
-  return Object.freeze({ ...effect, ...(targeting ? { targeting } : {}), mechanicTags, mechanicTargets, mechanicTriggers });
+  const targetingVariants = effect.type === 'enhanceBasic' && Number.isFinite(effect.blastAtStacks) ? Object.freeze([
+    Object.freeze({
+      action: 'basic',
+      when: Object.freeze({ enhanceStacksAtLeast: effect.blastAtStacks }),
+      targeting: Object.freeze({ side: defaultSide, acquisition: 'selected', coverage: 'blast' }),
+      overrides: Object.freeze([Object.freeze({
+        when: Object.freeze({ premiumWeaponDuplicatesAtLeast: 3 }),
+        coverage: 'aoe'
+      })])
+    })
+  ]) : undefined;
+  return Object.freeze({ ...effect, ...(targeting ? { targeting } : {}), ...(targetingVariants ? { targetingVariants } : {}), mechanicTags, mechanicTargets, mechanicTriggers });
 }
 
 function tagCombatKit(kit, defaultSide = 'enemy') {
@@ -175,15 +211,15 @@ export const CHARACTER_ROSTER = Object.freeze([
   ),
   character(
     { id: 'zero', name: 'ZERO', label: 'Character', hp: 50, baseAttack: 40, basePhysicalDefense: 2, baseMagicalDefense: 2, speed: 30, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'zeroBattle', test: false, passive: { id: 'cutthroat', criticalRateBonus: .1, criticalDamageBonus: .25 } },
-    { name: 'Zero', role: 'mainDps', level: 1, basic: { damageType: 'physical', multiplier: .5, target: 'blast', energyGain: 20, skillPointGain: 1 }, skill: { type: 'firstStrike', target: 'single', damageType: 'physical', multiplier: 1, firstHitMultiplier: 1.5, energyGain: 20 }, ultimate: { damageType: 'physical', multiplier: 1, target: 'aoe', energyCost: 100 }, passives: [{ type: 'cutthroat', criticalRateBonus: .1, criticalDamageBonus: .25 }] }
+    { name: 'Zero', role: 'mainDps', level: 1, basic: { damageType: 'physical', multiplier: .5, target: 'blast', energyGain: 20, skillPointGain: 1 }, skill: { type: 'firstStrike', target: 'single', damageType: 'physical', multiplier: 1, firstHitMultiplier: 1.5, energyGain: 20 }, ultimate: { damageType: 'physical', multiplier: 1, target: 'aoe', energyCost: 100, actionAdvance: 100, mechanicTargets: { 'tempo.action_advance': { side: 'self', acquisition: 'self', coverage: 'single' } } }, passives: [{ type: 'cutthroat', criticalRateBonus: .1, criticalDamageBonus: .25 }] }
   ),
   character(
     { id: 'lily', name: 'LILY', label: 'Character', hp: 100, basePhysicalAttack: 0, baseMagicalAttack: 20, basePhysicalDefense: 4, baseMagicalDefense: 4, speed: 20, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'lily', test: false },
-    { name: 'Lily', role: 'subDps', level: 1, basic: { damageType: 'magical', multiplier: 1, target: 'single', energyGain: 10, skillPointGain: 1 }, skill: { type: 'ricochet', damageType: 'magical', multiplier: .5, target: 'aoe', energyGain: 20, markTurns: 2 }, ultimate: { damageType: 'magical', multiplier: 1, target: 'aoe', energyCost: 100, mechanicTags: ['summon.create', 'summon.action'] }, passives: [{ type: 'exposed', defenseReduction: .1, duration: 2 }] }
+    { name: 'Lily', role: 'subDps', level: 1, basic: { damageType: 'magical', multiplier: 1, target: 'single', energyGain: 10, skillPointGain: 1 }, skill: { type: 'ricochet', damageType: 'magical', multiplier: .5, target: 'aoe', energyGain: 20, markTurns: 2, ricochetDamageMultiplier: .1 }, ultimate: { damageType: 'magical', multiplier: 1, target: 'aoe', energyCost: 100, summonDuration: 3, summonSpeed: 30, summonHp: 1, summonDamageType: 'true', summonMultiplier: 1, summonTarget: 'aoe', mechanicTags: ['summon.create', 'summon.action'] }, passives: [{ type: 'exposed', defenseReduction: .1, duration: 2 }] }
   ),
   character(
     { id: 'dawn', name: 'DAWN', label: 'Character', hp: 50, baseAttack: 40, basePhysicalDefense: 2, baseMagicalDefense: 4, speed: 20, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'dawn', test: false },
-    { name: 'Dawn', role: 'support', level: 1, basic: { damageType: 'magical', multiplier: 2, target: 'single', energyGain: 10, skillPointGain: 1 }, skill: { type: 'tune', target: 'ally', energyGain: 20, damageBonus: .4, duration: 1 }, ultimate: { type: 'dawnSupport', target: 'ally', energyCost: 100, energyRestore: .5, actionAdvance: 100 }, passives: [{ type: 'resourceful', skillPointCapBonus: 2, startingSkillPointBonus: 2 }] }
+    { name: 'Dawn', role: 'support', level: 1, basic: { damageType: 'magical', multiplier: 2, target: 'single', energyGain: 10, skillPointGain: 1 }, skill: { type: 'tune', target: 'ally', energyGain: 20, damageBonus: .4, duration: 1, skillPointReturn: 1 }, ultimate: { type: 'dawnSupport', target: 'ally', energyCost: 100, energyRestore: .5, skillPointGain: 1, actionAdvance: 100 }, passives: [{ type: 'resourceful', skillPointCapBonus: 2, startingSkillPointBonus: 2 }] }
   ),
   character(
     { id: 'logan', name: 'LOGAN', label: 'Character', hp: 200, baseAttack: 10, basePhysicalDefense: 4, baseMagicalDefense: 4, speed: 10, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'logan', test: false },
@@ -256,3 +292,87 @@ export const RUNE_COMBAT_RULES = Object.freeze({
   amplify: Object.freeze({ basicDamageBonus: .5, cooldownTurns: 2, mechanicTags: Object.freeze(['buff.damage', 'limit.cooldown']), mechanicTriggers: Object.freeze({ 'buff.damage': 'on_basic', 'limit.cooldown': 'on_basic' }), targeting: Object.freeze({ side: 'self', acquisition: 'self', coverage: 'single' }) }),
   united: Object.freeze({ actionAdvance: 100, cooldownTurns: 2, mechanicTags: Object.freeze(['tempo.action_advance', 'limit.cooldown']), mechanicTriggers: Object.freeze({ 'tempo.action_advance': 'on_ally_skill', 'limit.cooldown': 'on_ally_skill' }), targeting: Object.freeze({ side: 'self', acquisition: 'self', coverage: 'single' }) })
 });
+
+function upgradeComponent({ id, character, source, mechanicTags, targeting, trigger, values, targets = {}, triggers = {} }) {
+  const mechanicTargets = Object.fromEntries(mechanicTags.map(tag => [tag, Object.freeze({ ...(targets[tag] || targeting) })]));
+  const mechanicTriggers = Object.fromEntries(mechanicTags.map(tag => [tag, triggers[tag] || trigger]));
+  return Object.freeze({ id, character, source: Object.freeze({ ...source }), mechanicTags: Object.freeze([...mechanicTags]),
+    targeting: Object.freeze({ ...targeting }), mechanicTargets: Object.freeze(mechanicTargets),
+    mechanicTriggers: Object.freeze(mechanicTriggers), values: Object.freeze({ ...values }) });
+}
+
+const enemyOnEvent = Object.freeze({ side: 'enemy', acquisition: 'event_defined', coverage: 'event_defined' });
+const selfTarget = Object.freeze({ side: 'self', acquisition: 'self', coverage: 'single' });
+const teamPoolTarget = Object.freeze({ side: 'team', acquisition: 'battle_pool', coverage: 'global' });
+
+// Per-rank upgrades and weapon effects are analysis-visible components. The
+// engine reads these values; tags describe the effect without encoding its owner.
+const upgradeComponents = [
+  upgradeComponent({ id: 'soul.duplicate.1.follow-up-charges', character: 'soul', source: { kind: 'character_duplicate', rank: 1 }, mechanicTags: ['damage.follow_up', 'limit.charges'], targeting: enemyOnEvent, trigger: 'on_ally_damage_to_enemy', values: { followUpCharges: 7 } }),
+  upgradeComponent({ id: 'soul.duplicate.2.follow-up-damage', character: 'soul', source: { kind: 'character_duplicate', rank: 2 }, mechanicTags: ['damage.follow_up', 'buff.damage'], targeting: enemyOnEvent, trigger: 'on_ally_damage_to_enemy', values: { followUpDamageMultiplier: 2 } }),
+  upgradeComponent({ id: 'soul.duplicate.3.ultimate-damage', character: 'soul', source: { kind: 'character_duplicate', rank: 3 }, mechanicTags: ['damage.direct', 'damage.true', 'buff.damage'], targeting: { side: 'enemy', acquisition: 'all', coverage: 'aoe' }, trigger: 'on_ultimate', values: { ultimateDamageMultiplier: 2 } }),
+  upgradeComponent({ id: 'soul.duplicate.4.enhance-scaling', character: 'soul', source: { kind: 'character_duplicate', rank: 4 }, mechanicTags: ['buff.next_basic', 'buff.damage'], targeting: selfTarget, trigger: 'on_skill', values: { enhanceDamagePerStackMultiplier: 2 } }),
+  upgradeComponent({ id: 'soul.signature.enhance-refund', character: 'soul', source: { kind: 'signature_weapon' }, mechanicTags: ['resource.skill_point'], targeting: teamPoolTarget, trigger: 'on_skill', values: { enhanceRefundEvery: 3, enhanceRefundAmount: 1 } }),
+  upgradeComponent({ id: 'soul.premium-duplicate.1.basic-damage', character: 'soul', source: { kind: 'premium_weapon_duplicate', rank: 1 }, mechanicTags: ['damage.direct', 'buff.damage'], targeting: enemyOnEvent, trigger: 'on_basic', values: { basicDamageMultiplier: 2 } }),
+  upgradeComponent({ id: 'soul.premium-duplicate.2.critical-stats', character: 'soul', source: { kind: 'premium_weapon_duplicate', rank: 2 }, mechanicTags: ['buff.critical', 'damage.critical'], targeting: selfTarget, trigger: 'always_on', values: { criticalRateBonus: .1, criticalDamageBonus: .25 } }),
+  upgradeComponent({ id: 'soul.premium-duplicate.3.enhanced-aoe', character: 'soul', source: { kind: 'premium_weapon_duplicate', rank: 3 }, mechanicTags: ['buff.next_basic'], targeting: enemyOnEvent, trigger: 'on_basic', values: { enhancedBasicCoverage: 'aoe' } }),
+  upgradeComponent({ id: 'soul.premium-duplicate.4.follow-up-refund', character: 'soul', source: { kind: 'premium_weapon_duplicate', rank: 4 }, mechanicTags: ['damage.follow_up', 'limit.charges'], targeting: enemyOnEvent, trigger: 'on_ally_damage_to_enemy', values: { followUpRefundEvery: 2 } }),
+
+  upgradeComponent({ id: 'zero.duplicate.1.ultimate-delay', character: 'zero', source: { kind: 'character_duplicate', rank: 1 }, mechanicTags: ['tempo.action_delay'], targeting: { side: 'enemy', acquisition: 'all', coverage: 'all' }, trigger: 'on_ultimate', values: { ultimateEnemyDelay: 20 } }),
+  upgradeComponent({ id: 'zero.duplicate.2.basic-damage', character: 'zero', source: { kind: 'character_duplicate', rank: 2 }, mechanicTags: ['damage.direct', 'buff.damage'], targeting: enemyOnEvent, trigger: 'on_basic', values: { basicDamageMultiplier: 2 } }),
+  upgradeComponent({ id: 'zero.duplicate.3.ultimate-damage', character: 'zero', source: { kind: 'character_duplicate', rank: 3 }, mechanicTags: ['damage.direct', 'buff.damage'], targeting: { side: 'enemy', acquisition: 'all', coverage: 'aoe' }, trigger: 'on_ultimate', values: { ultimateDamageMultiplier: 2 } }),
+  upgradeComponent({ id: 'zero.duplicate.4.first-strike-damage', character: 'zero', source: { kind: 'character_duplicate', rank: 4 }, mechanicTags: ['damage.conditional_multiplier', 'trigger.first_hit_per_target'], targeting: enemyOnEvent, trigger: 'on_first_hit_per_target', values: { firstStrikeDamageMultiplier: 2 } }),
+  upgradeComponent({ id: 'zero.signature.ultimate-skill-point', character: 'zero', source: { kind: 'signature_weapon' }, mechanicTags: ['resource.skill_point'], targeting: teamPoolTarget, trigger: 'on_ultimate', values: { ultimateSkillPointGain: 1 } }),
+  upgradeComponent({ id: 'zero.premium-duplicate.1.basic-bleed', character: 'zero', source: { kind: 'premium_weapon_duplicate', rank: 1 }, mechanicTags: ['status.bleed', 'damage.over_time', 'trigger.per_hit', 'limit.stacks'], targeting: enemyOnEvent, trigger: 'on_successful_hit', values: { basicBleedStacks: 1 } }),
+  upgradeComponent({ id: 'zero.premium-duplicate.2.ultimate-energy-cost', character: 'zero', source: { kind: 'premium_weapon_duplicate', rank: 2 }, mechanicTags: ['resource.energy'], targeting: selfTarget, trigger: 'on_ultimate', values: { ultimateEnergyCost: 80 } }),
+  upgradeComponent({ id: 'zero.premium-duplicate.3.defense-ignore', character: 'zero', source: { kind: 'premium_weapon_duplicate', rank: 3 }, mechanicTags: ['buff.defense_ignore'], targeting: selfTarget, trigger: 'always_on', values: { defenseIgnore: .2 } }),
+  upgradeComponent({ id: 'zero.premium-duplicate.4.critical-stats', character: 'zero', source: { kind: 'premium_weapon_duplicate', rank: 4 }, mechanicTags: ['buff.critical', 'damage.critical'], targeting: selfTarget, trigger: 'always_on', values: { criticalRateMultiplier: 2, criticalDamageMultiplier: 2 } }),
+
+  upgradeComponent({ id: 'lily.duplicate.1.ultimate-weakening', character: 'lily', source: { kind: 'character_duplicate', rank: 1 }, mechanicTags: ['debuff.damage', 'limit.duration'], targeting: enemyOnEvent, trigger: 'on_ultimate', values: { enemyDamageMultiplier: .9, duration: 1 } }),
+  upgradeComponent({ id: 'lily.duplicate.2.exposed-stacking', character: 'lily', source: { kind: 'character_duplicate', rank: 2 }, mechanicTags: ['status.exposed', 'debuff.defense', 'limit.duration', 'limit.stacks'], targeting: enemyOnEvent, trigger: 'on_ability_hit', values: { exposedMaxStacks: 2, exposedDuration: 3 } }),
+  upgradeComponent({ id: 'lily.duplicate.3.ultimate-and-summon', character: 'lily', source: { kind: 'character_duplicate', rank: 3 }, mechanicTags: ['damage.direct', 'summon.action', 'limit.duration'], targeting: { side: 'enemy', acquisition: 'all', coverage: 'aoe' }, trigger: 'on_ultimate', values: { ultimateDamageMultiplier: 2, summonDuration: 4 } }),
+  upgradeComponent({ id: 'lily.duplicate.4.ricochet-repeat', character: 'lily', source: { kind: 'character_duplicate', rank: 4 }, mechanicTags: ['damage.true', 'status.ricochet', 'trigger.per_source'], targeting: enemyOnEvent, trigger: 'on_ally_damage_to_enemy', values: { ricochetRepeats: 2, ricochetSecondHitMultiplier: .5 } }),
+  upgradeComponent({ id: 'lily.signature.exposed-energy', character: 'lily', source: { kind: 'signature_weapon' }, mechanicTags: ['resource.energy'], targeting: selfTarget, trigger: 'on_ally_damage_to_enemy', values: { exposedAllyHitEnergy: 5 } }),
+  upgradeComponent({ id: 'lily.signature.ultimate-skill-point', character: 'lily', source: { kind: 'signature_weapon' }, mechanicTags: ['resource.skill_point'], targeting: teamPoolTarget, trigger: 'on_ultimate', values: { ultimateSkillPointGain: 1 } }),
+  upgradeComponent({ id: 'lily.premium-duplicate.1.entry-marks', character: 'lily', source: { kind: 'premium_weapon_duplicate', rank: 1 }, mechanicTags: ['status.ricochet', 'debuff.mark', 'limit.duration'], targeting: { side: 'enemy', acquisition: 'battle_pool', coverage: 'all' }, trigger: 'battle_start', values: { entryRicochetTurns: 2 } }),
+  upgradeComponent({ id: 'lily.premium-duplicate.2.exposed-barrier-damage', character: 'lily', source: { kind: 'premium_weapon_duplicate', rank: 2 }, mechanicTags: ['buff.barrier_damage', 'debuff.mark'], targeting: enemyOnEvent, trigger: 'on_ability_damage', values: { exposedBarrierDamagePerStack: .1 } }),
+  upgradeComponent({ id: 'lily.premium-duplicate.3.exposed-break-damage', character: 'lily', source: { kind: 'premium_weapon_duplicate', rank: 3 }, mechanicTags: ['buff.barrier_break_damage', 'debuff.mark'], targeting: enemyOnEvent, trigger: 'on_barrier_break', values: { exposedBreakDamagePerStack: .05 } }),
+  upgradeComponent({ id: 'lily.premium-duplicate.4.ultimate-team-boost', character: 'lily', source: { kind: 'premium_weapon_duplicate', rank: 4 }, mechanicTags: ['resource.energy', 'tempo.action_advance'], targeting: { side: 'ally', acquisition: 'all', coverage: 'all' }, trigger: 'on_ultimate', values: { teamEnergy: 20, teamActionAdvance: 20 } }),
+
+  upgradeComponent({ id: 'dawn.duplicate.1.ultimate-energy', character: 'dawn', source: { kind: 'character_duplicate', rank: 1 }, mechanicTags: ['resource.energy'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_ultimate', values: { ultimateEnergyRestore: 1 } }),
+  upgradeComponent({ id: 'dawn.duplicate.2.ultimate-skill-points', character: 'dawn', source: { kind: 'character_duplicate', rank: 2 }, mechanicTags: ['resource.skill_point'], targeting: teamPoolTarget, trigger: 'on_ultimate', values: { ultimateSkillPointGain: 3 } }),
+  upgradeComponent({ id: 'dawn.duplicate.3.tune-duration-and-attack', character: 'dawn', source: { kind: 'character_duplicate', rank: 3 }, mechanicTags: ['status.tune', 'buff.attack', 'limit.duration'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', values: { tuneExtraDuration: 1, tuneAttackBonus: .2 } }),
+  upgradeComponent({ id: 'dawn.duplicate.4.tune-damage', character: 'dawn', source: { kind: 'character_duplicate', rank: 4 }, mechanicTags: ['buff.next_basic', 'buff.damage'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', values: { tuneDamageBonus: .4 } }),
+  upgradeComponent({ id: 'dawn.signature.tune-defense-ignore', character: 'dawn', source: { kind: 'signature_weapon' }, mechanicTags: ['buff.defense_ignore'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', values: { tuneDefenseIgnore: .2 } }),
+  upgradeComponent({ id: 'dawn.premium-duplicate.1.tune-damage-reduction', character: 'dawn', source: { kind: 'premium_weapon_duplicate', rank: 1 }, mechanicTags: ['defense.damage_reduction'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', values: { tuneDamageReduction: .2 } }),
+  upgradeComponent({ id: 'dawn.premium-duplicate.2.tune-barrier-damage', character: 'dawn', source: { kind: 'premium_weapon_duplicate', rank: 2 }, mechanicTags: ['buff.barrier_damage'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', values: { tuneBarrierDamageBonus: .2 } }),
+  upgradeComponent({ id: 'dawn.premium-duplicate.3.tune-action-advance', character: 'dawn', source: { kind: 'premium_weapon_duplicate', rank: 3 }, mechanicTags: ['tempo.action_advance'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', values: { tuneActionAdvance: 20 } }),
+  upgradeComponent({ id: 'dawn.premium-duplicate.4.tune-critical', character: 'dawn', source: { kind: 'premium_weapon_duplicate', rank: 4 }, mechanicTags: ['buff.critical', 'damage.critical'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', values: { tuneCriticalRateBonus: .2, tuneCriticalDamageBonus: .5 } }),
+
+  upgradeComponent({ id: 'logan.duplicate.1.double-bleed', character: 'logan', source: { kind: 'character_duplicate', rank: 1 }, mechanicTags: ['status.bleed', 'damage.over_time', 'trigger.per_hit', 'limit.stacks'], targeting: enemyOnEvent, trigger: 'on_successful_hit', values: { basicBleedStacks: 2 } }),
+  upgradeComponent({ id: 'logan.duplicate.2.shield-strength', character: 'logan', source: { kind: 'character_duplicate', rank: 2 }, mechanicTags: ['defense.shield'], targeting: { side: 'ally', acquisition: 'all', coverage: 'all' }, trigger: 'on_skill', values: { shieldMultiplier: 2 } }),
+  upgradeComponent({ id: 'logan.duplicate.3.ultimate-bleed-and-skill-point', character: 'logan', source: { kind: 'character_duplicate', rank: 3 }, mechanicTags: ['status.bleed', 'damage.over_time', 'resource.skill_point', 'trigger.per_hit'], targeting: enemyOnEvent, trigger: 'on_ultimate', values: { ultimateBleedStacks: 2, ultimateSkillPointGain: 1 } }),
+  upgradeComponent({ id: 'logan.duplicate.4.lifesteal', character: 'logan', source: { kind: 'character_duplicate', rank: 4 }, mechanicTags: ['recovery.lifesteal'], targeting: { side: 'ally', acquisition: 'all', coverage: 'all' }, trigger: 'on_ally_damage_dealt', values: { lifestealRate: .2 } }),
+  upgradeComponent({ id: 'logan.signature.lifesteal-share', character: 'logan', source: { kind: 'signature_weapon' }, mechanicTags: ['recovery.healing'], targeting: selfTarget, trigger: 'on_ally_damage_dealt', values: { healLoganFromAllyLifesteal: true } }),
+  upgradeComponent({ id: 'logan.premium-duplicate.1.basic-damage', character: 'logan', source: { kind: 'premium_weapon_duplicate', rank: 1 }, mechanicTags: ['damage.direct', 'buff.damage'], targeting: enemyOnEvent, trigger: 'on_basic', values: { basicDamageMultiplier: 2 } }),
+  upgradeComponent({ id: 'logan.premium-duplicate.2.taunt', character: 'logan', source: { kind: 'premium_weapon_duplicate', rank: 2 }, mechanicTags: ['tempo.taunt', 'limit.duration'], targeting: { side: 'enemy', acquisition: 'all', coverage: 'all' }, trigger: 'on_skill', values: { tauntRate: .5, tauntExtraDuration: 1 } }),
+  upgradeComponent({ id: 'logan.premium-duplicate.3.ultimate-damage', character: 'logan', source: { kind: 'premium_weapon_duplicate', rank: 3 }, mechanicTags: ['damage.direct', 'buff.damage'], targeting: { side: 'enemy', acquisition: 'all', coverage: 'aoe' }, trigger: 'on_ultimate', values: { ultimateDamageMultiplier: 2 } }),
+  upgradeComponent({ id: 'logan.premium-duplicate.4.shielded-attack', character: 'logan', source: { kind: 'premium_weapon_duplicate', rank: 4 }, mechanicTags: ['buff.attack'], targeting: { side: 'ally', acquisition: 'all', coverage: 'all' }, trigger: 'on_shield_applied', values: { shieldedAttackBonus: .2 } })
+];
+
+for (const component of upgradeComponents) {
+  for (const tag of component.mechanicTags) if (!COMBAT_MECHANIC_TAGS.includes(tag)) throw new Error(`Unknown upgrade mechanic tag ${tag} on ${component.id}.`);
+}
+export const CHARACTER_UPGRADE_EFFECTS = Object.freeze(Object.fromEntries(upgradeComponents.map(component => [component.id, component])));
+export function getCharacterUpgradeEffect(id) { return CHARACTER_UPGRADE_EFFECTS[id] || null; }
+export function isCharacterUpgradeEffectActive(id, state = {}) {
+  const effect = getCharacterUpgradeEffect(id);
+  if (!effect || state.disabledUpgradeEffectIds?.has?.(id) || state.disabledUpgradeEffectIds?.includes?.(id)) return false;
+  if (effect.source.kind === 'character_duplicate') return (state.characterDuplicates || 0) >= effect.source.rank;
+  if (effect.source.kind === 'premium_weapon_duplicate') return state.weaponType === 'premium' && (state.premiumWeaponDuplicates || 0) >= effect.source.rank;
+  if (effect.source.kind === 'signature_weapon') return state.weaponType === 'premium';
+  return false;
+}
+export function getActiveCharacterUpgradeEffect(id, state = {}) {
+  return isCharacterUpgradeEffectActive(id, state) ? getCharacterUpgradeEffect(id) : null;
+}

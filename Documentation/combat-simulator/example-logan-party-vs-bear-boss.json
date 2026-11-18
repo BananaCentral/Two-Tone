@@ -89,13 +89,20 @@
         "multiplier": 0.5,
         "target": "aoe",
         "energyGain": 20,
-        "markTurns": 2
+        "markTurns": 2,
+        "ricochetDamageMultiplier": 0.1
       },
       "ultimate": {
         "damageType": "magical",
         "multiplier": 1,
         "target": "aoe",
-        "energyCost": 100
+        "energyCost": 100,
+        "summonDuration": 3,
+        "summonSpeed": 30,
+        "summonHp": 1,
+        "summonDamageType": "true",
+        "summonMultiplier": 1,
+        "summonTarget": "aoe"
       },
       "passives": [
         {
@@ -143,14 +150,16 @@
         "target": "ally",
         "energyGain": 20,
         "damageBonus": 0.4,
-        "duration": 1
+        "duration": 1,
+        "skillPointReturn": 1
       },
       "ultimate": {
         "type": "dawnSupport",
         "target": "ally",
         "energyCost": 100,
         "energyRestore": 0.5,
-        "actionAdvance": 100
+        "actionAdvance": 100,
+        "skillPointGain": 1
       },
       "passives": [
         {
