@@ -281,8 +281,7 @@ function instantiate(config, side) {
   });
 }
 function attackValue(unit) {
-  const shieldedAttackBonus = unit.shield > 0 ? upgradeValue(unit, 'logan.premium-duplicate.4.shielded-attack', 'shieldedAttackBonus') : 0;
-  return roundStatQuarter(unit.stats.attack * (1 + (unit.tune?.attackBonus || 0) + shieldedAttackBonus));
+  return roundStatQuarter(unit.stats.attack * (1 + (unit.tune?.attackBonus || 0)));
 }
 function healFromLifesteal(state,attacker,damageDealt,eventType='direct_hit'){
  const logan=state.allies.find(unit=>unit.archetypeId==='logan'&&unit.hp>0&&!unit.disabledPassiveIds?.has('tasteForBlood'));
@@ -326,13 +325,17 @@ function damageFor(state,attacker, target, type, multiplier) {
   const physicalIgnore=Math.min(1,globalIgnore+runeIgnore);
   const magicalIgnore=Math.min(1,globalIgnore+runeIgnore);
   const resistance=Math.max(0,1-(target.residueStacks||0)*(target.residueResistanceReductionPerStack??.05));
+  const logan=state.allies.find(unit=>unit.archetypeId==='logan');
+  const shieldedDamageBonus=attacker.side==='allies'&&attacker.shield>0&&logan
+    ?upgradeValue(logan,'logan.premium-duplicate.4.shielded-damage','shieldedDamageBonus'):0;
   return state.engine.resolveTypedHit({
     type, attack,
     physicalDefense:target.stats.physicalDefense, magicalDefense:target.stats.magicalDefense,
     multiplier, physicalDefenseIgnore:physicalIgnore, magicalDefenseIgnore:magicalIgnore,
-    damageMultiplier:(darkMatter?.damageMultiplier||1)*(1-(attacker.residueStacks||0)*(attacker.residueDamageReductionPerStack??.05)),
+    damageMultiplier:(darkMatter?.damageMultiplier||1)*(1-(attacker.residueStacks||0)*(attacker.residueDamageReductionPerStack??.05))*(1+shieldedDamageBonus),
     defenseMultiplier:resistance,
-    exposedStacks:target.marks.filter(mark=>mark.id==='exposed').length
+    exposedStacks:target.marks.filter(mark=>mark.id==='exposed').length,
+    exposedDefenseReduction:CHARACTER_COMBAT_DATA.lily.passives.find(passive=>passive.type==='exposed')?.defenseReduction??.2
   })?.damage??0;
 }
 function rollCritical(state,unit,damage,forceCritical=false,criticalDamageBonus=0){
@@ -695,7 +698,7 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
     engine: new TwoToneBattleEngine({ disabledCombatEffectIds: settings.disabledCombatEffectIds })
   };
   state.timeline=state.engine.timeline;
-  if(premiumLily)for(const enemy of enemies){const duration=upgradeValue(premiumLily,'lily.premium-duplicate.1.entry-marks','entryRicochetTurns');state.engine.setTimedMark({target:enemy,mark:{id:'ricochet',turns:duration,sources:[]}});state.engine.recordUpgradeEffect('lily.premium-duplicate.1.entry-marks',{actorId:premiumLily.id,targetIds:[enemy.id],trigger:'battle_start',values:{duration}})}
+  if(premiumLily)for(const enemy of enemies){const duration=upgradeValue(premiumLily,'lily.premium-duplicate.1.entry-marks','entryRicochetTurns');state.engine.setTimedMark({target:enemy,mark:{id:'soul-mark',turns:duration}});state.engine.setTimedMark({target:enemy,mark:{id:'ricochet',turns:duration,sources:[]}});state.engine.recordUpgradeEffect('lily.premium-duplicate.1.entry-marks',{actorId:premiumLily.id,targetIds:[enemy.id],trigger:'battle_start',values:{duration}})}
   const resourceful=allies.some(unit=>unit.passives.some(passive=>passive.type==='resourceful'));
   state.skillPoints=Math.min(state.skillPointCap,(settings.initialSkillPoints??3)+(resourceful?2:0));
   state.engine.recordBattleStartEffects([...allies,...enemies]);

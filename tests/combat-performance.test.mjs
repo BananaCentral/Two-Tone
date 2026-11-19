@@ -7,7 +7,7 @@ test('upgrade performance candidates cover individually tagged duplicate and wea
   assert.ok(upgrades.length >= 40);
   assert.ok(upgrades.some(candidate => candidate.id === 'soul.duplicate.2.follow-up-damage'));
   assert.ok(upgrades.some(candidate => candidate.id === 'dawn.signature.tune-defense-ignore'));
-  assert.ok(upgrades.some(candidate => candidate.id === 'logan.premium-duplicate.4.shielded-attack'));
+  assert.ok(upgrades.some(candidate => candidate.id === 'logan.premium-duplicate.4.shielded-damage'));
   assert.deepEqual(candidateSpecs('upgrade:soul.duplicate.2.follow-up-damage'), [
     { type: 'upgrade', id: 'soul.duplicate.2.follow-up-damage', character: 'soul', source: { kind: 'character_duplicate', rank: 2 } }
   ]);

@@ -13,7 +13,7 @@ export function calculateCombatHit({
   type, attack,
   physicalDefense, magicalDefense, multiplier,
   physicalDefenseIgnore = 0, magicalDefenseIgnore = 0,
-  damageMultiplier = 1, defenseMultiplier = 1, exposedStacks = 0
+  damageMultiplier = 1, defenseMultiplier = 1, exposedStacks = 0, exposedDefenseReduction = 0.2
 }) {
   if (!['physical', 'magical', 'true'].includes(type) || !Number.isFinite(attack) || attack <= 0 ||
       !Number.isFinite(multiplier) || multiplier < 0 || !Number.isFinite(damageMultiplier) || damageMultiplier < 0 ||
@@ -21,7 +21,7 @@ export function calculateCombatHit({
       !Number.isFinite(physicalDefense) || physicalDefense < 0 ||
       !Number.isFinite(magicalDefense) || magicalDefense < 0) return null;
 
-  const exposedMultiplier = Math.pow(0.9, Math.max(0, exposedStacks));
+  const exposedMultiplier = 1 - Math.min(1, Math.max(0, exposedStacks) * exposedDefenseReduction);
   const physicalEffectiveDefense = physicalDefense * defenseMultiplier * (1 - Math.min(1, Math.max(0, physicalDefenseIgnore))) * exposedMultiplier;
   const magicalEffectiveDefense = magicalDefense * defenseMultiplier * (1 - Math.min(1, Math.max(0, magicalDefenseIgnore))) * exposedMultiplier;
   let reduction;

@@ -94,16 +94,15 @@ function calculateLevelScaledStat(base,level,flat={},percent={},equipmentFlat={}
  const raw=((base+flats.reduce((a,b)=>a+b,0))*level+equipment.reduce((a,b)=>a+b,0))*(1+percents.reduce((a,b)=>a+b,0));
  return raw>=0&&Number.isFinite(raw)?roundStatQuarter(raw):null;
 }
-function loganShieldAttackBonus(unit){const logan=party.find(member=>member.id==='logan');return unit?.shield>0&&logan?upgradeValueFor('logan.premium-duplicate.4.shielded-attack','shieldedAttackBonus','logan'):0}
 function calculateAttack(unit){
  if(!unit||!Number.isFinite(unit.baseAttack))return null;
- return calculateLevelScaledStat(unit.baseAttack,Number.isInteger(unit.level)?unit.level:1,unit.attackFlatModifiers||{},{...(unit.attackPercentModifiers||{}),dawnTune:unit.tune?.attackBonus||0,bloodShield:loganShieldAttackBonus(unit)},unit.attackEquipmentFlatModifiers||{});
+ return calculateLevelScaledStat(unit.baseAttack,Number.isInteger(unit.level)?unit.level:1,unit.attackFlatModifiers||{},{...(unit.attackPercentModifiers||{}),dawnTune:unit.tune?.attackBonus||0},unit.attackEquipmentFlatModifiers||{});
 }
 const RESIDUE_RULES=Object.freeze({maxStacks:5,damageReductionPerStack:.05,resistanceReductionPerStack:.05,durationTurns:2});
 function residueStacksOf(unit){return Math.max(0,Math.min(unit?.residueMaxStacks||RESIDUE_RULES.maxStacks,Number.isInteger(unit?.residueStacks)?unit.residueStacks:0))}
 function residueReduction(unit){return residueStacksOf(unit)*(unit?.residueResistanceReductionPerStack??RESIDUE_RULES.resistanceReductionPerStack)}
 function activeRuneEffect(id,setId,trigger,options={}){return id&&hasRuneSet(id,setId)?combatEngine.resolveRuneEffect({setId,trigger,...options}):null}
-function damageDealtMultiplier(unit){const rune=activeRuneEffect(unit?.id,'dark-matter','passive');return (1-residueStacksOf(unit)*(unit?.residueDamageReductionPerStack??RESIDUE_RULES.damageReductionPerStack))*(rune?.damageMultiplier??1)}
+function damageDealtMultiplier(unit){const rune=activeRuneEffect(unit?.id,'dark-matter','passive'),logan=party.find(member=>member.id==='logan'),shieldedBonus=unit?.shield>0&&party.includes(unit)&&logan?upgradeValueFor('logan.premium-duplicate.4.shielded-damage','shieldedDamageBonus','logan'):0;return (1-residueStacksOf(unit)*(unit?.residueDamageReductionPerStack??RESIDUE_RULES.damageReductionPerStack))*(rune?.damageMultiplier??1)*(1+shieldedBonus)}
 function calculatePhysicalDefense(unit){
  if(!unit||!Number.isFinite(unit.basePhysicalDefense))return null;
  return calculateLevelScaledStat(unit.basePhysicalDefense,unit.level,unit.physicalDefenseFlatModifiers||{},unit.physicalDefensePercentModifiers||{},unit.physicalDefenseEquipmentFlatModifiers||{});
@@ -145,7 +144,8 @@ function calculateTypedActionDamage(type,attackRate,attacker,target){
  const defense=type==='physical'?calculatePhysicalDefense(target):type==='magical'?calculateMagicalDefense(target):calculateTrueDefense(target);
  const defenseMultiplier=1-residueReduction(target),physicalDefense=calculatePhysicalDefense(target),magicalDefense=calculateMagicalDefense(target),physicalIgnore=defenseIgnoreOf(attacker,'physical'),magicalIgnore=defenseIgnoreOf(attacker,'magical');
  const trueDefenseBasis=(physicalDefense*defenseMultiplier*(1-physicalIgnore)+magicalDefense*defenseMultiplier*(1-magicalIgnore))/2;
- const result=combatEngine.resolveTypedHit({type,attack,physicalDefense,magicalDefense,multiplier:attackRate,physicalDefenseIgnore:physicalIgnore,magicalDefenseIgnore:magicalIgnore,damageMultiplier:damageDealtMultiplier(attacker),defenseMultiplier,exposedStacks:target?.marks?.filter(m=>m.id==='exposed').length||0});
+ const exposedStacks=target?.marks?.filter(m=>m.id==='exposed').length||0,exposedDefenseReduction=CHARACTER_COMBAT_DATA.lily.passives.find(passive=>passive.type==='exposed')?.defenseReduction??.2;
+ const result=combatEngine.resolveTypedHit({type,attack,physicalDefense,magicalDefense,multiplier:attackRate,physicalDefenseIgnore:physicalIgnore,magicalDefenseIgnore:magicalIgnore,damageMultiplier:damageDealtMultiplier(attacker),defenseMultiplier,exposedStacks,exposedDefenseReduction});
  if(!result||!Number.isFinite(defense)||defense<0)return null;
  return {type,attackBasis:attack,defenseBasis:type==='true'?trueDefenseBasis:defense*defenseMultiplier*(1-(type==='physical'?physicalIgnore:magicalIgnore)),attackRate,damageBeforeDefense:result.damageBeforeDefense,reduction:result.reduction,damageTaken:result.damage};
 }

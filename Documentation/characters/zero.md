@@ -12,11 +12,11 @@ Zero gains 10 percentage points of Critical Rate and 25 percentage points of Cri
 
 ## Basic Attack
 
-Deals Physical Blast damage at a 0.5× multiplier and restores 20 Energy. It restores 1 party Skill Point under the shared Basic Attack default. Premium Weapon Duplicate 1 applies one Bleed stack to each enemy damaged.
+Deals Physical Blast damage at a 0.75× multiplier and restores 20 Energy. It restores 1 party Skill Point under the shared Basic Attack default. Premium Weapon Duplicate 1 applies one Bleed stack to each enemy damaged.
 
 ## Skill: First Strike
 
-Costs 1 party Skill Point, deals Physical damage to one selected enemy, and restores 20 Energy. The multiplier is 1.5× if this is the first time Zero has damaged that enemy in the current battle; otherwise it is 1.0×. The first-hit record is tracked separately for each enemy, lasts until the battle ends, and is set by any damaging action from Zero. Character Duplicate 4 doubles either multiplier, to 3.0× or 2.0×.
+Costs 1 party Skill Point, deals Physical damage to one selected enemy, and restores 20 Energy. The multiplier is 2.0× if this is the first time Zero has damaged that enemy in the current battle; otherwise it is 1.0×. The first-hit record is tracked separately for each enemy, lasts until the battle ends, and is set by any damaging action from Zero. Character Duplicate 4 doubles either multiplier, to 4.0× or 2.0×.
 
 ## Ultimate
 
@@ -25,9 +25,9 @@ Costs 100 Energy and deals Physical AoE damage at a 1.0× multiplier. It advance
 ## Character duplicates
 
 1. Ultimate delays every surviving enemy's next turn by 20%.
-2. Basic Attack's multiplier increases by 100%, from 0.5× to 1.0×.
+2. Basic Attack's multiplier increases by 100%, from 0.75× to 1.5×.
 3. Ultimate's multiplier increases by 100%, from 1.0× to 2.0×.
-4. First Strike's normal and first-hit multipliers increase by 100%, from 1.0×/1.5× to 2.0×/3.0×.
+4. First Strike's normal and first-hit multipliers increase by 100%, from 1.0×/2.0× to 2.0×/4.0×.
 
 ## Premium signature weapon
 

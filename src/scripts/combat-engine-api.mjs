@@ -591,9 +591,9 @@ export class TwoToneBattleEngine {
     if (tauntEnabled && activeUpgradeEffect('logan.premium-duplicate.2.taunt', upgradeState)) this.recordUpgradeEffect('logan.premium-duplicate.2.taunt', {
       actorId: actor.id, targetIds: enemies.filter(enemy => enemy?.hp > 0).map(enemy => enemy.id), trigger: 'on_skill',
       values: { tauntRate, duration: tauntTurns, tauntsApplied: taunts.filter(Boolean).length } });
-    if (shieldEnabled && activeUpgradeEffect('logan.premium-duplicate.4.shielded-attack', upgradeState)) this.recordUpgradeEffect('logan.premium-duplicate.4.shielded-attack', {
+    if (shieldEnabled && activeUpgradeEffect('logan.premium-duplicate.4.shielded-damage', upgradeState)) this.recordUpgradeEffect('logan.premium-duplicate.4.shielded-damage', {
       actorId: actor.id, targetIds: shields.map(entry => entry.target.id), trigger: 'on_shield_applied',
-      values: { shieldedAllies: shields.length, attackBonus: upgradeValue('logan.premium-duplicate.4.shielded-attack', 'shieldedAttackBonus', upgradeState) } });
+      values: { shieldedAllies: shields.length, damageBonus: upgradeValue('logan.premium-duplicate.4.shielded-damage', 'shieldedDamageBonus', upgradeState) } });
     return Object.freeze({ healthCost, shieldPerAlly, shields: Object.freeze(shields), tauntRate, tauntTurns,
       tauntsApplied: taunts.filter(Boolean).length });
   }

@@ -50,7 +50,7 @@ Calculated stats scale with Level and use the matching stat standards.
 ## Ultimate
 
 - Costs 100 Energy.
-- Deals True damage to all enemies at a 2.0× multiplier.
+- Deals True damage to all enemies at a 1.5× multiplier.
 - After its damage resolves, refills Follow Up to its current limit (5 by default, or 7 with Character Duplicate 1).
 
 ## Loadout
@@ -59,14 +59,14 @@ Calculated stats scale with Level and use the matching stat standards.
 - The Premium signature effect refunds 1 Skill Point after every 3 Skill Points spent on Enhance. It is active starting at Potential 1.
 - His Premium signature weapon is a separate, character-locked option. It grants +100% at Potential 1 and +200% at Potential 5, with 25 percentage points per potential. Its Potential 1 effect refunds 1 Skill Point after every 3 Skill Points spent on Enhance. Store ownership remains unavailable until the Store is implemented.
 - Premium Potential 2–5 correspond to weapon Duplicates 1–4. Duplicate 1 doubles Basic's base multiplier; Duplicate 2 adds 10 percentage points of Critical Rate and 25 percentage points of Critical Damage; Duplicate 3 changes a 3-stack Enhanced Basic from Blast to AoE; Duplicate 4 restores one Follow Up proc for every two Follow Up activations.
-- Soul's four Celestials start at Level 1. Each level increases its corresponding ability multiplier by 10% of its base value. At Level 1, Follow Up is 0.55×, Basic is 1.1×, each Enhance stack adds 1.1×, and Ultimate is 2.2×.
+- Soul's four Celestials start at Level 1. Each level increases its corresponding ability multiplier by 10% of its base value. At Level 1, Follow Up is 0.55×, Basic is 1.1×, each Enhance stack adds 1.1×, and Ultimate is 1.65×.
 - Runes add flat stats: main-stat value × rune level; each of three distinct substats contributes 25% of that value. Rune Set selection and effects follow the [Rune Set Standard](../rune-standard/rune-standard.md).
 
 ## Character Duplicates
 
 - Duplicate 1 raises Follow Up capacity from 5 to 7.
 - Duplicate 2 doubles Follow Up's base multiplier from 0.5× to 1.0×.
-- Duplicate 3 doubles Ultimate's base multiplier from 2.0× to 4.0×.
+- Duplicate 3 doubles Ultimate's base multiplier from 1.5× to 3.0×.
 - Duplicate 4 raises each Enhance stack's Basic damage increase from +100% to +200%.
 - Character Duplicate levels are separate from weapon Potential. Their acquisition costs are not defined yet.
 
