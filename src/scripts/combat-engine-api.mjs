@@ -901,11 +901,11 @@ export class TwoToneBattleEngine {
     const rule = this.runeRule(setId);
     if (!rule || !ready) return null;
     const effects = {
-      'radiant-moon': trigger === 'directDamage' ? { echo: rule.echo } : null,
-      'eternal-sun': trigger === 'passive' ? { criticalRate: rule.criticalRate, criticalDamage: rule.criticalDamage, stealth: rule.stealth } : null,
+      'radiant-moon': trigger === 'damagingSkill' ? { echo: rule.echo, cooldownTurns: rule.cooldownTurns } : null,
+      'eternal-sun': trigger === 'damagingUltimate' ? { forceCritical: true, criticalDamageBonus: rule.criticalDamageBonus, cooldownTurns: rule.cooldownTurns } : null,
       'celestial-star': trigger === 'ultimate' ? { actionAdvance: rule.ultimateAdvance, cooldownTurns: rule.cooldownTurns } : null,
-      'dark-matter': ['basic', 'skill', 'ultimate', 'passive'].includes(trigger) ? { defenseIgnore: rule.defenseIgnore, damageMultiplier: rule.damageMultiplier } : null,
-      'clear-skies': trigger === 'reflect' ? { reflect: shielded ? rule.shieldedReflect : rule.reflect } : null,
+      'dark-matter': trigger === 'abilityDamage' ? { defenseIgnore: rule.defenseIgnore, damageMultiplier: 1 + rule.damageBonus, cooldownTurns: rule.cooldownTurns } : null,
+      'clear-skies': trigger === 'skill' ? { shieldMaxHp: rule.shieldMaxHp, shieldDurationTurns: rule.shieldDurationTurns, cooldownTurns: rule.cooldownTurns } : trigger === 'reflect' && shielded ? { reflect: rule.reflect } : null,
       'infinite-space': trigger === 'ultimate' ? { actionDelay: rule.ultimateDelay } : null,
       recycle: trigger === 'skill' ? { skillPoints: rule.skillPoints, cooldownTurns: rule.cooldownTurns } : null,
       amplify: trigger === 'basic' ? { damageBonus: rule.basicDamageBonus, cooldownTurns: rule.cooldownTurns } : null,

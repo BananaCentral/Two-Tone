@@ -16,15 +16,33 @@ This standard defines Rune Set equipment and combat effects. Rune Set effects ar
 
 | Rune Set | Effect |
 |---|---|
-| **Radiant Moon** | Direct damage from the wearer's passives, Basic Attacks, Skills, and Ultimates applies 20% Echo to each hit. Damage-over-time does not Echo. Echo follows the [Echo Standard](../echo-standard.md). |
-| **Eternal Sun** | Adds 10 percentage points of Critical Rate, 25 percentage points of Critical Damage, and 10 percentage points of Stealth (dodge chance) to the wearer. Effective Critical Rate and Stealth are each capped at 100%; Critical Damage bonuses add together before being applied to a critical hit. |
+| **Radiant Moon** | When the wearer uses a damaging Skill, it adds 50% Echo to each direct hit of that Skill. Passive, Basic Attack, Ultimate, and damage-over-time events do not activate it. Echo follows the [Echo Standard](../echo-standard.md). |
+| **Eternal Sun** | The wearer's next damaging Ultimate is guaranteed to critically hit and gains 50 percentage points of Critical Damage. |
 | **Celestial Star** | After the wearer resolves an Ultimate, advance the wearer's next action by 100% of their action interval. Then Celestial Star is unavailable for the wearer's next two turns. |
-| **Dark Matter** | The wearer's Physical, Magical, and True damage is amplified by 10%. The wearer's attacks also ignore 20% of both Physical and Magical Defense. This applies to each defense wherever it contributes to damage, including both portions of True Damage. |
-| **Clear Skies** | The wearer reflects 10% of received HP and shield damage as True damage. While the wearer has a shield, this increases to 20%; the increase ends immediately when the shield is depleted. Damage dealt to an enemy Barrier does not trigger Reflect. Reflect follows the [Reflect Standard](../reflect-standard.md). |
-| **Infinite Space** | When the wearer uses an Ultimate, delay every living enemy on the field by 50% of that enemy's action interval. This applies even if the Ultimate does not damage an enemy and only once per enemy per Ultimate. |
-| **Recycle** | When the wearer uses a Skill, restore 1 Skill Point, subject to the party's Skill Point cap. After the Skill resolves, Recycle is unavailable for the wearer's next turn. |
+| **Dark Matter** | On the wearer's next damaging Basic Attack, Skill, or Ultimate, ignore 40% of both Physical and Magical Defense and amplify the attack's Physical, Magical, or True damage by 20%. |
+| **Clear Skies** | After the wearer uses a Skill, grant a shield equal to 10% of their Max HP for two wearer turns. While the wearer has any shield, add 10 percentage points of Reflect. Damage dealt to an enemy Barrier does not trigger Reflect. Reflect follows the [Reflect Standard](../reflect-standard.md). |
+| **Infinite Space** | When the wearer uses an Ultimate, delay every living enemy on the field by 100% of that enemy's action interval, even if the Ultimate deals no damage. Each affected enemy is immune to Infinite Space's delay for its next two turns. |
+| **Recycle** | When the wearer uses a Skill, restore 1 Skill Point, subject to the party's Skill Point cap. |
 | **Amplify** | When Amplify is not on cooldown, the wearer's Basic Attack deals 50% more damage. Apply the bonus once per Basic Attack action to the complete action, including all its hits and targets, whether Single Target, Blast, or AoE. After the Basic Attack resolves, Amplify is unavailable for the wearer's next two turns. |
-| **United** | When the wearer successfully uses a Skill on one or more allies, advance the wearer by 100% of their action interval. United is then unavailable for the wearer's next two turns. |
+| **United** | When the wearer successfully uses a Skill on one or more allies, advance the wearer by 50% of their action interval. United is then unavailable for the wearer's next two turns. |
+
+## Cooldowns and Eligibility
+
+Each cooldown starts when the effect triggers and is measured in the wearer's own turns. A two-turn cooldown is unavailable during the wearer's next two turns; a one-turn cooldown is unavailable during the wearer's next turn. Radiant Moon, Eternal Sun, Celestial Star, Clear Skies, Recycle, Amplify, and United have two-turn cooldowns. Dark Matter has a one-turn cooldown. Infinite Space instead tracks immunity separately for each enemy it delayed.
+
+All Runes require a four-piece set to activate. Eligibility below describes whether a character's current kit has an action that can trigger the effect; future characters are evaluated from their authored actions, not a fixed roster list.
+
+| Rune | Current eligible wearers | Trigger condition |
+|---|---|---|
+| Radiant Moon | Lily, Zero | A damaging Skill resolves. |
+| Eternal Sun | Lily, Logan, Soul, Zero | A damaging Ultimate resolves. |
+| Celestial Star | All current characters | An Ultimate resolves. |
+| Dark Matter | All current characters | A damaging Basic Attack, Skill, or Ultimate resolves. |
+| Clear Skies | All current characters | The wearer uses a Skill. |
+| Infinite Space | All current characters | The wearer uses an Ultimate. |
+| Recycle | All current characters | The wearer uses a Skill. |
+| Amplify | All current characters | The wearer uses a Basic Attack. |
+| United | Dawn, Logan | The wearer uses a Skill targeting one or more allies. |
 
 ## Rune Set Artwork
 
@@ -46,9 +64,9 @@ All sprites are stored in `assets/` and registered in the application asset cata
 
 ## Timing and Combination Rules
 
-- A cooldown starts after its triggering action resolves. Recycle is unavailable during the wearer's next scheduled turn; Celestial Star, Amplify, and United are unavailable during the wearer's next two scheduled turns. Each becomes ready again after those turns.
+- Cooldowns expire after the listed number of the wearer's turns. A shield from Clear Skies lasts through two of the wearer's turns; unused shield is removed when it expires.
 - Action Advance and Action Delay use the action interval rules in the [Turn Order Standard](../turn-order-standard/turn-order-standard.md). Independent effects from separate actions resolve normally under that standard.
-- Apply set effects once per named trigger as specified above. Do not reapply an effect for each hit within one action unless the effect explicitly says otherwise.
+- Activate each set effect at most once for its triggering action. A multi-hit damaging Skill gets Echo on each hit, while Radiant Moon's cooldown begins only once for the whole Skill. Infinite Space's immunity is tracked separately for each wearer and enemy.
 
 ## Implementation Status
 
@@ -56,4 +74,6 @@ Rune equipment is available per character in Loadout → Runes. Each slot can eq
 
 The set effect list shows the equipped count for each represented set and marks a bonus active only at four pieces. Mixed sets are allowed and grant no set effects. Selecting an occupied slot opens its main and substat controls, upgrade action, and Switch/Remove actions. Selecting an empty slot opens the owned Rune picker. Switching or removing a Rune returns it to inventory.
 
-Set cooldowns are tracked per wearer for the current battle and reset when a new battle starts. Recycle becomes ready after the wearer's next scheduled turn; Amplify, Celestial Star, and United become ready after the wearer's next two scheduled turns. Runes are intended to come from Challenges; Challenge content and reward rules are not configured yet.
+Set cooldowns, shields, and Infinite Space enemy immunities are tracked during battle and reset when a new battle starts. Runes are intended to come from Challenges; Challenge content and reward rules are not configured yet.
+
+Rune performance comparisons follow the [Action Value Standard](../action-value-standard.md): compare the no-Rune wearer baseline against the same wearer with only one eligible four-piece set passive active. Rune main stats and substats are excluded from both branches so the report isolates the set passive.

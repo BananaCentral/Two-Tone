@@ -287,9 +287,23 @@ function wearersFor(spec, party) {
   if (spec.type === 'character') return party.includes(spec.id) ? [spec.id] : [];
   if (spec.type === 'action' || spec.type === 'passive' || spec.type === 'character-overall') return party.includes(spec.character) ? [spec.character] : [];
   if (spec.type === 'effect') return party.includes(spec.character) ? [spec.character] : [];
-  // Runes are equippable by every character. Eligibility and actual activation
-  // are reported separately from the measured outcome; no roster names belong here.
+  if (spec.type === 'rune') {
+    return party.filter(character => isRuneEligible(spec.id, character));
+  }
   return party.slice();
+}
+function isRuneEligible(runeId, characterId) {
+  const requirement = RUNE_COMBAT_RULES[runeId]?.eligibility, kit = CHARACTER_COMBAT_DATA[characterId];
+  if (!requirement || !kit) return false;
+  const damaging = action => Boolean(action?.damageType && Number(action.multiplier) > 0);
+  if (requirement === 'damaging_skill') return damaging(kit.skill);
+  if (requirement === 'damaging_ultimate') return damaging(kit.ultimate);
+  if (requirement === 'damaging_ability') return ['basic', 'skill', 'ultimate'].some(slot => damaging(kit[slot]));
+  if (requirement === 'skill') return Boolean(kit.skill);
+  if (requirement === 'ultimate') return Boolean(kit.ultimate);
+  if (requirement === 'basic') return Boolean(kit.basic);
+  if (requirement === 'ally_targeted_skill') return ['ally', 'allAllies', 'actor_team'].includes(kit.skill?.target);
+  return false;
 }
 function findUnit(config, archetype) { return config.teams.allies.find(unit => unit.archetype === archetype); }
 function selectedAllyTargetIds(spec, base) {
@@ -325,14 +339,16 @@ function actionComparisonReference(spec, archetype) {
 }
 function comparisonReferenceFor(spec, archetype) {
   if (spec.type === 'action') return actionComparisonReference(spec, archetype)?.label || 'standard basic reference';
+  if (spec.type === 'rune') return 'character with no equipped Runes vs the same character with only this four-piece set passive enabled; Rune stat bonuses are disabled in both branches';
   return null;
 }
 function makeRuneBranch(base, wearer, setId) {
-  // Rune candidates only change one ally's Rune slots. Keep immutable archetypes shared
-  // and clone the small team/settings structures instead of deep-cloning the library.
+  // Rune passive comparisons are before/after character gauges: neither branch
+  // receives Rune main/substats. Control has no Runes; treatment equips a complete
+  // set so only its passive is active. Keep immutable archetypes shared.
   const branch = {
     ...base,
-    settings: { ...base.settings },
+    settings: { ...base.settings, benchmarkRunePassivesOnly: true },
     teams: {
       allies: base.teams.allies.map(unit => ({ ...unit })),
       enemies: base.teams.enemies.map(unit => ({ ...unit }))
@@ -340,7 +356,8 @@ function makeRuneBranch(base, wearer, setId) {
   };
   const wearerUnit = findUnit(branch, wearer);
   assert(wearerUnit, `Wearer ${wearer} is absent from matchup.`);
-  wearerUnit.runes = makeBalancedRunes(setId);
+  if (setId) wearerUnit.runes = makeBalancedRunes(setId);
+  else delete wearerUnit.runes;
   return branch;
 }
 function makeBranches(base, spec, wearer) {
@@ -506,7 +523,19 @@ function writeBenchmarkArtifacts(outputPath, samples, coverage, expectedBenchmar
   const mechanicCoveragePath = `${basePath}-benchmark-mechanics.csv`;
   const reportPath = `${basePath}-benchmark-report.md`;
   const chartFile = `${basePath}-character-winrate.svg`;
-  const completeDesign = scoreRows.length > 0 && scoreRows.every(row => row.sampledDesignStrata === expectedBenchmarkStrata.length);
+  const runeImpactSummary = `${path.basename(outputPath).replace(/\.jsonl$/i, '')}-rune-impact.csv`;
+  const runeImpactByWearer = `${path.basename(outputPath).replace(/\.jsonl$/i, '')}-rune-impact-by-wearer.csv`;
+  const runeOnlyReport = scoreRows.length === 0 && samples.some(row => row.componentType === 'rune');
+  const runeDesign = new Map();
+  for (const row of samples.filter(sample => sample.componentType === 'rune')) {
+    const key = `${row.candidate}|${row.wearer}`;
+    const strata = runeDesign.get(key) || new Set();
+    strata.add([row.allyCount, row.enemyCount, row.enemyCategory, row.difficulty].join('|'));
+    runeDesign.set(key, strata);
+  }
+  const completeDesign = runeOnlyReport
+    ? runeDesign.size > 0 && [...runeDesign.values()].every(strata => strata.size === expectedBenchmarkStrata.length)
+    : scoreRows.length > 0 && scoreRows.every(row => row.sampledDesignStrata === expectedBenchmarkStrata.length);
   const csv = value => `"${String(value ?? '').replaceAll('"', '""')}"`;
   const expected = {
     partySize: [String(BENCHMARK_PARTY_SIZE)], enemyCount: ['1', '2', '3', '4', '5'],
@@ -546,13 +575,15 @@ function writeBenchmarkArtifacts(outputPath, samples, coverage, expectedBenchmar
   const policyLines = policyScoreRows.map(row => `| ${row.character} | ${row.policyProfile} | ${row.outcomeScore.toFixed(1)} |`);
   const mechanicLines = mechanicRows.map(row => `| ${row.tag} | ${row.samplesWithEvents}/${row.scenarioPolicySamples} |`);
   fs.writeFileSync(chartFile, makeCharacterScoreSvg(scoreRows));
-  const report = `# Character Performance Benchmark Report\n\n`+
+  const report = `# ${runeOnlyReport ? 'Rune Set Passive Benchmark Report' : 'Character Performance Benchmark Report'}\n\n`+
     `- Benchmark version: 7\n- Sample status: ${completeDesign ? 'all design strata represented' : 'exploratory: design strata are missing'}\n- Generated: ${new Date().toISOString()}\n- Scenario-policy cells: ${scenarioCount}\n- Character scenario runs: ${comparisonCount}\n- Seeds per matchup: ${options.runs}; first seed: ${options.seed}\n- Policies: ${policyProfiles.map(policy => `\`${policy}\``).join(', ')}\n- Scenario selection: four-person parties across all five enemy counts, enemy class bands, and Easy/Normal/Hard enemy stat levels.\n\n`+
-    `## Character benchmark scores\n\n`+
-    `The headline ensemble score uses each character's actual authored kit; each win scores 100 and each completed loss scores 0. Action-limit incompletes count as non-wins and are reported separately. Within each enemy-class band, the three policy scores are weighted Basic-focused 25%, Skill-focused 25%, Mixed 50%. Easy, Normal, and Hard are weighted 25%, 50%, and 25%; represented enemy-class bands are then averaged equally. This gives one contextual party-benchmark score, not an intrinsic character rating. The policy range is shown because policies are reproducible probes, not estimates of player frequency. Ability event evidence records which tagged mechanics activated and their observed values; it is diagnostic and does not subtract a disabled-kit control.\n\n`+
+    `## ${runeOnlyReport ? 'Rune passive comparisons' : 'Character benchmark scores'}\n\n`+
+    `${runeOnlyReport
+      ? `Each eligible wearer is compared with no Runes equipped against the same character with only the selected four-piece Rune passive enabled. Rune stat bonuses are disabled in both branches. The [Rune summary](${path.basename(runeImpactSummary)}) and [by-wearer results](${path.basename(runeImpactByWearer)}) contain the before/after ratings and differences.`
+      : "The headline ensemble score uses each character's actual authored kit; each win scores 100 and each completed loss scores 0. Action-limit incompletes count as non-wins and are reported separately. Within each enemy-class band, the three policy scores are weighted Basic-focused 25%, Skill-focused 25%, Mixed 50%. Easy, Normal, and Hard are weighted 25%, 50%, and 25%; represented enemy-class bands are then averaged equally. This gives one contextual party-benchmark score, not an intrinsic character rating. The policy range is shown because policies are reproducible probes, not estimates of player frequency. Ability event evidence records which tagged mechanics activated and their observed values; it is diagnostic and does not subtract a disabled-kit control."}\n\n`+
     `Difficulty changes only enemy stats, using one uniform Level 1 stat multiplier for HP, Attack, Physical Defense, Magical Defense, and Speed: Easy ×0.75, Normal ×1, Hard ×1.5, rounded to the nearest 0.25. There are no separate encounter-length, HP, Attack, or Defense multipliers; enemy mechanics remain unchanged. Per-enemy authored and effective stats are recorded in each JSONL row. Scenario intervals resample enemy/team compositions within class bands; seed intervals summarize matched-seed variation.\n\n`+
-    `| Character | Ensemble win rate / 100 | Scenario 95% interval | Policy range | Sampled scenario cells | Design strata covered |\n|---|---:|---:|---:|---:|---:|\n${scoreLines.join('\n') || '| No character-overall candidates were included | | | | | |'}\n\n`+
-    `## Per-policy scores\n\n| Character | Policy | Win rate / 100 |\n|---|---|---:|\n${policyLines.join('\n') || '| No policy rows | | |'}\n\n`+
+    `${scoreRows.length ? `| Character | Ensemble win rate / 100 | Scenario 95% interval | Policy range | Sampled scenario cells | Design strata covered |\n|---|---:|---:|---:|---:|---:|\n${scoreLines.join('\n')}\n\n` : ''}`+
+    `${policyScoreRows.length ? `## Per-policy scores\n\n| Character | Policy | Win rate / 100 |\n|---|---|---:|\n${policyLines.join('\n')}\n\n` : ''}`+
     `## Scenario coverage\n\n| Dimension | Categories covered | Missing categories |\n|---|---:|---|\n${coverageLines.join('\n')}\n\n`+
     `Enemy class mixes observed are listed in [benchmark coverage CSV](${path.basename(coveragePath)}). Per-battle results and tagged ability event evidence remain in the JSONL. See the [character win-rate chart](${path.basename(chartFile)}).\n\n`+
     `## Mechanic event evidence\n\n| Mechanic tag | Scenario-policy samples with an event |\n|---|---:|\n${mechanicLines.join('\n') || '| No tagged events were captured | |'}\n\n`+
@@ -854,7 +885,19 @@ function buildRuneImpactRows(samples, runCount) {
       ? 'positive for at least one eligible wearer'
       : rows.every(row => row.outcomeAssessment === 'negative evidence') ? 'negative for all eligible wearers' : 'inconclusive or wearer-dependent'
   }));
-  return { overallRows, wearerRows };
+  const byRuneWearer = new Map(wearerRows.map(row => [`${row.candidate.slice('rune:'.length)}|${row.wearer}`, row]));
+  const completeWearerRows = RUNES.flatMap(rune => CHARACTER_IDS.map(wearer => {
+    const row = byRuneWearer.get(`${rune}|${wearer}`);
+    if (row) return { ...row, eligibility: 'eligible', ratingScope: 'four-ally battle outcome while wearer is present' };
+    const eligible = isRuneEligible(rune, wearer);
+    return { candidate: `rune:${rune}`, wearer, eligibility: eligible ? 'not sampled' : 'ineligible',
+      ratingScope: 'four-ally battle outcome while wearer is present', outcomeRating: null, controlOutcomeRating: null,
+      ratingDifference: null, winLiftPp: null, meanBAE: null, eventEvidence: null, outcomeAssessment: 'N/A' };
+  }));
+  const completeOverallRows = RUNES.map(rune => overallRows.find(row => row.rune === rune) || ({ rune, eligibleWearers: '', wearerCount: 0,
+    outcomeRating: null, controlOutcomeRating: null, ratingDifference: null, winLiftPp: null, meanBAE: null, meanHpSwing: null,
+    outcomeAssessment: 'no eligible comparisons' }));
+  return { overallRows: completeOverallRows, wearerRows: completeWearerRows };
 }
 function buildMechanicRatingRows(samples, runCount) {
   const candidates = new Map();
@@ -1020,8 +1063,9 @@ async function main() {
   const allAllyLists = [...allyTeams];
   const scaledArchetypes = new Map();
   const activePolicies = options.policyProfile === 'ensemble' ? POLICY_PROFILES : [options.policyProfile];
-  const characterStudies = options.characterBenchmarkReport || options.mechanicRating;
-  const anchors = options.character ? [options.character] : characterStudies
+  const characterStudies = options.characterBenchmarkReport || options.mechanicRating || options.runeImpactReport;
+  const anchors = options.character ? [options.character] : options.runeImpactReport ? CHARACTER_IDS
+    : characterStudies
     ? [...new Set(options.candidates.map(spec => spec.character || (spec.type === 'character' ? spec.id : null)).filter(Boolean))].sort()
     : [null];
   const anchorMatrixCounts = anchors.map(anchor => (anchor ? allAllyLists.filter(party => party.includes(anchor)).length : allAllyLists.length)

@@ -1,0 +1,11 @@
+tag,scenarioPolicySamples,samplesWithEvents
+"buff.damage","1350","985"
+"buff.defense_ignore","675","495"
+"damage.critical","540","143"
+"damage.echo","270","183"
+"damage.reflect","675","489"
+"defense.shield","675","489"
+"limit.cooldown","4455","2641"
+"resource.skill_point","675","483"
+"tempo.action_advance","945","358"
+"tempo.action_delay","675","157"

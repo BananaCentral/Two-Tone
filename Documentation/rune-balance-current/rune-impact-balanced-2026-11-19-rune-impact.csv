@@ -1,0 +1,10 @@
+rune,eligibleWearers,wearerCount,outcomeRating,controlOutcomeRating,ratingDifference,winLiftPp,meanBAE,meanHpSwing,outcomeAssessment
+"amplify","dawn;lily;logan;soul;zero","5","48.20833333333333","47.59999999999999","0.6083333333333333","0.6083333333333333","0.34121875","5.4595","inconclusive or wearer-dependent"
+"celestial-star","dawn;lily;logan;soul;zero","5","47.783333333333324","47.59999999999999","0.1833333333333333","0.18333333333333335","0.05980989583333335","0.9569583333333336","inconclusive or wearer-dependent"
+"clear-skies","dawn;lily;logan;soul;zero","5","47.89999999999999","47.59999999999999","0.3","0.3","0.11827343750000001","1.8923750000000001","inconclusive or wearer-dependent"
+"dark-matter","dawn;lily;logan;soul;zero","5","48.599999999999994","47.59999999999999","1","0.9999999999999998","0.4927447916666666","7.883916666666666","inconclusive or wearer-dependent"
+"eternal-sun","lily;logan;soul;zero","4","47.697916666666664","47.45833333333333","0.23958333333333326","0.2395833333333333","0.18233723958333334","2.9173958333333334","inconclusive or wearer-dependent"
+"infinite-space","dawn;lily;logan;soul;zero","5","48.158333333333324","47.59999999999999","0.5583333333333333","0.5583333333333333","0.2389583333333333","3.823333333333333","inconclusive or wearer-dependent"
+"radiant-moon","lily;zero","2","48.229166666666664","47.66666666666666","0.5625","0.5625","0.4226627604166666","6.762604166666666","inconclusive or wearer-dependent"
+"recycle","dawn;lily;logan;soul;zero","5","47.45","47.59999999999999","-0.15","-0.15","-0.017424479166666666","-0.27879166666666666","inconclusive or wearer-dependent"
+"united","dawn;logan","2","47.416666666666664","47.416666666666664","-2.7755575615628914e-17","0","0.09639322916666668","1.5422916666666668","inconclusive or wearer-dependent"

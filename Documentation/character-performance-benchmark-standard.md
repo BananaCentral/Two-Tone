@@ -71,16 +71,22 @@ Interpret the metrics together:
 
 Event values explain the result; they are not arbitrary point weights. Mechanic contribution scores are not additive because effects can overlap, enable one another, or change later decisions. An unobserved mechanic is reported as unobserved, not as ineffective.
 
+### Rune passive comparisons
+
+The standardized Rune test compares a character with no Runes equipped against the same character with only one eligible four-piece Rune passive enabled. Rune main stats and substats are disabled in both branches. Both branches use the same four-person party scenarios, enemies, policies, difficulties, and matched seeds. Rune summaries report each eligible wearer separately, then average eligible wearers equally; an ineligible pairing is N/A, not zero. The detailed comparison method and current Rune results are in the [Action Value Standard](action-value-standard.md) and [Rune balance report](rune-balance-current/README.md).
+
+The Outcome Rating remains a weighted win-rate result (100 per win, 0 per loss or timeout). Damage, BAE, HP swing, resources, Shields, and turns are diagnostics only; they explain whether the passive fired and what changed in combat, but they do not add to the score. These policy probes are not optimal-play models. If a resource or action-tempo passive changes later decisions, branches can diverge even with a matched seed. A small negative estimate is therefore not proof that a beneficial Rune has negative intrinsic value; inspect event evidence, per-wearer results, and uncertainty.
+
 ## Pairing and uncertainty
 
 Treatment and control use the same scenario and seed. This paired comparison reduces noise when the shared random inputs affect both branches similarly. The paired analysis is used directly; sharing random numbers is not assumed to reduce variance in every case.
 
-Reports show two separate 95% intervals:
+Character benchmark reports show two separate 95% intervals:
 
 1. **Seed interval:** variation across the repeated, matched seeds in the sampled scenarios.
 2. **Scenario interval:** stratified bootstrap variation from resampling scenario compositions within enemy-class bands.
 
-The intervals answer different questions. Neither repairs missing scenario coverage or an inaccurate combat model. Reports must show sample counts and disclose missing benchmark categories.
+The intervals answer different questions. Rune wearer reports currently include seed intervals but not scenario-bootstrap intervals; they disclose that limitation. Neither interval repairs missing scenario coverage or an inaccurate combat model. Reports must show sample counts and disclose missing benchmark categories.
 
 ## Efficiency and sample size
 

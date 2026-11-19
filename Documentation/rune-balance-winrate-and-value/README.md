@@ -1,5 +1,7 @@
 # Rune balance: win rate and combat value
 
+> **Historical study:** This was an exploratory report from an earlier simulator and scenario design. It is superseded by the shared-engine, passive-only comparison in [Rune balance current](../rune-balance-current/README.md). Do not combine these older figures with the current benchmark.
+
 ## What was measured
 
 Each Rune was compared with the same party and encounter without a Rune, using matched random seeds. The selected Rune was assigned to one character at a time. This measures individual Rune value, not the effect of equipping the same set on several characters.

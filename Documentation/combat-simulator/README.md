@@ -54,13 +54,13 @@ The benchmark contract and rating interpretation are documented in the [Characte
 
 Character studies use the scenario cap for each focal character, so the total number of scenario cells grows with the roster. The report shows the total and each character's coverage. This keeps candidate panels equally sized while allowing coverage to scale as characters are added.
 
-Run a quick, reproducible paired comparison for every Rune and wearer represented by the selected matchup sample:
+Run the balanced, reproducible paired comparison for every Rune and each eligible wearer:
 
 ```sh
-node tools/combat-performance.mjs --candidate rune:radiant-moon --runs 100 --limit-scenarios 1000
+node tools/combat-performance.mjs --candidate all-rune-impact --preset balanced
 ```
 
-Candidate examples include `all-runes`, `all-weapons`, `character:soul`, `weapon:premium@P1L50`, and `action:dawn/ultimate`. Use `--character` to limit a Rune or weapon comparison to one eligible wearer. Omit `--limit-scenarios` to use the selected preset's sample size (45 by default); pass `--limit-scenarios 0` to enumerate the complete full-party matrix. The complete matrix has 3,358,800 scenario cells before candidate and trial multipliers, so exhaustive runs are large batch jobs.
+Candidate examples include `all-runes`, `all-weapons`, `character:soul`, `weapon:premium@P1L50`, and `action:dawn/ultimate`. Rune passive reports compare each eligible character's no-Rune baseline with the same character using only the selected four-piece set passive. Rune main stats and substats are disabled in both branches; the paired full-party matchups, policies, difficulty weights, and seeds are held constant. The by-wearer report includes every character/Rune pairing; incompatible pairings are marked `ineligible` with N/A scores, not zero. Eligibility is based on whether the authored kit has a triggerable action (for example, Radiant Moon requires a damaging Skill). The report shows the before/after 0–100 battle outcome rating, rating difference, win-rate lift, BAE, and event-tag evidence. Conditional trigger frequency is also available in the JSONL `runeDiagnostics` fields. Use `--character` to restrict the study to one wearer. Omit `--limit-scenarios` to use the selected preset's sample size (45 balanced scenario cells per wearer); pass `--limit-scenarios 0` to enumerate the complete full-party matrix. The complete matrix has 3,358,800 scenario cells before candidate and trial multipliers, so exhaustive runs are large batch jobs.
 
 Use `--candidate all-effects` or `--candidate effect:<stable-effect-id>` to measure a support outcome by disabling only that effect in the control while forcing the same action in both branches. The catalog records its mechanic tags, trigger, targeting, and numeric measures; the JSONL includes resolved event values and selectable ally target coverage. `--candidate action:<character>/<skill-or-ultimate>` separately compares the action against its ordinary Basic alternative. Current catalogued support outcomes include Dawn’s Tune and Ultimate effects and Logan’s Blood Shield and Taunt. Add new support outcomes to `COMBAT_EFFECT_CATALOG` and route their shared engine resolver through the effect gate and event recorder before including them in the balance suite.
 
