@@ -23,10 +23,10 @@ Calculated stats scale with Level and use the matching stat standards.
 ## Passive: Follow Up
 
 - When another ally's action deals damage to one or more enemies, Soul makes one automatic Follow Up attack if a proc remains.
-- Soul's own Basic and Ultimate do not trigger Follow Up.
+- Soul's own Basic and Ultimate do not trigger Follow Up unless he has the Premium weapon equipped and uses a Basic Attack enhanced 3 or more times.
 - Follow Up deals True damage at a 0.5× multiplier.
 - Each allied action instance is one unique source. A multi-hit or multi-target action can trigger at most one Follow Up.
-- Follow Up has 5 procs by default, or 7 with Character Duplicate 1. The Ultimate refills it to the current proc limit after its damage resolves.
+- Follow Up has 5 procs by default, or 7 with Premium Weapon Duplicate 1. The Ultimate refills it to the current proc limit after its damage resolves.
 - If the triggering action damaged multiple enemies, the Follow Up's total damage is distributed as evenly as possible across the surviving enemies it hit. Any remainder is assigned in target order.
 - A Follow Up attack cannot trigger another Follow Up.
 
@@ -37,7 +37,7 @@ Calculated stats scale with Level and use the matching stat standards.
 - Restores 1 party Skill Point under the shared Basic default.
 - If Soul has Enhanced Basic stacks, each stack adds 1.0× to this Basic's multiplier and restores an additional 10 Energy.
 - Enhanced Basic stacks are consumed by the next Basic Attack.
-- With at least 3 stacks, Basic becomes a Blast: it hits the selected enemy and up to two adjacent enemies, with full damage to each. Premium Weapon Duplicate 3 changes this to AoE.
+- With at least 3 stacks, Basic becomes a Blast: it hits the selected enemy and up to two adjacent enemies, with full damage to each. Premium Weapon Duplicate 3 changes this to AoE. With the Premium weapon equipped, this triple-enhanced Basic can trigger Follow Up once from its own damage.
 
 ## Skill: Enhance
 
@@ -51,21 +51,21 @@ Calculated stats scale with Level and use the matching stat standards.
 
 - Costs 100 Energy.
 - Deals True damage to all enemies at a 1.5× multiplier.
-- After its damage resolves, refills Follow Up to its current limit (5 by default, or 7 with Character Duplicate 1).
+- After its damage resolves, refills Follow Up to its current limit (5 by default, or 7 with Premium Weapon Duplicate 1).
 
 ## Loadout
 
 - Soul starts with his Standard signature weapon at Potential 1. Weapon bonuses apply to Soul’s base stats.
-- The Premium signature effect refunds 1 Skill Point after every 3 Skill Points spent on Enhance. It is active starting at Potential 1.
-- His Premium signature weapon is a separate, character-locked option. It grants +100% at Potential 1 and +200% at Potential 5, with 25 percentage points per potential. Its Potential 1 effect refunds 1 Skill Point after every 3 Skill Points spent on Enhance. Store ownership remains unavailable until the Store is implemented.
-- Premium Potential 2–5 correspond to weapon Duplicates 1–4. Duplicate 1 doubles Basic's base multiplier; Duplicate 2 adds 10 percentage points of Critical Rate and 25 percentage points of Critical Damage; Duplicate 3 changes a 3-stack Enhanced Basic from Blast to AoE; Duplicate 4 restores one Follow Up proc for every two Follow Up activations.
+- The Premium signature effect refunds 1 Skill Point after every 3 Skill Points spent on Enhance. It also lets a triple-enhanced Basic trigger Soul's Follow Up from its own damage. These effects are active starting at Potential 1.
+- His Premium signature weapon is a separate, character-locked option. It grants +100% at Potential 1 and +200% at Potential 5, with 25 percentage points per potential. Its Potential 1 effects refund 1 Skill Point after every 3 Skill Points spent on Enhance and let a triple-enhanced Basic trigger Follow Up from its own damage. Store ownership remains unavailable until the Store is implemented.
+- Premium Potential 2–5 correspond to weapon Duplicates 1–4. Duplicate 1 raises Follow Up capacity from 5 to 7; Duplicate 2 adds 10 percentage points of Critical Rate and 25 percentage points of Critical Damage; Duplicate 3 changes a 3-stack Enhanced Basic from Blast to AoE; Duplicate 4 restores one Follow Up proc for every two Follow Up activations.
 - Soul's four Celestials start at Level 1. Each level increases its corresponding ability multiplier by 10% of its base value. At Level 1, Follow Up is 0.55×, Basic is 1.1×, each Enhance stack adds 1.1×, and Ultimate is 1.65×.
 - Runes add flat stats: main-stat value × rune level; each of three distinct substats contributes 25% of that value. Rune Set selection and effects follow the [Rune Set Standard](../rune-standard/rune-standard.md).
 
 ## Character Duplicates
 
-- Duplicate 1 raises Follow Up capacity from 5 to 7.
-- Duplicate 2 doubles Follow Up's base multiplier from 0.5× to 1.0×.
+- Duplicate 1 doubles Follow Up's base multiplier from 0.5× to 1.0×.
+- Duplicate 2 doubles Basic Attack's base multiplier from 1.0× to 2.0×.
 - Duplicate 3 doubles Ultimate's base multiplier from 1.5× to 3.0×.
 - Duplicate 4 raises each Enhance stack's Basic damage increase from +100% to +200%.
 - Character Duplicate levels are separate from weapon Potential. Their acquisition costs are not defined yet.

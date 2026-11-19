@@ -178,6 +178,7 @@ export class TwoToneBattleEngine {
       const rule = COMBAT_EFFECT_LIFECYCLE[effectId];
       if (Number.isFinite(effect.turns) && (!rule || rule.storage !== storage)) throw new Error(`Timed ${storage} effect ${effectId || '(missing id)'} has no compatible lifecycle definition.`);
       if (!rule || rule.storage !== storage || rule.clock !== clock || (selected && !selected.has(storage))) return effect;
+      if (effect.skipFirstTick) return { ...effect, skipFirstTick: false };
       return { ...effect, turns: Number.isFinite(effect.turns) ? effect.turns - 1 : effect.turns };
     }).filter(effect => !Number.isFinite(effect.turns) || effect.turns > 0) : []);
     if (event || marks) unit.marks = ageList(unit.marks, 'marks');
@@ -344,7 +345,7 @@ export class TwoToneBattleEngine {
         if (stacks) results.push(Object.freeze({ type: 'bleed', stacks }));
       }
       if (passive.type === 'exposed' && isEnemyTarget) {
-        const exposedUpgrade = activeUpgradeEffect('lily.duplicate.2.exposed-stacking', upgradeState);
+        const exposedUpgrade = activeUpgradeEffect('lily.duplicate.1.exposed-stacking', upgradeState);
         const duplicateStacking = !!exposedUpgrade;
         const stacks = this.applyStackingTimedMark({ target, id: 'exposed',
           turns: exposedUpgrade?.values.exposedDuration ?? passive.duration ?? 2,
@@ -354,14 +355,14 @@ export class TwoToneBattleEngine {
     }
     if (isEnemyTarget && archetypeId === 'logan' && ['basic', 'ultimate'].includes(action)) {
       const stacks = action === 'basic'
-        ? upgradeValue('logan.duplicate.1.double-bleed', 'basicBleedStacks', upgradeState, 1)
-        : upgradeValue('logan.duplicate.3.ultimate-bleed-and-skill-point', 'ultimateBleedStacks', upgradeState, 1);
+        ? upgradeValue('logan.premium-duplicate.1.basic-bleed', 'basicBleedStacks', upgradeState, 1)
+        : upgradeValue('logan.premium-duplicate.2.ultimate-bleed-and-skill-point', 'ultimateBleedStacks', upgradeState, 1);
       const definition = CHARACTER_COMBAT_DATA.logan?.[action];
       const added = this.applyBleed({ target, sourceId: actor.id, stacks, maxStacks: target.bleedMaxStacks ?? 5,
         sourceComponentId: `action:logan/${action}`, mechanicTags: definition?.mechanicTags || ['status.bleed', 'damage.over_time', 'trigger.per_hit', 'limit.stacks'] });
       if (added) {
         results.push(Object.freeze({ type: 'bleed', stacks: added }));
-        const effectId = action === 'basic' ? 'logan.duplicate.1.double-bleed' : 'logan.duplicate.3.ultimate-bleed-and-skill-point';
+        const effectId = action === 'basic' ? 'logan.premium-duplicate.1.basic-bleed' : 'logan.premium-duplicate.2.ultimate-bleed-and-skill-point';
         if (activeUpgradeEffect(effectId, upgradeState)) this.recordUpgradeEffect(effectId, { actorId: actor.id,
           targetIds: [target.id], trigger: 'on_successful_hit', actionId: hit.actionId, values: { bleedStacks: added } });
       }
@@ -378,12 +379,12 @@ export class TwoToneBattleEngine {
       results.push(Object.freeze({ type: 'ricochet-mark' })); record('ricochet-mark', 'skill', 'skill', 'on_successful_hit', [target.id], { duration: 2 }, `action:${archetypeId}/skill`);
     }
     if (isEnemyTarget && archetypeId === 'lily' && ['ultimate', 'summon'].includes(action) &&
-        activeUpgradeEffect('lily.duplicate.1.ultimate-weakening', upgradeState)) {
-      const effect = getCharacterUpgradeEffect('lily.duplicate.1.ultimate-weakening');
+        activeUpgradeEffect('lily.premium-duplicate.1.ultimate-weakening', upgradeState)) {
+      const effect = getCharacterUpgradeEffect('lily.premium-duplicate.1.ultimate-weakening');
       this.setTimedDebuff({ target, debuff: { id: 'lily-weakened',
         turns: effect.values.duration, damageMultiplier: effect.values.enemyDamageMultiplier } });
       results.push(Object.freeze({ type: 'lily-weakened' }));
-      this.recordMechanicEvent({ componentId: 'upgrade:lily.duplicate.1.ultimate-weakening', mechanicTags: ['debuff.damage', 'limit.duration'], trigger: 'on_ultimate', status: 'applied', actorId: actor.id, targetIds: [target.id], actionId: hit.actionId, values: { duration: effect.values.duration, damageMultiplier: effect.values.enemyDamageMultiplier } });
+      this.recordMechanicEvent({ componentId: 'upgrade:lily.premium-duplicate.1.ultimate-weakening', mechanicTags: ['debuff.damage', 'limit.duration'], trigger: action === 'summon' ? 'on_summon_damage' : 'on_ultimate', status: 'applied', actorId: actor.id, targetIds: [target.id], actionId: hit.actionId, values: { duration: effect.values.duration, damageMultiplier: effect.values.enemyDamageMultiplier } });
     }
     return Object.freeze(results);
   }
@@ -455,11 +456,15 @@ export class TwoToneBattleEngine {
       damage: base + (index < remainder ? 1 : 0) }));
     return Object.freeze({ ...charge, totalDamage, targets: Object.freeze(allocations) });
   }
-  resolveFollowUpEvent({ passive, ownerId, sourceActorId, sourceId, hits = [], enemies = [],
+  resolveFollowUpEvent({ passive, ownerId, sourceActorId, sourceId, hits = [], enemies = [], action = null, enhancedStacks = 0,
     totalDamage, maxCharges = passive?.charges ?? 5, refundEvery = 0, characterDuplicates = 0,
     premiumWeaponDuplicates = 0, weaponType = null, disabledUpgradeEffectIds = null } = {}) {
-    if (!passive || passive.type !== 'followUp' || ownerId === sourceActorId ||
-        !Array.isArray(hits) || !Array.isArray(enemies)) return null;
+    if (!passive || passive.type !== 'followUp' || !Array.isArray(hits) || !Array.isArray(enemies)) return null;
+    const upgradeState = { characterDuplicates, premiumWeaponDuplicates, weaponType, disabledUpgradeEffectIds };
+    const selfEnhancedBasic = ownerId === sourceActorId && action === 'basic' &&
+      enhancedStacks >= upgradeValue('soul.signature.enhanced-basic-follow-up', 'selfFollowUpAtEnhanceStacks', upgradeState, Infinity) &&
+      activeUpgradeEffect('soul.signature.enhanced-basic-follow-up', upgradeState);
+    if (ownerId === sourceActorId && !selfEnhancedBasic) return null;
     const targets = [...new Set(hits.filter(hit => hit &&
       eventCanTrigger('soulFollowUp', hit.eventType || (hit.summon ? 'summon_hit' : 'direct_hit')) &&
       (hit.damage > 0 || hit.shieldDamage > 0 || hit.barrierDamage > 0 || hit.breakDamage > 0) && !hit.dodged &&
@@ -471,19 +476,21 @@ export class TwoToneBattleEngine {
     const allocation = this.resolveFollowUpAllocation({ passive, sourceId, targets, totalDamage,
       maxCharges, refundEvery });
     if (!allocation) return null;
+    const trigger = selfEnhancedBasic ? 'on_self_enhanced_basic' : 'on_ally_damage_to_enemy';
     this.recordAuthoredEffect({ ownerId: 'soul', slot: 'passive', effectId: passive.id || passive.type,
-      trigger: 'on_ally_damage_to_enemy', actorId: ownerId, targetIds: targets.map(target => target.id),
+      trigger, actorId: ownerId, targetIds: targets.map(target => target.id),
       actionId: sourceId, values: { damage: allocation.totalDamage, chargesRemaining: allocation.remaining, activations: allocation.activations } });
-    const upgradeState = { characterDuplicates, premiumWeaponDuplicates, weaponType, disabledUpgradeEffectIds };
-    if (activeUpgradeEffect('soul.duplicate.1.follow-up-charges', upgradeState)) this.recordUpgradeEffect('soul.duplicate.1.follow-up-charges', {
-      actorId: ownerId, targetIds: targets.map(target => target.id), trigger: 'on_ally_damage_to_enemy', actionId: sourceId,
+    if (activeUpgradeEffect('soul.premium-duplicate.1.follow-up-charges', upgradeState)) this.recordUpgradeEffect('soul.premium-duplicate.1.follow-up-charges', {
+      actorId: ownerId, targetIds: targets.map(target => target.id), trigger, actionId: sourceId,
       values: { maxCharges, chargesRemaining: allocation.remaining } });
-    if (activeUpgradeEffect('soul.duplicate.2.follow-up-damage', upgradeState)) this.recordUpgradeEffect('soul.duplicate.2.follow-up-damage', {
-      actorId: ownerId, targetIds: targets.map(target => target.id), trigger: 'on_ally_damage_to_enemy', actionId: sourceId,
+    if (activeUpgradeEffect('soul.duplicate.1.follow-up-damage', upgradeState)) this.recordUpgradeEffect('soul.duplicate.1.follow-up-damage', {
+      actorId: ownerId, targetIds: targets.map(target => target.id), trigger, actionId: sourceId,
       values: { damage: allocation.totalDamage } });
     if (refundEvery > 0 && allocation.activations % refundEvery === 0 && activeUpgradeEffect('soul.premium-duplicate.4.follow-up-refund', upgradeState)) this.recordUpgradeEffect('soul.premium-duplicate.4.follow-up-refund', {
-      actorId: ownerId, targetIds: targets.map(target => target.id), trigger: 'on_ally_damage_to_enemy', actionId: sourceId,
+      actorId: ownerId, targetIds: targets.map(target => target.id), trigger, actionId: sourceId,
       values: { chargesRefunded: 1, chargesRemaining: allocation.remaining, activations: allocation.activations } });
+    if (selfEnhancedBasic) this.recordUpgradeEffect('soul.signature.enhanced-basic-follow-up', { actorId: ownerId,
+      targetIds: targets.map(target => target.id), trigger, actionId: sourceId, values: { enhanceStacks, chargesRemaining: allocation.remaining } });
     return Object.freeze({ ...allocation, targets: allocation.targets, affectedTargets: Object.freeze(targets) });
   }
   refillFollowUps({ passive, maxCharges = passive?.charges ?? 5 } = {}) {
@@ -535,10 +542,10 @@ export class TwoToneBattleEngine {
       defenseIgnore: upgradeValue('dawn.signature.tune-defense-ignore', 'tuneDefenseIgnore', upgradeState),
       damageReduction: upgradeValue('dawn.premium-duplicate.1.tune-damage-reduction', 'tuneDamageReduction', upgradeState),
       barrierDamageBonus: upgradeValue('dawn.premium-duplicate.2.tune-barrier-damage', 'tuneBarrierDamageBonus', upgradeState),
-      criticalRateBonus: upgradeValue('dawn.premium-duplicate.4.tune-critical', 'tuneCriticalRateBonus', upgradeState),
-      criticalDamageBonus: upgradeValue('dawn.premium-duplicate.4.tune-critical', 'tuneCriticalDamageBonus', upgradeState) };
+      criticalRateBonus: upgradeValue('dawn.duplicate.2.tune-critical', 'tuneCriticalRateBonus', upgradeState),
+      criticalDamageBonus: upgradeValue('dawn.duplicate.2.tune-critical', 'tuneCriticalDamageBonus', upgradeState) };
     if (!this.applyTune({ target, tune })) return null;
-    const actionAdvance = upgradeValue('dawn.premium-duplicate.3.tune-action-advance', 'tuneActionAdvance', upgradeState);
+    const actionAdvance = upgradeValue('dawn.premium-duplicate.4.tune-action-advance', 'tuneActionAdvance', upgradeState);
     if (actionAdvance) this.timeline.modify(target.id, actionAdvance);
     this.recordAuthoredEffect({ ownerId: 'dawn', slot: 'skill', effectId: 'skill', trigger: 'on_skill', actorId: actor.id,
       targetIds: [target.id], values: { damageBonus: tune.damageBonus, duration: tune.turns, actionAdvance } });
@@ -546,16 +553,103 @@ export class TwoToneBattleEngine {
       values: { damageBonus: tune.damageBonus, duration: tune.turns, skillPointReturn: tune.skillPointReturn, actionAdvance } });
     const tuneUpgradeEvidence = [
       ['dawn.duplicate.3.tune-duration-and-attack', { duration: tune.turns, attackBonus: tune.attackBonus }],
+      ['dawn.duplicate.2.tune-critical', { criticalRateBonus: tune.criticalRateBonus, criticalDamageBonus: tune.criticalDamageBonus }],
       ['dawn.duplicate.4.tune-damage', { damageBonus: tune.damageBonus }],
       ['dawn.signature.tune-defense-ignore', { defenseIgnore: tune.defenseIgnore }],
       ['dawn.premium-duplicate.1.tune-damage-reduction', { damageReduction: tune.damageReduction }],
       ['dawn.premium-duplicate.2.tune-barrier-damage', { barrierDamageBonus: tune.barrierDamageBonus }],
-      ['dawn.premium-duplicate.3.tune-action-advance', { actionAdvance }],
-      ['dawn.premium-duplicate.4.tune-critical', { criticalRateBonus: tune.criticalRateBonus, criticalDamageBonus: tune.criticalDamageBonus }]
+      ['dawn.premium-duplicate.4.tune-action-advance', { actionAdvance }]
     ];
     for (const [effectId, values] of tuneUpgradeEvidence) if (activeUpgradeEffect(effectId, upgradeState))
       this.recordUpgradeEffect(effectId, { actorId: actor.id, targetIds: [target.id], trigger: 'on_skill', values });
     return Object.freeze({ tune: Object.freeze({ ...tune }), actionAdvance, effectApplied: true });
+  }
+  resolveCloudActionPassive({ actor, characterDuplicates = 0, premiumWeaponDuplicates = 0, weaponType = null } = {}) {
+    if (!actor || actor.hp <= 0 || (actor.archetypeId || actor.id) !== 'cloud') return 0;
+    const state = { characterDuplicates, premiumWeaponDuplicates,
+      weaponType: weaponType || actor.weapon?.type || null, disabledUpgradeEffectIds: actor.disabledUpgradeEffectIds };
+    const advance = upgradeValue('cloud.duplicate.1.weightless-advance', 'actionAdvance', state, 20);
+    if (advance > 0) this.timeline.modify(actor.id, advance);
+    this.recordMechanicEvent({ componentId: 'passive:cloud/weightless', mechanicTags: ['tempo.action_advance', 'trigger.per_action'], trigger: 'on_action',
+      status: 'applied', actorId: actor.id, targetIds: [actor.id], values: { actionAdvance: advance } });
+    if (activeUpgradeEffect('cloud.duplicate.1.weightless-advance', state)) this.recordUpgradeEffect('cloud.duplicate.1.weightless-advance', {
+      actorId: actor.id, targetIds: [actor.id], trigger: 'on_action', values: { actionAdvance: advance } });
+    return advance;
+  }
+  applyCloudBasicTempo({ actor, allies = [], plan, characterDuplicates = 0, premiumWeaponDuplicates = 0, weaponType = null } = {}) {
+    if (!actor || actor.hp <= 0 || !plan || !Array.isArray(allies)) return Object.freeze([]);
+    const state = { characterDuplicates, premiumWeaponDuplicates,
+      weaponType: weaponType || actor.weapon?.type || null, disabledUpgradeEffectIds: actor.disabledUpgradeEffectIds };
+    const speedBonus = upgradeValue('cloud.duplicate.2.basic-tempo', 'speedBonus', state, plan.speedBonus || 0.2);
+    const duration = upgradeValue('cloud.duplicate.2.basic-tempo', 'speedDuration', state, plan.speedDuration || 2);
+    const maxStacks = upgradeValue('cloud.duplicate.2.basic-tempo', 'speedMaxStacks', state, plan.speedMaxStacks || 5);
+    const affected = [];
+    for (const target of allies) {
+      if (!target || target.hp <= 0) continue;
+      const current = (target.marks || []).filter(mark => mark.id === 'cloud-tempo');
+      const stacks = Math.min(maxStacks, current.length + 1);
+      this.setTimedMark({ target, mark: { id: 'cloud-tempo', turns: duration, speedBonus, skipFirstTick: target.id === actor.id }, stacks });
+      affected.push(target.id);
+    }
+    if (affected.length) this.recordMechanicEvent({ componentId: 'action:cloud/basic', mechanicTags: ['buff.speed', 'limit.duration', 'limit.stacks'],
+      trigger: 'on_basic', status: 'applied', actorId: actor.id, targetIds: affected,
+      values: { speedBonus, duration, maxStacks, affectedAllies: affected.length } });
+    if (activeUpgradeEffect('cloud.duplicate.2.basic-tempo', state)) this.recordUpgradeEffect('cloud.duplicate.2.basic-tempo', {
+      actorId: actor.id, targetIds: affected, trigger: 'on_basic', values: { speedBonus, duration, maxStacks, affectedAllies: affected.length } });
+    return Object.freeze(affected);
+  }
+  resolveCloudRestoration({ actor, target, allies = [], plan, speed = null, characterDuplicates = 0,
+    premiumWeaponDuplicates = 0, weaponType = null } = {}) {
+    if (!actor || actor.hp <= 0 || !target || target.hp <= 0 || !plan || !Array.isArray(allies)) return null;
+    const state = { characterDuplicates, premiumWeaponDuplicates, weaponType: weaponType || actor.weapon?.type || null,
+      disabledUpgradeEffectIds: actor.disabledUpgradeEffectIds };
+    const healMultiplier = plan.healMultiplier || 1;
+    const actionAdvance = upgradeValue('cloud.duplicate.3.restoration-advance', 'actionAdvance', state, plan.actionAdvance || 0);
+    const amount = roundCombatHp((Number.isFinite(speed) ? speed : actor.stats?.speed ?? actor.speed ?? 0) * healMultiplier);
+    const targetIndex = allies.findIndex(member => member?.id === target.id), adjacent = [];
+    if (targetIndex >= 0) {
+      for (const index of [targetIndex - 1, targetIndex + 1]) if (allies[index]?.hp > 0) adjacent.push(allies[index]);
+    }
+    const recipients = [{ target, multiplier: 1 }, ...adjacent.slice(0, 2).map(member => ({ target: member, multiplier: plan.adjacentHealMultiplier ?? 0.5 }))];
+    const healed = recipients.map(entry => {
+      const result = this.resolveHealing({ target: entry.target, amount: amount * entry.multiplier });
+      return Object.freeze({ target: entry.target, requested: result?.requested || 0, applied: result?.applied || 0, hp: entry.target.hp });
+    });
+    if (actionAdvance > 0) this.timeline.modify(target.id, actionAdvance);
+    const totalHealing = healed.reduce((sum, entry) => sum + entry.applied, 0);
+    this.recordMechanicEvent({ componentId: 'action:cloud/skill', mechanicTags: ['recovery.healing', 'tempo.action_advance'], trigger: 'on_skill',
+      status: 'applied', actorId: actor.id, targetIds: healed.map(entry => entry.target.id),
+      values: { healing: totalHealing, baseHeal: amount, actionAdvance, healMultiplier, recipients: healed.length } });
+    if (activeUpgradeEffect('cloud.duplicate.3.restoration-advance', state)) this.recordUpgradeEffect('cloud.duplicate.3.restoration-advance', {
+      actorId: actor.id, targetIds: [target.id], trigger: 'on_skill', values: { actionAdvance } });
+    if (activeUpgradeEffect('cloud.premium-duplicate.4.restoration-healing', state)) this.recordUpgradeEffect('cloud.premium-duplicate.4.restoration-healing', {
+      actorId: actor.id, targetIds: healed.map(entry => entry.target.id), trigger: 'on_skill', values: { healMultiplier, healing: totalHealing } });
+    return Object.freeze({ healing: totalHealing, baseHeal: amount, actionAdvance, recipients: Object.freeze(healed) });
+  }
+  resolveCloudUltimateEffects({ actor, target, enemies = [], plan, characterDuplicates = 0,
+    premiumWeaponDuplicates = 0, weaponType = null } = {}) {
+    if (!actor || actor.hp <= 0 || !target || !plan || !Array.isArray(enemies)) return null;
+    const state = { characterDuplicates, premiumWeaponDuplicates, weaponType: weaponType || actor.weapon?.type || null,
+      disabledUpgradeEffectIds: actor.disabledUpgradeEffectIds };
+    const actionDelay = upgradeValue('cloud.duplicate.4.ultimate-control', 'actionDelay', state, plan.actionDelay || 0);
+    if (actionDelay > 0 && target.hp > 0) this.timeline.modify(target.id, -actionDelay);
+    const slowPercent = upgradeValue('cloud.premium-duplicate.3.ultimate-slow', 'slowPercent', state, plan.slowPercent || 0);
+    const affected = [];
+    if (weaponType === 'premium' && slowPercent > 0) for (const enemy of enemies) {
+      if (!enemy || enemy.hp <= 0) continue;
+      const current = (enemy.marks || []).filter(mark => mark.id === 'cloud-slow');
+      const stacks = Math.min(plan.slowMaxStacks || 5, current.length + 1);
+      this.setTimedMark({ target: enemy, mark: { id: 'cloud-slow', turns: plan.slowDuration || 2, slowPercent }, stacks });
+      affected.push(enemy.id);
+    }
+    this.recordMechanicEvent({ componentId: 'action:cloud/ultimate', mechanicTags: ['tempo.action_delay', 'debuff.speed', 'limit.duration', 'limit.stacks'],
+      trigger: 'on_ultimate', status: 'applied', actorId: actor.id, targetIds: [target.id, ...affected],
+      values: { actionDelay, slowPercent: affected.length ? slowPercent : 0, duration: plan.slowDuration || 2, affectedEnemies: affected.length } });
+    if (activeUpgradeEffect('cloud.duplicate.4.ultimate-control', state)) this.recordUpgradeEffect('cloud.duplicate.4.ultimate-control', {
+      actorId: actor.id, targetIds: [target.id], trigger: 'on_ultimate', values: { actionDelay } });
+    if (activeUpgradeEffect('cloud.premium-duplicate.3.ultimate-slow', state)) this.recordUpgradeEffect('cloud.premium-duplicate.3.ultimate-slow', {
+      actorId: actor.id, targetIds: affected, trigger: 'on_ultimate', values: { slowPercent, duration: plan.slowDuration || 2, affectedEnemies: affected.length } });
+    return Object.freeze({ actionDelay, slowPercent: affected.length ? slowPercent : 0, affected: Object.freeze(affected) });
   }
   resolveLoganBloodShield({ actor, allies = [], enemies = [], plan,
     characterDuplicates = 0, premiumWeaponDuplicates = 0, weaponType = null } = {}) {
@@ -565,7 +659,7 @@ export class TwoToneBattleEngine {
     const shieldEffectId = 'logan.blood-shield.protection', tauntEffectId = 'logan.blood-shield.taunt';
     const shieldEnabled = this.isCombatEffectEnabled(shieldEffectId), tauntEnabled = this.isCombatEffectEnabled(tauntEffectId);
     const healthCost = Math.min(Math.max(0, actor.hp - 1), Math.max(1, roundCombatHp(actor.hp * plan.healthCost)));
-    const shieldPerAlly = healthCost * upgradeValue('logan.duplicate.2.shield-strength', 'shieldMultiplier', upgradeState, 1);
+    const shieldPerAlly = healthCost * upgradeValue('logan.duplicate.4.shield-strength', 'shieldMultiplier', upgradeState, 1);
     actor.hp = Math.max(1, actor.hp - healthCost);
     const shields = [];
     for (const ally of allies) {
@@ -573,8 +667,8 @@ export class TwoToneBattleEngine {
       const result = shieldEnabled ? this.applyShield({ target: ally, amount: shieldPerAlly }) : null;
       shields.push(Object.freeze({ target: ally, amount: result?.applied || 0 }));
     }
-    const tauntRate = tauntEnabled ? upgradeValue('logan.premium-duplicate.2.taunt', 'tauntRate', upgradeState, plan.tauntChance) : 0;
-    const tauntTurns = tauntEnabled ? plan.tauntTurns + upgradeValue('logan.premium-duplicate.2.taunt', 'tauntExtraDuration', upgradeState) : 0;
+    const tauntRate = tauntEnabled ? upgradeValue('logan.premium-duplicate.3.taunt', 'tauntRate', upgradeState, plan.tauntChance) : 0;
+    const tauntTurns = tauntEnabled ? upgradeValue('logan.premium-duplicate.3.taunt', 'tauntTurns', upgradeState, plan.tauntTurns) : 0;
     const taunts = enemies.filter(enemy => enemy?.hp > 0).map(enemy => tauntEnabled ? this.applyTaunt({
       target: enemy, sourceId: actor.id, targetId: actor.id, rate: tauntRate, turns: tauntTurns
     }) : false);
@@ -585,10 +679,10 @@ export class TwoToneBattleEngine {
       values: { shieldGranted: shields.reduce((sum, entry) => sum + entry.amount, 0), shieldPerAlly: shields[0]?.amount || 0 } });
     this.recordCombatEffect(tauntEffectId, { trigger: 'on_skill', status: tauntEnabled ? 'applied' : 'prevented', actorId: actor.id, targetIds: enemies.filter(enemy => enemy?.hp > 0).map(enemy => enemy.id),
       values: { tauntRate, duration: tauntTurns, tauntsApplied: taunts.filter(Boolean).length } });
-    if (shieldEnabled && activeUpgradeEffect('logan.duplicate.2.shield-strength', upgradeState)) this.recordUpgradeEffect('logan.duplicate.2.shield-strength', {
+    if (shieldEnabled && activeUpgradeEffect('logan.duplicate.4.shield-strength', upgradeState)) this.recordUpgradeEffect('logan.duplicate.4.shield-strength', {
       actorId: actor.id, targetIds: shields.map(entry => entry.target.id), trigger: 'on_skill',
       values: { shieldGranted: shields.reduce((sum, entry) => sum + entry.amount, 0), shieldPerAlly: shields[0]?.amount || 0 } });
-    if (tauntEnabled && activeUpgradeEffect('logan.premium-duplicate.2.taunt', upgradeState)) this.recordUpgradeEffect('logan.premium-duplicate.2.taunt', {
+    if (tauntEnabled && activeUpgradeEffect('logan.premium-duplicate.3.taunt', upgradeState)) this.recordUpgradeEffect('logan.premium-duplicate.3.taunt', {
       actorId: actor.id, targetIds: enemies.filter(enemy => enemy?.hp > 0).map(enemy => enemy.id), trigger: 'on_skill',
       values: { tauntRate, duration: tauntTurns, tauntsApplied: taunts.filter(Boolean).length } });
     if (shieldEnabled && activeUpgradeEffect('logan.premium-duplicate.4.shielded-damage', upgradeState)) this.recordUpgradeEffect('logan.premium-duplicate.4.shielded-damage', {
@@ -597,17 +691,20 @@ export class TwoToneBattleEngine {
     return Object.freeze({ healthCost, shieldPerAlly, shields: Object.freeze(shields), tauntRate, tauntTurns,
       tauntsApplied: taunts.filter(Boolean).length });
   }
-  resolveDawnUltimate({ actor, target, battle, plan, characterDuplicates = 0 } = {}) {
+  resolveDawnUltimate({ actor, target, battle, plan, characterDuplicates = 0,
+    premiumWeaponDuplicates = 0, weaponType = null } = {}) {
     if (!actor || !target || target.hp <= 0 || !battle || !plan ||
         !Number.isFinite(target.energy) || !Number.isFinite(target.maxEnergy) ||
         !Number.isFinite(battle.skillPoints) || !Number.isFinite(battle.skillPointCap)) return null;
     const energyBefore = target.energy, skillPointsBefore = battle.skillPoints;
-    const upgradeState = { characterDuplicates, disabledUpgradeEffectIds: actor.disabledUpgradeEffectIds };
+    const upgradeState = { characterDuplicates, premiumWeaponDuplicates, weaponType: weaponType || actor.weapon?.type || null,
+      disabledUpgradeEffectIds: actor.disabledUpgradeEffectIds };
     const energyId = 'dawn.ultimate.energy-restore', advanceId = 'dawn.ultimate.action-advance', skillPointId = 'dawn.ultimate.skill-point';
     const energyEnabled = this.isCombatEffectEnabled(energyId), advanceEnabled = this.isCombatEffectEnabled(advanceId), skillPointEnabled = this.isCombatEffectEnabled(skillPointId);
     const energyRate = upgradeValue('dawn.duplicate.1.ultimate-energy', 'ultimateEnergyRestore', upgradeState, plan.energyRestore);
     if (energyEnabled) target.energy = Math.min(target.maxEnergy, target.energy + target.maxEnergy * energyRate);
-    if (skillPointEnabled) battle.skillPoints = Math.min(battle.skillPointCap, battle.skillPoints + upgradeValue('dawn.duplicate.2.ultimate-skill-points', 'ultimateSkillPointGain', upgradeState, plan.skillPointGain ?? 1));
+    const ultimateSkillPointGain = upgradeValue('dawn.premium-duplicate.3.ultimate-skill-points', 'ultimateSkillPointGain', upgradeState, plan.skillPointGain ?? 1);
+    if (skillPointEnabled) battle.skillPoints = Math.min(battle.skillPointCap, battle.skillPoints + ultimateSkillPointGain);
     const actionAdvance = advanceEnabled ? plan.actionAdvance : 0;
     if (actionAdvance) this.timeline.modify(target.id, actionAdvance);
     const result = { energyGained: target.energy - energyBefore, skillPointsGained: battle.skillPoints - skillPointsBefore, actionAdvance };
@@ -621,7 +718,7 @@ export class TwoToneBattleEngine {
       targetIds: [id === skillPointId ? actor.id : target.id], values });
     if (energyEnabled && activeUpgradeEffect('dawn.duplicate.1.ultimate-energy', upgradeState)) this.recordUpgradeEffect('dawn.duplicate.1.ultimate-energy', {
       actorId: actor.id, targetIds: [target.id], trigger: 'on_ultimate', values: { energyGained: result.energyGained } });
-    if (skillPointEnabled && activeUpgradeEffect('dawn.duplicate.2.ultimate-skill-points', upgradeState)) this.recordUpgradeEffect('dawn.duplicate.2.ultimate-skill-points', {
+    if (skillPointEnabled && activeUpgradeEffect('dawn.premium-duplicate.3.ultimate-skill-points', upgradeState)) this.recordUpgradeEffect('dawn.premium-duplicate.3.ultimate-skill-points', {
       actorId: actor.id, targetIds: [actor.id], trigger: 'on_ultimate', values: { skillPointsGained: result.skillPointsGained } });
     return Object.freeze(result);
   }
@@ -635,38 +732,44 @@ export class TwoToneBattleEngine {
     const actorAdvance = actor.ultimate?.actionAdvance ?? 100;
     this.timeline.modify(actor.id, actorAdvance);
     const delayed = [];
-    const enemyDelay = upgradeValue('zero.duplicate.1.ultimate-delay', 'ultimateEnemyDelay', upgradeState);
+    const enemyDelay = upgradeValue('zero.premium-duplicate.2.ultimate-delay', 'ultimateEnemyDelay', upgradeState);
     if (enemyDelay) for (const enemy of enemies) if (enemy?.hp > 0 && this.timeline.modify(enemy.id, -enemyDelay)) delayed.push(enemy.id);
-    const skillPointGain = upgradeValue('zero.signature.ultimate-skill-point', 'ultimateSkillPointGain', upgradeState);
+    const skillPointGain = upgradeValue('zero.signature.ultimate-resources', 'ultimateSkillPointGain', upgradeState);
+    const energyBefore = Number.isFinite(actor.energy) ? actor.energy : null;
+    const energyGain = upgradeValue('zero.signature.ultimate-resources', 'ultimateEnergyGain', upgradeState);
+    if (energyBefore !== null && energyGain > 0) actor.energy = Math.min(Number.isFinite(actor.maxEnergy) ? actor.maxEnergy : 120, actor.energy + energyGain);
+    const energyGained = energyBefore === null ? 0 : actor.energy - energyBefore;
     battle.skillPoints = Math.min(battle.skillPointCap, battle.skillPoints + skillPointGain);
     this.recordAuthoredEffect({ ownerId: 'zero', slot: 'ultimate', effectId: 'ultimate', trigger: 'on_ultimate', actorId: actor.id,
-      targetIds: enemies.filter(enemy => enemy?.hp > 0).map(enemy => enemy.id), values: { actionAdvance: actorAdvance, skillPointsGained: battle.skillPoints - skillPointsBefore } });
-    if (delayed.length) this.recordMechanicEvent({ componentId: 'upgrade:zero.duplicate.1.ultimate-delay', mechanicTags: ['tempo.action_delay'], trigger: 'on_ultimate', status: 'applied', actorId: actor.id, targetIds: delayed, values: { actionDelay: enemyDelay, targetsAffected: delayed.length } });
-    if (skillPointGain) this.recordUpgradeEffect('zero.signature.ultimate-skill-point', { actorId: actor.id,
-      targetIds: [actor.id], trigger: 'on_ultimate', values: { skillPointsGained: battle.skillPoints - skillPointsBefore } });
+      targetIds: enemies.filter(enemy => enemy?.hp > 0).map(enemy => enemy.id), values: { actionAdvance: actorAdvance, skillPointsGained: battle.skillPoints - skillPointsBefore, energyGained } });
+    if (delayed.length) this.recordUpgradeEffect('zero.premium-duplicate.2.ultimate-delay', { actorId: actor.id,
+      targetIds: delayed, trigger: 'on_ultimate', values: { actionDelay: enemyDelay, targetsAffected: delayed.length } });
+    if (skillPointGain || energyGain) this.recordUpgradeEffect('zero.signature.ultimate-resources', { actorId: actor.id,
+      targetIds: [actor.id], trigger: 'on_ultimate', values: { skillPointsGained: battle.skillPoints - skillPointsBefore, energyGained } });
     return Object.freeze({ actorAdvance, delayed: Object.freeze(delayed),
-      skillPointsGained: battle.skillPoints - skillPointsBefore });
+      skillPointsGained: battle.skillPoints - skillPointsBefore, energyGained });
   }
-  resolveLoganUltimateEffects({ actor, battle, characterDuplicates = 0 } = {}) {
+  resolveLoganUltimateEffects({ actor, battle, premiumWeaponDuplicates = 0, hasPremiumWeapon = false } = {}) {
     if (!actor || !battle || !Number.isFinite(battle.skillPoints) || !Number.isFinite(battle.skillPointCap)) return null;
     const before = battle.skillPoints;
-    const skillPointGain = upgradeValue('logan.duplicate.3.ultimate-bleed-and-skill-point', 'ultimateSkillPointGain', {
-      characterDuplicates, disabledUpgradeEffectIds: actor.disabledUpgradeEffectIds });
+    const upgradeState = { premiumWeaponDuplicates, weaponType: hasPremiumWeapon ? 'premium' : actor.weapon?.type || null,
+      disabledUpgradeEffectIds: actor.disabledUpgradeEffectIds };
+    const skillPointGain = upgradeValue('logan.premium-duplicate.2.ultimate-bleed-and-skill-point', 'ultimateSkillPointGain', upgradeState);
     battle.skillPoints = Math.min(battle.skillPointCap, battle.skillPoints + skillPointGain);
-    if (skillPointGain) this.recordUpgradeEffect('logan.duplicate.3.ultimate-bleed-and-skill-point', { actorId: actor.id,
+    if (skillPointGain) this.recordUpgradeEffect('logan.premium-duplicate.2.ultimate-bleed-and-skill-point', { actorId: actor.id,
       targetIds: [actor.id], trigger: 'on_ultimate', values: { skillPoints: battle.skillPoints - before } });
     return Object.freeze({ skillPointsGained: battle.skillPoints - before });
   }
-  resolveLilyPremiumUltimateEffects({ actor, allies = [], battle, premiumWeaponDuplicates = 0,
+  resolveLilyPremiumUltimateEffects({ actor, allies = [], battle, characterDuplicates = 0, premiumWeaponDuplicates = 0,
     hasPremiumWeapon = false } = {}) {
     if (!actor || !Array.isArray(allies) || !battle || !Number.isFinite(battle.skillPoints) || !Number.isFinite(battle.skillPointCap)) return null;
     const skillPointsBefore = battle.skillPoints, energy = [];
-    const upgradeState = { premiumWeaponDuplicates, weaponType: hasPremiumWeapon ? 'premium' : actor.weapon?.type,
+    const upgradeState = { characterDuplicates, premiumWeaponDuplicates, weaponType: hasPremiumWeapon ? 'premium' : actor.weapon?.type,
       disabledUpgradeEffectIds: actor.disabledUpgradeEffectIds };
     const skillPointGain = upgradeValue('lily.signature.ultimate-skill-point', 'ultimateSkillPointGain', upgradeState);
     battle.skillPoints = Math.min(battle.skillPointCap, battle.skillPoints + skillPointGain);
-    const teamEnergy = upgradeValue('lily.premium-duplicate.4.ultimate-team-boost', 'teamEnergy', upgradeState);
-    const actionAdvance = upgradeValue('lily.premium-duplicate.4.ultimate-team-boost', 'teamActionAdvance', upgradeState);
+    const teamEnergy = upgradeValue('lily.duplicate.3.ultimate-team-boost', 'teamEnergy', upgradeState);
+    const actionAdvance = upgradeValue('lily.duplicate.3.ultimate-team-boost', 'teamActionAdvance', upgradeState);
     if (teamEnergy || actionAdvance) for (const ally of allies) {
       if (!ally || ally.hp <= 0 || ally.isHauntling) continue;
       const maxEnergy = Number.isFinite(ally.maxEnergy) ? ally.maxEnergy : 120;
@@ -677,7 +780,7 @@ export class TwoToneBattleEngine {
     }
     if (skillPointGain) this.recordUpgradeEffect('lily.signature.ultimate-skill-point', { actorId: actor.id,
       targetIds: [actor.id], trigger: 'on_ultimate', values: { skillPointsGained: battle.skillPoints - skillPointsBefore } });
-    if (teamEnergy || actionAdvance) this.recordUpgradeEffect('lily.premium-duplicate.4.ultimate-team-boost', { actorId: actor.id,
+    if (teamEnergy || actionAdvance) this.recordUpgradeEffect('lily.duplicate.3.ultimate-team-boost', { actorId: actor.id,
       targetIds: energy.map(entry => entry.id), trigger: 'on_ultimate', values: { energy: energy.reduce((sum, entry) => sum + entry.energyGained, 0), actionAdvance: energy.reduce((sum, entry) => sum + entry.actionAdvance, 0) } });
     return Object.freeze({ skillPointsGained: battle.skillPoints - skillPointsBefore, energy: Object.freeze(energy) });
   }
@@ -685,17 +788,18 @@ export class TwoToneBattleEngine {
     if (!owner || owner.hp <= 0 || sourceId === undefined || sourceId === null) return null;
     const upgradeState = { characterDuplicates, disabledUpgradeEffectIds: owner.disabledUpgradeEffectIds };
     const ability = owner.ultimate || {};
-    const durationTurns = upgradeValue('lily.duplicate.3.ultimate-and-summon', 'summonDuration', {
-      ...upgradeState }, ability.summonDuration ?? 3);
+    const effectId = 'lily.duplicate.2.ultimate-and-summon';
+    const durationTurns = upgradeValue(effectId, 'summonDuration', upgradeState, ability.summonDuration ?? 3);
+    const multiplier = (ability.summonMultiplier ?? 1) * upgradeValue(effectId, 'summonDamageMultiplier', upgradeState, 1);
     const plan = Object.freeze({ id: `hauntling-${sourceId}`, ownerId: owner.id, name: 'Hauntling',
       durationTurns, speed: ability.summonSpeed ?? 30, hp: ability.summonHp ?? 1, maxHp: ability.summonHp ?? 1,
-      damageType: ability.summonDamageType ?? 'true', multiplier: ability.summonMultiplier ?? 1,
+      damageType: ability.summonDamageType ?? 'true', multiplier,
       target: ability.summonTarget ?? 'aoe', immediateOnSpawn: true });
     this.recordMechanicEvent({ componentId: 'action:lily/ultimate', mechanicTags: ['summon.create', 'summon.action', 'limit.duration'],
       trigger: 'on_ultimate', status: 'applied', actorId: owner.id, targetIds: [plan.id], actionId: sourceId,
       values: { duration: durationTurns, multiplier: plan.multiplier } });
-    if (activeUpgradeEffect('lily.duplicate.3.ultimate-and-summon', upgradeState)) this.recordUpgradeEffect('lily.duplicate.3.ultimate-and-summon', {
-      actorId: owner.id, targetIds: [plan.id], trigger: 'on_ultimate', actionId: sourceId, values: { summonDuration: durationTurns } });
+    if (activeUpgradeEffect(effectId, upgradeState)) this.recordUpgradeEffect(effectId, {
+      actorId: owner.id, targetIds: [plan.id], trigger: 'on_ultimate', actionId: sourceId, values: { summonDuration: durationTurns, multiplier } });
     return plan;
   }
   advanceSummonTurn(summon) {
@@ -966,29 +1070,36 @@ export class TwoToneBattleEngine {
       if (characterId === 'soul') {
         const basicCelestial = Number.isFinite(celestialMultipliers.basic) ? celestialMultipliers.basic : 1;
         const skillCelestial = Number.isFinite(celestialMultipliers.skill) ? celestialMultipliers.skill : 1;
-        multiplier = ability.multiplier * upgradeValue('soul.premium-duplicate.1.basic-damage', 'basicDamageMultiplier', upgradeState, 1) * basicCelestial +
+        multiplier = ability.multiplier * upgradeValue('soul.duplicate.2.basic-damage', 'basicDamageMultiplier', upgradeState, 1) * basicCelestial +
           enhanceStacks * (kit.skill?.damagePerStack || 0) * upgradeValue('soul.duplicate.4.enhance-scaling', 'enhanceDamagePerStackMultiplier', upgradeState, 1) * skillCelestial;
         if (enhanceStacks >= (kit.skill?.blastAtStacks ?? Infinity)) {
           target = upgradeValue('soul.premium-duplicate.3.enhanced-aoe', 'enhancedBasicCoverage', upgradeState, 'blast');
         }
-      } else if (characterId === 'logan') multiplier *= upgradeValue('logan.premium-duplicate.1.basic-damage', 'basicDamageMultiplier', upgradeState, 1);
+      } else if (characterId === 'logan') multiplier *= upgradeValue('logan.duplicate.1.basic-damage', 'basicDamageMultiplier', upgradeState, 1);
       else if (characterId === 'zero') multiplier *= upgradeValue('zero.duplicate.2.basic-damage', 'basicDamageMultiplier', upgradeState, 1);
+      else if (characterId === 'cloud') multiplier *= upgradeValue('cloud.premium-duplicate.1.basic-damage', 'basicDamageMultiplier', upgradeState, 1);
     } else if (action === 'skill' && !benchmarkAction && ability.type === 'firstStrike') {
       multiplier = targetAlreadyHit ? ability.multiplier : ability.firstHitMultiplier;
       multiplier *= upgradeValue('zero.duplicate.4.first-strike-damage', 'firstStrikeDamageMultiplier', upgradeState, 1);
     } else if (action === 'ultimate' && !benchmarkAction) {
       if (characterId === 'soul') multiplier *= upgradeValue('soul.duplicate.3.ultimate-damage', 'ultimateDamageMultiplier', upgradeState, 1);
-      if (characterId === 'lily') multiplier *= upgradeValue('lily.duplicate.3.ultimate-and-summon', 'ultimateDamageMultiplier', upgradeState, 1);
+      if (characterId === 'lily') multiplier *= upgradeValue('lily.duplicate.2.ultimate-and-summon', 'ultimateDamageMultiplier', upgradeState, 1);
       if (characterId === 'zero') multiplier *= upgradeValue('zero.duplicate.3.ultimate-damage', 'ultimateDamageMultiplier', upgradeState, 1);
-      if (characterId === 'logan') multiplier *= upgradeValue('logan.premium-duplicate.3.ultimate-damage', 'ultimateDamageMultiplier', upgradeState, 1);
+      if (characterId === 'logan') multiplier *= upgradeValue('logan.duplicate.3.ultimate-damage', 'ultimateDamageMultiplier', upgradeState, 1);
+      if (characterId === 'cloud') multiplier *= upgradeValue('cloud.premium-duplicate.2.ultimate-damage', 'ultimateDamageMultiplier', upgradeState, 1);
     }
 
     if (!benchmarkAction && (action !== 'basic' || characterId !== 'soul')) multiplier *= celestial;
     if (action === 'basic') multiplier *= tuneMultiplier;
     const energyCost = action === 'ultimate' && characterId === 'zero' && !benchmarkAction
-      ? upgradeValue('zero.premium-duplicate.2.ultimate-energy-cost', 'ultimateEnergyCost', upgradeState, ability.energyCost || 100)
+      ? upgradeValue('zero.premium-duplicate.3.ultimate-energy-cost', 'ultimateEnergyCost', upgradeState, ability.energyCost || 100)
+      : action === 'ultimate' && characterId === 'cloud' && !benchmarkAction
+        ? upgradeValue('cloud.duplicate.4.ultimate-control', 'ultimateEnergyCost', upgradeState, ability.energyCost || 100)
       : action === 'ultimate' ? (ability.energyCost || 100)
         : benchmarkAction && ability.benchmarkSlot === 'ultimate' ? (ability.energyCost || 100) : 0;
+    const actionDelay = action === 'ultimate' && characterId === 'cloud' && !benchmarkAction
+      ? upgradeValue('cloud.duplicate.4.ultimate-control', 'actionDelay', upgradeState, ability.actionDelay || 0)
+      : ability.actionDelay || 0;
     return Object.freeze({ action, type: ability.type || action, damageType, multiplier, target,
       energyGain: ability.energyGain || 0,
       energyPerStack: action === 'basic' && characterId === 'soul' && !benchmarkAction ? (kit.skill?.energyPerStack || 0) : 0,
@@ -998,13 +1109,26 @@ export class TwoToneBattleEngine {
       energyRestore: ability.energyRestore || 0,
       skillPointReturn: ability.skillPointReturn || 0,
       actionAdvance: ability.actionAdvance || 0,
+      actionDelay,
+      speedBonus: ability.speedBonus || 0,
+      speedDuration: ability.speedDuration || 0,
+      speedMaxStacks: ability.speedMaxStacks || 0,
+      healMultiplier: action === 'skill' && characterId === 'cloud'
+        ? upgradeValue('cloud.premium-duplicate.4.restoration-healing', 'healMultiplier', upgradeState, ability.healMultiplier || 1)
+        : ability.healMultiplier || 0,
+      adjacentHealMultiplier: ability.adjacentHealMultiplier || 0,
+      slowPercent: action === 'ultimate' && characterId === 'cloud'
+        ? upgradeValue('cloud.premium-duplicate.3.ultimate-slow', 'slowPercent', upgradeState, ability.slowPercent || 0)
+        : ability.slowPercent || 0,
+      slowDuration: ability.slowDuration || 0,
+      slowMaxStacks: ability.slowMaxStacks || 0,
       healthCost: ability.healthCost || 0,
       shieldDistribution: ability.shieldDistribution || null,
       tauntChance: ability.tauntChance || 0,
       tauntTurns: ability.tauntTurns || 0,
       damageBonus: ability.damageBonus || 0,
       duration: ability.duration || 0,
-      support: ['tune', 'bloodShield', 'dawnSupport'].includes(ability.type) });
+      support: ['tune', 'bloodShield', 'dawnSupport', 'cloudRestoration'].includes(ability.type) });
   }
   resolveActionResources({ actor, battle, plan, enhancedStacks = 0, payEnergyCost = false } = {}) {
     if (!actor || !battle || !plan || !Number.isFinite(actor.energy) || !Number.isFinite(battle.skillPoints) ||
@@ -1028,8 +1152,8 @@ export class TwoToneBattleEngine {
       mechanicTags: resourceTags, trigger: `on_${plan.action}`, status: 'applied', actorId: actor.id, targetIds: [actor.id], values: result });
     const upgradeState = { characterDuplicates: actor.characterDuplicates || 0, premiumWeaponDuplicates: actor.premiumWeaponDuplicates || 0,
       weaponType: actor.weapon?.type || null, disabledUpgradeEffectIds: actor.disabledUpgradeEffectIds };
-    if (plan.action === 'ultimate' && (actor.archetypeId || actor.id) === 'zero' && activeUpgradeEffect('zero.premium-duplicate.2.ultimate-energy-cost', upgradeState))
-      this.recordUpgradeEffect('zero.premium-duplicate.2.ultimate-energy-cost', { actorId: actor.id, targetIds: [actor.id],
+    if (plan.action === 'ultimate' && (actor.archetypeId || actor.id) === 'zero' && activeUpgradeEffect('zero.premium-duplicate.3.ultimate-energy-cost', upgradeState))
+      this.recordUpgradeEffect('zero.premium-duplicate.3.ultimate-energy-cost', { actorId: actor.id, targetIds: [actor.id],
         trigger: 'on_ultimate', values: { energySpent: result.energySpent, energyBefore: result.energyBefore, energyAfter: result.energyAfter } });
     if (plan.action === 'basic' && (actor.archetypeId || actor.id) === 'soul' && plan.target === 'aoe' && activeUpgradeEffect('soul.premium-duplicate.3.enhanced-aoe', upgradeState))
       this.recordUpgradeEffect('soul.premium-duplicate.3.enhanced-aoe', { actorId: actor.id, targetIds: [actor.id], trigger: 'on_basic', values: { enhancedStacks } });

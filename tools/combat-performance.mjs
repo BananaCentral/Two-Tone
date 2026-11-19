@@ -29,10 +29,10 @@ const TAG_MEASUREMENT_RULES = Object.freeze({
   'damage.critical': ['damage', 'critical'], 'damage.conditional_multiplier': ['damage', 'trigger'],
   'damage.over_time': ['damage', 'status'], 'damage.echo': ['damage'], 'damage.reflect': ['damage'],
   'damage.follow_up': ['damage', 'trigger'], 'damage.barrier_break': ['damage', 'barrier'],
-  'buff.attack': ['damage', 'support'], 'buff.critical': ['damage', 'critical'], 'buff.next_basic': ['damage', 'support'],
+  'buff.attack': ['damage', 'support'], 'buff.speed': ['speed', 'support'], 'buff.critical': ['damage', 'critical'], 'buff.next_basic': ['damage', 'support'],
   'buff.damage': ['damage', 'support'], 'buff.barrier_damage': ['damage', 'barrier'], 'buff.barrier_break_damage': ['damage', 'barrier'],
   'buff.defense_ignore': ['damage', 'defense'], 'debuff.defense': ['damage', 'defense'], 'debuff.damage': ['damage', 'mitigation'],
-  'debuff.mark': ['status', 'damage'], 'defense.shield': ['shield', 'survival'], 'defense.barrier': ['barrier'],
+  'debuff.speed': ['speed', 'control'], 'debuff.mark': ['status', 'damage'], 'defense.shield': ['shield', 'survival'], 'defense.barrier': ['barrier'],
   'defense.damage_reduction': ['mitigation', 'survival'], 'defense.stealth': ['dodge', 'survival'],
   'recovery.healing': ['healing', 'survival'], 'recovery.lifesteal': ['healing', 'survival'],
   'resource.energy': ['energy'], 'resource.skill_point': ['skillPoints'], 'resource.capacity': ['skillPoints'], 'resource.hp_cost': ['healthCost', 'survival'],
@@ -192,9 +192,22 @@ function componentFor(spec) {
     const kit = CHARACTER_COMBAT_DATA[spec.character];
     if (!kit) return null;
     const effects = [...kit.passives, kit.basic, kit.skill, kit.ultimate];
-    return { mechanicTags: [...new Set(effects.flatMap(effect => effect?.mechanicTags || []))],
-      mechanicTargets: Object.assign({}, ...effects.map(effect => effect?.mechanicTargets || {})),
-      mechanicTriggers: Object.assign({}, ...effects.map(effect => effect?.mechanicTriggers || {})) };
+    const authoredEffects = Object.values(COMBAT_EFFECT_CATALOG).filter(effect => effect.character === spec.character);
+    const allEffects = [...effects, ...authoredEffects];
+    const metadataByTag = field => {
+      const values = new Map();
+      for (const effect of allEffects) for (const tag of effect?.mechanicTags || []) {
+        const value = effect?.[field]?.[tag] ?? (field === 'mechanicTargets' ? effect?.targeting : field === 'mechanicTriggers' ? effect?.trigger : null);
+        if (!value) continue;
+        const normalized = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        if (!values.has(tag)) values.set(tag, { normalized, value });
+        else if (values.get(tag).normalized !== normalized) values.set(tag, { normalized: 'event_defined', value: field === 'mechanicTargets'
+          ? { side: 'trigger_targets', acquisition: 'event_defined', coverage: 'event_defined' } : 'event_defined' });
+      }
+      return Object.fromEntries([...values].map(([tag, entry]) => [tag, entry.value]));
+    };
+    return { mechanicTags: [...new Set(allEffects.flatMap(effect => effect?.mechanicTags || []))],
+      mechanicTargets: metadataByTag('mechanicTargets'), mechanicTriggers: metadataByTag('mechanicTriggers') };
   }
   return null;
 }

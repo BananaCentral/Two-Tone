@@ -62,7 +62,11 @@ function statAtLevel(value, level) {
   return roundStatQuarter(value * level);
 }
 function mean(values) { return values.length ? values.reduce((sum, n) => sum + n, 0) / values.length : 1; }
-function effectiveSpeed(unit) { return Math.max(1, unit.stats.speed); }
+function effectiveSpeed(unit) {
+ const bonus=(unit.marks||[]).filter(mark=>mark.id==='cloud-tempo').reduce((sum,mark)=>sum+(mark.speedBonus||.2),0);
+ const slow=(unit.marks||[]).filter(mark=>mark.id==='cloud-slow').reduce((sum,mark)=>sum+(mark.slowPercent||.2),0);
+ return Math.max(1,unit.stats.speed*(1+bonus-slow));
+}
 function makeRng(seed) {
   let state = seed >>> 0;
   return function random() {
@@ -106,7 +110,7 @@ function validateConfig(config) {
       const taunt=instance.taunt??archetype.taunt;
       assert(taunt===undefined||(taunt&&Number.isFinite(taunt.rate)&&taunt.rate>=0&&taunt.rate<=1&&Number.isInteger(taunt.turns)&&taunt.turns>0),'Taunt needs a rate from 0 to 1 and a positive integer duration.');
       assert(archetype.basic && Number.isFinite(archetype.basic.multiplier) && ['physical', 'magical', 'true'].includes(archetype.basic.damageType), 'Archetype ' + instance.archetype + ' needs a typed Basic Attack.');
-      assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage', 'momentum', 'exposed', 'resourceful', 'residue', 'lethalImpact', 'pursuit', 'sharpClaws', 'bleed', 'cutthroat', 'tasteForBlood'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
+      assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage', 'momentum', 'exposed', 'resourceful', 'residue', 'lethalImpact', 'pursuit', 'sharpClaws', 'bleed', 'cutthroat', 'tasteForBlood', 'cloudWeightless'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
       for (const passive of archetype.passives || []) {
         if (passive.type === 'everyNthBasic') assert(Number.isInteger(passive.every) && passive.every > 0, 'everyNthBasic needs a positive integer interval.');
         if (passive.type === 'followUp') assert(Number.isFinite(passive.multiplier) && passive.multiplier >= 0, 'followUp needs a non-negative multiplier.');
@@ -114,7 +118,7 @@ function validateConfig(config) {
         if (passive.type === 'momentum') assert(Number.isFinite(passive.damageBonus) && passive.damageBonus >= 0 && Number.isInteger(passive.maxStacks) && passive.maxStacks >= 0, 'momentum needs a non-negative damageBonus and a non-negative integer maxStacks.');
         if (passive.type === 'bleed') assert(Number.isInteger(passive.stacksPerHit??1)&&(passive.stacksPerHit??1)>0&&Number.isInteger(passive.maxStacks??5)&&(passive.maxStacks??5)>0,'bleed needs positive integer stacksPerHit and maxStacks.');
       }
-      assert(!archetype.skill || ['enhanceBasic', 'ricochet', 'tune', 'bloodShield', 'firstStrike'].includes(archetype.skill.type), 'Unsupported skill type in ' + instance.archetype + '.');
+      assert(!archetype.skill || ['enhanceBasic', 'ricochet', 'tune', 'bloodShield', 'firstStrike', 'cloudRestoration'].includes(archetype.skill.type), 'Unsupported skill type in ' + instance.archetype + '.');
       assert(!archetype.ultimate || archetype.ultimate.type==='dawnSupport'||['physical', 'magical', 'true'].includes(archetype.ultimate.damageType), 'Ultimate needs a supported damage type or support handler.');
     }
   }
@@ -191,8 +195,8 @@ function instantiate(config, side) {
     const passives = (archetype.passives || []).filter(passive => !disabledPassiveIds.has(passive.id || passive.type)).map((passive, index) => ({
       ...passive,
       key: passive.id || passive.type + '-' + index,
-      remaining: passive.type === 'followUp' ? upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'soul.duplicate.1.follow-up-charges', 'followUpCharges', passive.charges ?? Infinity) : passive.charges ?? Infinity,
-      charges: passive.type === 'followUp' ? upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'soul.duplicate.1.follow-up-charges', 'followUpCharges', passive.charges) : passive.charges,
+      remaining: passive.type === 'followUp' ? upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'soul.premium-duplicate.1.follow-up-charges', 'followUpCharges', passive.charges ?? Infinity) : passive.charges ?? Infinity,
+      charges: passive.type === 'followUp' ? upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'soul.premium-duplicate.1.follow-up-charges', 'followUpCharges', passive.charges) : passive.charges,
       seenSources: new Set(),
       attackCount: 0
     }));
@@ -223,9 +227,9 @@ function instantiate(config, side) {
       runeEnergyRestored:0,
       disabledPassiveIds,
       disabledUpgradeEffectIds,
-      criticalRateBonus:(archetype.criticalRateBonus||0)+(instance.criticalRateBonus||0)+upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'soul.premium-duplicate.2.critical-stats', 'criticalRateBonus')+(!disabledPassiveIds.has('cutthroat')?(archetype.passives?.find(passive=>passive.type==='cutthroat')?.criticalRateBonus||0)*(upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'zero.premium-duplicate.4.critical-stats', 'criticalRateMultiplier', 1)-1):0),
-      criticalDamageBonus:(archetype.criticalDamageBonus||0)+(instance.criticalDamageBonus||0)+upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'soul.premium-duplicate.2.critical-stats', 'criticalDamageBonus')+(!disabledPassiveIds.has('cutthroat')?(archetype.passives?.find(passive=>passive.type==='cutthroat')?.criticalDamageBonus||0)*(upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'zero.premium-duplicate.4.critical-stats', 'criticalDamageMultiplier', 1)-1):0),
-      defenseIgnoreBonus:upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'zero.premium-duplicate.3.defense-ignore', 'defenseIgnore'),
+      criticalRateBonus:(archetype.criticalRateBonus||0)+(instance.criticalRateBonus||0)+upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'soul.premium-duplicate.2.critical-stats', 'criticalRateBonus')+(!disabledPassiveIds.has('cutthroat')?(archetype.passives?.find(passive=>passive.type==='cutthroat')?.criticalRateBonus||0)*(upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'zero.duplicate.1.critical-stats', 'criticalRateMultiplier', 1)-1):0),
+      criticalDamageBonus:(archetype.criticalDamageBonus||0)+(instance.criticalDamageBonus||0)+upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'soul.premium-duplicate.2.critical-stats', 'criticalDamageBonus')+(!disabledPassiveIds.has('cutthroat')?(archetype.passives?.find(passive=>passive.type==='cutthroat')?.criticalDamageBonus||0)*(upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'zero.duplicate.1.critical-stats', 'criticalDamageMultiplier', 1)-1):0),
+      defenseIgnoreBonus:upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'zero.premium-duplicate.4.defense-ignore', 'defenseIgnore'),
       lifestealRate:(instance.lifesteal??archetype.lifesteal??0)+(instance.lifestealBonus||0)+(archetype.lifestealBonus||0),
       lifestealHealing:0,
       criticalHits:0,
@@ -263,6 +267,8 @@ function instantiate(config, side) {
       damageBreakdown:newDamageBreakdown(),
       damageTaken: 0,
       supportDamageAmplified:0,
+      healingDone:0,
+      healingReceived:0,
       shieldGranted:0,
       shieldReceived:0,
       shieldAbsorbed:0,
@@ -292,14 +298,14 @@ function attackValue(unit) {
 }
 function healFromLifesteal(state,attacker,damageDealt,eventType='direct_hit'){
  const logan=state.allies.find(unit=>unit.archetypeId==='logan'&&unit.hp>0&&!unit.disabledPassiveIds?.has('tasteForBlood'));
- const passiveRate=attacker.side==='allies'&&logan?upgradeValue(logan,'logan.duplicate.4.lifesteal','lifestealRate',.1):0;
+ const passiveRate=attacker.side==='allies'&&logan?upgradeValue(logan,'logan.duplicate.2.lifesteal','lifestealRate',.1):0;
  const rate=Math.max(0,(attacker.lifestealRate||0)+passiveRate);
  if(rate<=0||damageDealt<=0||attacker.hp<=0)return 0;
  const healing=state.engine.resolveLifesteal({attacker,damage:damageDealt,rate,eventType,
   mechanicSource:passiveRate>0?{componentId:'passive:logan/tasteForBlood',mechanicTags:['recovery.lifesteal'],trigger:'on_ally_damage'}:null,
   sourceActorId:logan?.id})?.applied||0;
  attacker.lifestealHealing=(attacker.lifestealHealing||0)+healing;
- if(healing>0&&passiveRate>.1)state.engine.recordUpgradeEffect('logan.duplicate.4.lifesteal',{actorId:logan.id,targetIds:[attacker.id],trigger:'on_ally_damage_dealt',values:{healing,lifestealRate:passiveRate}});
+ if(healing>0&&passiveRate>.1)state.engine.recordUpgradeEffect('logan.duplicate.2.lifesteal',{actorId:logan.id,targetIds:[attacker.id],trigger:'on_ally_damage_dealt',values:{healing,lifestealRate:passiveRate}});
  state.lifestealHealingBySide[attacker.side]+=healing;
  const passiveHealing=Math.min(healing,roundStat(damageDealt*passiveRate));
  const sharedHeal=logan?upgradeValue(logan,'logan.signature.lifesteal-share','healLoganFromAllyLifesteal'):false;if(logan&&attacker!==logan&&attacker.side==='allies'&&sharedHeal){const echo=state.engine.resolveHealing({target:logan,amount:passiveHealing})?.applied||0;if(echo>0){state.engine.recordUpgradeEffect('logan.signature.lifesteal-share',{actorId:logan.id,targetIds:[logan.id],trigger:'on_ally_lifesteal',values:{healing:echo}});logan.lifestealHealing+=echo;state.lifestealHealingBySide.allies+=echo}}
@@ -417,14 +423,14 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
     const celestialRune=attacker.side==='allies'?state.engine.resolveRuneEffect({setId:attacker.runeSetId==='celestial-star'?'celestial-star':null,trigger:'criticalStrike',ready:state.engine.isRuneReady(attacker.runeCooldownState,'celestial-star')}):null;
     const outcome=state.engine.resolveDamageSequence({target,attacker,rawDamage:baseDamage,damageType:spec.damageType,eventType,sourceId:attacker.id,actionId,mechanicSource,additionalMechanicSources,defenseMechanicSource:defenseMechanicSource(target),reflectMechanicSource:reflectMechanicSource(target),echoMechanicSource,
       primary:{stealthChance:Math.min(1,Math.max(0,target.stealth||0)),criticalRate:celestialRune?.forceCritical?1:attacker.criticalRate+(attacker.criticalRateBonus||0)+(attacker.tune?.criticalRateBonus||0)+(options.forceCritical?1:0),criticalDamage:attacker.criticalDamage+(attacker.criticalDamageBonus||0)+(attacker.tune?.criticalDamageBonus||0)+(options.criticalDamageBonus||0)+(celestialRune?.criticalDamageBonus||0),damageReduction:target.tune?.damageReduction||0,vulnerabilityMultiplier:target.side==='enemies'&&target.brokenTurns>0?1.5:1,random:state.random,
-       barrierDamageMultiplier:target.side==='enemies'?1+(attacker.tune?.barrierDamageBonus||0)+exposedStacks*upgradeValue(barrierLily||{},'lily.premium-duplicate.2.exposed-barrier-damage','exposedBarrierDamagePerStack'):1,
-       breakDamagePercent:.1+exposedStacks*upgradeValue(barrierLily||{},'lily.premium-duplicate.3.exposed-break-damage','exposedBreakDamagePerStack'),brokenDuration:brokenDuration(target.stats.speed,Math.max(1,state.enemyAverage/state.slowerAverage)),
+       barrierDamageMultiplier:target.side==='enemies'?1+(attacker.tune?.barrierDamageBonus||0)+exposedStacks*upgradeValue(barrierLily||{},'lily.premium-duplicate.3.exposed-barrier-damage','exposedBarrierDamagePerStack'):1,
+       breakDamagePercent:.1+exposedStacks*upgradeValue(barrierLily||{},'lily.premium-duplicate.4.exposed-break-damage','exposedBreakDamagePerStack'),brokenDuration:brokenDuration(target.stats.speed,Math.max(1,state.enemyAverage/state.slowerAverage)),
        reflectPercent:reflectPercentOf(target,state),echoPercent:attacker.side!==target.side?Math.max(0,Math.min(1,(attacker.echoPercent||0)+runeEcho)):0},
       calculateReflectDamage:(amount,reflector,reflectTarget)=>{const attack=attackValue(reflector);return attack>0?damageFor(state,reflector,reflectTarget,'true',amount/attack*(1-(reflector.residueStacks||0)*(reflector.residueDamageReductionPerStack??.05))):0},
       reflect:{stealthChance:attacker.stealth||0,criticalRate:target.criticalRate+(target.criticalRateBonus||0)+(target.tune?.criticalRateBonus||0),criticalDamage:target.criticalDamage+(target.criticalDamageBonus||0)+(target.tune?.criticalDamageBonus||0),damageReduction:attacker.tune?.damageReduction||0,vulnerabilityMultiplier:attacker.side==='enemies'&&attacker.brokenTurns>0?1.5:1,random:state.random,
-       barrierDamageMultiplier:1+(attacker.tune?.barrierDamageBonus||0)+reflectExposed*upgradeValue(barrierLily||{},'lily.premium-duplicate.2.exposed-barrier-damage','exposedBarrierDamagePerStack'),
-       breakDamagePercent:.1+reflectExposed*upgradeValue(barrierLily||{},'lily.premium-duplicate.3.exposed-break-damage','exposedBreakDamagePerStack'),brokenDuration:brokenDuration(attacker.stats.speed,Math.max(1,state.enemyAverage/state.slowerAverage))},
-      echo:{random:state.random,reflectPercent:reflectPercentOf(target,state),barrierDamageMultiplier:1,breakDamagePercent:.1+exposedStacks*upgradeValue(barrierLily||{},'lily.premium-duplicate.3.exposed-break-damage','exposedBreakDamagePerStack'),brokenDuration:brokenDuration(target.stats.speed,Math.max(1,state.enemyAverage/state.slowerAverage))}});
+       barrierDamageMultiplier:1+(attacker.tune?.barrierDamageBonus||0)+reflectExposed*upgradeValue(barrierLily||{},'lily.premium-duplicate.3.exposed-barrier-damage','exposedBarrierDamagePerStack'),
+       breakDamagePercent:.1+reflectExposed*upgradeValue(barrierLily||{},'lily.premium-duplicate.4.exposed-break-damage','exposedBreakDamagePerStack'),brokenDuration:brokenDuration(attacker.stats.speed,Math.max(1,state.enemyAverage/state.slowerAverage))},
+      echo:{random:state.random,reflectPercent:reflectPercentOf(target,state),barrierDamageMultiplier:1,breakDamagePercent:.1+exposedStacks*upgradeValue(barrierLily||{},'lily.premium-duplicate.4.exposed-break-damage','exposedBreakDamagePerStack'),brokenDuration:brokenDuration(target.stats.speed,Math.max(1,state.enemyAverage/state.slowerAverage))}});
     if(!outcome||outcome.dodged){hits.push({target,damage:0,shieldDamage:0,barrierDamage:0,breakDamage:0,barrierRemaining:target.barrier,broken:false,critical:false,dodged:true,eventType,actionId});continue}
     if(outcome.critical){state.criticalHits++;attacker.criticalHits=(attacker.criticalHits||0)+1;if(celestialRune&&state.engine.startRuneCooldown(attacker.runeCooldownState,'celestial-star',attacker.turns,celestialRune.cooldownTurns)){attacker.runeActivations++;state.engine.recordMechanicEvent({componentId:'rune:celestial-star',mechanicTags:RUNE_COMBAT_RULES['celestial-star'].mechanicTags,trigger:'on_critical_strike',status:'applied',actorId:attacker.id,targetIds:[target.id],values:{forceCritical:celestialRune.forceCritical,criticalDamageBonus:celestialRune.criticalDamageBonus,cooldownTurns:celestialRune.cooldownTurns}})}}
     const roll={damage:outcome.damage,critical:outcome.critical},damage=outcome.damage,shieldAbsorbed=outcome.shieldDamage,breakShieldAbsorbed=outcome.breakShieldDamage,barrierDamage=outcome.barrierDamage,breakDamage=outcome.breakDamage,broken=outcome.broken;
@@ -454,12 +460,12 @@ function applyResidue(state,attacker,targets){
  const passive=attacker.passives.find(entry=>entry.type==='residue');if(!passive)return;
  for(const target of targets)state.engine.applyResidue({target,maxStacks:passive.maxStacks??5,damageReductionPerStack:passive.damageReductionPerStack??.05,resistanceReductionPerStack:passive.resistanceReductionPerStack??.05,durationTurns:2});
 }
-function triggerFollowUps(state, sourceId, sourceActorId, hits) {
+function triggerFollowUps(state, sourceId, sourceActorId, hits, { action = null, enhancedStacks = 0 } = {}) {
   for (const soul of state.allies) {
-    if (soul.hp <= 0 || soul.id === sourceActorId) continue;
+    if (soul.hp <= 0) continue;
     for (const passive of soul.passives.filter(p => p.type === 'followUp')) {
-      const rawTotal = roundStat(attackValue(soul, passive.damageType) * passive.multiplier * upgradeValue(soul,'soul.duplicate.2.follow-up-damage','followUpDamageMultiplier',1) * celestialFactor(soul, 'passive'));
-      const allocation=state.engine.resolveFollowUpEvent({passive,ownerId:soul.id,sourceActorId,sourceId,hits,enemies:state.enemies,totalDamage:rawTotal,maxCharges:passive.charges??5,refundEvery:upgradeValue(soul,'soul.premium-duplicate.4.follow-up-refund','followUpRefundEvery'),characterDuplicates:soul.characterDuplicates||0,premiumWeaponDuplicates:soul.premiumWeaponDuplicates||0,weaponType:soul.weapon?.type||null,disabledUpgradeEffectIds:soul.disabledUpgradeEffectIds});if(!allocation)continue;
+      const rawTotal = roundStat(attackValue(soul, passive.damageType) * passive.multiplier * upgradeValue(soul,'soul.duplicate.1.follow-up-damage','followUpDamageMultiplier',1) * celestialFactor(soul, 'passive'));
+      const allocation=state.engine.resolveFollowUpEvent({passive,ownerId:soul.id,sourceActorId,sourceId,hits,enemies:state.enemies,action,enhancedStacks,totalDamage:rawTotal,maxCharges:passive.charges??5,refundEvery:upgradeValue(soul,'soul.premium-duplicate.4.follow-up-refund','followUpRefundEvery'),characterDuplicates:soul.characterDuplicates||0,premiumWeaponDuplicates:soul.premiumWeaponDuplicates||0,weaponType:soul.weapon?.type||null,disabledUpgradeEffectIds:soul.disabledUpgradeEffectIds});if(!allocation)continue;
       soul.followUpCount++;
       soul.followUpActivations=allocation.activations;
       allocation.targets.forEach(({target,damage:share}) => {
@@ -530,6 +536,19 @@ function applyDawnTune(state,actor,target,plan=actionPlan(state,actor,'skill')){
  if(result.actionAdvance)target.turnsAdvanced+=result.actionAdvance/100;
  return true;
 }
+function applyCloudActionPassive(state,actor){
+ const advance=state.engine.resolveCloudActionPassive({actor,characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0,weaponType:actor.weapon?.type||null});
+ actor.turnsAdvanced+=advance/100;return advance;
+}
+function applyCloudRestoration(state,actor,plan,actionOverride=null){
+ const target=state.allies.find(unit=>unit.id===actionOverride?.targetId&&unit.hp>0)||chooseSupportTarget(state,actor);
+ const result=state.engine.resolveCloudRestoration({actor,target,allies:state.allies.filter(unit=>!unit.isHauntling),plan,speed:effectiveSpeed(actor),characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0,weaponType:actor.weapon?.type||null});
+ if(!result)return false;
+ actor.healingDone=(actor.healingDone||0)+result.healing;
+ for(const entry of result.recipients)entry.target.healingReceived=(entry.target.healingReceived||0)+entry.applied;
+ target.turnsAdvanced+=result.actionAdvance/100;actor.restorationUses=(actor.restorationUses||0)+1;
+ applyCloudActionPassive(state,actor);useRuneRecycle(state,actor);triggerUnited(state,actor,target);return true;
+}
 function resolveAllyUltimate(state,actor){
  const ultimate=actor.ultimate;if(!ultimate)return false;
  const basePlan=actionPlan(state,actor,'ultimate'),sunReady=actor.runeSetId==='eternal-sun'&&state.engine.isRuneReady(actor.runeCooldownState,'eternal-sun'),plan=basePlan?{...basePlan,energyCost:Math.max(0,basePlan.energyCost-(sunReady?RUNE_COMBAT_RULES['eternal-sun'].ultimateEnergyReduction:0))}:null,cost=plan?.energyCost??Infinity;
@@ -537,23 +556,28 @@ function resolveAllyUltimate(state,actor){
  if(sunReady){state.engine.resolveRuneTrigger({setId:'eternal-sun',trigger:'ultimate',actorId:actor.id,targetIds:[actor.id]});actor.eternalSunNextActionPending=true;actor.runeActivations++;}
  actor.ultimateCount++;
  if(plan.type==='dawnSupport'){
-  const target=chooseSupportTarget(state,actor),result=state.engine.resolveDawnUltimate({actor,target,battle:state,plan,characterDuplicates:actor.characterDuplicates||0});if(!result)return false;
+  const target=chooseSupportTarget(state,actor),result=state.engine.resolveDawnUltimate({actor,target,battle:state,plan,characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:dawnPremiumDuplicates(actor),weaponType:actor.weapon?.type||null});if(!result)return false;
   target.energyGranted+=result.energyGained;target.energyGained+=result.energyGained;actor.skillPointsGenerated+=result.skillPointsGained;actor.skillPointsGranted+=result.skillPointsGained;target.turnsAdvanced+=result.actionAdvance/100;
   applyUltimateRuneEffects(state,actor,[]);triggerUnitedLinkedBasics(state,actor);
  }else{
   const sourceId=++state.sourceSerial;
   const hits=runAttack(state,actor,state.enemies.filter(unit=>unit.hp>0),ultimate,{multiplier:plan.multiplier,sourceActionId:sourceId});
+  if(actor.archetypeId==='cloud'){
+   const target=state.enemies.find(unit=>unit.id===hits.find(hit=>hit.target)?.target);
+   if(target)state.engine.resolveCloudUltimateEffects({actor,target,enemies:state.enemies,plan,characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0,weaponType:actor.weapon?.type||null});
+   applyCloudActionPassive(state,actor);
+  }
   applyUltimateRuneEffects(state,actor,hits);applyRicochet(state,actor,sourceId,hits);triggerFollowUps(state,sourceId,actor.id,hits);triggerUnitedLinkedBasics(state,actor);
   if(actor.archetypeId==='zero'){
    const result=state.engine.resolveZeroUltimateEffects({actor,enemies:state.enemies,battle:state,characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0,hasPremiumWeapon:actor.weapon?.type==='premium'});
-   if(result){actor.turnsAdvanced+=result.actorAdvance/100;actor.skillPointsGenerated+=result.skillPointsGained;actor.skillPointsGranted+=result.skillPointsGained}
+   if(result){actor.turnsAdvanced+=result.actorAdvance/100;actor.skillPointsGenerated+=result.skillPointsGained;actor.skillPointsGranted+=result.skillPointsGained;actor.energyGained+=result.energyGained}
   }
-  if(actor.archetypeId==='lily'&&actor.weapon?.type==='premium'){
-   const result=state.engine.resolveLilyPremiumUltimateEffects({actor,allies:state.allies,battle:state,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0,hasPremiumWeapon:true});
+ if(actor.archetypeId==='lily'){
+   const result=state.engine.resolveLilyPremiumUltimateEffects({actor,allies:state.allies,battle:state,characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:actor.weapon?.type==='premium'?(actor.premiumWeaponDuplicates||0):0,hasPremiumWeapon:actor.weapon?.type==='premium'});
    if(result){actor.skillPointsGenerated+=result.skillPointsGained;actor.skillPointsGranted+=result.skillPointsGained;for(const entry of result.energy){const ally=state.allies.find(unit=>unit.id===entry.id);if(ally){ally.energyGranted+=entry.energyGained;ally.energyGained+=entry.energyGained;ally.turnsAdvanced+=entry.actionAdvance/100}}}
   }
   if(actor.archetypeId==='logan'){
-   const result=state.engine.resolveLoganUltimateEffects({actor,battle:state,characterDuplicates:actor.characterDuplicates||0});
+   const result=state.engine.resolveLoganUltimateEffects({actor,battle:state,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0,hasPremiumWeapon:actor.weapon?.type==='premium'});
    if(result){actor.skillPointsGenerated+=result.skillPointsGained;actor.skillPointsGranted+=result.skillPointsGained}
   }
   if(ultimate.refillFollowUps)refillPassives(state,actor);
@@ -586,9 +610,9 @@ function resolveAllyAction(state, actor) {
   const actionOverrideConfig=state.actionOverride?.actorId===actor.id&&state.actionOverride.turn===actor.turns?state.actionOverride:null;
   const actionOverride=actionOverrideConfig?.action??null;
   if(actor.isHauntling){
-    const id=++state.sourceSerial,hits=runAttack(state,actor,foes,{damageType:'true',multiplier:1,target:'aoe'},{multiplier:celestialFactor(actor,'ultimate'),damageChannel:'summon',sourceActionId:id});
+    const id=++state.sourceSerial,hits=runAttack(state,actor,foes,{damageType:'true',multiplier:actor.basic?.multiplier??1,target:'aoe'},{multiplier:celestialFactor(actor,'ultimate'),damageChannel:'summon',sourceActionId:id});
     const lily=state.allies.find(unit=>unit.archetypeId==='lily'&&unit.hp>0);
-    if(lily)for(const target of landedTargets(hits))state.engine.resolveHitEffects({actor:lily,target,hit:{dodged:false},action:'summon',eventType:'summon_hit',passives:lily.passives,characterDuplicates:lily.characterDuplicates||0,isEnemyTarget:true});
+    if(lily)for(const target of landedTargets(hits))state.engine.resolveHitEffects({actor:lily,target,hit:{dodged:false},action:'summon',eventType:'summon_hit',passives:lily.passives,characterDuplicates:lily.characterDuplicates||0,premiumWeaponDuplicates:lily.weapon?.type==='premium'?(lily.premiumWeaponDuplicates||0):0,hasPremiumWeapon:lily.weapon?.type==='premium',isEnemyTarget:true});
     applyRicochet(state,actor,id,hits);triggerFollowUps(state,id,actor.id,hits);
     state.engine.advanceSummonTurn(actor);return;
   }
@@ -608,6 +632,10 @@ function resolveAllyAction(state, actor) {
   if(skill?.type==='tune'&&state.skillPoints>0){
     const plan=actionPlan(state,actor,'skill');if(!settleActionResources(state,actor,plan))return;state.skillUses++;actor.skillUses++;
     const target=state.allies.find(unit=>unit.id===actionOverrideConfig?.targetId&&unit.hp>0)||chooseSupportTarget(state,actor);applyDawnTune(state,actor,target,plan);useRuneRecycle(state,actor);triggerUnited(state,actor,target);return;
+  }
+  if(skill?.type==='cloudRestoration'&&state.skillPoints>0){
+    const plan=actionPlan(state,actor,'skill');if(!settleActionResources(state,actor,plan))return;state.skillUses++;actor.skillUses++;
+    applyCloudRestoration(state,actor,plan,actionOverrideConfig);return;
   }
   if(skill?.type==='firstStrike'&&state.skillPoints>0){
     const plan=actionPlan(state,actor,'skill');if(!settleActionResources(state,actor,plan))return;state.skillUses++;actor.skillUses++;
@@ -641,12 +669,16 @@ function resolveAllyAction(state, actor) {
   const amplify=basic.benchmarkSlot?1:amplifyBasic(state,actor);
   const untunedPlan=actor.tune?.basicEnhanced?actionPlan(state,actor,'basic'):plan;
   if(!settleActionResources(state,actor,plan,{enhancedStacks:stacks,payEnergyCost:basic.benchmarkSlot==='ultimate'}))return;
+  if(actor.archetypeId==='cloud'){
+   state.engine.applyCloudBasicTempo({actor,allies:state.allies.filter(unit=>!unit.isHauntling),plan,characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0,weaponType:actor.weapon?.type||null});
+   applyCloudActionPassive(state,actor);
+  }
   const sourceId=++state.sourceSerial;
   const hits = runAttack(state, actor, foes, basic, { multiplier:basicMultiplier*amplify,unbuffedMultiplier:actor.tune?.basicEnhanced?untunedPlan.multiplier*amplify:undefined,targetMode,sourceActionId:sourceId });
   actor.basicAttackCount++;
   if(actor.tune?.basicEnhanced){const tuneSource=state.allies.find(unit=>unit.id===actor.tune.sourceId);actor.tune.basicEnhanced=false;const tunedSpBefore=state.skillPoints;state.skillPoints=Math.min(state.skillPointCap,state.skillPoints+(actor.tune.skillPointReturn||0));const refund=state.skillPoints-tunedSpBefore;actor.skillPointsGenerated+=refund;if(tuneSource){tuneSource.skillPointsGranted+=refund;tuneSource.skillPointsGenerated+=refund;if(refund>0)state.engine.recordMechanicEvent({componentId:'action:dawn/skill',mechanicTags:['resource.skill_point'],trigger:'on_tuned_basic_used',status:'applied',actorId:tuneSource.id,targetIds:[actor.id],actionId:sourceId,values:{skillPointsGained:refund,skillPointsBefore:tunedSpBefore,skillPointsAfter:state.skillPoints}})}}
   actor.enhanceStacks = 0;
-  applyRicochet(state,actor,sourceId,hits);triggerFollowUps(state, sourceId, actor.id, hits);
+  applyRicochet(state,actor,sourceId,hits);triggerFollowUps(state, sourceId, actor.id, hits,{action:'basic',enhancedStacks:stacks});
 }
 function resolveEnemyAction(state, actor) {
   const targets = state.allies.filter(unit => unit.hp > 0);
@@ -668,7 +700,7 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
   const random = makeRng(seed);
   const allies = instantiate(config, 'allies');
   const enemies = instantiate(config, 'enemies');
-  const premiumLily=allies.find(unit=>unit.archetypeId==='lily'&&upgradeValue(unit,'lily.premium-duplicate.1.entry-marks','entryRicochetTurns')>0);
+  const premiumLily=allies.find(unit=>unit.archetypeId==='lily'&&upgradeValue(unit,'lily.premium-duplicate.2.entry-marks','entryRicochetTurns')>0);
   const allyAverage = mean(allies.map(effectiveSpeed));
   const enemyAverage = mean(enemies.map(effectiveSpeed));
   const slowerAverage = Math.min(allyAverage, enemyAverage);
@@ -690,7 +722,7 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
     engine: new TwoToneBattleEngine({ disabledCombatEffectIds: settings.disabledCombatEffectIds })
   };
   state.timeline=state.engine.timeline;
-  if(premiumLily)for(const enemy of enemies){const duration=upgradeValue(premiumLily,'lily.premium-duplicate.1.entry-marks','entryRicochetTurns');state.engine.setTimedMark({target:enemy,mark:{id:'soul-mark',turns:duration}});state.engine.setTimedMark({target:enemy,mark:{id:'ricochet',turns:duration,sources:[]}});state.engine.recordUpgradeEffect('lily.premium-duplicate.1.entry-marks',{actorId:premiumLily.id,targetIds:[enemy.id],trigger:'battle_start',values:{duration}})}
+  if(premiumLily)for(const enemy of enemies){const soulMarkTurns=upgradeValue(premiumLily,'lily.premium-duplicate.2.entry-marks','entrySoulMarkTurns'),ricochetTurns=upgradeValue(premiumLily,'lily.premium-duplicate.2.entry-marks','entryRicochetTurns');if(soulMarkTurns)state.engine.setTimedMark({target:enemy,mark:{id:'soul-mark',turns:soulMarkTurns}});if(ricochetTurns)state.engine.setTimedMark({target:enemy,mark:{id:'ricochet',turns:ricochetTurns,sources:[]}});state.engine.recordUpgradeEffect('lily.premium-duplicate.2.entry-marks',{actorId:premiumLily.id,targetIds:[enemy.id],trigger:'on_enemy_enter',values:{soulMarkTurns,ricochetTurns}})}
   const resourceful=allies.some(unit=>unit.passives.some(passive=>passive.type==='resourceful'));
   state.skillPoints=Math.min(state.skillPointCap,(settings.initialSkillPoints??3)+(resourceful?2:0));
   state.engine.recordBattleStartEffects([...allies,...enemies]);
@@ -751,7 +783,7 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
     state.actionOverrideStatus=!requestedActor||requestedActor.hp<=0?'actor_defeated_before_action'
       :requestedActor.turns<state.actionOverride.turn?'battle_ended_before_action':'actor_unable_to_take_action';
   }
-  const unitDetails=allies.filter(unit=>!unit.isHauntling).map(unit=>({id:unit.id,archetype:unit.archetypeId,role:unit.role,stats:{...unit.stats},hp:unit.hp,maxHp:unit.maxHp,shield:unit.shield||0,damage:unit.damageDealt,damageBreakdown:{...unit.damageBreakdown},damageTaken:unit.damageTaken,criticalHits:unit.criticalHits||0,supportDamageAmplified:unit.supportDamageAmplified,shieldGranted:unit.shieldGranted,shieldReceived:unit.shieldReceived,shieldAbsorbed:unit.shieldAbsorbed,hpSpent:unit.hpSpent,lifestealHealing:unit.lifestealHealing||0,turns:unit.turns,skills:unit.skillUses,ultimates:unit.ultimateCount,followUps:unit.followUpCount,tuneUses:unit.tuneUses,tunesReceived:unit.tunesReceived,turnsAdvanced:unit.turnsAdvanced,skillPointsSpent:unit.skillPointsSpent,skillPointsGenerated:unit.skillPointsGenerated,skillPointsGranted:unit.skillPointsGranted,energy:unit.energy,energySpent:unit.energySpent,energyGained:unit.energyGained,energyGranted:unit.energyGranted,runeEnergyRestored:unit.runeEnergyRestored,runeActivations:unit.runeActivations,tauntRedirectedHits:unit.tauntRedirectedHits}));
+  const unitDetails=allies.filter(unit=>!unit.isHauntling).map(unit=>({id:unit.id,archetype:unit.archetypeId,role:unit.role,stats:{...unit.stats},hp:unit.hp,maxHp:unit.maxHp,shield:unit.shield||0,damage:unit.damageDealt,damageBreakdown:{...unit.damageBreakdown},damageTaken:unit.damageTaken,criticalHits:unit.criticalHits||0,supportDamageAmplified:unit.supportDamageAmplified,healingDone:unit.healingDone||0,healingReceived:unit.healingReceived||0,shieldGranted:unit.shieldGranted,shieldReceived:unit.shieldReceived,shieldAbsorbed:unit.shieldAbsorbed,hpSpent:unit.hpSpent,lifestealHealing:unit.lifestealHealing||0,turns:unit.turns,skills:unit.skillUses,ultimates:unit.ultimateCount,followUps:unit.followUpCount,tuneUses:unit.tuneUses,tunesReceived:unit.tunesReceived,turnsAdvanced:unit.turnsAdvanced,skillPointsSpent:unit.skillPointsSpent,skillPointsGenerated:unit.skillPointsGenerated,skillPointsGranted:unit.skillPointsGranted,energy:unit.energy,energySpent:unit.energySpent,energyGained:unit.energyGained,energyGranted:unit.energyGranted,runeEnergyRestored:unit.runeEnergyRestored,runeActivations:unit.runeActivations,tauntRedirectedHits:unit.tauntRedirectedHits}));
   return {
     winner, actions: state.actions, allyTurns: state.allyTurns, enemyTurns: state.enemyTurns, elapsedTime:state.currentTime,
     actionOverride:state.actionOverride?{...state.actionOverride,observed:state.actionOverrideObserved,resolved:state.actionOverrideResolved,status:state.actionOverrideStatus}:null,
