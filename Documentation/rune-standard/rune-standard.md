@@ -17,32 +17,32 @@ This standard defines Rune Set equipment and combat effects. Rune Set effects ar
 | Rune Set | Effect |
 |---|---|
 | **Radiant Moon** | When the wearer uses a damaging Skill, it adds 50% Echo to each direct hit of that Skill. Passive, Basic Attack, Ultimate, and damage-over-time events do not activate it. Echo follows the [Echo Standard](../echo-standard.md). |
-| **Eternal Sun** | The wearer's next damaging Ultimate is guaranteed to critically hit and gains 50 percentage points of Critical Damage. |
-| **Celestial Star** | After the wearer resolves an Ultimate, advance the wearer's next action by 100% of their action interval. Then Celestial Star is unavailable for the wearer's next two turns. |
-| **Dark Matter** | On the wearer's next damaging Basic Attack, Skill, or Ultimate, ignore 40% of both Physical and Magical Defense and amplify the attack's Physical, Magical, or True damage by 20%. |
-| **Clear Skies** | After the wearer uses a Skill, grant a shield equal to 10% of their Max HP for two wearer turns. While the wearer has any shield, add 10 percentage points of Reflect. Damage dealt to an enemy Barrier does not trigger Reflect. Reflect follows the [Reflect Standard](../reflect-standard.md). |
+| **Eternal Sun** | While ready, reduce the wearer's Ultimate Energy cost by 20. After the wearer uses an Ultimate, their next action restores 20 additional Energy. After that next action resolves, Eternal Sun is unavailable for the wearer's next turn. The Energy discount remains available until that cooldown begins. |
+| **Celestial Star** | While ready, the wearer's next eligible damaging hit is guaranteed to be a critical hit and gains 25 percentage points of Critical Damage. When that critical hit lands, Celestial Star is unavailable for the wearer's next two turns. If the hit is dodged, it does not consume the effect. |
+| **Dark Matter** | On the wearer's next damaging Basic Attack, Skill, or Ultimate, ignore 40% of both Physical and Magical Defense. Then Dark Matter is unavailable for the wearer's next turn. |
+| **Clear Skies** | After the wearer uses a Skill, grant a shield equal to 20% of their Max HP for two wearer turns. While the wearer has any shield, add 10 percentage points of Reflect. Damage dealt to an enemy Barrier does not trigger Reflect. Reflect follows the [Reflect Standard](../reflect-standard.md). Then Clear Skies is unavailable for the wearer's next turn. |
 | **Infinite Space** | When the wearer uses an Ultimate, delay every living enemy on the field by 100% of that enemy's action interval, even if the Ultimate deals no damage. Each affected enemy is immune to Infinite Space's delay for its next two turns. |
-| **Recycle** | When the wearer uses a Skill, restore 1 Skill Point, subject to the party's Skill Point cap. |
+| **Recycle** | When the wearer uses a Skill, restore 1 Skill Point, subject to the party's Skill Point cap, and advance the wearer's action by 80%. Then Recycle is unavailable for the wearer's next two turns. |
 | **Amplify** | When Amplify is not on cooldown, the wearer's Basic Attack deals 50% more damage. Apply the bonus once per Basic Attack action to the complete action, including all its hits and targets, whether Single Target, Blast, or AoE. After the Basic Attack resolves, Amplify is unavailable for the wearer's next two turns. |
-| **United** | When the wearer successfully uses a Skill on one or more allies, advance the wearer by 50% of their action interval. United is then unavailable for the wearer's next two turns. |
+| **United** | When the wearer successfully uses a Skill on exactly one other ally, link that ally to the wearer for the ally's next action. When that action resolves, it triggers the wearer's Basic Attack against a random living enemy for 50% of its normal damage, using its normal targeting pattern and hit effects. The link-generated Basic Attack can trigger other active United links, but each United wearer can trigger at most once within the same chain. After the linked action, United is unavailable for the wearer's next two turns. |
 
 ## Cooldowns and Eligibility
 
-Each cooldown starts when the effect triggers and is measured in the wearer's own turns. A two-turn cooldown is unavailable during the wearer's next two turns; a one-turn cooldown is unavailable during the wearer's next turn. Radiant Moon, Eternal Sun, Celestial Star, Clear Skies, Recycle, Amplify, and United have two-turn cooldowns. Dark Matter has a one-turn cooldown. Infinite Space instead tracks immunity separately for each enemy it delayed.
+Each cooldown starts when the effect triggers and is measured in the wearer's own turns. A two-turn cooldown is unavailable during the wearer's next two turns; a one-turn cooldown is unavailable during the wearer's next turn. Radiant Moon, Celestial Star, Infinite Space's enemy immunity, Amplify, and United use two-turn timing. Eternal Sun, Dark Matter, and Clear Skies use one-turn timing; Recycle uses two-turn timing. Eternal Sun's cooldown begins after the action following its Ultimate. United's cooldown begins after the linked ally's next action resolves. Infinite Space tracks immunity separately for each enemy it delayed.
 
 All Runes require a four-piece set to activate. Eligibility below describes whether a character's current kit has an action that can trigger the effect; future characters are evaluated from their authored actions, not a fixed roster list.
 
 | Rune | Current eligible wearers | Trigger condition |
 |---|---|---|
 | Radiant Moon | Lily, Zero | A damaging Skill resolves. |
-| Eternal Sun | Lily, Logan, Soul, Zero | A damaging Ultimate resolves. |
-| Celestial Star | All current characters | An Ultimate resolves. |
+| Eternal Sun | All current characters | The wearer uses an Ultimate, then completes their next action. |
+| Celestial Star | All current characters | The wearer's next eligible damaging hit lands as a critical hit. |
 | Dark Matter | All current characters | A damaging Basic Attack, Skill, or Ultimate resolves. |
 | Clear Skies | All current characters | The wearer uses a Skill. |
 | Infinite Space | All current characters | The wearer uses an Ultimate. |
 | Recycle | All current characters | The wearer uses a Skill. |
 | Amplify | All current characters | The wearer uses a Basic Attack. |
-| United | Dawn, Logan | The wearer uses a Skill targeting one or more allies. |
+| United | Dawn | The wearer uses a Skill targeting exactly one other ally. |
 
 ## Rune Set Artwork
 

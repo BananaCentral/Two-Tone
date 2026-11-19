@@ -302,6 +302,7 @@ function isRuneEligible(runeId, characterId) {
   if (requirement === 'skill') return Boolean(kit.skill);
   if (requirement === 'ultimate') return Boolean(kit.ultimate);
   if (requirement === 'basic') return Boolean(kit.basic);
+  if (requirement === 'single_ally_targeted_skill') return kit.skill?.target === 'ally';
   if (requirement === 'ally_targeted_skill') return ['ally', 'allAllies', 'actor_team'].includes(kit.skill?.target);
   return false;
 }

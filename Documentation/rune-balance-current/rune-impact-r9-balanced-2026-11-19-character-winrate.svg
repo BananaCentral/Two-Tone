@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 100" role="img" aria-labelledby="title description">
+<title id="title">Character party win rates</title>
+<desc id="description">Balanced benchmark win rate for each character using its actual kit.</desc>
+<rect width="100%" height="100%" fill="#0b1020"/>
+<text x="24" y="32" fill="#f5f7ff" font-size="19" font-family="system-ui,sans-serif" font-weight="700">Character win rates with actual kits</text>
+<line x1="175" y1="58" x2="175" y2="80" stroke="#27334a" stroke-width="1"/>
+<text x="175" y="51" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">0%</text>
+<line x1="315" y1="58" x2="315" y2="80" stroke="#27334a" stroke-width="1"/>
+<text x="315" y="51" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">25%</text>
+<line x1="455" y1="58" x2="455" y2="80" stroke="#27334a" stroke-width="1"/>
+<text x="455" y="51" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">50%</text>
+<line x1="595" y1="58" x2="595" y2="80" stroke="#27334a" stroke-width="1"/>
+<text x="595" y="51" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">75%</text>
+<line x1="735" y1="58" x2="735" y2="80" stroke="#27334a" stroke-width="1"/>
+<text x="735" y="51" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">100%</text>
+</svg>

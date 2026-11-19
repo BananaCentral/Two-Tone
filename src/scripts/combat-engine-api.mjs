@@ -902,14 +902,14 @@ export class TwoToneBattleEngine {
     if (!rule || !ready) return null;
     const effects = {
       'radiant-moon': trigger === 'damagingSkill' ? { echo: rule.echo, cooldownTurns: rule.cooldownTurns } : null,
-      'eternal-sun': trigger === 'damagingUltimate' ? { forceCritical: true, criticalDamageBonus: rule.criticalDamageBonus, cooldownTurns: rule.cooldownTurns } : null,
-      'celestial-star': trigger === 'ultimate' ? { actionAdvance: rule.ultimateAdvance, cooldownTurns: rule.cooldownTurns } : null,
-      'dark-matter': trigger === 'abilityDamage' ? { defenseIgnore: rule.defenseIgnore, damageMultiplier: 1 + rule.damageBonus, cooldownTurns: rule.cooldownTurns } : null,
+      'eternal-sun': trigger === 'ultimate' ? { energyCostReduction: rule.ultimateEnergyReduction, nextActionEnergyRestore: rule.nextActionEnergyRestore } : trigger === 'nextAction' ? { energyRestore: rule.nextActionEnergyRestore, cooldownTurns: rule.cooldownTurns } : null,
+      'celestial-star': trigger === 'criticalStrike' ? { forceCritical: rule.forceCritical, criticalDamageBonus: rule.criticalDamageBonus, cooldownTurns: rule.cooldownTurns } : null,
+      'dark-matter': trigger === 'abilityDamage' ? { defenseIgnore: rule.defenseIgnore, cooldownTurns: rule.cooldownTurns } : null,
       'clear-skies': trigger === 'skill' ? { shieldMaxHp: rule.shieldMaxHp, shieldDurationTurns: rule.shieldDurationTurns, cooldownTurns: rule.cooldownTurns } : trigger === 'reflect' && shielded ? { reflect: rule.reflect } : null,
       'infinite-space': trigger === 'ultimate' ? { actionDelay: rule.ultimateDelay } : null,
-      recycle: trigger === 'skill' ? { skillPoints: rule.skillPoints, cooldownTurns: rule.cooldownTurns } : null,
+      recycle: trigger === 'skill' ? { skillPoints: rule.skillPoints, actionAdvance: rule.actionAdvance, cooldownTurns: rule.cooldownTurns } : null,
       amplify: trigger === 'basic' ? { damageBonus: rule.basicDamageBonus, cooldownTurns: rule.cooldownTurns } : null,
-      united: trigger === 'allySkill' ? { actionAdvance: rule.actionAdvance, cooldownTurns: rule.cooldownTurns } : null
+      united: trigger === 'allySkill' ? { linkActions: rule.linkActions, basicDamageMultiplier: rule.basicDamageMultiplier, cooldownAfterLinkTurns: rule.cooldownAfterLinkTurns } : null
     };
     const effect = effects[setId] || null;
     return effect ? Object.freeze({ ...effect }) : null;
@@ -944,7 +944,7 @@ export class TwoToneBattleEngine {
     if (effect && effectId && effect.cooldownTurns) this.startRuneCooldown(state, effectId, turn, effect.cooldownTurns);
     const rule = RUNE_COMBAT_RULES[setId];
     const eventTrigger = String(trigger || '').replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
-    const authoredTrigger = Object.values(rule?.mechanicTriggers || {}).find(value => value === `on_${eventTrigger}`) || Object.values(rule?.mechanicTriggers || {})[0] || `on_${eventTrigger}`;
+    const authoredTrigger = Object.values(rule?.mechanicTriggers || {}).find(value => value === `on_${eventTrigger}` || value === `after_${eventTrigger}`) || Object.values(rule?.mechanicTriggers || {})[0] || `on_${eventTrigger}`;
     if (effect && rule?.mechanicTags?.length) this.recordMechanicEvent({ componentId: `rune:${setId}`,
       mechanicTags: rule.mechanicTags, trigger: authoredTrigger, status: 'triggered',
       actorId, targetIds, values: effect });
