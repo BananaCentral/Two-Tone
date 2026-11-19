@@ -51,7 +51,7 @@ Calculated stats scale with Level and follow the shared character, Attack, Defen
 
 - Costs 100 Energy.
 - Deals single-target Magical damage at a 1.25× Attack multiplier and delays the target's next action by 40 percentage points.
-- Character Duplicate 4 increases the delay to 100 percentage points and reduces the Energy cost to 80.
+- Character Duplicate 4 increases the delay to 80 percentage points and reduces the Energy cost to 80.
 - Ultimates are off-turn actions and do not consume a scheduled turn.
 - Mechanic tags: `damage.magical`, `tempo.action_delay`, `debuff.speed`, `limit.duration`, `limit.stacks`, `resource.energy`.
 
@@ -71,7 +71,7 @@ Calculated stats scale with Level and follow the shared character, Attack, Defen
 1. Weightless advances Cloud by 40% after each action instead of 20%.
 2. Basic Attack's Speed bonus becomes +40% per stack and lasts three turns instead of two.
 3. Restoration advances its selected ally by 80% instead of 40%.
-4. Ultimate action delay increases from 40% to 100% and its Energy cost decreases to 80.
+4. Ultimate action delay increases from 40% to 80% and its Energy cost decreases to 80.
 
 ## Premium Weapon Duplicates
 
