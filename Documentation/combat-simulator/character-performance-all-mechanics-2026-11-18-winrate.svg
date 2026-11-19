@@ -1,0 +1,204 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1150 1074" role="img" aria-labelledby="title description">
+<title id="title">Performance comparison win rates</title>
+<desc id="description">Equal-weighted baseline and treatment win rates by candidate and wearer, plus percentage-point difference.</desc>
+<rect width="100%" height="100%" fill="#0b1020"/>
+<text x="28" y="34" fill="#f5f7ff" font-size="20" font-family="system-ui,sans-serif" font-weight="700">Win rate before and after</text>
+<text x="28" y="53" fill="#aeb9ce" font-size="11" font-family="system-ui,sans-serif">Each row equally weights the reported scenario strata for that candidate and wearer.</text>
+<line x1="300" y1="56" x2="300" y2="1044" stroke="#27334a" stroke-width="1"/>
+<text x="300" y="48" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">0%</text>
+<line x1="422.5" y1="56" x2="422.5" y2="1044" stroke="#27334a" stroke-width="1"/>
+<text x="422.5" y="48" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">25%</text>
+<line x1="545" y1="56" x2="545" y2="1044" stroke="#27334a" stroke-width="1"/>
+<text x="545" y="48" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">50%</text>
+<line x1="667.5" y1="56" x2="667.5" y2="1044" stroke="#27334a" stroke-width="1"/>
+<text x="667.5" y="48" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">75%</text>
+<line x1="790" y1="56" x2="790" y2="1044" stroke="#27334a" stroke-width="1"/>
+<text x="790" y="48" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">100%</text>
+<text x="28" y="72" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">action:dawn/basic · dawn</text>
+<line x1="392.34615384615387" y1="68" x2="405.6955128205128" y2="68" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="392.34615384615387" cy="68" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="405.6955128205128" cy="68" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="72" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">18.8% → 21.6%</text>
+<text x="1015" y="72" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+2.72 pp</text>
+<text x="28" y="103" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">action:dawn/skill · dawn</text>
+<line x1="392.34615384615387" y1="99" x2="393.28846153846155" y2="99" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="392.34615384615387" cy="99" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="393.28846153846155" cy="99" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="103" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">18.8% → 19.0%</text>
+<text x="1015" y="103" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+0.19 pp</text>
+<text x="28" y="134" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">action:dawn/ultimate · dawn</text>
+<line x1="405.6955128205128" y1="130" x2="417.6314102564103" y2="130" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="405.6955128205128" cy="130" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="417.6314102564103" cy="130" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="134" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">21.6% → 24.0%</text>
+<text x="1015" y="134" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+2.44 pp</text>
+<text x="28" y="165" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">action:lily/basic · lily</text>
+<line x1="385.359872611465" y1="161" x2="385.359872611465" y2="161" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="385.359872611465" cy="161" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="385.359872611465" cy="161" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="165" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">17.4% → 17.4%</text>
+<text x="1015" y="165" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+0.00 pp</text>
+<text x="28" y="196" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">action:lily/skill · lily</text>
+<line x1="384.2675159235669" y1="192" x2="390.6656050955414" y2="192" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="384.2675159235669" cy="192" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="390.6656050955414" cy="192" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="196" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">17.2% → 18.5%</text>
+<text x="1015" y="196" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+1.31 pp</text>
+<text x="28" y="227" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">action:lily/ultimate · lily</text>
+<line x1="387.8566878980892" y1="223" x2="404.71019108280257" y2="223" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="387.8566878980892" cy="223" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="404.71019108280257" cy="223" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="227" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">17.9% → 21.4%</text>
+<text x="1015" y="227" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+3.44 pp</text>
+<text x="28" y="258" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">action:logan/basic · logan</text>
+<line x1="400.41975308641975" y1="254" x2="400.11728395061726" y2="254" stroke="#ff8b8b" stroke-width="3"/>
+<circle cx="400.41975308641975" cy="254" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="400.11728395061726" cy="254" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="258" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">20.5% → 20.4%</text>
+<text x="1015" y="258" fill="#ff8b8b" font-size="12" font-family="system-ui,sans-serif">-0.06 pp</text>
+<text x="28" y="289" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">action:logan/skill · logan</text>
+<line x1="400.41975308641975" y1="285" x2="412.36728395061726" y2="285" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="400.41975308641975" cy="285" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="412.36728395061726" cy="285" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="289" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">20.5% → 22.9%</text>
+<text x="1015" y="289" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+2.44 pp</text>
+<text x="28" y="320" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">action:logan/ultimate · logan</text>
+<line x1="398.4537037037037" y1="316" x2="403.141975308642" y2="316" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="398.4537037037037" cy="316" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="403.141975308642" cy="316" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="320" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">20.1% → 21.0%</text>
+<text x="1015" y="320" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+0.96 pp</text>
+<text x="28" y="351" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">action:soul/basic · soul</text>
+<line x1="392.4318181818182" y1="347" x2="408.18181818181813" y2="347" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="392.4318181818182" cy="347" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="408.18181818181813" cy="347" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="351" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">18.9% → 22.1%</text>
+<text x="1015" y="351" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+3.21 pp</text>
+<text x="28" y="382" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">action:soul/skill · soul</text>
+<line x1="392.4318181818182" y1="378" x2="416.29545454545456" y2="378" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="392.4318181818182" cy="378" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="416.29545454545456" cy="378" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="382" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">18.9% → 23.7%</text>
+<text x="1015" y="382" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+4.87 pp</text>
+<text x="28" y="413" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">action:soul/ultimate · soul</text>
+<line x1="385.27272727272725" y1="409" x2="415.1818181818182" y2="409" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="385.27272727272725" cy="409" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="415.1818181818182" cy="409" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="413" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">17.4% → 23.5%</text>
+<text x="1015" y="413" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+6.10 pp</text>
+<text x="28" y="444" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">action:zero/basic · zero</text>
+<line x1="415.78980891719743" y1="440" x2="413.1369426751593" y2="440" stroke="#ff8b8b" stroke-width="3"/>
+<circle cx="415.78980891719743" cy="440" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="413.1369426751593" cy="440" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="444" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">23.6% → 23.1%</text>
+<text x="1015" y="444" fill="#ff8b8b" font-size="12" font-family="system-ui,sans-serif">-0.54 pp</text>
+<text x="28" y="475" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">action:zero/skill · zero</text>
+<line x1="411.7324840764331" y1="471" x2="415.63375796178343" y2="471" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="411.7324840764331" cy="471" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="415.63375796178343" cy="471" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="475" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">22.8% → 23.6%</text>
+<text x="1015" y="475" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+0.80 pp</text>
+<text x="28" y="506" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">action:zero/ultimate · zero</text>
+<line x1="424.52866242038215" y1="502" x2="446.063694267516" y2="502" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="424.52866242038215" cy="502" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="446.063694267516" cy="502" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="506" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">25.4% → 29.8%</text>
+<text x="1015" y="506" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+4.39 pp</text>
+<text x="28" y="537" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">character-overall:dawn · dawn</text>
+<line x1="399.41346153846155" y1="533" x2="394.07371794871796" y2="533" stroke="#ff8b8b" stroke-width="3"/>
+<circle cx="399.41346153846155" cy="533" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="394.07371794871796" cy="533" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="537" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">20.3% → 19.2%</text>
+<text x="1015" y="537" fill="#ff8b8b" font-size="12" font-family="system-ui,sans-serif">-1.09 pp</text>
+<text x="28" y="568" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">character-overall:lily · lily</text>
+<line x1="386.29617834394907" y1="564" x2="390.6656050955414" y2="564" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="386.29617834394907" cy="564" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="390.6656050955414" cy="564" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="568" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">17.6% → 18.5%</text>
+<text x="1015" y="568" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+0.89 pp</text>
+<text x="28" y="599" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">character-overall:logan · logan</text>
+<line x1="388.32098765432096" y1="595" x2="412.36728395061726" y2="595" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="388.32098765432096" cy="595" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="412.36728395061726" cy="595" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="599" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">18.0% → 22.9%</text>
+<text x="1015" y="599" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+4.91 pp</text>
+<text x="28" y="630" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">character-overall:soul · soul</text>
+<line x1="388.1363636363636" y1="626" x2="416.29545454545456" y2="626" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="388.1363636363636" cy="626" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="416.29545454545456" cy="626" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="630" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">18.0% → 23.7%</text>
+<text x="1015" y="630" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+5.75 pp</text>
+<text x="28" y="661" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">character-overall:zero · zero</text>
+<line x1="413.1369426751593" y1="657" x2="415.63375796178343" y2="657" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="413.1369426751593" cy="657" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="415.63375796178343" cy="657" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="661" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">23.1% → 23.6%</text>
+<text x="1015" y="661" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+0.51 pp</text>
+<text x="28" y="692" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">effect:dawn.tune.support · dawn</text>
+<line x1="390.6185897435898" y1="688" x2="393.28846153846155" y2="688" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="390.6185897435898" cy="688" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="393.28846153846155" cy="688" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="692" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">18.5% → 19.0%</text>
+<text x="1015" y="692" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+0.54 pp</text>
+<text x="28" y="723" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">effect:dawn.ultimate.action-advance · dawn</text>
+<line x1="412.9198717948718" y1="719" x2="417.6314102564103" y2="719" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="412.9198717948718" cy="719" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="417.6314102564103" cy="719" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="723" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">23.0% → 24.0%</text>
+<text x="1015" y="723" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+0.96 pp</text>
+<text x="28" y="754" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">effect:dawn.ultimate.energy-restore · dawn</text>
+<line x1="410.87820512820514" y1="750" x2="417.6314102564103" y2="750" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="410.87820512820514" cy="750" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="417.6314102564103" cy="750" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="754" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">22.6% → 24.0%</text>
+<text x="1015" y="754" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+1.38 pp</text>
+<text x="28" y="785" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">effect:dawn.ultimate.skill-point · dawn</text>
+<line x1="422.9711538461538" y1="781" x2="424.69871794871796" y2="781" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="422.9711538461538" cy="781" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="424.69871794871796" cy="781" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="785" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">25.1% → 25.4%</text>
+<text x="1015" y="785" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+0.35 pp</text>
+<text x="28" y="816" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">effect:logan.blood-shield.protection · logan</text>
+<line x1="385.9012345679012" y1="812" x2="412.36728395061726" y2="812" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="385.9012345679012" cy="812" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="412.36728395061726" cy="812" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="816" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">17.5% → 22.9%</text>
+<text x="1015" y="816" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+5.40 pp</text>
+<text x="28" y="847" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">effect:logan.blood-shield.taunt · logan</text>
+<line x1="409.19135802469134" y1="843" x2="412.36728395061726" y2="843" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="409.19135802469134" cy="843" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="412.36728395061726" cy="843" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="847" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">22.3% → 22.9%</text>
+<text x="1015" y="847" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+0.65 pp</text>
+<text x="28" y="878" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">passive:dawn/resourceful · dawn</text>
+<line x1="383.7083333333333" y1="874" x2="394.07371794871796" y2="874" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="383.7083333333333" cy="874" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="394.07371794871796" cy="874" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="878" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">17.1% → 19.2%</text>
+<text x="1015" y="878" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+2.12 pp</text>
+<text x="28" y="909" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">passive:lily/exposed · lily</text>
+<line x1="390.04140127388536" y1="905" x2="390.6656050955414" y2="905" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="390.04140127388536" cy="905" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="390.6656050955414" cy="905" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="909" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">18.4% → 18.5%</text>
+<text x="1015" y="909" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+0.13 pp</text>
+<text x="28" y="940" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">passive:logan/tasteForBlood · logan</text>
+<line x1="406.7716049382716" y1="936" x2="412.36728395061726" y2="936" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="406.7716049382716" cy="936" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="412.36728395061726" cy="936" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="940" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">21.8% → 22.9%</text>
+<text x="1015" y="940" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+1.14 pp</text>
+<text x="28" y="971" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">passive:soul/followUp · soul</text>
+<line x1="412" y1="967" x2="416.29545454545456" y2="967" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="412" cy="967" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="416.29545454545456" cy="967" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="971" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">22.9% → 23.7%</text>
+<text x="1015" y="971" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+0.88 pp</text>
+<text x="28" y="1002" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">passive:zero/cutthroat · zero</text>
+<line x1="415.63375796178343" y1="998" x2="415.63375796178343" y2="998" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="415.63375796178343" cy="998" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="415.63375796178343" cy="998" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="1002" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">23.6% → 23.6%</text>
+<text x="1015" y="1002" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+0.00 pp</text>
+<circle cx="308" cy="1062" r="5" fill="#f3bd66"/><text x="319" y="1066" fill="#aeb9ce" font-size="11" font-family="system-ui,sans-serif">Before</text><circle cx="392" cy="1062" r="4" fill="#79baff"/><text x="403" y="1066" fill="#aeb9ce" font-size="11" font-family="system-ui,sans-serif">After</text><text x="1015" y="1066" fill="#aeb9ce" font-size="11" font-family="system-ui,sans-serif">Difference</text>
+</svg>

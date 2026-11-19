@@ -1,0 +1,10 @@
+rune,eligibleWearers,wearerCount,winLiftPp,meanBAE,meanHpSwing,outcomeAssessment
+"eternal-sun","lily;logan;soul;zero","4","2.0467834241719594","2.3918464721908195","38.26954355505311","positive for at least one eligible wearer"
+"celestial-star","dawn;lily;logan;soul;zero","5","0.4464771487064481","0.7454582027984695","11.927331244775512","positive for at least one eligible wearer"
+"dark-matter","dawn;lily;logan;soul;zero","5","-29.056286777624354","-24.73446347502204","-395.75141560035263","negative for all eligible wearers"
+"clear-skies","dawn;lily;logan;soul;zero","5","2.5816493799508655","2.364084337678005","37.82534940284808","positive for at least one eligible wearer"
+"infinite-space","dawn;lily;logan;soul;zero","5","0.12709850501782563","0.44082507172243107","7.053201147558897","positive for at least one eligible wearer"
+"recycle","dawn;lily;logan;soul;zero","5","1.3961694710102357","1.5990096410393981","25.58415425663037","positive for at least one eligible wearer"
+"amplify","dawn;lily;logan;soul;zero","5","0.8677785217063351","1.8253663960700188","29.2058623371203","positive for at least one eligible wearer"
+"united","dawn;logan","2","3.501899335232668","3.4495686617105887","55.19309858736942","positive for at least one eligible wearer"
+"radiant-moon","lily;zero","2","1.7515923566878984","2.7270625995222932","43.63300159235669","positive for at least one eligible wearer"

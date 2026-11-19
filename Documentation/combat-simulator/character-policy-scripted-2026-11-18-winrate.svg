@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1150 268" role="img" aria-labelledby="title description">
+<title id="title">Performance comparison win rates</title>
+<desc id="description">Equal-weighted baseline and treatment win rates by candidate and wearer, plus percentage-point difference.</desc>
+<rect width="100%" height="100%" fill="#0b1020"/>
+<text x="28" y="34" fill="#f5f7ff" font-size="20" font-family="system-ui,sans-serif" font-weight="700">Win rate before and after</text>
+<text x="28" y="53" fill="#aeb9ce" font-size="11" font-family="system-ui,sans-serif">Each row equally weights the reported scenario strata for that candidate and wearer.</text>
+<line x1="300" y1="56" x2="300" y2="238" stroke="#27334a" stroke-width="1"/>
+<text x="300" y="48" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">0%</text>
+<line x1="422.5" y1="56" x2="422.5" y2="238" stroke="#27334a" stroke-width="1"/>
+<text x="422.5" y="48" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">25%</text>
+<line x1="545" y1="56" x2="545" y2="238" stroke="#27334a" stroke-width="1"/>
+<text x="545" y="48" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">50%</text>
+<line x1="667.5" y1="56" x2="667.5" y2="238" stroke="#27334a" stroke-width="1"/>
+<text x="667.5" y="48" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">75%</text>
+<line x1="790" y1="56" x2="790" y2="238" stroke="#27334a" stroke-width="1"/>
+<text x="790" y="48" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">100%</text>
+<text x="28" y="72" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">character-overall:dawn · dawn</text>
+<line x1="386.8388888888889" y1="68" x2="379.48888888888894" y2="68" stroke="#ff8b8b" stroke-width="3"/>
+<circle cx="386.8388888888889" cy="68" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="379.48888888888894" cy="68" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="72" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">17.7% → 16.2%</text>
+<text x="1015" y="72" fill="#ff8b8b" font-size="12" font-family="system-ui,sans-serif">-1.50 pp</text>
+<text x="28" y="103" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">character-overall:lily · lily</text>
+<line x1="386.2037037037037" y1="99" x2="384.1166666666667" y2="99" stroke="#ff8b8b" stroke-width="3"/>
+<circle cx="386.2037037037037" cy="99" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="384.1166666666667" cy="99" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="103" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">17.6% → 17.2%</text>
+<text x="1015" y="103" fill="#ff8b8b" font-size="12" font-family="system-ui,sans-serif">-0.43 pp</text>
+<text x="28" y="134" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">character-overall:logan · logan</text>
+<line x1="365.33333333333337" y1="130" x2="387.9277777777778" y2="130" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="365.33333333333337" cy="130" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="387.9277777777778" cy="130" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="134" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">13.3% → 17.9%</text>
+<text x="1015" y="134" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+4.61 pp</text>
+<text x="28" y="165" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">character-overall:soul · soul</text>
+<line x1="368.05555555555554" y1="161" x2="403.89814814814815" y2="161" stroke="#71ddb2" stroke-width="3"/>
+<circle cx="368.05555555555554" cy="161" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="403.89814814814815" cy="161" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="165" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">13.9% → 21.2%</text>
+<text x="1015" y="165" fill="#71ddb2" font-size="12" font-family="system-ui,sans-serif">+7.31 pp</text>
+<text x="28" y="196" fill="#e8edf7" font-size="12" font-family="system-ui,sans-serif">character-overall:zero · zero</text>
+<line x1="393.64444444444445" y1="192" x2="391.3759259259259" y2="192" stroke="#ff8b8b" stroke-width="3"/>
+<circle cx="393.64444444444445" cy="192" r="5" fill="#f3bd66" stroke="#101728" stroke-width="1"/>
+<circle cx="391.3759259259259" cy="192" r="4" fill="#79baff" stroke="#101728" stroke-width="1"/>
+<text x="810" y="196" fill="#d6deec" font-size="11" font-family="system-ui,sans-serif">19.1% → 18.6%</text>
+<text x="1015" y="196" fill="#ff8b8b" font-size="12" font-family="system-ui,sans-serif">-0.46 pp</text>
+<circle cx="308" cy="256" r="5" fill="#f3bd66"/><text x="319" y="260" fill="#aeb9ce" font-size="11" font-family="system-ui,sans-serif">Before</text><circle cx="392" cy="256" r="4" fill="#79baff"/><text x="403" y="260" fill="#aeb9ce" font-size="11" font-family="system-ui,sans-serif">After</text><text x="1015" y="260" fill="#aeb9ce" font-size="11" font-family="system-ui,sans-serif">Difference</text>
+</svg>

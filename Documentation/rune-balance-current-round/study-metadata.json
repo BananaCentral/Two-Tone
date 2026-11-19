@@ -1,4 +1,6 @@
 {
+  "status": "archived-superseded-scenario-model",
+  "supersededBy": "Easy 0.75x, Normal 1x, Hard 1.5x uniform enemy Level 1 stat multipliers",
   "runeTrials": 874800,
   "baselineTrials": 24300,
   "isolatedConditions": 5832,

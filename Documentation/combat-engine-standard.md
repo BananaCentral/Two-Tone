@@ -7,6 +7,9 @@ Combat balance reports must execute the same combat rules and authored combat da
 ## Source of truth
 
 - `src/scripts/combat-definitions.mjs` owns character and enemy combat sheets. The browser game and analysis tools import these definitions. Display-only art and labels remain in the live roster entries.
+- The same module owns `COMBAT_RESOURCE_STANDARD`: allied characters start each encounter with 40 Energy and have a 120 Energy cap by default. Authored character-specific values and explicit scenario overrides can change these defaults.
+- The same module owns `ENEMY_DIFFICULTY_STANDARD`: performance studies apply a uniform 0.75×, 1×, or 1.5× multiplier to all Level 1 enemy stats for Easy, Normal, or Hard. No separate encounter-length, HP, Attack, or Defense scaling is applied.
+- The same module owns `COMBAT_PERFORMANCE_POLICY_STANDARD`: Basic-focused, Skill-focused, and Mixed action probabilities; the per-scheduled-turn Ultimate probability; and the policy/difficulty weights used for the headline rating. Simulator adapters must read this standard rather than duplicate the values.
 - `src/scripts/combat-math.mjs` owns shared numeric primitives used by live battle code and the simulator, including HP/stat rounding and typed direct-hit damage.
 - `src/scripts/combat-engine-api.mjs` is the shared runtime API boundary. Both live battles and the runner use its action intents (authored action plan plus resource commitment), typed-hit calculation, target plans, enemy basic-attack plans, Rune triggers, complete direct/Reflect/Echo damage sequences, bleed ticks, Shield/healing application, character-specific effect handlers, shared status application and aging, Follow-Up/Ricochet allocation, summon lifetime, battle outcomes, and turn timeline.
 - `Documentation/combat-effect-lifecycle-standard.md` and `COMBAT_EFFECT_LIFECYCLE` define reapplication, turn clocks, stack consumption, cooldown timing, summon lifetime, cleanse, and defeat cleanup. The shared engine owns these transitions.
@@ -33,7 +36,7 @@ Timed effects advance on explicit lifecycle clocks. Both live battles and simula
 
 ## Runtime boundary
 
-The player controller and simulator policy choose different actions by design. They submit those intents to `TwoToneBattleEngine`, which owns action planning and resource commitment, typed damage and intake, character hit effects, support actions, ultimate effects, Rune cooldowns, Follow-Up and Ricochet allocation, summon duration, enemy attack plans, status state, turn scheduling, and battle outcome decisions. The browser retains animation, input, and wave presentation; the simulator retains its AI policy, scenario loop, and metrics collection. Adapters may choose targets or attach presentation/metrics, but must not add alternate damage, resource, status, or ability-effect rules.
+The player controller and simulator policy choose different actions by design. They submit those intents to `TwoToneBattleEngine`, which owns action planning and resource commitment, typed damage and intake, character hit effects, support actions, ultimate effects, Rune cooldowns, Follow-Up and Ricochet allocation, summon duration, enemy attack plans, status state, turn scheduling, and battle outcome decisions. The browser retains animation, input, and wave presentation; the simulator retains its AI policy, scenario loop, and metrics collection. The standardized policy probabilities live in shared combat definitions; policy rolls use an independent seeded random stream so a change to policy sampling does not perturb battle-resolution randomness. Adapters may choose targets or attach presentation/metrics, but must not add alternate damage, resource, status, or ability-effect rules.
 
 ## Mechanic event attribution
 

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { TwoToneBattleEngine, roundCombatHp, roundCombatStatQuarter } from '../src/scripts/combat-engine-api.mjs';
-import { CHARACTER_COMBAT_DATA, CHARACTER_UPGRADE_EFFECTS, COMBAT_EFFECT_CATALOG, COMBAT_MECHANIC_TAGS, COMBAT_PERFORMANCE_STANDARD, ENEMY_COMBAT_DATA, getActiveCharacterUpgradeEffect, RUNE_COMBAT_RULES } from '../src/scripts/combat-definitions.mjs';
+import { CHARACTER_COMBAT_DATA, CHARACTER_UPGRADE_EFFECTS, COMBAT_EFFECT_CATALOG, COMBAT_MECHANIC_TAGS, COMBAT_PERFORMANCE_POLICY_STANDARD, COMBAT_PERFORMANCE_STANDARD, COMBAT_RESOURCE_STANDARD, ENEMY_COMBAT_DATA, getActiveCharacterUpgradeEffect, RUNE_COMBAT_RULES } from '../src/scripts/combat-definitions.mjs';
 
 const DEFAULT_CONFIG = fileURLToPath(new URL('../Documentation/combat-simulator/example-soul-vs-slime.json', import.meta.url));
 const EPSILON = 1e-9;
@@ -14,7 +14,9 @@ function assert(condition, message) {
 function roundStat(value) { return roundCombatHp(value); }
 function roundStatQuarter(value) { return roundCombatStatQuarter(value); }
 const DAMAGE_CHANNELS=['direct','bleed','followUp','ricochet','summon','echo','reflect'];
-const POLICY_PROFILES=new Set(['scripted-auto-v1','skill-reserve-auto-v1','effect-aware-auto-v1']);
+const POLICY_PROFILES=new Set(COMBAT_PERFORMANCE_POLICY_STANDARD.map(policy=>policy.id));
+const DEFAULT_POLICY_PROFILE='mixed-v1';
+const POLICY_BY_ID=new Map(COMBAT_PERFORMANCE_POLICY_STANDARD.map(policy=>[policy.id,policy]));
 function newDamageBreakdown(){return Object.fromEntries(DAMAGE_CHANNELS.map(channel=>[channel,0]))}
 function sourceForAttack(attacker, spec, options, action, eventType) {
   const archetypeId = attacker.archetypeId;
@@ -128,7 +130,7 @@ function validateConfig(config) {
   }
   const disabledCombatEffectIds=config.settings?.disabledCombatEffectIds;
   assert(disabledCombatEffectIds===undefined||(Array.isArray(disabledCombatEffectIds)&&disabledCombatEffectIds.every(id=>typeof id==='string'&&COMBAT_EFFECT_CATALOG[id])), 'settings.disabledCombatEffectIds must contain catalogued combat effect IDs.');
-  const policyProfile=config.settings?.policyProfile??'scripted-auto-v1';
+  const policyProfile=config.settings?.policyProfile??DEFAULT_POLICY_PROFILE;
   assert(POLICY_PROFILES.has(policyProfile),`Unknown policy profile ${policyProfile}.`);
 }
 
@@ -183,7 +185,7 @@ function instantiate(config, side) {
     const characterDuplicates = instance.characterDuplicates ?? archetype.characterDuplicates ?? 0;
     assert(Number.isInteger(characterDuplicates) && characterDuplicates >= 0 && characterDuplicates <= 4, 'Character duplicates must be from 0 to 4.');
     const premiumWeaponDuplicates = weapon?.type === 'premium' ? weapon.potential - 1 : 0;
-    const maxEnergy = archetype.energy?.max ?? 120;
+    const maxEnergy = archetype.energy?.max ?? COMBAT_RESOURCE_STANDARD.maximumEnergy;
     const passives = (archetype.passives || []).filter(passive => !disabledPassiveIds.has(passive.id || passive.type)).map((passive, index) => ({
       ...passive,
       key: passive.id || passive.type + '-' + index,
@@ -238,7 +240,7 @@ function instantiate(config, side) {
       bleedMaxStacks:archetype.passives?.find(passive=>passive.type==='bleed')?.maxStacks??5,
       tauntEffects:instance.tauntEffects??[],
       barriersBroken: 0,
-      energy: Math.max(0, Math.min(maxEnergy, instance.energy ?? archetype.energy?.start ?? (side === 'allies' ? 20 : 0))),
+      energy: Math.max(0, Math.min(maxEnergy, instance.energy ?? archetype.energy?.start ?? (side === 'allies' ? COMBAT_RESOURCE_STANDARD.startingEnergy : 0))),
       maxEnergy,
       celestials: instance.celestials ?? archetype.celestials ?? {},
       weapon,
@@ -457,67 +459,7 @@ function refillPassives(state,unit, passiveIds) {
   }
 }
 function dawnPremiumDuplicates(unit){return unit.archetypeId==='dawn'&&unit.weapon?.type==='premium'?unit.premiumWeaponDuplicates:0}
-function previewTargetOrder(state){
- const order=new Map();
- for(const [index,entry] of state.timeline.preview(64).entries())if(!order.has(entry.id))order.set(entry.id,index);
- return order;
-}
-function expectedActionDamage(state,actor,spec,mode,multiplier){
- const foes=state.enemies.filter(unit=>unit.hp>0);if(!foes.length||!spec?.damageType||!Number.isFinite(multiplier))return 0;
- let targets;
- if(mode==='aoe')targets=foes;
- else{
-  const primary=foes.slice().sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp||a.id.localeCompare(b.id))[0];
-  targets=state.engine.resolveTargets({candidates:foes,mode,primary});
- }
- return targets.reduce((sum,target)=>sum+damageFor(state,actor,target,spec.damageType,multiplier),0);
-}
-function expectedBasicDamage(state,actor,forecastSelfEnhance=true){
- let expectedActor=actor;
- const skill=actor.skill;
- if(forecastSelfEnhance&&skill?.target==='self'&&skill.mechanicTags?.includes('buff.next_basic')&&Number.isFinite(skill.damagePerStack)){
-  const available=Math.max(0,state.skillPoints),room=Math.max(0,(skill.maxStacks??Infinity)-(actor.enhanceStacks||0));
-  expectedActor={...actor,enhanceStacks:(actor.enhanceStacks||0)+Math.min(available,room)};
- }
- const plan=actionPlan(state,expectedActor,'basic',{tuneMultiplier:actor.tune?.basicEnhanced?1+(actor.tune.damageBonus||0):1});
- return expectedActionDamage(state,expectedActor,actor.basic,plan?.target||actor.basic?.target,plan?.multiplier??actor.basic?.multiplier??0);
-}
-function chooseEffectAwareSupportTarget(state,actor){
- const order=previewTargetOrder(state);
- return state.allies.filter(unit=>unit.hp>0&&!unit.isHauntling&&unit.id!==actor.id)
-  .sort((a,b)=>(order.get(a.id)??Infinity)-(order.get(b.id)??Infinity)||expectedBasicDamage(state,b)-expectedBasicDamage(state,a)||a.id.localeCompare(b.id))[0]||actor;
-}
-function hasFreshStatusTarget(skill,foes){
- const statusTags=(skill?.mechanicTags||[]).filter(tag=>tag.startsWith('status.'));
- return statusTags.some(tag=>{
-  const status=tag.slice('status.'.length);
-  return foes.some(enemy=>status==='bleed'?enemy.bleedStacks.length<(enemy.bleedMaxStacks??5):!enemy.marks.some(mark=>mark.id===status));
- });
-}
-function shouldUseEffectAwareSkill(state,actor,foes){
- const skill=actor.skill;if(!skill||state.skillPoints<=0)return false;
- const tags=new Set(skill.mechanicTags||[]);
- if(tags.has('buff.next_basic')){
-  if(skill.target==='self')return Number.isFinite(skill.damagePerStack)&&skill.damagePerStack>0&&actor.enhanceStacks<(skill.maxStacks??Infinity);
-  const target=chooseEffectAwareSupportTarget(state,actor);
-  if(!target||target===actor||target.hp<=0||target.tune?.basicEnhanced)return false;
-  const gain=expectedBasicDamage(state,target)*(skill.damageBonus||0);
-  return gain>expectedBasicDamage(state,actor);
- }
- if(tags.has('defense.shield')||tags.has('recovery.healing')||tags.has('defense.damage_reduction'))
-  return state.allies.some(ally=>ally.hp>0&&(ally.hp<ally.maxHp||(tags.has('defense.shield')&&!(ally.shield>0))));
- if(skill.damageType&&Number.isFinite(skill.multiplier)){
-  let skillMultiplier=actionPlan(state,actor,'skill',{targetAlreadyHit:actor.firstStrikeTargets?.has(foes.slice().sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp||a.id.localeCompare(b.id))[0]?.id)} )?.multiplier??skill.multiplier;
-  const skillDamage=expectedActionDamage(state,actor,skill,skill.target||'single',skillMultiplier);
-  const basicDamage=expectedBasicDamage(state,actor);
-  if(hasFreshStatusTarget(skill,foes)&&skillDamage>0)return true;
-  return skillDamage>basicDamage;
- }
- if(tags.has('debuff.damage')||tags.has('debuff.defense')||tags.has('tempo.action_advance'))return foes.length>0||state.allies.some(ally=>ally.hp>0&&ally.id!==actor.id);
- return false;
-}
 function chooseSupportTarget(state,actor){
- if(state.policyProfile==='effect-aware-auto-v1')return chooseEffectAwareSupportTarget(state,actor);
  const eligible=state.allies.filter(unit=>unit.hp>0&&unit.id!==actor.id);
  if(!eligible.length)return actor;
  const target=eligible[state.supportTargetCursor%eligible.length];
@@ -552,6 +494,53 @@ function applyDawnTune(state,actor,target,plan=actionPlan(state,actor,'skill')){
  if(result.actionAdvance)target.turnsAdvanced+=result.actionAdvance/100;
  return true;
 }
+function resolveAllyUltimate(state,actor){
+ const ultimate=actor.ultimate;if(!ultimate)return false;
+ const plan=actionPlan(state,actor,'ultimate'),cost=plan?.energyCost??Infinity;
+ if(actor.energy<cost||!settleActionResources(state,actor,plan,{payEnergyCost:true}))return false;
+ actor.ultimateCount++;
+ if(plan.type==='dawnSupport'){
+  const target=chooseSupportTarget(state,actor),result=state.engine.resolveDawnUltimate({actor,target,battle:state,plan,characterDuplicates:actor.characterDuplicates||0});if(!result)return false;
+  target.energyGranted+=result.energyGained;target.energyGained+=result.energyGained;actor.skillPointsGenerated+=result.skillPointsGained;actor.skillPointsGranted+=result.skillPointsGained;target.turnsAdvanced+=result.actionAdvance/100;
+ }else{
+  const sourceId=++state.sourceSerial;
+  const hits=runAttack(state,actor,state.enemies.filter(unit=>unit.hp>0),ultimate,{multiplier:plan.multiplier,sourceActionId:sourceId});
+  applyUltimateRuneEffects(state,actor,hits);applyRicochet(state,actor,sourceId,hits);triggerFollowUps(state,sourceId,actor.id,hits);
+  if(actor.archetypeId==='zero'){
+   const result=state.engine.resolveZeroUltimateEffects({actor,enemies:state.enemies,battle:state,characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0,hasPremiumWeapon:actor.weapon?.type==='premium'});
+   if(result){actor.turnsAdvanced+=result.actorAdvance/100;actor.skillPointsGenerated+=result.skillPointsGained;actor.skillPointsGranted+=result.skillPointsGained}
+  }
+  if(actor.archetypeId==='lily'&&actor.weapon?.type==='premium'){
+   const result=state.engine.resolveLilyPremiumUltimateEffects({actor,allies:state.allies,battle:state,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0,hasPremiumWeapon:true});
+   if(result){actor.skillPointsGenerated+=result.skillPointsGained;actor.skillPointsGranted+=result.skillPointsGained;for(const entry of result.energy){const ally=state.allies.find(unit=>unit.id===entry.id);if(ally){ally.energyGranted+=entry.energyGained;ally.energyGained+=entry.energyGained;ally.turnsAdvanced+=entry.actionAdvance/100}}}
+  }
+  if(actor.archetypeId==='logan'){
+   const result=state.engine.resolveLoganUltimateEffects({actor,battle:state,characterDuplicates:actor.characterDuplicates||0});
+   if(result){actor.skillPointsGenerated+=result.skillPointsGained;actor.skillPointsGranted+=result.skillPointsGained}
+  }
+  if(ultimate.refillFollowUps)refillPassives(state,actor);
+  if(actor.archetypeId==='lily'&&state.enemies.some(unit=>unit.hp>0)){
+   const summonPlan=state.engine.resolveSummonPlan({owner:actor,characterDuplicates:actor.characterDuplicates||0,sourceId}),summon={...actor,id:summonPlan.id,name:summonPlan.name,isHauntling:true,immediateOnSpawn:summonPlan.immediateOnSpawn,turnsRemaining:summonPlan.durationTurns,hp:summonPlan.hp,maxHp:summonPlan.maxHp,energy:0,ultimate:null,skill:null,basic:{damageType:summonPlan.damageType,multiplier:summonPlan.multiplier,target:summonPlan.target},passives:[],turns:0,damageDealt:0,damageBreakdown:newDamageBreakdown(),damageTaken:0,supportDamageAmplified:0,shieldGranted:0,shieldReceived:0,shieldAbsorbed:0,hpSpent:0,tuneUses:0,tunesReceived:0,turnsAdvanced:0,skillPointsSpent:0,skillPointsGenerated:0,skillPointsGranted:0,energyGranted:0,tauntRedirectedHits:0,skillUses:0,followUpCount:0,ultimateCount:0,aoeCount:0};
+   state.allies.push(summon);
+  }
+ }
+ return true;
+}
+function resolveReadyUltimates(state,scheduledActor){
+ const forced=state.actionOverride?.actorId===scheduledActor?.id&&state.actionOverride.turn===scheduledActor.turns&&state.actionOverride.action==='ultimate'?scheduledActor:null;
+ for(const actor of state.allies){
+  if(actor.hp<=0||actor.isHauntling||!actor.ultimate)continue;
+  const cost=actionPlan(state,actor,'ultimate')?.energyCost??Infinity;
+  if(actor.energy<cost)continue;
+  if(state.actionOverride?.actorId===actor.id&&state.actionOverride.action==='ultimate'&&actor!==forced)continue;
+  const policy=POLICY_BY_ID.get(state.policyProfile)||POLICY_BY_ID.get(DEFAULT_POLICY_PROFILE);
+  if(actor!==forced&&state.policyRandom()>=policy.ultimateUseProbability)continue;
+  const before=actor.ultimateCount;
+  if(resolveAllyUltimate(state,actor)&&actor===forced){state.actionOverrideObserved=true;state.actionOverrideResolved='ultimate';state.actionOverrideStatus='executed'}
+  if(actor===forced&&actor.ultimateCount===before)state.actionOverrideStatus='insufficient_energy';
+  if(!state.enemies.some(enemy=>enemy.hp>0))break;
+ }
+}
 function resolveAllyAction(state, actor) {
   let foes = state.enemies.filter(unit => unit.hp > 0);
   if (!foes.length) return;
@@ -564,48 +553,12 @@ function resolveAllyAction(state, actor) {
     applyRicochet(state,actor,id,hits);triggerFollowUps(state,id,actor.id,hits);
     state.engine.advanceSummonTurn(actor);return;
   }
-  const ultimate = actor.ultimate;
-  const ultimatePlan=actionPlan(state,actor,'ultimate'),ultimateCost=ultimatePlan?.energyCost??Infinity;
-  if (ultimate && actor.energy >= ultimateCost && (actionOverride===null||actionOverride==='ultimate')) {
-    if(!settleActionResources(state,actor,ultimatePlan,{payEnergyCost:true}))return;
-    actor.ultimateCount++;
-    if(ultimatePlan.type==='dawnSupport'){
-      const target=state.allies.find(unit=>unit.id===actionOverrideConfig?.targetId&&unit.hp>0)||chooseSupportTarget(state,actor),result=state.engine.resolveDawnUltimate({actor,target,battle:state,plan:ultimatePlan,characterDuplicates:actor.characterDuplicates||0});if(!result)return;
-      target.energyGranted+=result.energyGained;target.energyGained+=result.energyGained;actor.skillPointsGenerated+=result.skillPointsGained;actor.skillPointsGranted+=result.skillPointsGained;target.turnsAdvanced+=result.actionAdvance/100;
-      applyUltimateRuneEffects(state,actor);
-    }else{
-    const plan=actionPlan(state,actor,'ultimate');
-    const sourceId=++state.sourceSerial;
-    const hits = runAttack(state, actor, foes, ultimate, { multiplier: plan.multiplier,sourceActionId:sourceId });
-    applyUltimateRuneEffects(state,actor,hits);
-    applyRicochet(state,actor,sourceId,hits);triggerFollowUps(state, sourceId, actor.id, hits);
-    if(actor.archetypeId==='zero'){
-      const result=state.engine.resolveZeroUltimateEffects({actor,enemies:state.enemies,battle:state,characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0,hasPremiumWeapon:actor.weapon?.type==='premium'});
-      if(result){actor.turnsAdvanced+=result.actorAdvance/100;actor.skillPointsGenerated+=result.skillPointsGained;actor.skillPointsGranted+=result.skillPointsGained}
-    }
-    if(actor.archetypeId==='lily'&&actor.weapon?.type==='premium'){
-      const result=state.engine.resolveLilyPremiumUltimateEffects({actor,allies:state.allies,battle:state,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0,hasPremiumWeapon:true});
-      if(result){actor.skillPointsGenerated+=result.skillPointsGained;actor.skillPointsGranted+=result.skillPointsGained;for(const entry of result.energy){const ally=state.allies.find(unit=>unit.id===entry.id);if(ally){ally.energyGranted+=entry.energyGained;ally.energyGained+=entry.energyGained;ally.turnsAdvanced+=entry.actionAdvance/100}}}
-    }
-    if(actor.archetypeId==='logan'){
-      const result=state.engine.resolveLoganUltimateEffects({actor,battle:state,characterDuplicates:actor.characterDuplicates||0});
-      if(result){actor.skillPointsGenerated+=result.skillPointsGained;actor.skillPointsGranted+=result.skillPointsGained}
-    }
-    if (ultimate.refillFollowUps) refillPassives(state,actor);
-    if(actor.archetypeId==='lily'&&state.enemies.some(unit=>unit.hp>0)){
-      const summonPlan=state.engine.resolveSummonPlan({owner:actor,characterDuplicates:actor.characterDuplicates||0,sourceId}),summon={...actor,id:summonPlan.id,name:summonPlan.name,isHauntling:true,immediateOnSpawn:summonPlan.immediateOnSpawn,turnsRemaining:summonPlan.durationTurns,hp:summonPlan.hp,maxHp:summonPlan.maxHp,energy:0,ultimate:null,skill:null,basic:{damageType:summonPlan.damageType,multiplier:summonPlan.multiplier,target:summonPlan.target},passives:[],turns:0,damageDealt:0,damageBreakdown:newDamageBreakdown(),damageTaken:0,supportDamageAmplified:0,shieldGranted:0,shieldReceived:0,shieldAbsorbed:0,hpSpent:0,tuneUses:0,tunesReceived:0,turnsAdvanced:0,skillPointsSpent:0,skillPointsGenerated:0,skillPointsGranted:0,energyGranted:0,tauntRedirectedHits:0,skillUses:0,followUpCount:0,ultimateCount:0,aoeCount:0};
-      state.allies.push(summon);
-    }
-    }
-    foes = state.enemies.filter(unit => unit.hp > 0);
-    if (!foes.length) return;
-  }
   const skill = actor.skill;
-  const skillReserve=state.policyProfile==='skill-reserve-auto-v1'?1:0;
-  const hasSkillResources=state.skillPoints>skillReserve;
-  const effectAwareSkill=actionOverride==='skill'||state.policyProfile!=='effect-aware-auto-v1'||shouldUseEffectAwareSkill(state,actor,foes);
-  const canUseSkill=hasSkillResources&&effectAwareSkill;
-  if(actionOverride!=='basic'&&actionOverride!=='ultimate'&&canUseSkill){
+  const hasSkillResources=state.skillPoints>0;
+  const policy=POLICY_BY_ID.get(state.policyProfile)||POLICY_BY_ID.get(DEFAULT_POLICY_PROFILE);
+  const chooseSkill=actionOverride==='skill'||(actionOverride===null&&state.policyRandom()<policy.skillProbability);
+  const canUseSkill=hasSkillResources&&chooseSkill;
+  if(canUseSkill){
   if(skill?.type==='bloodShield'&&state.skillPoints>0){
     const plan=actionPlan(state,actor,'skill');if(!settleActionResources(state,actor,plan))return;state.skillUses++;actor.skillUses++;
     const recipients=state.allies.filter(unit=>unit.hp>0),result=state.engine.resolveLoganBloodShield({actor,allies:recipients,enemies:state.enemies,plan,characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0});if(!result)return;
@@ -682,8 +635,8 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
   const slowerAverage = Math.min(allyAverage, enemyAverage);
   const settings = config.settings || {};
   const state = {
-    allies, enemies, random, sourceSerial: 0, supportTargetCursor: seed,
-    policyProfile:settings.policyProfile??'scripted-auto-v1',
+    allies, enemies, random, policyRandom:makeRng((seed^0x9e3779b9)>>>0), sourceSerial: 0, supportTargetCursor: seed,
+    policyProfile:settings.policyProfile??DEFAULT_POLICY_PROFILE,
     actionOverride:settings.actionOverride??null,
     actionOverrideObserved:false,
     actionOverrideResolved:null,
@@ -715,14 +668,15 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
     state.actions++;
     actor.turns++;
     actor.runeTriggeredThisTurn={recycle:false,amplify:false};
+    const isOverriddenActor=state.actionOverride?.actorId===actor.id&&state.actionOverride.turn===actor.turns;
+    const priorSkills=actor.skillUses,priorUltimates=actor.ultimateCount;
+    if(isOverriddenActor)state.actionOverrideObserved=true;
+    resolveReadyUltimates(state,actor);
     if (actor.side === 'allies') {
       state.allyTurns++;
       resolveBleedTick(state, actor);
       if (actor.hp <= 0) continue;
-      const isOverriddenActor=state.actionOverride?.actorId===actor.id&&state.actionOverride.turn===actor.turns;
-      const priorSkills=actor.skillUses,priorUltimates=actor.ultimateCount;
-      if(isOverriddenActor)state.actionOverrideObserved=true;
-      resolveAllyAction(state, actor);
+      if(state.enemies.some(unit=>unit.hp>0))resolveAllyAction(state, actor);
       if(isOverriddenActor){
         state.actionOverrideResolved=actor.ultimateCount>priorUltimates?'ultimate':actor.skillUses>priorSkills?'skill':'basic';
         if(state.actionOverrideResolved===state.actionOverride.action)state.actionOverrideStatus='executed';
@@ -734,7 +688,8 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
       state.enemyTurns++;
       resolveBleedTick(state,actor);
       if(actor.hp<=0)continue;
-      if (actor.brokenTurns > 0) {
+      if(!state.enemies.some(unit=>unit.hp>0)){}
+      else if (actor.brokenTurns > 0) {
         actor.brokenTurns--;
         if (actor.brokenTurns === 0) {
           actor.barrier = actor.maxBarrier;

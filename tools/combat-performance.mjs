@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { simulateBattle } from './combat-simulator.mjs';
-import { CHARACTER_COMBAT_DATA, CHARACTER_UPGRADE_EFFECTS, COMBAT_EFFECT_CATALOG, COMBAT_MECHANIC_TAGS, COMBAT_PERFORMANCE_STANDARD, ENEMY_COMBAT_DATA, ENEMY_LEVEL_SCALING, enemyStatsAtLevel, RUNE_COMBAT_RULES } from '../src/scripts/combat-definitions.mjs';
+import { CHARACTER_COMBAT_DATA, CHARACTER_UPGRADE_EFFECTS, COMBAT_EFFECT_CATALOG, COMBAT_MECHANIC_TAGS, COMBAT_PERFORMANCE_POLICY_STANDARD, COMBAT_PERFORMANCE_STANDARD, COMBAT_RESOURCE_STANDARD, ENEMY_COMBAT_DATA, ENEMY_DIFFICULTY_STANDARD, ENEMY_LEVEL_SCALING, enemyStatsAtMultiplier, RUNE_COMBAT_RULES } from '../src/scripts/combat-definitions.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // The benchmark roster follows the same authored definitions as the live game.
@@ -13,9 +13,10 @@ const ENEMY_IDS = Object.keys(ENEMY_COMBAT_DATA).sort();
 const RUNES = Object.keys(RUNE_COMBAT_RULES).sort();
 const CHARACTER_PASSIVES = Object.entries(CHARACTER_COMBAT_DATA).flatMap(([character, kit]) =>
   kit.passives.map(passive => ({ character, id: passive.id || passive.type })));
-const ENEMY_LEVELS = [1, 2, 3];
+const ENEMY_DIFFICULTIES = ENEMY_DIFFICULTY_STANDARD;
 const DEFAULT_POLICY_PROFILE = 'ensemble';
-const POLICY_PROFILES = ['scripted-auto-v1', 'skill-reserve-auto-v1', 'effect-aware-auto-v1'];
+const POLICY_PROFILES = COMBAT_PERFORMANCE_POLICY_STANDARD.map(policy => policy.id);
+const POLICY_WEIGHTS = new Map(COMBAT_PERFORMANCE_POLICY_STANDARD.map(policy => [policy.id, policy.ratingWeight]));
 const BENCHMARK_PARTY_SIZE = 4;
 const RUNE_MAIN = ['hp', 'attack', 'physicalDefense', 'magicalDefense'];
 const BAE_REFERENCE_HP = COMBAT_PERFORMANCE_STANDARD.baseStats.attack * (1 - Math.min(
@@ -106,27 +107,32 @@ function makeBalancedRunes(setId = null) {
     ...(setId ? { setId } : {})
   }));
 }
-function enemyLevelMetadata(archetype, level) {
+function enemyDifficultyMetadata(archetype, difficulty) {
   const authoredStats = { ...(archetype.baseStats ?? archetype.stats) };
-  const multiplier = level;
-  return { authoredLevel: archetype.level ?? 1, benchmarkLevel: level, growthMultiplier: multiplier,
-    authoredStats, benchmarkStats: enemyStatsAtLevel(authoredStats, level),
+  const multiplier = difficulty.statMultiplier;
+  return { difficulty: difficulty.id, authoredLevel: archetype.level ?? 1, statMultiplier: multiplier,
+    authoredStats, benchmarkStats: enemyStatsAtMultiplier(authoredStats, multiplier),
     unchangedStats: ENEMY_LEVEL_SCALING.unchangedStats };
 }
-function makeBaseConfig(library, allies, enemies, enemyLevel, archetypeCache = null) {
-  const profileKey = String(enemyLevel);
+function makeBaseConfig(library, allies, enemies, difficulty, archetypeCache = null) {
+  const profileKey = difficulty.id;
   let archetypes = archetypeCache?.get(profileKey);
   if (!archetypes) {
     archetypes = itemlessLibrary(library);
-    for (const id of ENEMY_IDS) archetypes[id].level = enemyLevel;
+    for (const id of ENEMY_IDS) {
+      archetypes[id].stats = enemyStatsAtMultiplier(archetypes[id].baseStats ?? archetypes[id].stats, difficulty.statMultiplier);
+      archetypes[id].level = 1;
+    }
     archetypeCache?.set(profileKey, archetypes);
   }
-  // Every enemy composition uses the same Level 1 anchored growth curve.
+  // Difficulty applies one uniform Level 1 stat multiplier, never a separate
+  // encounter-length, HP, Attack, or Defense adjustment.
   return {
     version: 1,
-    name: `enemy-level-${enemyLevel}: ${allies.join('+')} vs ${enemies.join('+')}`,
+    name: `enemy-${difficulty.id}: ${allies.join('+')} vs ${enemies.join('+')}`,
     settings: { initialSkillPoints: 3, skillPointCap: 5, maxActions: 2000, policyProfile: DEFAULT_POLICY_PROFILE,
-      benchmarkEnemyScaling: Object.fromEntries([...new Set(enemies)].map(id => [id, enemyLevelMetadata(library[id], enemyLevel)])) },
+      benchmarkDifficulty: difficulty.id,
+      benchmarkEnemyScaling: Object.fromEntries([...new Set(enemies)].map(id => [id, enemyDifficultyMetadata(library[id], difficulty)])) },
     archetypes,
     teams: {
       allies: allies.map((archetype, slot) => ({ id: `ally-${slot}-${archetype}`, archetype, slot })),
@@ -402,6 +408,11 @@ function makeBranches(base, spec, wearer) {
 function winValue(result) { return result.winner === 'allies' ? 1 : 0; }
 function outcomeRating(result) { return result.winner === 'allies' ? 100 : 0; }
 function average(values) { return values.length ? values.reduce((sum, n) => sum + n, 0) / values.length : 0; }
+function weightedMean(entries, valueOf, weightOf) {
+  let weightedTotal=0,totalWeight=0;
+  for(const entry of entries){const value=valueOf(entry),weight=weightOf(entry);if(Number.isFinite(value)&&Number.isFinite(weight)&&weight>0){weightedTotal+=value*weight;totalWeight+=weight}}
+  return totalWeight?weightedTotal/totalWeight:null;
+}
 function meanCI(values) {
   const mean = average(values);
   if (values.length < 2) return { mean, lower: mean, upper: mean };
@@ -429,9 +440,9 @@ function benchmarkCharacterRows(samples, seed = 1, expectedDesignStrata = 45, bo
     const key = `${sample.candidate}|${sample.wearer}`;
     if (!grouped.has(key)) grouped.set(key, { candidate: sample.candidate, character: sample.wearer, scenarios: new Map(), designStrata: new Set() });
     const entry = grouped.get(key);
-    entry.designStrata.add([sample.allyCount, sample.enemyCount, sample.enemyCategory, sample.enemyLevel].join('|'));
+    entry.designStrata.add([sample.allyCount, sample.enemyCount, sample.enemyCategory, sample.difficulty].join('|'));
     const block = entry.scenarios.get(sample.enemyCategory) || new Map();
-    const compositionKey = [sample.allyCount, sample.enemyCount, sample.enemyLevel, sample.partyComposition, sample.enemyComposition].join('|');
+    const compositionKey = [sample.allyCount, sample.enemyCount, sample.difficulty, sample.partyComposition, sample.enemyComposition].join('|');
     const policies = block.get(compositionKey) || [];
     policies.push(sample); block.set(compositionKey, policies); entry.scenarios.set(sample.enemyCategory, block);
   }
@@ -439,21 +450,31 @@ function benchmarkCharacterRows(samples, seed = 1, expectedDesignStrata = 45, bo
   const random = () => { randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0; return randomState / 4294967296; };
   const output = [];
   for (const entry of grouped.values()) {
-    const strata = [...entry.scenarios.values()];
-    const cells = strata.map(compositions => [...compositions.values()].map(policyRows => ({
-      treatmentBySeed: Array.from({ length: policyRows[0].treatmentRatings.length }, (_, i) => average(policyRows.map(row => row.treatmentRatings[i])))
-    })));
-    const treatment = average(cells.map(group => average(group.map(cell => average(cell.treatmentBySeed)))));
-    const runCount = Math.min(...[...entry.scenarios.values()].flatMap(block => [...block.values()].map(rows => rows[0].treatmentRatings.length)));
-    const perSeed = Array.from({ length: runCount }, (_, run) => average(cells.map(group => average(group.map(cell => cell.treatmentBySeed[run])))));
-    const scenarioScores = [];
-    for (let replicate = 0; replicate < bootstrapReplicates; replicate++) {
-      const picked = cells.map(group => Array.from({ length: group.length }, () => group[Math.floor(random() * group.length)]));
-      scenarioScores.push(average(picked.map(group => average(group.map(cell => average(cell.treatmentBySeed))))));
+    const bands=[...entry.scenarios.values()].map(compositions=>{
+      const byDifficulty=new Map();
+      for(const policyRows of compositions.values()){
+        const difficulty=policyRows[0].difficulty,rows=byDifficulty.get(difficulty)||[];
+        rows.push({treatmentBySeed:Array.from({length:policyRows[0].treatmentRatings.length},(_,i)=>weightedMean(policyRows,row=>row.treatmentRatings[i],row=>POLICY_WEIGHTS.get(row.policyProfile)??1))});
+        byDifficulty.set(difficulty,rows);
+      }
+      return byDifficulty;
+    });
+    const runCount=Math.min(...[...entry.scenarios.values()].flatMap(block=>[...block.values()].map(rows=>rows[0].treatmentRatings.length)));
+    const bandMean=(band,valueOf)=>weightedMean(ENEMY_DIFFICULTIES.map(difficulty=>{const cells=band.get(difficulty.id)||[];return {difficulty,value:cells.length?average(cells.map(valueOf)):null}}),item=>item.value,item=>item.difficulty.ratingWeight);
+    const perSeed=Array.from({length:runCount},(_,run)=>average(bands.map(band=>bandMean(band,cell=>cell.treatmentBySeed[run]))));
+    const treatment=average(perSeed);
+    const scenarioScores=[];
+    for(let replicate=0;replicate<bootstrapReplicates;replicate++){
+      const pickedBands=bands.map(band=>weightedMean(ENEMY_DIFFICULTIES.map(difficulty=>{
+        const cells=band.get(difficulty.id)||[];
+        const picked=cells.length?Array.from({length:cells.length},()=>cells[Math.floor(random()*cells.length)]):[];
+        return {difficulty,value:cells.length?average(picked.map(cell=>average(cell.treatmentBySeed))):null};
+      }),item=>item.value,item=>item.difficulty.ratingWeight));
+      scenarioScores.push(average(pickedBands));
     }
     output.push({ candidate: entry.candidate, character: entry.character, outcomeScore: treatment,
-      policyProfile: policyFilter || 'equal-weight-ensemble', sampledScenarioCells: cells.reduce((sum, group) => sum + group.length, 0),
-      policyScenarioCells: [...entry.scenarios.values()].flatMap(block => [...block.values()]).reduce((sum, rows) => sum + rows.length, 0), scenarioBootstrapBlocks: strata.length,
+      policyProfile: policyFilter || 'weighted-ensemble', sampledScenarioCells: bands.reduce((sum,band)=>sum+[...band.values()].reduce((subtotal,cells)=>subtotal+cells.length,0),0),
+      policyScenarioCells: [...entry.scenarios.values()].flatMap(block => [...block.values()]).reduce((sum, rows) => sum + rows.length, 0), scenarioBootstrapBlocks: bands.length,
       sampledDesignStrata: entry.designStrata.size, expectedDesignStrata,
       scenario95Lower: percentile(scenarioScores, .025), scenario95Upper: percentile(scenarioScores, .975),
       seed95Lower: Math.max(0, meanCI(perSeed).lower), seed95Upper: Math.min(100, meanCI(perSeed).upper) });
@@ -490,7 +511,7 @@ function writeBenchmarkArtifacts(outputPath, samples, coverage, expectedBenchmar
   const expected = {
     partySize: [String(BENCHMARK_PARTY_SIZE)], enemyCount: ['1', '2', '3', '4', '5'],
     enemyArchetype: ENEMY_IDS, enemyClassBand: ['common_only', 'elite_present', 'boss_present'],
-    enemyLevel: ENEMY_LEVELS.map(String), policy: policyProfiles, benchmarkStratum: expectedBenchmarkStrata
+    difficulty: ENEMY_DIFFICULTIES.map(({id}) => id), policy: policyProfiles, benchmarkStratum: expectedBenchmarkStrata
   };
   const coverageRows = Object.entries(expected).flatMap(([dimension, categories]) => {
     const values = coverage.get(dimension) || new Map();
@@ -498,7 +519,7 @@ function writeBenchmarkArtifacts(outputPath, samples, coverage, expectedBenchmar
   });
   const perCharacterCoverage = new Map();
   for (const sample of samples.filter(row => row.componentType === 'character-overall')) {
-    const stratum = [sample.allyCount, sample.enemyCount, sample.enemyCategory, sample.enemyLevel].join('|');
+    const stratum = [sample.allyCount, sample.enemyCount, sample.enemyCategory, sample.difficulty].join('|');
     const key = `${sample.wearer}|${stratum}`;
     if (!perCharacterCoverage.has(key)) perCharacterCoverage.set(key, new Set());
     perCharacterCoverage.get(key).add(sample.policyProfile);
@@ -526,10 +547,10 @@ function writeBenchmarkArtifacts(outputPath, samples, coverage, expectedBenchmar
   const mechanicLines = mechanicRows.map(row => `| ${row.tag} | ${row.samplesWithEvents}/${row.scenarioPolicySamples} |`);
   fs.writeFileSync(chartFile, makeCharacterScoreSvg(scoreRows));
   const report = `# Character Performance Benchmark Report\n\n`+
-    `- Benchmark version: 5\n- Sample status: ${completeDesign ? 'all design strata represented' : 'exploratory: design strata are missing'}\n- Generated: ${new Date().toISOString()}\n- Scenario-policy cells: ${scenarioCount}\n- Character scenario runs: ${comparisonCount}\n- Seeds per matchup: ${options.runs}; first seed: ${options.seed}\n- Policies: ${policyProfiles.map(policy => `\`${policy}\``).join(', ')}\n- Scenario selection: four-person parties across all five enemy counts, enemy class bands, and enemy Levels 1–3.\n\n`+
+    `- Benchmark version: 7\n- Sample status: ${completeDesign ? 'all design strata represented' : 'exploratory: design strata are missing'}\n- Generated: ${new Date().toISOString()}\n- Scenario-policy cells: ${scenarioCount}\n- Character scenario runs: ${comparisonCount}\n- Seeds per matchup: ${options.runs}; first seed: ${options.seed}\n- Policies: ${policyProfiles.map(policy => `\`${policy}\``).join(', ')}\n- Scenario selection: four-person parties across all five enemy counts, enemy class bands, and Easy/Normal/Hard enemy stat levels.\n\n`+
     `## Character benchmark scores\n\n`+
-    `The headline ensemble score is the equal-weight mean of the three named policy win rates using each character's actual authored kit; each win scores 100 and each completed loss scores 0. Action-limit incompletes count as non-wins and are reported separately. The score averages outcomes within enemy-class bands, then gives represented bands equal weight. It is a contextual party-benchmark score, not an intrinsic character rating. The policy range is shown because the policies are reproducible probes, not estimates of player frequency. Ability event evidence records which tagged mechanics activated and their observed values; it is diagnostic and does not subtract a disabled-kit control.\n\n`+
-    `Enemies use the character Level curve: each authored Level 1 stat (HP, Attack, both defenses, and Speed) is multiplied by Level and rounded to the nearest 0.25. Enemy mechanics remain unchanged. Per-enemy authored and effective stats are recorded in each JSONL row. Scenario intervals resample enemy/team compositions within class bands; seed intervals summarize matched-seed variation.\n\n`+
+    `The headline ensemble score uses each character's actual authored kit; each win scores 100 and each completed loss scores 0. Action-limit incompletes count as non-wins and are reported separately. Within each enemy-class band, the three policy scores are weighted Basic-focused 25%, Skill-focused 25%, Mixed 50%. Easy, Normal, and Hard are weighted 25%, 50%, and 25%; represented enemy-class bands are then averaged equally. This gives one contextual party-benchmark score, not an intrinsic character rating. The policy range is shown because policies are reproducible probes, not estimates of player frequency. Ability event evidence records which tagged mechanics activated and their observed values; it is diagnostic and does not subtract a disabled-kit control.\n\n`+
+    `Difficulty changes only enemy stats, using one uniform Level 1 stat multiplier for HP, Attack, Physical Defense, Magical Defense, and Speed: Easy ×0.75, Normal ×1, Hard ×1.5, rounded to the nearest 0.25. There are no separate encounter-length, HP, Attack, or Defense multipliers; enemy mechanics remain unchanged. Per-enemy authored and effective stats are recorded in each JSONL row. Scenario intervals resample enemy/team compositions within class bands; seed intervals summarize matched-seed variation.\n\n`+
     `| Character | Ensemble win rate / 100 | Scenario 95% interval | Policy range | Sampled scenario cells | Design strata covered |\n|---|---:|---:|---:|---:|---:|\n${scoreLines.join('\n') || '| No character-overall candidates were included | | | | | |'}\n\n`+
     `## Per-policy scores\n\n| Character | Policy | Win rate / 100 |\n|---|---|---:|\n${policyLines.join('\n') || '| No policy rows | | |'}\n\n`+
     `## Scenario coverage\n\n| Dimension | Categories covered | Missing categories |\n|---|---:|---|\n${coverageLines.join('\n')}\n\n`+
@@ -537,7 +558,7 @@ function writeBenchmarkArtifacts(outputPath, samples, coverage, expectedBenchmar
     `## Mechanic event evidence\n\n| Mechanic tag | Scenario-policy samples with an event |\n|---|---:|\n${mechanicLines.join('\n') || '| No tagged events were captured | |'}\n\n`+
     `A missing event may mean the mechanic was unsupported, ineligible, or rare in this sample. It is not evidence of zero value. See [mechanic coverage CSV](${path.basename(mechanicCoveragePath)}).\n\n`+
     `## Interpretation and limitations\n\n`+
-    `Equal policy weights define the benchmark ensemble; they do not claim that players use the policies equally often. Results remain sensitive to the authored roster, sampled compositions, and shared engine. Read policy-specific scores, coverage, and event evidence alongside the ensemble result.\n`;
+    `The policy and difficulty weights define the benchmark convention; they do not claim that players or encounters occur in these proportions in live play. Results remain sensitive to the authored roster, sampled compositions, and shared engine. Read policy-specific scores, coverage, and event evidence alongside the ensemble result.\n`;
   fs.writeFileSync(reportPath, report);
   console.log(`Benchmark report: ${reportPath}`);
   console.log(`Benchmark coverage: ${coveragePath}`);
@@ -746,7 +767,7 @@ function parseArgs(args) {
   return options;
 }
 function help() {
-  return `Two-Tone matched combat performance runner\n\nUsage: node tools/combat-performance.mjs [options]\n\nOptions:\n  --preset quick|balanced|full  Select a coverage/run-count preset (default balanced)\n  --candidate all-characters|all-rune-impact|all-rune-ratings|all-runes|all-weapons\n  --candidate all-actions|all-passives|all-effects|all-character-mechanics|all-upgrade-effects\n  --candidate rune:<id>|character:<id>|passive:<character>/<id>\n  --candidate effect:<stable-effect-id>|upgrade:<effect-id>\n  --candidate weapon:standard@P1L1|weapon:premium@P1L50\n  --candidate action:<character>/basic|skill|ultimate\n  --policy ensemble|scripted-auto-v1|skill-reserve-auto-v1|effect-aware-auto-v1 (default ensemble)\n  --character <id>           Restrict item tests to this eligible wearer\n  --runs <n>                  Matched seeds per matchup\n  --seed <n>                  First reproducible seed (default 1)\n  --limit-scenarios <n>       Per-character panel cap; use 0 for exhaustive panels\n  --max-actions <n>           Maximum unit actions in one battle (default 2000)\n  --output <path>             JSONL result path\n  --include-trials            Include per-seed details (larger output)\n\nThe roster is read from authored combat definitions. Character studies use four-ally parties, all enemy counts and class bands, and Level 1–3 enemy profiles. Enemy HP, Attack, defenses, and Speed use the character curve (Level 1 stat × Level, rounded to 0.25); mechanics stay unchanged. Balanced samples all 45 enemy-count/class/level strata once; full samples each twice. The default ensemble runs all three policies on matched scenarios and equally averages them for the headline score, while also reporting per-policy scores.`;
+  return `Two-Tone matched combat performance runner\n\nUsage: node tools/combat-performance.mjs [options]\n\nOptions:\n  --preset quick|balanced|full  Select a coverage/run-count preset (default balanced)\n  --candidate all-characters|all-rune-impact|all-rune-ratings|all-runes|all-weapons\n  --candidate all-actions|all-passives|all-effects|all-character-mechanics|all-upgrade-effects\n  --candidate rune:<id>|character:<id>|passive:<character>/<id>\n  --candidate effect:<stable-effect-id>|upgrade:<effect-id>\n  --candidate weapon:standard@P1L1|weapon:premium@P1L50\n  --candidate action:<character>/basic|skill|ultimate\n  --policy ensemble|basic-focused-v1|skill-focused-v1|mixed-v1 (default ensemble)\n  --character <id>           Restrict item tests to this eligible wearer\n  --runs <n>                  Matched seeds per matchup\n  --seed <n>                  First reproducible seed (default 1)\n  --limit-scenarios <n>       Per-character panel cap; use 0 for exhaustive panels\n  --max-actions <n>           Maximum unit actions in one battle (default 2000)\n  --output <path>             JSONL result path\n  --include-trials            Include per-seed details (larger output)\n\nThe roster is read from authored combat definitions. Character studies use four-ally parties, all enemy counts and class bands, and Easy/Normal/Hard difficulty. Enemy HP, Attack, defenses, and Speed use one uniform Level 1 stat multiplier (0.75×/1×/1.5×), rounded to 0.25; mechanics stay unchanged. Balanced samples all 45 enemy-count/class/difficulty strata once; full samples each twice. Basic/Skill action probabilities are 75/25, 25/75, and 50/50 for Basic-focused, Skill-focused, and Mixed policies. Whenever an ally has a ready Ultimate, each scheduled combat turn independently rolls a 75% activation chance; that Ultimate does not consume the actor's normal action. The final rating weights policies 25/25/50 and Easy/Normal/Hard 25/50/25. Per-policy scores are also reported.`;
 }
 function enemyLineupGroups(enemyTeams, library) {
   const groups = new Map();
@@ -766,15 +787,15 @@ function* scenarioSamples(allyLists, enemyTeams, limit, library) {
     compositions: [...compositions.entries()].sort(([a], [b]) => a.localeCompare(b)) }));
   if (!limit) {
     for (const party of allyLists) for (const group of groups) for (const [,orders] of group.compositions)
-      for (const enemies of orders) for (const enemyLevel of ENEMY_LEVELS)
-        yield { party, enemies, enemyLevel, enemyClassMix: enemyClassMix(enemies, library), enemyClassBand: enemyClassBand(enemies, library) };
+      for (const enemies of orders) for (const difficulty of ENEMY_DIFFICULTIES)
+        yield { party, enemies, difficulty, enemyClassMix: enemyClassMix(enemies, library), enemyClassBand: enemyClassBand(enemies, library) };
     return;
   }
   const strata = [];
   for (let enemyCount = 1; enemyCount <= 5; enemyCount++)
     for (const band of ['common_only', 'elite_present', 'boss_present']) {
       const group = groups.find(row => row.count === enemyCount && row.band === band);
-      if (group) for (const enemyLevel of ENEMY_LEVELS) strata.push({ group, enemyLevel });
+      if (group) for (const difficulty of ENEMY_DIFFICULTIES) strata.push({ group, difficulty });
     }
   const count = Math.min(limit, allyLists.length * strata.length);
   const selectedStrata = count < strata.length
@@ -785,18 +806,18 @@ function* scenarioSamples(allyLists, enemyTeams, limit, library) {
   const remainder = strata.length ? extraCount % strata.length : 0;
   for (const index of selectedStrata) {
     const stratum = strata[index], group = stratum.group, compositions = group.compositions;
-    const levelIndex = ENEMY_LEVELS.indexOf(stratum.enemyLevel);
+    const difficultyIndex = ENEMY_DIFFICULTIES.indexOf(stratum.difficulty);
     const quota = count < strata.length ? 1 : 1 + perStratum + (index < remainder ? 1 : 0);
     for (let sample = 0; sample < quota; sample++) {
       const partyIndex = (index * 13 + sample * 7) % allyLists.length;
-      // Spread the three levels across distinct enemy identities/compositions,
+      // Spread the three difficulty levels across distinct enemy identities/compositions,
       // then rotate formation order so Blast layouts also receive coverage.
-      const compositionIndex = compositions.length <= ENEMY_LEVELS.length
-        ? (levelIndex + sample) % compositions.length
-        : Math.floor(((levelIndex + sample + 0.5) % ENEMY_LEVELS.length) * compositions.length / ENEMY_LEVELS.length);
+      const compositionIndex = compositions.length <= ENEMY_DIFFICULTIES.length
+        ? (difficultyIndex + sample) % compositions.length
+        : Math.floor(((difficultyIndex + sample + 0.5) % ENEMY_DIFFICULTIES.length) * compositions.length / ENEMY_DIFFICULTIES.length);
       const [composition, orders] = compositions[compositionIndex];
-      const order = orders[(sample + levelIndex + group.count) % orders.length];
-      yield { party: allyLists[partyIndex], enemies: order, enemyLevel: stratum.enemyLevel,
+      const order = orders[(sample + difficultyIndex + group.count) % orders.length];
+      yield { party: allyLists[partyIndex], enemies: order, difficulty: stratum.difficulty,
         enemyClassMix: enemyClassMix(order, library), enemyClassBand: enemyClassBand(order, library), enemyComposition: composition };
     }
   }
@@ -842,7 +863,7 @@ function buildMechanicRatingRows(samples, runCount) {
     candidates.set(sample.candidate, candidateRows);
     const strata = candidateRows.wearers.get(sample.wearer) || new Map();
     candidateRows.wearers.set(sample.wearer, strata);
-    const stratum = [sample.enemyLevel, sample.allyCount, sample.enemyCount, sample.enemyCategory].join('|');
+    const stratum = [sample.difficulty, sample.allyCount, sample.enemyCount, sample.enemyCategory].join('|');
     const compositions = strata.get(stratum) || new Map();
     strata.set(stratum, compositions);
     const composition = `${sample.partyComposition}|${sample.enemyComposition}`;
@@ -885,9 +906,7 @@ function buildMechanicRatingRows(samples, runCount) {
           evidence.set(tag, row);
         }
         for (let seedIndex = 0; seedIndex < runCount; seedIndex++) {
-          const battleWins = [], battleBaes = [], useWins = [], useBaes = [];
-          const battleControlRatings = [], battleTreatmentRatings = [], battleRatingDeltas = [];
-          const useControlRatings = [], useTreatmentRatings = [], useRatingDeltas = [];
+          const executedForms = formations.filter(formation => (formation.actionStatuses?.[seedIndex] || null) === 'executed');
           for (const formation of formations) {
             const status = formation.actionStatuses?.[seedIndex] || null;
             if (isAction) {
@@ -896,38 +915,19 @@ function buildMechanicRatingRows(samples, runCount) {
               statusCounts[status || 'missing_status'] = (statusCounts[status || 'missing_status'] || 0) + 1;
               const executed = status === 'executed';
               if (executed) { activationSum++; executedCount++; }
-              const delta = formation.winDeltas[seedIndex], bae = formation.baeValues[seedIndex];
-              battleWins.push(delta); battleBaes.push(bae);
-              battleControlRatings.push(formation.controlRatings[seedIndex]);
-              battleTreatmentRatings.push(formation.treatmentRatings[seedIndex]);
-              battleRatingDeltas.push(formation.ratingDeltas[seedIndex]);
-              if (executed) {
-                useWins.push(delta); useBaes.push(bae);
-                useControlRatings.push(formation.controlRatings[seedIndex]);
-                useTreatmentRatings.push(formation.treatmentRatings[seedIndex]);
-                useRatingDeltas.push(formation.ratingDeltas[seedIndex]);
-              }
-            } else {
-              battleWins.push(formation.winDeltas[seedIndex]); battleBaes.push(formation.baeValues[seedIndex]);
-              useWins.push(formation.winDeltas[seedIndex]); useBaes.push(formation.baeValues[seedIndex]);
-              battleControlRatings.push(formation.controlRatings[seedIndex]);
-              battleTreatmentRatings.push(formation.treatmentRatings[seedIndex]);
-              battleRatingDeltas.push(formation.ratingDeltas[seedIndex]);
-              useControlRatings.push(formation.controlRatings[seedIndex]);
-              useTreatmentRatings.push(formation.treatmentRatings[seedIndex]);
-              useRatingDeltas.push(formation.ratingDeltas[seedIndex]);
             }
           }
-          values.battleWin[seedIndex] = meanFinite(battleWins);
-          values.battleBae[seedIndex] = meanFinite(battleBaes);
-          values.useWin[seedIndex] = meanFinite(useWins);
-          values.useBae[seedIndex] = meanFinite(useBaes);
-          values.battleControlRating[seedIndex] = meanFinite(battleControlRatings);
-          values.battleTreatmentRating[seedIndex] = meanFinite(battleTreatmentRatings);
-          values.battleRatingDelta[seedIndex] = meanFinite(battleRatingDeltas);
-          values.useControlRating[seedIndex] = meanFinite(useControlRatings);
-          values.useTreatmentRating[seedIndex] = meanFinite(useTreatmentRatings);
-          values.useRatingDelta[seedIndex] = meanFinite(useRatingDeltas);
+          const policyMean = (rows, field) => weightedMean(rows, row => row[field][seedIndex], row => POLICY_WEIGHTS.get(row.policyProfile) ?? 1);
+          values.battleWin[seedIndex] = policyMean(formations, 'winDeltas');
+          values.battleBae[seedIndex] = policyMean(formations, 'baeValues');
+          values.battleControlRating[seedIndex] = policyMean(formations, 'controlRatings');
+          values.battleTreatmentRating[seedIndex] = policyMean(formations, 'treatmentRatings');
+          values.battleRatingDelta[seedIndex] = policyMean(formations, 'ratingDeltas');
+          values.useWin[seedIndex] = policyMean(isAction ? executedForms : formations, 'winDeltas');
+          values.useBae[seedIndex] = policyMean(isAction ? executedForms : formations, 'baeValues');
+          values.useControlRating[seedIndex] = policyMean(isAction ? executedForms : formations, 'controlRatings');
+          values.useTreatmentRating[seedIndex] = policyMean(isAction ? executedForms : formations, 'treatmentRatings');
+          values.useRatingDelta[seedIndex] = policyMean(isAction ? executedForms : formations, 'ratingDeltas');
         }
         compositionRows.push({ values, activationRate: activationOpportunities ? activationSum / activationOpportunities : null });
       }
@@ -937,7 +937,27 @@ function buildMechanicRatingRows(samples, runCount) {
         onUseCompositionCount: compositionRows.filter(row => row.values.useWin.some(Number.isFinite)).length });
     }
 
-    const perSeed = Object.fromEntries(fields.map(field => [field, Array.from({ length: runCount }, (_, i) => meanFinite(stratumRows.map(row => row.values[field][i])))]));
+    const strataByBand = new Map();
+    for (const row of stratumRows) {
+      const [difficulty, , enemyCount, enemyCategory] = row.stratum.split('|');
+      const counts = strataByBand.get(enemyCategory) || new Map();
+      const difficulties = counts.get(enemyCount) || [];
+      difficulties.push({ ...row, difficulty }); counts.set(enemyCount, difficulties); strataByBand.set(enemyCategory, counts);
+    }
+    const perSeed = Object.fromEntries(fields.map(field => {
+      const scores = Array.from({ length: runCount }, (_, seedIndex) => {
+        const bandScores = [...strataByBand.values()].map(counts => {
+          const enemyCountScores = [...counts.values()].map(difficultyRows => weightedMean(
+            difficultyRows,
+            row => row.values[field][seedIndex],
+            row => ENEMY_DIFFICULTIES.find(item => item.id === row.difficulty)?.ratingWeight ?? 1
+          ));
+          return meanFinite(enemyCountScores);
+        });
+        return meanFinite(bandScores);
+      });
+      return [field, scores];
+    }));
     const primaryWin = isAction ? perSeed.useWin : perSeed.battleWin;
     const primaryBae = isAction ? perSeed.useBae : perSeed.battleBae;
     const primaryControlRating = isAction ? perSeed.useControlRating : perSeed.battleControlRating;
@@ -1005,23 +1025,23 @@ async function main() {
     ? [...new Set(options.candidates.map(spec => spec.character || (spec.type === 'character' ? spec.id : null)).filter(Boolean))].sort()
     : [null];
   const anchorMatrixCounts = anchors.map(anchor => (anchor ? allAllyLists.filter(party => party.includes(anchor)).length : allAllyLists.length)
-    * enemyTeams.length * ENEMY_LEVELS.length);
+    * enemyTeams.length * ENEMY_DIFFICULTIES.length);
   const targetScenarios = anchorMatrixCounts.reduce((sum, count) => sum + (options.limitScenarios ? Math.min(options.limitScenarios, count) : count), 0) * activePolicies.length;
   console.log(`Scenario universe: ${anchorMatrixCounts.reduce((sum, count) => sum + count, 0).toLocaleString()} anchored cells; selected ${targetScenarios.toLocaleString()} policy-scenario cells across ${activePolicies.length} policy profile(s); ${options.runs} matched runs per comparison.`);
   const progressEvery = Math.max(1, Math.ceil(targetScenarios / 20));
   const sampledScenarioCoverage = new Map();
   for (const policyProfile of activePolicies) {
   let policyScenarioIndex = 0;
-  for (const { party, enemies, enemyLevel, enemyClassMix: sampledEnemyClassMix, enemyClassBand: sampledEnemyClassBand, focalCharacter } of candidateScenarioSamples(allAllyLists, enemyTeams, options.limitScenarios, library, anchors)) {
+  for (const { party, enemies, difficulty, enemyClassMix: sampledEnemyClassMix, enemyClassBand: sampledEnemyClassBand, focalCharacter } of candidateScenarioSamples(allAllyLists, enemyTeams, options.limitScenarios, library, anchors)) {
       scenarios++; policyScenarioIndex++;
       for (const [dimension, value] of Object.entries({ partySize: party.length, enemyCount: enemies.length,
-        enemyArchetype: [...new Set(enemies)], enemyClassBand: sampledEnemyClassBand, enemyClassMix: sampledEnemyClassMix, enemyLevel, policy: policyProfile,
-        benchmarkStratum: `${party.length}|${enemies.length}|${sampledEnemyClassBand}|${enemyLevel}` })) {
+        enemyArchetype: [...new Set(enemies)], enemyClassBand: sampledEnemyClassBand, enemyClassMix: sampledEnemyClassMix, difficulty: difficulty.id, policy: policyProfile,
+        benchmarkStratum: `${party.length}|${enemies.length}|${sampledEnemyClassBand}|${difficulty.id}` })) {
         const values = sampledScenarioCoverage.get(dimension) || new Map();
         for (const category of (Array.isArray(value) ? value : [value])) values.set(String(category), (values.get(String(category)) || 0) + 1);
         sampledScenarioCoverage.set(dimension, values);
       }
-      const base = makeBaseConfig(library, party, enemies, enemyLevel, scaledArchetypes);
+      const base = makeBaseConfig(library, party, enemies, difficulty, scaledArchetypes);
       base.settings.policyProfile = policyProfile;
       const neutralControlConfigs = new Map(), neutralControlResults = new Map();
       for (const spec of options.candidates) {
@@ -1099,12 +1119,12 @@ async function main() {
             candidate: candidateLabel(spec),
             wearer, party, enemies,
             comparisonReference,
-            performanceStandard: { baseStats: COMBAT_PERFORMANCE_STANDARD.baseStats,
+            performanceStandard: { baseStats: COMBAT_PERFORMANCE_STANDARD.baseStats, resources: COMBAT_RESOURCE_STANDARD,
               damageMultipliers: COMBAT_PERFORMANCE_STANDARD.damageMultipliers, baeReferenceHp: BAE_REFERENCE_HP },
             enemyCategories: [...new Set(enemies.map(id => library[id].tags?.type || 'unknown'))].sort(),
             enemyClassMix: sampledEnemyClassMix, enemyClassBand: sampledEnemyClassBand, policyProfile,
             benchmarkEnemyScaling: base.settings.benchmarkEnemyScaling,
-            enemyLevel, runs: options.runs, seed: options.seed,
+            difficulty: difficulty.id, enemyStatMultiplier: difficulty.statMultiplier, runs: options.runs, seed: options.seed,
             mechanicEvaluation,
             tagMeasurements,
             winRate, outcomeRating,
@@ -1129,7 +1149,7 @@ async function main() {
               (options.mechanicRating && ['passive', 'action', 'effect', 'character-overall', 'upgrade'].includes(spec.type))) ratingSamples.push({
             candidate: candidateLabel(spec), wearer, scenarioId: scenarios,
             comparisonReference,
-            policyProfile, enemyLevel, partyComposition: party.slice().sort().join('+'),
+            policyProfile, difficulty: difficulty.id, enemyStatMultiplier: difficulty.statMultiplier, partyComposition: party.slice().sort().join('+'),
             enemyComposition: enemies.slice().sort().join('+'), allyCount: party.length,
             enemyCount: enemies.length, enemyCategory: sampledEnemyClassBand,
             componentType: spec.type,
@@ -1145,8 +1165,8 @@ async function main() {
           if (!actualCharacterGauge) {
             const partyComposition = party.slice().sort().join('+');
             const enemyComposition = enemies.slice().sort().join('+');
-            const key = `${summary.candidate}|${wearer}|${enemyLevel}|${partyComposition}|${enemyComposition}`;
-            if (!accumulated.has(key)) accumulated.set(key, { candidate: summary.candidate, wearer, mechanicTags: mechanicEvaluation.tags.join(';'), measurementPlan: measurementPlanLabel(mechanicEvaluation), unobservedTags: tagMeasurements.filter(entry => entry.evidenceStatus !== 'event_observed').map(entry => entry.tag).join(';'), requiredCoverage: [...new Set(mechanicEvaluation.byTag.map(entry => entry.coverage))].join(';'), enemyLevel, partyComposition, enemyComposition, enemyCategory: summary.enemyCategories.join('+'), allyCount: party.length, enemyCount: enemies.length, formations: 0, controlWin: 0, treatmentWin: 0, controlTimeout: 0, treatmentTimeout: 0, controlRating: 0, treatmentRating: 0, ratingDelta: 0, winDelta: 0, hpSwing: 0, bae: 0, impact: {} });
+            const key = `${summary.candidate}|${wearer}|${difficulty.id}|${partyComposition}|${enemyComposition}`;
+            if (!accumulated.has(key)) accumulated.set(key, { candidate: summary.candidate, wearer, mechanicTags: mechanicEvaluation.tags.join(';'), measurementPlan: measurementPlanLabel(mechanicEvaluation), unobservedTags: tagMeasurements.filter(entry => entry.evidenceStatus !== 'event_observed').map(entry => entry.tag).join(';'), requiredCoverage: [...new Set(mechanicEvaluation.byTag.map(entry => entry.coverage))].join(';'), difficulty: difficulty.id, enemyStatMultiplier: difficulty.statMultiplier, partyComposition, enemyComposition, enemyCategory: summary.enemyCategories.join('+'), allyCount: party.length, enemyCount: enemies.length, formations: 0, controlWin: 0, treatmentWin: 0, controlTimeout: 0, treatmentTimeout: 0, controlRating: 0, treatmentRating: 0, ratingDelta: 0, winDelta: 0, hpSwing: 0, bae: 0, impact: {} });
             const aggregate = accumulated.get(key); aggregate.formations++; aggregate.controlWin += summary.winRate.control / 100; aggregate.treatmentWin += summary.winRate.treatment / 100; aggregate.controlTimeout += summary.winRate.controlTimeoutRatePct / 100; aggregate.treatmentTimeout += summary.winRate.treatmentTimeoutRatePct / 100; aggregate.controlRating += summary.outcomeRating.control; aggregate.treatmentRating += summary.outcomeRating.treatment; aggregate.ratingDelta += summary.outcomeRating.difference; aggregate.winDelta += summary.winRate.differencePercentagePoints; aggregate.hpSwing += summary.hpSwing.mean; aggregate.bae += summary.bae.mean;
             for (const [metric, estimate] of Object.entries(summary.impact)) aggregate.impact[metric] = (aggregate.impact[metric] || 0) + estimate.mean;
           }
@@ -1161,8 +1181,8 @@ async function main() {
   const expectedBenchmarkStrata = [];
   for (const partySize of [BENCHMARK_PARTY_SIZE]) for (const enemyCount of [1, 2, 3, 4, 5])
     for (const enemyBand of ['common_only', 'elite_present', 'boss_present'])
-      for (const enemyLevel of ENEMY_LEVELS)
-        expectedBenchmarkStrata.push(`${partySize}|${enemyCount}|${enemyBand}|${enemyLevel}`);
+      for (const difficulty of ENEMY_DIFFICULTIES)
+        expectedBenchmarkStrata.push(`${partySize}|${enemyCount}|${enemyBand}|${difficulty.id}`);
   writeBenchmarkArtifacts(options.output, ratingSamples, sampledScenarioCoverage, expectedBenchmarkStrata, options, scenarios, comparisons);
   const compositionMeans = [...accumulated.values()].map(row => ({ ...row,
     controlWin: row.controlWin / row.formations, treatmentWin: row.treatmentWin / row.formations, controlTimeout: row.controlTimeout / row.formations, treatmentTimeout: row.treatmentTimeout / row.formations,
@@ -1171,15 +1191,15 @@ async function main() {
     impact: Object.fromEntries(Object.entries(row.impact).map(([metric, value]) => [metric, value / row.formations])) }));
   const strata = new Map();
   for (const row of compositionMeans) {
-    const key = `${row.candidate}|${row.wearer}|${row.enemyLevel}|${row.allyCount}|${row.enemyCount}|${row.enemyCategory}`;
-    if (!strata.has(key)) strata.set(key, { candidate: row.candidate, wearer: row.wearer, enemyLevel: row.enemyLevel, allyCount: row.allyCount, enemyCount: row.enemyCount, enemyCategory: row.enemyCategory, compositionPairs: 0, controlWin: 0, treatmentWin: 0, controlTimeout: 0, treatmentTimeout: 0, controlRating: 0, treatmentRating: 0, ratingDelta: 0, winDelta: 0, hpSwing: 0, bae: 0, impact: {} });
+    const key = `${row.candidate}|${row.wearer}|${row.difficulty}|${row.allyCount}|${row.enemyCount}|${row.enemyCategory}`;
+    if (!strata.has(key)) strata.set(key, { candidate: row.candidate, wearer: row.wearer, difficulty: row.difficulty, enemyStatMultiplier: row.enemyStatMultiplier, allyCount: row.allyCount, enemyCount: row.enemyCount, enemyCategory: row.enemyCategory, compositionPairs: 0, controlWin: 0, treatmentWin: 0, controlTimeout: 0, treatmentTimeout: 0, controlRating: 0, treatmentRating: 0, ratingDelta: 0, winDelta: 0, hpSwing: 0, bae: 0, impact: {} });
     const aggregate = strata.get(key); aggregate.compositionPairs++; aggregate.controlWin += row.controlWin; aggregate.treatmentWin += row.treatmentWin; aggregate.controlTimeout += row.controlTimeout; aggregate.treatmentTimeout += row.treatmentTimeout; aggregate.controlRating += row.controlRating; aggregate.treatmentRating += row.treatmentRating; aggregate.ratingDelta += row.ratingDelta; aggregate.winDelta += row.winDelta; aggregate.hpSwing += row.hpSwing; aggregate.bae += row.bae;
     for (const [metric, value] of Object.entries(row.impact)) aggregate.impact[metric] = (aggregate.impact[metric] || 0) + value;
   }
   const rows = [...strata.values()];
   if (rows.length) fs.writeFileSync(summaryFile, [
-    'candidate,wearer,comparisonReference,mechanicTags,measurementPlan,unobservedTags,requiredCoverage,enemyLevel,allyCount,enemyCount,enemyCategory,equallyWeightedCompositionPairs,outcomeRatingBefore,outcomeRatingAfter,outcomeRatingDifference,winRateBeforePct,winRateAfterPct,timeoutRateBeforePct,timeoutRateAfterPct,differencePercentagePoints,meanHpSwing,meanBAE,enemyHpRemovedDelta,allyHpRetainedDelta,allyDamageDealtDelta,allyDamageTakenDelta,allyHealingDelta,allyShieldGrantedDelta,allyShieldAbsorbedDelta,allyEnergyGrantedDelta,allyEnergyGainedDelta,allyEnergySpentDelta,allyEnergyRemainingDelta,allySkillPointsGrantedDelta,allyTurnsDelta,enemyTurnsDelta',
-    ...rows.map(row => [row.candidate, row.wearer, row.comparisonReference, row.mechanicTags, row.measurementPlan, row.unobservedTags, row.requiredCoverage, row.enemyLevel, row.allyCount, row.enemyCount, row.enemyCategory, row.compositionPairs, row.controlRating / row.compositionPairs, row.treatmentRating / row.compositionPairs, row.ratingDelta / row.compositionPairs, row.controlWin / row.compositionPairs * 100, row.treatmentWin / row.compositionPairs * 100, row.controlTimeout / row.compositionPairs * 100, row.treatmentTimeout / row.compositionPairs * 100, row.winDelta / row.compositionPairs, row.hpSwing / row.compositionPairs, row.bae / row.compositionPairs, row.impact.enemyHpRemoved / row.compositionPairs, row.impact.allyHpRetained / row.compositionPairs, row.impact.damageDealt / row.compositionPairs, row.impact.damageTaken / row.compositionPairs, row.impact.healing / row.compositionPairs, row.impact.shieldsGranted / row.compositionPairs, row.impact.shieldsAbsorbed / row.compositionPairs, row.impact.energyGranted / row.compositionPairs, row.impact.energyGained / row.compositionPairs, row.impact.energySpent / row.compositionPairs, row.impact.energyRemaining / row.compositionPairs, row.impact.skillPointsGranted / row.compositionPairs, row.impact.allyTurns / row.compositionPairs, row.impact.enemyTurns / row.compositionPairs].map(csvEscape).join(','))
+    'candidate,wearer,comparisonReference,mechanicTags,measurementPlan,unobservedTags,requiredCoverage,difficulty,enemyStatMultiplier,allyCount,enemyCount,enemyCategory,equallyWeightedCompositionPairs,outcomeRatingBefore,outcomeRatingAfter,outcomeRatingDifference,winRateBeforePct,winRateAfterPct,timeoutRateBeforePct,timeoutRateAfterPct,differencePercentagePoints,meanHpSwing,meanBAE,enemyHpRemovedDelta,allyHpRetainedDelta,allyDamageDealtDelta,allyDamageTakenDelta,allyHealingDelta,allyShieldGrantedDelta,allyShieldAbsorbedDelta,allyEnergyGrantedDelta,allyEnergyGainedDelta,allyEnergySpentDelta,allyEnergyRemainingDelta,allySkillPointsGrantedDelta,allyTurnsDelta,enemyTurnsDelta',
+    ...rows.map(row => [row.candidate, row.wearer, row.comparisonReference, row.mechanicTags, row.measurementPlan, row.unobservedTags, row.requiredCoverage, row.difficulty, row.enemyStatMultiplier, row.allyCount, row.enemyCount, row.enemyCategory, row.compositionPairs, row.controlRating / row.compositionPairs, row.treatmentRating / row.compositionPairs, row.ratingDelta / row.compositionPairs, row.controlWin / row.compositionPairs * 100, row.treatmentWin / row.compositionPairs * 100, row.controlTimeout / row.compositionPairs * 100, row.treatmentTimeout / row.compositionPairs * 100, row.winDelta / row.compositionPairs, row.hpSwing / row.compositionPairs, row.bae / row.compositionPairs, row.impact.enemyHpRemoved / row.compositionPairs, row.impact.allyHpRetained / row.compositionPairs, row.impact.damageDealt / row.compositionPairs, row.impact.damageTaken / row.compositionPairs, row.impact.healing / row.compositionPairs, row.impact.shieldsGranted / row.compositionPairs, row.impact.shieldsAbsorbed / row.compositionPairs, row.impact.energyGranted / row.compositionPairs, row.impact.energyGained / row.compositionPairs, row.impact.energySpent / row.compositionPairs, row.impact.energyRemaining / row.compositionPairs, row.impact.skillPointsGranted / row.compositionPairs, row.impact.allyTurns / row.compositionPairs, row.impact.enemyTurns / row.compositionPairs].map(csvEscape).join(','))
   ].join('\n') + '\n');
   const chartFile = options.output.replace(/\.jsonl$/i, '') + (options.characterBenchmarkReport ? '-character-winrate.svg' : '-winrate.svg');
   if (!options.characterBenchmarkReport) fs.writeFileSync(chartFile, makeWinRateSvg(rows));

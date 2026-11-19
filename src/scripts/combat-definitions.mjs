@@ -47,19 +47,42 @@ export const COMBAT_PERFORMANCE_STANDARD = Object.freeze({
   referenceUltimateEnergyCost: 100
 });
 
+// Shared individual Energy baseline for allied characters. Energy is separate
+// from the party's shared Skill Point pool.
+export const COMBAT_RESOURCE_STANDARD = Object.freeze({ startingEnergy: 40, maximumEnergy: 120 });
+
 // Enemy levels use the same linear stat curve as character levels: authored
 // Level 1 stats scale by Level, rounded to the nearest 0.25. Enemy mechanics
 // remain unchanged as they do for characters.
 export const ENEMY_LEVEL_SCALING = Object.freeze({ maxLevel: 50, statStep: 0.25, multiplier: 'base-stat-times-level',
   scaledStats: Object.freeze(['hp', 'attack', 'physicalDefense', 'magicalDefense', 'speed']), unchangedStats: Object.freeze([]) });
-export function enemyStatsAtLevel(levelOneStats, level = 1) {
-  if (!Number.isInteger(level) || level < 1 || level > ENEMY_LEVEL_SCALING.maxLevel) throw new RangeError(`Enemy level must be an integer from 1 to ${ENEMY_LEVEL_SCALING.maxLevel}.`);
-  const multiplier = level;
+// Benchmark difficulty changes only the enemy stat level multiplier. It does
+// not add separate HP, Attack, Defense, or encounter-length adjustments.
+export const ENEMY_DIFFICULTY_STANDARD = Object.freeze([
+  Object.freeze({ id: 'easy', statMultiplier: 0.75, ratingWeight: 0.25 }),
+  Object.freeze({ id: 'normal', statMultiplier: 1, ratingWeight: 0.5 }),
+  Object.freeze({ id: 'hard', statMultiplier: 1.5, ratingWeight: 0.25 })
+]);
+// The benchmark's generic action policies and their final-rating weights live
+// here so the simulator and performance reporter consume one shared contract.
+// Ultimate readiness is sampled once per living eligible ally per scheduled
+// combat turn; policy sampling uses its own seeded RNG stream.
+export const COMBAT_PERFORMANCE_POLICY_STANDARD = Object.freeze([
+  Object.freeze({ id: 'basic-focused-v1', basicProbability: 0.75, skillProbability: 0.25, ultimateUseProbability: 0.75, ratingWeight: 0.25 }),
+  Object.freeze({ id: 'skill-focused-v1', basicProbability: 0.25, skillProbability: 0.75, ultimateUseProbability: 0.75, ratingWeight: 0.25 }),
+  Object.freeze({ id: 'mixed-v1', basicProbability: 0.5, skillProbability: 0.5, ultimateUseProbability: 0.75, ratingWeight: 0.5 })
+]);
+export function enemyStatsAtMultiplier(levelOneStats, multiplier) {
+  if (!Number.isFinite(multiplier) || multiplier <= 0 || multiplier > ENEMY_LEVEL_SCALING.maxLevel) throw new RangeError(`Enemy stat multiplier must be greater than 0 and no more than ${ENEMY_LEVEL_SCALING.maxLevel}.`);
   const step = ENEMY_LEVEL_SCALING.statStep;
   return { ...levelOneStats, ...Object.fromEntries(ENEMY_LEVEL_SCALING.scaledStats.map(stat => {
     const value = levelOneStats[stat];
     return [stat, Number.isFinite(value) ? Math.round(value * multiplier / step) * step : value];
   })) };
+}
+export function enemyStatsAtLevel(levelOneStats, level = 1) {
+  if (!Number.isInteger(level) || level < 1 || level > ENEMY_LEVEL_SCALING.maxLevel) throw new RangeError(`Enemy level must be an integer from 1 to ${ENEMY_LEVEL_SCALING.maxLevel}.`);
+  return enemyStatsAtMultiplier(levelOneStats, level);
 }
 
 // Damage events carry provenance separately from ability tags. This matrix is

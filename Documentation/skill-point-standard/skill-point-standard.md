@@ -28,3 +28,5 @@ This standard defines how the party's shared Skill Points are gained, spent, and
 ## Exceptions
 
 An ability may override this default only when its rules explicitly state a different SP gain. Enemy Basic Attacks do not restore party SP.
+
+Energy is an individual character resource and is separate from shared SP. Characters start an encounter with 40 Energy by default; see the [Energy Standard](../energy-standard/energy-standard.md).

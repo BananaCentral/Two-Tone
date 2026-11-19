@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 310" role="img" aria-labelledby="title description">
+<title id="title">Character party win rates</title>
+<desc id="description">Balanced benchmark win rate for each character using its actual kit.</desc>
+<rect width="100%" height="100%" fill="#0b1020"/>
+<text x="24" y="32" fill="#f5f7ff" font-size="19" font-family="system-ui,sans-serif" font-weight="700">Character win rates with actual kits</text>
+<line x1="175" y1="58" x2="175" y2="290" stroke="#27334a" stroke-width="1"/>
+<text x="175" y="51" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">0%</text>
+<line x1="315" y1="58" x2="315" y2="290" stroke="#27334a" stroke-width="1"/>
+<text x="315" y="51" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">25%</text>
+<line x1="455" y1="58" x2="455" y2="290" stroke="#27334a" stroke-width="1"/>
+<text x="455" y="51" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">50%</text>
+<line x1="595" y1="58" x2="595" y2="290" stroke="#27334a" stroke-width="1"/>
+<text x="595" y="51" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">75%</text>
+<line x1="735" y1="58" x2="735" y2="290" stroke="#27334a" stroke-width="1"/>
+<text x="735" y="51" fill="#aeb9ce" font-size="11" text-anchor="middle" font-family="system-ui,sans-serif">100%</text>
+<text x="24" y="73" fill="#e8edf7" font-size="13" font-family="system-ui,sans-serif">dawn</text>
+<rect x="175" y="59" width="115.62962962962963" height="18" rx="5" fill="#79baff" opacity=".85"/>
+<text x="298.6296296296296" y="73" fill="#d6deec" font-size="12" font-family="system-ui,sans-serif">20.6%</text>
+<text x="24" y="115" fill="#e8edf7" font-size="13" font-family="system-ui,sans-serif">lily</text>
+<rect x="175" y="101" width="113.55555555555557" height="18" rx="5" fill="#79baff" opacity=".85"/>
+<text x="296.55555555555554" y="115" fill="#d6deec" font-size="12" font-family="system-ui,sans-serif">20.3%</text>
+<text x="24" y="157" fill="#e8edf7" font-size="13" font-family="system-ui,sans-serif">logan</text>
+<rect x="175" y="143" width="114.48888888888891" height="18" rx="5" fill="#79baff" opacity=".85"/>
+<text x="297.48888888888894" y="157" fill="#d6deec" font-size="12" font-family="system-ui,sans-serif">20.4%</text>
+<text x="24" y="199" fill="#e8edf7" font-size="13" font-family="system-ui,sans-serif">soul</text>
+<rect x="175" y="185" width="128.17777777777775" height="18" rx="5" fill="#79baff" opacity=".85"/>
+<text x="311.17777777777775" y="199" fill="#d6deec" font-size="12" font-family="system-ui,sans-serif">22.9%</text>
+<text x="24" y="241" fill="#e8edf7" font-size="13" font-family="system-ui,sans-serif">zero</text>
+<rect x="175" y="227" width="129.62962962962965" height="18" rx="5" fill="#79baff" opacity=".85"/>
+<text x="312.6296296296297" y="241" fill="#d6deec" font-size="12" font-family="system-ui,sans-serif">23.1%</text>
+</svg>
