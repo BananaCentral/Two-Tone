@@ -319,7 +319,7 @@ export const CHARACTER_ROSTER = Object.freeze([
       skill: { type: 'cloudRestoration', target: 'ally', healMultiplier: 1, adjacentHealMultiplier: .5, actionAdvance: 40, energyGain: 20,
         mechanicTags: ['recovery.healing', 'tempo.action_advance'],
         effects: [{ id: 'cloud.skill.restoration', mechanicTags: ['recovery.healing', 'tempo.action_advance'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', measures: ['healing', 'actionAdvance'] }] },
-      ultimate: { damageType: 'magical', multiplier: 1.25, target: 'single', energyCost: 100, actionDelay: 60, slowPercent: .2, slowDuration: 2, slowMaxStacks: 5,
+      ultimate: { damageType: 'magical', multiplier: 1.25, target: 'single', energyCost: 100, actionDelay: 40, slowPercent: .2, slowDuration: 2, slowMaxStacks: 5,
         mechanicTags: ['tempo.action_delay', 'debuff.speed', 'limit.duration', 'limit.stacks'],
         effects: [{ id: 'cloud.ultimate.control', mechanicTags: ['tempo.action_delay', 'debuff.speed', 'limit.duration', 'limit.stacks'], targeting: { side: 'enemy', acquisition: 'selected', coverage: 'single' }, trigger: 'on_ultimate', measures: ['actionDelay', 'slowPercent', 'duration', 'maxStacks'] }] },
       passives: [{ type: 'cloudWeightless', id: 'weightless', actionAdvance: 20, mechanicTags: ['tempo.action_advance', 'trigger.per_action'], mechanicTriggers: { 'tempo.action_advance': 'on_action', 'trigger.per_action': 'on_action' } }] }
