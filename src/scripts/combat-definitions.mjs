@@ -304,7 +304,7 @@ export const CHARACTER_ROSTER = Object.freeze([
       ] }, passives: [{ type: 'resourceful', skillPointCapBonus: 2, startingSkillPointBonus: 2 }] }
   ),
   character(
-    { id: 'cloud', name: 'CLOUD', label: 'Character', hp: 50, baseAttack: 10, basePhysicalDefense: 2, baseMagicalDefense: 2, speed: 60, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'portrait', test: false },
+    { id: 'cloud', name: 'CLOUD', label: 'Character', hp: 50, baseAttack: 10, basePhysicalDefense: 2, baseMagicalDefense: 2, speed: 60, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'cloudFront', test: false },
     { name: 'Cloud', role: 'support', level: 1,
       basic: { damageType: 'magical', multiplier: .25, target: 'aoe', energyGain: 10, skillPointGain: 1,
         speedBonus: .2, speedDuration: 2, speedMaxStacks: 5,

@@ -1,6 +1,6 @@
 # Cloud Character Sheet
 
-Cloud has no custom artwork yet. The battle scene and party portrait use the generic character placeholder until his assets are added.
+Cloud's front-facing full-body artwork is used for his loadout, portraits, and ally targeting. His battle sprite changes with his equipped signature weapon: Windcall uses the Windcall battle sprite, while Cloud-nine uses the Cloud-nine battle sprite.
 
 ## Identity
 
@@ -55,6 +55,11 @@ Calculated stats scale with Level and follow the shared character, Attack, Defen
 - Ultimates are off-turn actions and do not consume a scheduled turn.
 - Mechanic tags: `damage.magical`, `tempo.action_delay`, `debuff.speed`, `limit.duration`, `limit.stacks`, `resource.energy`.
 
+## Signature Weapons
+
+- Standard Weapon: **Windcall**. Its artwork and matching equipped battle sprite are included.
+- Premium Weapon: **Cloud-nine**. Its weapon artwork is shown in the loadout and featured-weapon banner.
+
 ## Premium Weapon Effect
 
 - While Cloud has his Premium weapon equipped, using his Ultimate applies a 20% Speed slow to every living enemy for two of that enemy's turns.
@@ -78,4 +83,4 @@ Calculated stats scale with Level and follow the shared character, Attack, Defen
 ## Availability and Assets
 
 - Cloud is included in the playable character roster and featured-character rotation. A new account does not receive him automatically.
-- Add Cloud's battle art and portrait when the assets are ready; until then, both use the standard placeholder.
+- Asset files: `assets/cloud-front.png`, `assets/cloud-windcall.png`, `assets/cloud-windcall-battle.png`, `assets/cloud-nine.png`, and `assets/cloud-nine-battle.png`.

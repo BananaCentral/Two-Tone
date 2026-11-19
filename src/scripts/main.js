@@ -1,7 +1,7 @@
 import { CHARACTER_COMBAT_DATA, CHARACTER_ROSTER, COMBAT_RESOURCE_STANDARD, ENEMY_ARCHETYPES, ENEMY_COMBAT_DATA, RUNE_COMBAT_RULES, enemyStatsAtLevel, getActiveCharacterUpgradeEffect } from './combat-definitions.mjs';
 import { TwoToneBattleEngine, TwoToneTurnTimeline } from './combat-engine-api.mjs';
 'use strict';
-const sources={arena:'/assets/embedded-image-01.png',area1Background:'/assets/area-1-meadow.jpg',soul:'/assets/soul-battle-standard.png',soulBattleStandard:'/assets/soul-battle-standard.png',soulBattlePremium:'/assets/soul-battle-premium.png',lily:'/assets/lily-front.png',lilyFront:'/assets/lily-front.png',lilyBack:'/assets/lily-back.png',dawnBattle:'/assets/dawn-battle.png',dawnFront:'/assets/dawn-front.png',loganBattle:'/assets/logan.png',loganFront:'/assets/logan-front.png',loganPortrait:'/assets/logan-front.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',goblinBattle:'/assets/goblin.png',bearBattle:'/assets/bear.png',hawkBattle:'/assets/hawk.png',geodeBattle:'/assets/geode.png',wolfBattle:'/assets/wolf.png',wolfArtwork:'/assets/wolf-artwork.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',soulFront:'/assets/soul-portrait.png',soulWeaponStandard:'/assets/soul-weapon-standard.png',soulWeaponPremium:'/assets/soul-weapon-premium.png',zeroFront:'/assets/zero.png',zeroBattle:'/assets/zero-battle.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png',enchantedBottleSmall:'/assets/enchanted-bottle-small.png',enchantedBottleMedium:'/assets/enchanted-bottle-medium.png',enchantedBottleLarge:'/assets/enchanted-bottle-large.png',enchantedBookSmall:'/assets/enchanted-book-small.png',enchantedBookMedium:'/assets/enchanted-book-medium.png',enchantedBookLarge:'/assets/enchanted-book-large.png',core:'/assets/core.png',gem:'/assets/gem.png',coin:'/assets/coins.png',runeRadiantMoon:'/assets/rune-radiant-moon.png',runeEternalSun:'/assets/rune-eternal-sun.png',runeCelestialStar:'/assets/rune-celestial-star.png',runeDarkMatter:'/assets/rune-dark-matter.png',runeClearSkies:'/assets/rune-clear-skies.png',runeInfiniteSpace:'/assets/rune-infinite-space.png',runeRecycle:'/assets/rune-recycle.png',runeAmplify:'/assets/rune-amplify.png',runeUnited:'/assets/rune-united.png'};
+const sources={arena:'/assets/embedded-image-01.png',area1Background:'/assets/area-1-meadow.jpg',soul:'/assets/soul-battle-standard.png',soulBattleStandard:'/assets/soul-battle-standard.png',soulBattlePremium:'/assets/soul-battle-premium.png',lily:'/assets/lily-front.png',lilyFront:'/assets/lily-front.png',lilyBack:'/assets/lily-back.png',dawnBattle:'/assets/dawn-battle.png',dawnFront:'/assets/dawn-front.png',loganBattle:'/assets/logan.png',loganFront:'/assets/logan-front.png',loganPortrait:'/assets/logan-front.png',cloudFront:'/assets/cloud-front.png',cloudWindcallBattle:'/assets/cloud-windcall-battle.png',cloudWindcall:'/assets/cloud-windcall.png',cloudNineBattle:'/assets/cloud-nine-battle.png',cloudNine:'/assets/cloud-nine.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',goblinBattle:'/assets/goblin.png',bearBattle:'/assets/bear.png',hawkBattle:'/assets/hawk.png',geodeBattle:'/assets/geode.png',wolfBattle:'/assets/wolf.png',wolfArtwork:'/assets/wolf-artwork.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',soulFront:'/assets/soul-portrait.png',soulWeaponStandard:'/assets/soul-weapon-standard.png',soulWeaponPremium:'/assets/soul-weapon-premium.png',zeroFront:'/assets/zero.png',zeroBattle:'/assets/zero-battle.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png',enchantedBottleSmall:'/assets/enchanted-bottle-small.png',enchantedBottleMedium:'/assets/enchanted-bottle-medium.png',enchantedBottleLarge:'/assets/enchanted-bottle-large.png',enchantedBookSmall:'/assets/enchanted-book-small.png',enchantedBookMedium:'/assets/enchanted-book-medium.png',enchantedBookLarge:'/assets/enchanted-book-large.png',core:'/assets/core.png',gem:'/assets/gem.png',coin:'/assets/coins.png',runeRadiantMoon:'/assets/rune-radiant-moon.png',runeEternalSun:'/assets/rune-eternal-sun.png',runeCelestialStar:'/assets/rune-celestial-star.png',runeDarkMatter:'/assets/rune-dark-matter.png',runeClearSkies:'/assets/rune-clear-skies.png',runeInfiniteSpace:'/assets/rune-infinite-space.png',runeRecycle:'/assets/rune-recycle.png',runeAmplify:'/assets/rune-amplify.png',runeUnited:'/assets/rune-united.png'};
 const BATTLE_AREAS=Object.freeze({
  'area-1':Object.freeze({name:'Area 1',background:'area1Background'})
 });
@@ -1261,6 +1261,7 @@ function weaponBonus(record,id=loadoutCharacterId){
  return weaponPotentialMultiplier(type,type==='premium'?w.premiumPotential:w.standardPotential,w[type+'Level']);
 }
 function equippedSoulBattleSprite(){const weapon=loadoutFor('soul').weapon;return weapon.selected==='premium'&&weapon.premiumOwned?'soulBattlePremium':'soulBattleStandard'}
+function equippedCloudBattleSprite(){const weapon=loadoutFor('cloud').weapon;return weapon.selected==='premium'&&weapon.premiumOwned?'cloudNineBattle':'cloudWindcallBattle'}
 function settleWeaponProgress(weapon,type,cap=weaponLevelCap()){
  const levelKey=type+'Level',expKey=type+'Exp',ascendedKey=type+'Ascended';let levelsGained=0;
  while(weapon[levelKey]<cap){
@@ -1430,15 +1431,15 @@ function drawLoadoutWeapons(){
  const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId),w=record.weapon;
  loadoutPanel(model.name+' • WEAPONS',`Each weapon levels independently. Enchanted Books: S ${itemInventory.books.small} • M ${itemInventory.books.medium} • L ${itemInventory.books.large}.`);
  const cap=weaponLevelCap();
- const cards=[{x:145,label:'STANDARD SIGNATURE',selected:w.selected==='standard',potential:w.standardPotential,type:'standard'},
-              {x:825,label:'PREMIUM SIGNATURE',selected:w.selected==='premium',potential:w.premiumPotential,type:'premium'}];
+ const cards=[{x:145,label:model.id==='cloud'?'WINDCALL':model.id==='soul'?'ASHBLADE':'STANDARD SIGNATURE',selected:w.selected==='standard',potential:w.standardPotential,type:'standard'},
+              {x:825,label:model.id==='cloud'?'CLOUD-NINE':model.id==='soul'?'SOULBOUND':'PREMIUM SIGNATURE',selected:w.selected==='premium',potential:w.premiumPotential,type:'premium'}];
  for(const c of cards){
   const level=w[c.type+'Level'],exp=w[c.type+'Exp'],needed=requiredExp(level),bonus=weaponPotentialMultiplier(c.type,c.potential,level)*100,atGate=ASCENSION_GATES.includes(level)&&!w[c.type+'Ascended'].includes(level);
   rect(c.x,205,630,470,'rgba(25,37,58,.94)',c.selected?'#edcf98':'#718ba4',14);
-  const soulWeaponName=model.id==='soul'?(c.type==='standard'?'ASHBLADE':'SOULBOUND'):null;
-  text(soulWeaponName?soulWeaponName+' • '+c.type.toUpperCase():c.label,c.x+30,245,22,'#f3dfb9','850');
+  const characterWeaponName=model.id==='soul'?(c.type==='standard'?'ASHBLADE':'SOULBOUND'):model.id==='cloud'?(c.type==='standard'?'WINDCALL':'CLOUD-NINE'):null;
+  text(characterWeaponName||c.label,c.x+30,245,22,'#f3dfb9','850');
   text(c.type==='standard'?'Included with '+model.name:'Acquired in the Store',c.x+30,278,15,'#c4d6e5','550');
-  const weaponArt=model.id==='soul'?images[c.type==='premium'?'soulWeaponPremium':'soulWeaponStandard']:null;
+  const weaponArt=model.id==='soul'?images[c.type==='premium'?'soulWeaponPremium':'soulWeaponStandard']:model.id==='cloud'?images[c.type==='premium'?'cloudNine':'cloudWindcall']:null;
   if(weaponArt?.complete&&weaponArt.naturalWidth){ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(weaponArt,c.x+386,215,220,220);ctx.restore()}
   text('+'+bonus.toFixed(2).replace(/0+$/,'').replace(/\.$/,'')+'% to all six stats',c.x+30,340,26,'#f4d99c','800');
   text('POTENTIAL '+c.potential+' / 5   •   LEVEL '+level+' / '+cap,c.x+30,382,17,'#d6e2ef','750');
@@ -1541,7 +1542,7 @@ function drawLoadout(){
  text('CHARACTER DETAILS',42,42,14,'#d7c69f','800');text(model.name,42,72,25,'#fff1d5','850');
  // Character selector stays available across every loadout tab.
  const characters=availableCharacters();for(let i=0;i<characters.length;i++){
-  const p=characters[i],x=300+i*76,y=16,active=p.id===loadoutCharacterId,img=images[({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'})[p.id]];
+  const p=characters[i],x=300+i*76,y=16,active=p.id===loadoutCharacterId,img=images[({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront',cloud:'cloudFront'})[p.id]];
   choiceRects.push({x,y,w:68,h:68,action:'loadout:character:'+p.id,enabled:!p.test});
   ctx.save();ctx.beginPath();ctx.arc(x+34,y+34,31,0,Math.PI*2);ctx.clip();rect(x+3,y+3,62,62,'#18243a');if(img?.complete&&img.naturalWidth)drawCharacterPortrait(img,p.id,x+3,y+3,62);ctx.restore();
   ctx.beginPath();ctx.arc(x+34,y+34,active?34:32,0,Math.PI*2);ctx.strokeStyle=active?'#f5d897':'rgba(189,207,230,.62)';ctx.lineWidth=active?3:1.5;ctx.stroke();
@@ -1557,7 +1558,7 @@ function drawLoadout(){
  }
  // Small grounding glow under the character echoes the reference's luminous stage.
  const glow=ctx.createRadialGradient(680,846,8,680,846,370);glow.addColorStop(0,'rgba(163,191,255,.35)');glow.addColorStop(1,'rgba(82,114,190,0)');rect(280,720,760,180,glow);
- const artKey=({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'})[model.id];
+ const artKey=({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront',cloud:'cloudFront'})[model.id];
  const art=images[artKey];if(art?.complete&&art.naturalWidth)drawStoreBannerImage(art,265,138,800,748);
  // Right-side content panel, consistent across all tabs.
  rect(1058,112,512,744,'rgba(10,16,31,.76)','rgba(190,207,230,.42)',18);
@@ -1590,9 +1591,9 @@ function drawLoadoutDetailsPanel(model,record,progress,cap){
 }
 function drawLoadoutWeaponsPanel(model,record){
  const w=record.weapon,type=w.selected,level=w[type+'Level'],cap=weaponLevelCap(),exp=w[type+'Exp'],needed=requiredExp(level),potential=w[type+'Potential'],bonus=weaponPotentialMultiplier(type,potential,level)*100,owned=type==='standard'||w.premiumOwned,gate=ASCENSION_GATES.includes(level)&&!w[type+'Ascended'].includes(level);
- const weaponName=model.id==='soul'?(type==='premium'?'SOULBOUND':'ASHBLADE'):(type==='premium'?'PREMIUM SIGNATURE':'STANDARD SIGNATURE');
+ const weaponName=model.id==='soul'?(type==='premium'?'SOULBOUND':'ASHBLADE'):model.id==='cloud'?(type==='premium'?'CLOUD-NINE':'WINDCALL'):(type==='premium'?'PREMIUM SIGNATURE':'STANDARD SIGNATURE');
  text(weaponName,1090,151,17,'#e8d6af','850');
- const weaponArt=model.id==='soul'?images[type==='premium'?'soulWeaponPremium':'soulWeaponStandard']:null;if(weaponArt?.complete&&weaponArt.naturalWidth)drawStoreBannerImage(weaponArt,1090,171,445,300);
+ const weaponArt=model.id==='soul'?images[type==='premium'?'soulWeaponPremium':'soulWeaponStandard']:model.id==='cloud'?images[type==='premium'?'cloudNine':'cloudWindcall']:null;if(weaponArt?.complete&&weaponArt.naturalWidth)drawStoreBannerImage(weaponArt,1090,171,445,300);
  text('POTENTIAL '+potential+' / 5     •     LEVEL '+level+' / '+cap,1090,490,14,'#e1e8f0','750');
  text(gate?'ASCENSION REQUIRED':level>=cap?'WEAPON LEVEL CAP REACHED':'XP  '+exp+' / '+needed,1090,516,13,'#b9c8d7','600');
  line(1090,529,445,exp/Math.max(1,needed),'#d9b96e','rgba(218,228,240,.18)',7);
@@ -1750,7 +1751,7 @@ function drawSettings(){
 }
 let lastStoreNotice='',storeReveal=null,activeStoreBanner=null,storeActionPending=false;
 const STORE_ITEM_SPRITES=Object.freeze({core:'core',gem:'gem','bottle:small':'enchantedBottleSmall','bottle:medium':'enchantedBottleMedium','bottle:large':'enchantedBottleLarge','book:small':'enchantedBookSmall','book:medium':'enchantedBookMedium','book:large':'enchantedBookLarge'});
-const STORE_REWARD_SPRITES=Object.freeze({'premium-soul':'soulWeaponPremium'});
+const STORE_REWARD_SPRITES=Object.freeze({'premium-soul':'soulWeaponPremium','premium-cloud':'cloudNine'});
 const STORE_REVEAL_TIMING=Object.freeze({cardEnterMs:1000,cardFlipMs:500});
 function getStoreRotation(){
  const ids=ROSTER.filter(model=>!model.test).map(model=>model.id);
@@ -1759,7 +1760,7 @@ function getStoreRotation(){
 function storeRewardPools(type,rotation){
  const models=ROSTER.filter(model=>!model.test),featuredIds=type==='character'?rotation.featuredCharacters:rotation.featuredWeapons;
  const idFor=model=>type==='character'?model.id:'premium-'+model.id;
- const make=model=>({id:idFor(model),name:type==='character'?model.name:model.id==='soul'?'Soulbound':model.name+' Premium Weapon'});
+ const make=model=>({id:idFor(model),name:type==='character'?model.name:model.id==='soul'?'Soulbound':model.id==='cloud'?'Cloud-nine':model.name+' Premium Weapon'});
  return {featured:models.filter(model=>featuredIds.includes(idFor(model))).map(make),offFeature:models.filter(model=>!featuredIds.includes(idFor(model))).map(make)};
 }
 function awardStoreReward(type,reward){
@@ -1806,9 +1807,10 @@ function handleStoreAction(action){
   if(ids.includes(value))window.TwoToneAccount.action('set-target',{type,target:value}).then(()=>{activeStoreBanner={type,id:value};lastStoreNotice=''}).catch(error=>{lastStoreNotice=error.message==='target_unavailable'?'The banner has changed. Choose a current target.':'Target could not be selected.'});
  }else if(kind==='draw')drawStoreLottery(type,Number(value)||1);
 }
-const STORE_BANNER_PORTRAITS=Object.freeze({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'});
+const STORE_BANNER_PORTRAITS=Object.freeze({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront',cloud:'cloudFront'});
 function storeBannerImage(type,model){
  if(type==='weapon'&&model?.id==='soul')return images.soulWeaponPremium;
+ if(type==='weapon'&&model?.id==='cloud')return images.cloudNine;
  return images[STORE_BANNER_PORTRAITS[model?.id]];
 }
 function drawStoreBannerImage(img,x,y,w,h){
@@ -1818,7 +1820,7 @@ function drawStoreBannerImage(img,x,y,w,h){
 }
 function drawCharacterPortrait(img,id,x,y,size){
  if(!img?.complete||!img.naturalWidth)return;
- const crops={soul:[50,0,400],zero:[223,0,440],lily:[32,0,192],dawn:[23,0,210],logan:[220,0,447]},[sx,sy,side]=crops[id]||[0,0,Math.min(img.naturalWidth,img.naturalHeight)];
+ const crops={soul:[50,0,400],zero:[223,0,440],lily:[32,0,192],dawn:[23,0,210],logan:[220,0,447],cloud:[143,0,600]},[sx,sy,side]=crops[id]||[0,0,Math.min(img.naturalWidth,img.naturalHeight)];
  ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(img,sx,sy,Math.min(side,img.naturalWidth-sx),Math.min(side,img.naturalHeight-sy),x,y,size,size);ctx.restore();
 }
 function storeBannerButton(x,y,w,h,action,label,sub,enabled,primary=false){
@@ -1834,7 +1836,7 @@ function storeBannerButton(x,y,w,h,action,label,sub,enabled,primary=false){
 function storeBannerEntries(rotation){
  const entries=[];
  for(const id of rotation.featuredCharacters){const model=ROSTER.find(item=>item.id===id);if(model)entries.push({type:'character',id,name:model.name,model})}
- for(const id of rotation.featuredWeapons){const model=ROSTER.find(item=>item.id===id.replace(/^premium-/,''));if(model)entries.push({type:'weapon',id,name:model.id==='soul'?'Soulbound':model.name+' Premium',model})}
+ for(const id of rotation.featuredWeapons){const model=ROSTER.find(item=>item.id===id.replace(/^premium-/,''));if(model)entries.push({type:'weapon',id,name:model.id==='soul'?'Soulbound':model.id==='cloud'?'Cloud-nine':model.name+' Premium',model})}
  return entries;
 }
 function drawStoreBannerSidebar(entries,state){
@@ -2005,7 +2007,7 @@ function drawPartySetup(){
   const x=212+i*295,y=238,w=275,h=215,id=draft[i],p=id?roster(id):null;
   rect(x,y,w,h,p?'rgba(38,54,79,.94)':'rgba(21,33,56,.88)',p?'#9eb8d3':'#4c607a',13);
   if(p){
-   const portrait=images[({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'})[p.id]];
+   const portrait=images[({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront',cloud:'cloudFront'})[p.id]];
    if(portrait?.complete&&portrait.naturalWidth)drawCharacterPortrait(portrait,p.id,x+w/2-42,y+8,84);
    text(p.name,x+w/2,y+112,21,'#f6eefa','800','center');
    if(p.test)text('TEST PLACEHOLDER',x+w/2,y+136,12,'#e5ca99','650','center');
@@ -2019,7 +2021,7 @@ function drawPartySetup(){
  const characters=availableCharacters();for(let i=0;i<characters.length;i++){
    const p=characters[i],x=172+i*247,y=520,w=230,h=132,selected=draft.includes(p.id);
   rect(x,y,w,h,selected?'rgba(35,59,76,.92)':'rgba(29,41,67,.94)',selected?'#8fbcad':'#7e97b0',11);
-  const portrait=images[({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'})[p.id]];
+  const portrait=images[({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront',cloud:'cloudFront'})[p.id]];
   if(portrait?.complete&&portrait.naturalWidth)drawCharacterPortrait(portrait,p.id,x+12,y+24,66);
   text(p.name,x+90,y+40,19,'#f5e9dc','800');
   if(p.test)text('TEST PLACEHOLDER',x+90,y+63,11,'#e5ca99','600');
@@ -2204,15 +2206,15 @@ function drawUnit(p,pos,view,t,acting=false){
  ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.44,16,0,0,Math.PI*2);ctx.fillStyle='rgba(12,12,40,.45)';ctx.fill();
  if(acting||select){ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.51,22,0,0,Math.PI*2);ctx.lineWidth=4;ctx.strokeStyle=select?(allyTargeting||supportAnimating?'#55aaff':'#eaca94'):'#8be3fb';ctx.stroke()}
  if(p.hp<=0)ctx.globalAlpha=.37;
- const art=p.id==='soul'?(view==='party'||view==='ally-impact'?'soulFront':equippedSoulBattleSprite()):p.id==='zero'?(view==='party'||view==='ally-impact'?'zeroFront':'zeroBattle'):p.id==='lily'?(view==='party'||view==='ally-impact'?'lilyFront':'lilyBack'):p.id==='dawn'?(view==='party'||view==='ally-impact'?'dawnFront':'dawnBattle'):p.id==='logan'?(view==='party'||view==='ally-impact'?'loganFront':'loganBattle'):'portrait';
+ const art=p.id==='soul'?(view==='party'||view==='ally-impact'?'soulFront':equippedSoulBattleSprite()):p.id==='zero'?(view==='party'||view==='ally-impact'?'zeroFront':'zeroBattle'):p.id==='lily'?(view==='party'||view==='ally-impact'?'lilyFront':'lilyBack'):p.id==='dawn'?(view==='party'||view==='ally-impact'?'dawnFront':'dawnBattle'):p.id==='logan'?(view==='party'||view==='ally-impact'?'loganFront':'loganBattle'):p.id==='cloud'?(view==='party'||view==='ally-impact'?'cloudFront':equippedCloudBattleSprite()):'portrait';
  const zb=view==='command'&&p.id==='soul'?soulBasicStage(t):null;
   if(zb!==null)soulBasicPaint(x,baseY,w,h,zb,art);
   else if(art&&images[art]?.complete&&images[art].naturalWidth){
-  const img=images[art],fullArtwork=art==='soulFront'||art==='zeroFront'||art==='lilyFront'||art==='dawnFront'||art==='loganFront';ctx.imageSmoothingEnabled=fullArtwork;
+  const img=images[art],fullArtwork=art==='soulFront'||art==='zeroFront'||art==='lilyFront'||art==='dawnFront'||art==='loganFront'||art==='cloudFront';ctx.imageSmoothingEnabled=fullArtwork;
   if(fullArtwork){
    // Ally targeting uses the same full-body front artwork across the entire party.
    ctx.drawImage(img,x,top,w,h);
-  }else if(art==='soul'||art==='soulBattleStandard'||art==='soulBattlePremium'||art==='zeroBattle'||art==='lilyBack'||art==='loganBattle'){
+  }else if(art==='soul'||art==='soulBattleStandard'||art==='soulBattlePremium'||art==='zeroBattle'||art==='lilyBack'||art==='loganBattle'||art==='cloudWindcallBattle'||art==='cloudNineBattle'){
    // Fit the visible cutout to the same enlarged battle-stage height across
    // playable characters, removing transparent source-image margins.
    const b=spriteAlphaBounds(img),scale=(h*1.12)/b.h,drawW=b.w*scale,drawH=b.h*scale;
@@ -2533,7 +2535,7 @@ function drawAllyPortraitHud(){
   const portraitX=x+12,portraitY=top+10,portraitSize=112;
   ctx.save();ctx.globalAlpha=ko?.57:activeAlly?1:.84;
   rect(x,top,cardW,cardH,'rgba(14,23,42,.96)',targetSelected?'#eaca94':activeAlly?'#f3d79e':'rgba(129,164,191,.82)',12);
-  hudPortrait(p.id==='soul'?images.soulFront:p.id==='zero'?images.zeroFront:p.id==='lily'?images.lilyFront:p.id==='dawn'?images.dawnFront:p.id==='logan'?images.loganPortrait:images.portrait,portraitX,portraitY,portraitSize,portraitSize,true);
+  hudPortrait(p.id==='soul'?images.soulFront:p.id==='zero'?images.zeroFront:p.id==='lily'?images.lilyFront:p.id==='dawn'?images.dawnFront:p.id==='logan'?images.loganPortrait:p.id==='cloud'?images.cloudFront:images.portrait,portraitX,portraitY,portraitSize,portraitSize,true);
   if(ko)rect(portraitX,portraitY,portraitSize,portraitSize,'rgba(30,17,23,.62)',null,10);
   drawAllyUltimate(p,x+95,top-15,136);
   drawAllyStatuses(p,portraitX,portraitY,portraitSize);
@@ -2611,7 +2613,8 @@ function drawHud(t){
   else if(id==='lily')hudPortrait(images.lilyFront,xx+7,yy+5,49,44);
   else if(id==='dawn')hudPortrait(images.dawnFront,xx+7,yy+5,49,44);
  else if(id==='logan')hudPortrait(images.loganPortrait,xx+7,yy+5,49,44);
- else hudPortrait(images.portrait,xx+7,yy+5,49,44);
+ else if(id==='cloud')hudPortrait(images.cloudFront,xx+7,yy+5,49,44);
+ else if(ally)hudPortrait(images.portrait,xx+7,yy+5,49,44);
   else{hudCircle(xx+31,yy+21,13,'#6e8eac');rect(xx+19,yy+33,24,16,'#6784a1',null,7)}
   text(now?'NOW':String(i+1),xx+54,yy+48,10,now?'#fff2cb':'#bacbdf','850','right');
  }
@@ -2723,7 +2726,7 @@ function drawSetup(){
   const x=218+i*285,y=220,w=260,h=142,p=roster(draft[i]);
   rect(x,y,w,h,p?'rgba(38,54,79,.94)':'rgba(21,33,56,.88)',p?'#9eb8d3':'#4c607a',12);
   if(p){
-   const portrait=images[({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront'})[p.id]];
+   const portrait=images[({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront',cloud:'cloudFront'})[p.id]];
    if(portrait?.complete&&portrait.naturalWidth)drawCharacterPortrait(portrait,p.id,x+12,y+24,68);
    text(p.name,x+92,y+63,18,'#f6eefa','800');
    text(p.test?'TEST PLACEHOLDER':'LEVEL '+progressFor(p.id).level,x+92,y+94,13,p.test?'#e5ca99':'#c4d6e5','600');
