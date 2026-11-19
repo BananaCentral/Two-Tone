@@ -47,6 +47,21 @@ export const COMBAT_PERFORMANCE_STANDARD = Object.freeze({
   referenceUltimateEnergyCost: 100
 });
 
+// Enemy levels use the same linear stat curve as character levels: authored
+// Level 1 stats scale by Level, rounded to the nearest 0.25. Enemy mechanics
+// remain unchanged as they do for characters.
+export const ENEMY_LEVEL_SCALING = Object.freeze({ maxLevel: 50, statStep: 0.25, multiplier: 'base-stat-times-level',
+  scaledStats: Object.freeze(['hp', 'attack', 'physicalDefense', 'magicalDefense', 'speed']), unchangedStats: Object.freeze([]) });
+export function enemyStatsAtLevel(levelOneStats, level = 1) {
+  if (!Number.isInteger(level) || level < 1 || level > ENEMY_LEVEL_SCALING.maxLevel) throw new RangeError(`Enemy level must be an integer from 1 to ${ENEMY_LEVEL_SCALING.maxLevel}.`);
+  const multiplier = level;
+  const step = ENEMY_LEVEL_SCALING.statStep;
+  return { ...levelOneStats, ...Object.fromEntries(ENEMY_LEVEL_SCALING.scaledStats.map(stat => {
+    const value = levelOneStats[stat];
+    return [stat, Number.isFinite(value) ? Math.round(value * multiplier / step) * step : value];
+  })) };
+}
+
 // Damage events carry provenance separately from ability tags. This matrix is
 // the shared default for proc eligibility in live battles and simulations.
 export const COMBAT_DAMAGE_EVENT_TYPES = Object.freeze([
@@ -334,7 +349,7 @@ export const ENEMY_COMBAT_DATA = Object.freeze(Object.fromEntries(Object.entries
     basic: { damageType: unit.basicAttack.damageType, multiplier: unit.basicAttack.multiplier, target: unit.basicAttack.targetMode === 'single' ? 'random' : unit.basicAttack.targetMode },
     passives: enemyPassive(unit) ? [enemyPassive(unit)] : []
   }, 'ally'),
-  stats: runtimeStats(unit), tags: unit.tags,
+  baseStats: Object.freeze(runtimeStats(unit)), stats: Object.freeze(runtimeStats(unit)), tags: unit.tags,
   mechanicTags: Object.freeze([...(unit.stealth > 0 ? ['defense.stealth'] : []), 'defense.barrier', 'status.broken']),
   mechanicTargets: Object.freeze({
     'defense.barrier': Object.freeze({ side: 'self', acquisition: 'self', coverage: 'single' }),

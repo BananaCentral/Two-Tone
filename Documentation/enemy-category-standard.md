@@ -30,9 +30,9 @@ Category classifies an enemy's encounter role. It does not itself define stat mu
 
 ## Enemy Levels and Barriers
 
-- Category does not define enemy Level or level-based stat growth.
-- The current Slime training encounter is explicitly Level 1. The current enemy runtime uses authored archetype stats directly. No enemy level-scaling or progression standard is defined; do not infer a Level 50 Slime by multiplying its stats by 50.
-- Enemy archetypes define HP, Attack, Defense, and Speed. Enemy Barrier and Broken State rules are defined in the [Turn Order Standard](turn-order-standard/turn-order-standard.md).
+- Category does not determine enemy Level or its stat curve. Enemy Levels 1–50 use the [Enemy Level Standard](enemy-level-standard.md), matching the character curve for HP, Attack, both defenses, and Speed.
+- Enemy definitions are authored at Level 1. The current Slime training encounter is Level 1 and therefore uses its authored stats.
+- Enemy archetypes define Level 1 HP, Attack, Defense, and Speed. Enemy Barrier and Broken State rules are defined in the [Turn Order Standard](turn-order-standard/turn-order-standard.md).
 
 Enemy archetypes also carry descriptive area, type, strengths, and weaknesses metadata. The type tag must match the validated enemy category. These tags are internal metadata and do not render in the UI or affect combat by themselves; see the [Enemy Tags Standard](enemy-tags-standard.md).
 

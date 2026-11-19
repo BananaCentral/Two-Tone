@@ -14,6 +14,7 @@ function assert(condition, message) {
 function roundStat(value) { return roundCombatHp(value); }
 function roundStatQuarter(value) { return roundCombatStatQuarter(value); }
 const DAMAGE_CHANNELS=['direct','bleed','followUp','ricochet','summon','echo','reflect'];
+const POLICY_PROFILES=new Set(['scripted-auto-v1','skill-reserve-auto-v1','effect-aware-auto-v1']);
 function newDamageBreakdown(){return Object.fromEntries(DAMAGE_CHANNELS.map(channel=>[channel,0]))}
 function sourceForAttack(attacker, spec, options, action, eventType) {
   const archetypeId = attacker.archetypeId;
@@ -127,6 +128,8 @@ function validateConfig(config) {
   }
   const disabledCombatEffectIds=config.settings?.disabledCombatEffectIds;
   assert(disabledCombatEffectIds===undefined||(Array.isArray(disabledCombatEffectIds)&&disabledCombatEffectIds.every(id=>typeof id==='string'&&COMBAT_EFFECT_CATALOG[id])), 'settings.disabledCombatEffectIds must contain catalogued combat effect IDs.');
+  const policyProfile=config.settings?.policyProfile??'scripted-auto-v1';
+  assert(POLICY_PROFILES.has(policyProfile),`Unknown policy profile ${policyProfile}.`);
 }
 
 const RUNE_STAT_VALUES=COMBAT_PERFORMANCE_STANDARD.baseStats;
@@ -451,7 +454,67 @@ function refillPassives(state,unit, passiveIds) {
   }
 }
 function dawnPremiumDuplicates(unit){return unit.archetypeId==='dawn'&&unit.weapon?.type==='premium'?unit.premiumWeaponDuplicates:0}
-function chooseDawnTarget(state,actor){
+function previewTargetOrder(state){
+ const order=new Map();
+ for(const [index,entry] of state.timeline.preview(64).entries())if(!order.has(entry.id))order.set(entry.id,index);
+ return order;
+}
+function expectedActionDamage(state,actor,spec,mode,multiplier){
+ const foes=state.enemies.filter(unit=>unit.hp>0);if(!foes.length||!spec?.damageType||!Number.isFinite(multiplier))return 0;
+ let targets;
+ if(mode==='aoe')targets=foes;
+ else{
+  const primary=foes.slice().sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp||a.id.localeCompare(b.id))[0];
+  targets=state.engine.resolveTargets({candidates:foes,mode,primary});
+ }
+ return targets.reduce((sum,target)=>sum+damageFor(state,actor,target,spec.damageType,multiplier),0);
+}
+function expectedBasicDamage(state,actor,forecastSelfEnhance=true){
+ let expectedActor=actor;
+ const skill=actor.skill;
+ if(forecastSelfEnhance&&skill?.target==='self'&&skill.mechanicTags?.includes('buff.next_basic')&&Number.isFinite(skill.damagePerStack)){
+  const available=Math.max(0,state.skillPoints),room=Math.max(0,(skill.maxStacks??Infinity)-(actor.enhanceStacks||0));
+  expectedActor={...actor,enhanceStacks:(actor.enhanceStacks||0)+Math.min(available,room)};
+ }
+ const plan=actionPlan(state,expectedActor,'basic',{tuneMultiplier:actor.tune?.basicEnhanced?1+(actor.tune.damageBonus||0):1});
+ return expectedActionDamage(state,expectedActor,actor.basic,plan?.target||actor.basic?.target,plan?.multiplier??actor.basic?.multiplier??0);
+}
+function chooseEffectAwareSupportTarget(state,actor){
+ const order=previewTargetOrder(state);
+ return state.allies.filter(unit=>unit.hp>0&&!unit.isHauntling&&unit.id!==actor.id)
+  .sort((a,b)=>(order.get(a.id)??Infinity)-(order.get(b.id)??Infinity)||expectedBasicDamage(state,b)-expectedBasicDamage(state,a)||a.id.localeCompare(b.id))[0]||actor;
+}
+function hasFreshStatusTarget(skill,foes){
+ const statusTags=(skill?.mechanicTags||[]).filter(tag=>tag.startsWith('status.'));
+ return statusTags.some(tag=>{
+  const status=tag.slice('status.'.length);
+  return foes.some(enemy=>status==='bleed'?enemy.bleedStacks.length<(enemy.bleedMaxStacks??5):!enemy.marks.some(mark=>mark.id===status));
+ });
+}
+function shouldUseEffectAwareSkill(state,actor,foes){
+ const skill=actor.skill;if(!skill||state.skillPoints<=0)return false;
+ const tags=new Set(skill.mechanicTags||[]);
+ if(tags.has('buff.next_basic')){
+  if(skill.target==='self')return Number.isFinite(skill.damagePerStack)&&skill.damagePerStack>0&&actor.enhanceStacks<(skill.maxStacks??Infinity);
+  const target=chooseEffectAwareSupportTarget(state,actor);
+  if(!target||target===actor||target.hp<=0||target.tune?.basicEnhanced)return false;
+  const gain=expectedBasicDamage(state,target)*(skill.damageBonus||0);
+  return gain>expectedBasicDamage(state,actor);
+ }
+ if(tags.has('defense.shield')||tags.has('recovery.healing')||tags.has('defense.damage_reduction'))
+  return state.allies.some(ally=>ally.hp>0&&(ally.hp<ally.maxHp||(tags.has('defense.shield')&&!(ally.shield>0))));
+ if(skill.damageType&&Number.isFinite(skill.multiplier)){
+  let skillMultiplier=actionPlan(state,actor,'skill',{targetAlreadyHit:actor.firstStrikeTargets?.has(foes.slice().sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp||a.id.localeCompare(b.id))[0]?.id)} )?.multiplier??skill.multiplier;
+  const skillDamage=expectedActionDamage(state,actor,skill,skill.target||'single',skillMultiplier);
+  const basicDamage=expectedBasicDamage(state,actor);
+  if(hasFreshStatusTarget(skill,foes)&&skillDamage>0)return true;
+  return skillDamage>basicDamage;
+ }
+ if(tags.has('debuff.damage')||tags.has('debuff.defense')||tags.has('tempo.action_advance'))return foes.length>0||state.allies.some(ally=>ally.hp>0&&ally.id!==actor.id);
+ return false;
+}
+function chooseSupportTarget(state,actor){
+ if(state.policyProfile==='effect-aware-auto-v1')return chooseEffectAwareSupportTarget(state,actor);
  const eligible=state.allies.filter(unit=>unit.hp>0&&unit.id!==actor.id);
  if(!eligible.length)return actor;
  const target=eligible[state.supportTargetCursor%eligible.length];
@@ -504,7 +567,7 @@ function resolveAllyAction(state, actor) {
     if(!settleActionResources(state,actor,ultimatePlan,{payEnergyCost:true}))return;
     actor.ultimateCount++;
     if(ultimatePlan.type==='dawnSupport'){
-      const target=state.allies.find(unit=>unit.id===actionOverrideConfig?.targetId&&unit.hp>0)||chooseDawnTarget(state,actor),result=state.engine.resolveDawnUltimate({actor,target,battle:state,plan:ultimatePlan,characterDuplicates:actor.characterDuplicates||0});if(!result)return;
+      const target=state.allies.find(unit=>unit.id===actionOverrideConfig?.targetId&&unit.hp>0)||chooseSupportTarget(state,actor),result=state.engine.resolveDawnUltimate({actor,target,battle:state,plan:ultimatePlan,characterDuplicates:actor.characterDuplicates||0});if(!result)return;
       target.energyGranted+=result.energyGained;target.energyGained+=result.energyGained;actor.skillPointsGenerated+=result.skillPointsGained;actor.skillPointsGranted+=result.skillPointsGained;target.turnsAdvanced+=result.actionAdvance/100;
       applyUltimateRuneEffects(state,actor);
     }else{
@@ -535,7 +598,11 @@ function resolveAllyAction(state, actor) {
     if (!foes.length) return;
   }
   const skill = actor.skill;
-  if(actionOverride!=='basic'&&actionOverride!=='ultimate'){
+  const skillReserve=state.policyProfile==='skill-reserve-auto-v1'?1:0;
+  const hasSkillResources=state.skillPoints>skillReserve;
+  const effectAwareSkill=actionOverride==='skill'||state.policyProfile!=='effect-aware-auto-v1'||shouldUseEffectAwareSkill(state,actor,foes);
+  const canUseSkill=hasSkillResources&&effectAwareSkill;
+  if(actionOverride!=='basic'&&actionOverride!=='ultimate'&&canUseSkill){
   if(skill?.type==='bloodShield'&&state.skillPoints>0){
     const plan=actionPlan(state,actor,'skill');if(!settleActionResources(state,actor,plan))return;state.skillUses++;actor.skillUses++;
     const recipients=state.allies.filter(unit=>unit.hp>0),result=state.engine.resolveLoganBloodShield({actor,allies:recipients,enemies:state.enemies,plan,characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0});if(!result)return;
@@ -545,7 +612,7 @@ function resolveAllyAction(state, actor) {
   }
   if(skill?.type==='tune'&&state.skillPoints>0){
     const plan=actionPlan(state,actor,'skill');if(!settleActionResources(state,actor,plan))return;state.skillUses++;actor.skillUses++;
-    const target=state.allies.find(unit=>unit.id===actionOverrideConfig?.targetId&&unit.hp>0)||chooseDawnTarget(state,actor);applyDawnTune(state,actor,target,plan);useRuneRecycle(state,actor);triggerUnited(state,actor,target);return;
+    const target=state.allies.find(unit=>unit.id===actionOverrideConfig?.targetId&&unit.hp>0)||chooseSupportTarget(state,actor);applyDawnTune(state,actor,target,plan);useRuneRecycle(state,actor);triggerUnited(state,actor,target);return;
   }
   if(skill?.type==='firstStrike'&&state.skillPoints>0){
     const plan=actionPlan(state,actor,'skill');if(!settleActionResources(state,actor,plan))return;state.skillUses++;actor.skillUses++;
@@ -613,6 +680,7 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
   const settings = config.settings || {};
   const state = {
     allies, enemies, random, sourceSerial: 0, supportTargetCursor: seed,
+    policyProfile:settings.policyProfile??'scripted-auto-v1',
     actionOverride:settings.actionOverride??null,
     actionOverrideObserved:false,
     actionOverrideResolved:null,
@@ -675,7 +743,7 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
     state.engine.ageUnitEffects(actor,{event:'affected_turn_end'});
     if(actor.side==='allies')state.engine.ageRuneCooldowns(actor.runeCooldownState,actor.turns,['recycle','amplify','celestial-star','united']);
   }
-  const outcome=state.engine.resolveBattleOutcome({allies,enemies,actionLimitReached:state.actions>=state.maxActions}),winner=outcome==='defeat'?'enemies':outcome==='victory'?'allies':'draw';
+  const outcome=state.engine.resolveBattleOutcome({allies,enemies,actionLimitReached:state.actions>=state.maxActions}),winner=outcome==='defeat'?'enemies':outcome==='victory'?'allies':outcome==='incomplete'?'incomplete':outcome;
   if(state.actionOverride&&state.actionOverrideStatus==='pending'){
     const requestedActor=allies.find(unit=>unit.id===state.actionOverride.actorId);
     state.actionOverrideStatus=!requestedActor||requestedActor.hp<=0?'actor_defeated_before_action'
@@ -714,14 +782,14 @@ function simulateBatch(config, runs = 100, seed = 1, maxActions = null) {
   assert(Number.isInteger(runs) && runs > 0, 'Runs must be a positive integer.');
   const results = Array.from({ length: runs }, (_, index) => simulateBattle(config, seed + index, maxActions));
   const meanOf = key => results.reduce((sum, result) => sum + result[key], 0) / runs;
-  const wins = { allies: 0, enemies: 0, draws: 0 };
-  for (const result of results) wins[result.winner === 'draw' ? 'draws' : result.winner]++;
+  const wins = { allies: 0, enemies: 0, incomplete: 0 };
+  for (const result of results) wins[result.winner]++;
   const unitTypes=[...new Set(results.flatMap(result=>Object.keys(result.unitStats)))],averageUnitStats={};
   for(const type of unitTypes){const rows=results.map(result=>result.unitStats[type]).filter(Boolean),meanKey=key=>rows.reduce((sum,row)=>sum+(row[key]||0),0)/runs;averageUnitStats[type]={role:rows.find(row=>row.role)?.role||null,damage:meanKey('damage'),damage95CI:mean95Interval(rows.map(row=>row.damage)),damageBreakdown:Object.fromEntries(DAMAGE_CHANNELS.map(channel=>[channel,rows.reduce((sum,row)=>sum+(row.damageBreakdown[channel]||0),0)/runs])),turns:meanKey('turns'),dps:results.reduce((sum,result)=>sum+(result.unitStats[type]?.damage||0)/Math.max(result.elapsedTime,EPSILON),0)/runs,criticalHits:meanKey('criticalHits'),damageTaken:meanKey('damageTaken'),supportDamageAmplified:meanKey('supportDamageAmplified'),lifestealHealing:meanKey('lifestealHealing'),shieldGranted:meanKey('shieldGranted'),shieldReceived:meanKey('shieldReceived'),shieldAbsorbed:meanKey('shieldAbsorbed'),hpSpent:meanKey('hpSpent'),skills:meanKey('skills'),ultimates:meanKey('ultimates'),followUps:meanKey('followUps'),tuneUses:meanKey('tuneUses'),tunesReceived:meanKey('tunesReceived'),turnsAdvanced:meanKey('turnsAdvanced'),skillPointsSpent:meanKey('skillPointsSpent'),skillPointsGenerated:meanKey('skillPointsGenerated'),skillPointsGranted:meanKey('skillPointsGranted'),energyGranted:meanKey('energyGranted'),energySpent:meanKey('energySpent'),energyGained:meanKey('energyGained'),energyRemaining:meanKey('energyRemaining'),tauntRedirectedHits:meanKey('tauntRedirectedHits'),survivalRate:rows.reduce((sum,row)=>sum+row.survivors,0)/Math.max(1,rows.reduce((sum,row)=>sum+row.unitCount,0))};}
   return {
     runs, seed, wins,
-    winRate: { allies: wins.allies / runs, enemies: wins.enemies / runs, draws: wins.draws / runs },
-    winRate95CI:{allies:wilsonInterval(wins.allies,runs),enemies:wilsonInterval(wins.enemies,runs),draws:wilsonInterval(wins.draws,runs)},
+    winRate: { allies: wins.allies / runs, enemies: wins.enemies / runs, incomplete: wins.incomplete / runs },
+    winRate95CI:{allies:wilsonInterval(wins.allies,runs),enemies:wilsonInterval(wins.enemies,runs),incomplete:wilsonInterval(wins.incomplete,runs)},
     averageActions: meanOf('actions'), averageAllyTurns: meanOf('allyTurns'), averageEnemyTurns: meanOf('enemyTurns'), averageElapsedTime:meanOf('elapsedTime'),
     averageSkillUses: meanOf('skillUses'), averageFollowUps: meanOf('followUps'),averageCriticalHits:meanOf('criticalHits'),
     averageUltimates: meanOf('ultimates'), averageAoeAttacks: meanOf('aoeAttacks'),
@@ -781,7 +849,7 @@ async function main() {
   else {
     console.log('Two-Tone combat simulation');
     console.log('Scenario: ' + (config.name || path.basename(options.config)) + ' | runs: ' + summary.runs + ' | seed: ' + summary.seed);
-    console.log('Wins: allies ' + summary.wins.allies + ' (' + (summary.winRate.allies * 100).toFixed(1) + '%), enemies ' + summary.wins.enemies + ' (' + (summary.winRate.enemies * 100).toFixed(1) + '%), draws ' + summary.wins.draws);
+    console.log('Wins: allies ' + summary.wins.allies + ' (' + (summary.winRate.allies * 100).toFixed(1) + '%), enemies ' + summary.wins.enemies + ' (' + (summary.winRate.enemies * 100).toFixed(1) + '%), action-limit incomplete ' + summary.wins.incomplete);
     console.log('Avg turns: allies ' + summary.averageAllyTurns.toFixed(1) + ', enemies ' + summary.averageEnemyTurns.toFixed(1) + ' | avg actions ' + summary.averageActions.toFixed(1));
     console.log('Avg damage: allies ' + summary.averageDamageDealt.allies.toFixed(1) + ', enemies ' + summary.averageDamageDealt.enemies.toFixed(1));
     console.log('Avg Follow Ups: ' + summary.averageFollowUps.toFixed(1) + ' | Ultimates: ' + summary.averageUltimates.toFixed(1) + ' | AoE attacks: ' + summary.averageAoeAttacks.toFixed(1) + ' | Critical hits: ' + summary.averageCriticalHits.toFixed(1));
