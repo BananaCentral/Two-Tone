@@ -1,6 +1,6 @@
 # Lily Character Sheet
 
-Battle-stage artwork uses the northeast-facing `assets/lily-back.png` under the shared Character Battle Sprite Standard. Her HUD and party portrait uses the front-facing `assets/lily-front.png`.
+Battle-stage artwork follows the equipped weapon: `assets/lily-standard-battle.png` with her standard weapon and `assets/lily-signature-battle.png` with her signature weapon. Their matching weapon artwork is `assets/lily-standard-weapon.png` and `assets/lily-signature-weapon.png`. Her HUD and party portrait continues to use the front-facing `assets/lily-front.png`.
 
 ## Identity and base stats
 

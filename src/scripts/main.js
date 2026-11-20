@@ -1,7 +1,7 @@
 import { CHARACTER_COMBAT_DATA, CHARACTER_ROSTER, COMBAT_RESOURCE_STANDARD, ENEMY_ARCHETYPES, ENEMY_COMBAT_DATA, RUNE_COMBAT_RULES, enemyStatsAtLevel, getActiveCharacterUpgradeEffect } from './combat-definitions.mjs';
 import { TwoToneBattleEngine, TwoToneTurnTimeline } from './combat-engine-api.mjs';
 'use strict';
-const sources={arena:'/assets/embedded-image-01.png',area1Background:'/assets/area-1-meadow.jpg',soul:'/assets/soul-battle-standard.png',soulBattleStandard:'/assets/soul-battle-standard.png',soulBattlePremium:'/assets/soul-battle-premium.png',lily:'/assets/lily-front.png',lilyFront:'/assets/lily-front.png',lilyBack:'/assets/lily-back.png',dawnBattle:'/assets/dawn-battle.png',dawnFront:'/assets/dawn-front.png',loganBattle:'/assets/logan.png',loganFront:'/assets/logan-front.png',loganPortrait:'/assets/logan-front.png',cloudFront:'/assets/cloud-front.png',cloudWindcallBattle:'/assets/cloud-windcall-battle.png',cloudWindcall:'/assets/cloud-windcall.png',cloudNineBattle:'/assets/cloud-nine-battle.png',cloudNine:'/assets/cloud-nine.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',goblinBattle:'/assets/goblin.png',bearBattle:'/assets/bear.png',hawkBattle:'/assets/hawk.png',geodeBattle:'/assets/geode.png',wolfBattle:'/assets/wolf.png',wolfArtwork:'/assets/wolf-artwork.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',soulFront:'/assets/soul-portrait.png',soulWeaponStandard:'/assets/soul-weapon-standard.png',soulWeaponPremium:'/assets/soul-weapon-premium.png',zeroFront:'/assets/zero.png',zeroBattle:'/assets/zero-battle.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png',enchantedBottleSmall:'/assets/enchanted-bottle-small.png',enchantedBottleMedium:'/assets/enchanted-bottle-medium.png',enchantedBottleLarge:'/assets/enchanted-bottle-large.png',enchantedBookSmall:'/assets/enchanted-book-small.png',enchantedBookMedium:'/assets/enchanted-book-medium.png',enchantedBookLarge:'/assets/enchanted-book-large.png',core:'/assets/core.png',gem:'/assets/gem.png',coin:'/assets/coins.png',runeRadiantMoon:'/assets/rune-radiant-moon.png',runeEternalSun:'/assets/rune-eternal-sun.png',runeCelestialStar:'/assets/rune-celestial-star.png',runeDarkMatter:'/assets/rune-dark-matter.png',runeClearSkies:'/assets/rune-clear-skies.png',runeInfiniteSpace:'/assets/rune-infinite-space.png',runeRecycle:'/assets/rune-recycle.png',runeAmplify:'/assets/rune-amplify.png',runeUnited:'/assets/rune-united.png'};
+const sources={arena:'/assets/embedded-image-01.png',area1Background:'/assets/area-1-meadow.jpg',soul:'/assets/soul-battle-standard.png',soulBattleStandard:'/assets/soul-battle-standard.png',soulBattlePremium:'/assets/soul-battle-premium.png',lily:'/assets/lily-front.png',lilyFront:'/assets/lily-front.png',lilyBack:'/assets/lily-back.png',lilyStandardBattle:'/assets/lily-standard-battle.png',lilySignatureBattle:'/assets/lily-signature-battle.png',lilyWeaponStandard:'/assets/lily-standard-weapon.png',lilyWeaponSignature:'/assets/lily-signature-weapon.png',dawnBattle:'/assets/dawn-battle.png',dawnFront:'/assets/dawn-front.png',loganBattle:'/assets/logan.png',loganFront:'/assets/logan-front.png',loganPortrait:'/assets/logan-front.png',cloudFront:'/assets/cloud-front.png',cloudWindcallBattle:'/assets/cloud-windcall-battle.png',cloudWindcall:'/assets/cloud-windcall.png',cloudNineBattle:'/assets/cloud-nine-battle.png',cloudNine:'/assets/cloud-nine.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.png',goblinBattle:'/assets/goblin.png',bearBattle:'/assets/bear.png',hawkBattle:'/assets/hawk.png',geodeBattle:'/assets/geode.png',wolfBattle:'/assets/wolf.png',wolfArtwork:'/assets/wolf-artwork.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',soulFront:'/assets/soul-portrait.png',soulWeaponStandard:'/assets/soul-weapon-standard.png',soulWeaponPremium:'/assets/soul-weapon-premium.png',zeroFront:'/assets/zero.png',zeroBattle:'/assets/zero-battle.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png',enchantedBottleSmall:'/assets/enchanted-bottle-small.png',enchantedBottleMedium:'/assets/enchanted-bottle-medium.png',enchantedBottleLarge:'/assets/enchanted-bottle-large.png',enchantedBookSmall:'/assets/enchanted-book-small.png',enchantedBookMedium:'/assets/enchanted-book-medium.png',enchantedBookLarge:'/assets/enchanted-book-large.png',core:'/assets/core.png',gem:'/assets/gem.png',coin:'/assets/coins.png',runeRadiantMoon:'/assets/rune-radiant-moon.png',runeEternalSun:'/assets/rune-eternal-sun.png',runeCelestialStar:'/assets/rune-celestial-star.png',runeDarkMatter:'/assets/rune-dark-matter.png',runeClearSkies:'/assets/rune-clear-skies.png',runeInfiniteSpace:'/assets/rune-infinite-space.png',runeRecycle:'/assets/rune-recycle.png',runeAmplify:'/assets/rune-amplify.png',runeUnited:'/assets/rune-united.png'};
 const BATTLE_AREAS=Object.freeze({
  'area-1':Object.freeze({name:'Area 1',background:'area1Background'})
 });
@@ -1262,6 +1262,7 @@ function weaponBonus(record,id=loadoutCharacterId){
 }
 function equippedSoulBattleSprite(){const weapon=loadoutFor('soul').weapon;return weapon.selected==='premium'&&weapon.premiumOwned?'soulBattlePremium':'soulBattleStandard'}
 function equippedCloudBattleSprite(){const weapon=loadoutFor('cloud').weapon;return weapon.selected==='premium'&&weapon.premiumOwned?'cloudNineBattle':'cloudWindcallBattle'}
+function equippedLilyBattleSprite(){const weapon=loadoutFor('lily').weapon;return weapon.selected==='premium'&&weapon.premiumOwned?'lilySignatureBattle':'lilyStandardBattle'}
 function settleWeaponProgress(weapon,type,cap=weaponLevelCap()){
  const levelKey=type+'Level',expKey=type+'Exp',ascendedKey=type+'Ascended';let levelsGained=0;
  while(weapon[levelKey]<cap){
@@ -1431,15 +1432,15 @@ function drawLoadoutWeapons(){
  const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId),w=record.weapon;
  loadoutPanel(model.name+' • WEAPONS',`Each weapon levels independently. Enchanted Books: S ${itemInventory.books.small} • M ${itemInventory.books.medium} • L ${itemInventory.books.large}.`);
  const cap=weaponLevelCap();
- const cards=[{x:145,label:model.id==='cloud'?'WINDCALL':model.id==='soul'?'ASHBLADE':'STANDARD SIGNATURE',selected:w.selected==='standard',potential:w.standardPotential,type:'standard'},
-              {x:825,label:model.id==='cloud'?'CLOUD-NINE':model.id==='soul'?'SOULBOUND':'PREMIUM SIGNATURE',selected:w.selected==='premium',potential:w.premiumPotential,type:'premium'}];
+ const cards=[{x:145,label:model.id==='cloud'?'WINDCALL':model.id==='soul'?'ASHBLADE':model.id==='lily'?'LILY STANDARD':'STANDARD SIGNATURE',selected:w.selected==='standard',potential:w.standardPotential,type:'standard'},
+              {x:825,label:model.id==='cloud'?'CLOUD-NINE':model.id==='soul'?'SOULBOUND':model.id==='lily'?'LILY SIGNATURE':'PREMIUM SIGNATURE',selected:w.selected==='premium',potential:w.premiumPotential,type:'premium'}];
  for(const c of cards){
   const level=w[c.type+'Level'],exp=w[c.type+'Exp'],needed=requiredExp(level),bonus=weaponPotentialMultiplier(c.type,c.potential,level)*100,atGate=ASCENSION_GATES.includes(level)&&!w[c.type+'Ascended'].includes(level);
   rect(c.x,205,630,470,'rgba(25,37,58,.94)',c.selected?'#edcf98':'#718ba4',14);
-  const characterWeaponName=model.id==='soul'?(c.type==='standard'?'ASHBLADE':'SOULBOUND'):model.id==='cloud'?(c.type==='standard'?'WINDCALL':'CLOUD-NINE'):null;
+  const characterWeaponName=model.id==='soul'?(c.type==='standard'?'ASHBLADE':'SOULBOUND'):model.id==='cloud'?(c.type==='standard'?'WINDCALL':'CLOUD-NINE'):model.id==='lily'?(c.type==='standard'?'LILY STANDARD':'LILY SIGNATURE'):null;
   text(characterWeaponName||c.label,c.x+30,245,22,'#f3dfb9','850');
   text(c.type==='standard'?'Included with '+model.name:'Acquired in the Store',c.x+30,278,15,'#c4d6e5','550');
-  const weaponArt=model.id==='soul'?images[c.type==='premium'?'soulWeaponPremium':'soulWeaponStandard']:model.id==='cloud'?images[c.type==='premium'?'cloudNine':'cloudWindcall']:null;
+  const weaponArt=model.id==='soul'?images[c.type==='premium'?'soulWeaponPremium':'soulWeaponStandard']:model.id==='cloud'?images[c.type==='premium'?'cloudNine':'cloudWindcall']:model.id==='lily'?images[c.type==='premium'?'lilyWeaponSignature':'lilyWeaponStandard']:null;
   if(weaponArt?.complete&&weaponArt.naturalWidth){ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(weaponArt,c.x+386,215,220,220);ctx.restore()}
   text('+'+bonus.toFixed(2).replace(/0+$/,'').replace(/\.$/,'')+'% to all six stats',c.x+30,340,26,'#f4d99c','800');
   text('POTENTIAL '+c.potential+' / 5   •   LEVEL '+level+' / '+cap,c.x+30,382,17,'#d6e2ef','750');
@@ -1591,9 +1592,9 @@ function drawLoadoutDetailsPanel(model,record,progress,cap){
 }
 function drawLoadoutWeaponsPanel(model,record){
  const w=record.weapon,type=w.selected,level=w[type+'Level'],cap=weaponLevelCap(),exp=w[type+'Exp'],needed=requiredExp(level),potential=w[type+'Potential'],bonus=weaponPotentialMultiplier(type,potential,level)*100,owned=type==='standard'||w.premiumOwned,gate=ASCENSION_GATES.includes(level)&&!w[type+'Ascended'].includes(level);
- const weaponName=model.id==='soul'?(type==='premium'?'SOULBOUND':'ASHBLADE'):model.id==='cloud'?(type==='premium'?'CLOUD-NINE':'WINDCALL'):(type==='premium'?'PREMIUM SIGNATURE':'STANDARD SIGNATURE');
+ const weaponName=model.id==='soul'?(type==='premium'?'SOULBOUND':'ASHBLADE'):model.id==='cloud'?(type==='premium'?'CLOUD-NINE':'WINDCALL'):model.id==='lily'?(type==='premium'?'LILY SIGNATURE':'LILY STANDARD'):(type==='premium'?'PREMIUM SIGNATURE':'STANDARD SIGNATURE');
  text(weaponName,1090,151,17,'#e8d6af','850');
- const weaponArt=model.id==='soul'?images[type==='premium'?'soulWeaponPremium':'soulWeaponStandard']:model.id==='cloud'?images[type==='premium'?'cloudNine':'cloudWindcall']:null;if(weaponArt?.complete&&weaponArt.naturalWidth)drawStoreBannerImage(weaponArt,1090,171,445,300);
+ const weaponArt=model.id==='soul'?images[type==='premium'?'soulWeaponPremium':'soulWeaponStandard']:model.id==='cloud'?images[type==='premium'?'cloudNine':'cloudWindcall']:model.id==='lily'?images[type==='premium'?'lilyWeaponSignature':'lilyWeaponStandard']:null;if(weaponArt?.complete&&weaponArt.naturalWidth)drawStoreBannerImage(weaponArt,1090,171,445,300);
  text('POTENTIAL '+potential+' / 5     •     LEVEL '+level+' / '+cap,1090,490,14,'#e1e8f0','750');
  text(gate?'ASCENSION REQUIRED':level>=cap?'WEAPON LEVEL CAP REACHED':'XP  '+exp+' / '+needed,1090,516,13,'#b9c8d7','600');
  line(1090,529,445,exp/Math.max(1,needed),'#d9b96e','rgba(218,228,240,.18)',7);
@@ -1811,6 +1812,7 @@ const STORE_BANNER_PORTRAITS=Object.freeze({soul:'soulFront',zero:'zeroFront',li
 function storeBannerImage(type,model){
  if(type==='weapon'&&model?.id==='soul')return images.soulWeaponPremium;
  if(type==='weapon'&&model?.id==='cloud')return images.cloudNine;
+ if(type==='weapon'&&model?.id==='lily')return images.lilyWeaponSignature;
  return images[STORE_BANNER_PORTRAITS[model?.id]];
 }
 function drawStoreBannerImage(img,x,y,w,h){
@@ -1836,7 +1838,7 @@ function storeBannerButton(x,y,w,h,action,label,sub,enabled,primary=false){
 function storeBannerEntries(rotation){
  const entries=[];
  for(const id of rotation.featuredCharacters){const model=ROSTER.find(item=>item.id===id);if(model)entries.push({type:'character',id,name:model.name,model})}
- for(const id of rotation.featuredWeapons){const model=ROSTER.find(item=>item.id===id.replace(/^premium-/,''));if(model)entries.push({type:'weapon',id,name:model.id==='soul'?'Soulbound':model.id==='cloud'?'Cloud-nine':model.name+' Premium',model})}
+ for(const id of rotation.featuredWeapons){const model=ROSTER.find(item=>item.id===id.replace(/^premium-/,''));if(model)entries.push({type:'weapon',id,name:model.id==='soul'?'Soulbound':model.id==='cloud'?'Cloud-nine':model.id==='lily'?'Lily Signature':model.name+' Premium',model})}
  return entries;
 }
 function drawStoreBannerSidebar(entries,state){
@@ -2206,7 +2208,7 @@ function drawUnit(p,pos,view,t,acting=false){
  ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.44,16,0,0,Math.PI*2);ctx.fillStyle='rgba(12,12,40,.45)';ctx.fill();
  if(acting||select){ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.51,22,0,0,Math.PI*2);ctx.lineWidth=4;ctx.strokeStyle=select?(allyTargeting||supportAnimating?'#55aaff':'#eaca94'):'#8be3fb';ctx.stroke()}
  if(p.hp<=0)ctx.globalAlpha=.37;
- const art=p.id==='soul'?(view==='party'||view==='ally-impact'?'soulFront':equippedSoulBattleSprite()):p.id==='zero'?(view==='party'||view==='ally-impact'?'zeroFront':'zeroBattle'):p.id==='lily'?(view==='party'||view==='ally-impact'?'lilyFront':'lilyBack'):p.id==='dawn'?(view==='party'||view==='ally-impact'?'dawnFront':'dawnBattle'):p.id==='logan'?(view==='party'||view==='ally-impact'?'loganFront':'loganBattle'):p.id==='cloud'?(view==='party'||view==='ally-impact'?'cloudFront':equippedCloudBattleSprite()):'portrait';
+ const art=p.id==='soul'?(view==='party'||view==='ally-impact'?'soulFront':equippedSoulBattleSprite()):p.id==='zero'?(view==='party'||view==='ally-impact'?'zeroFront':'zeroBattle'):p.id==='lily'?(view==='party'||view==='ally-impact'?'lilyFront':equippedLilyBattleSprite()):p.id==='dawn'?(view==='party'||view==='ally-impact'?'dawnFront':'dawnBattle'):p.id==='logan'?(view==='party'||view==='ally-impact'?'loganFront':'loganBattle'):p.id==='cloud'?(view==='party'||view==='ally-impact'?'cloudFront':equippedCloudBattleSprite()):'portrait';
  const zb=view==='command'&&p.id==='soul'?soulBasicStage(t):null;
   if(zb!==null)soulBasicPaint(x,baseY,w,h,zb,art);
   else if(art&&images[art]?.complete&&images[art].naturalWidth){
@@ -2214,7 +2216,7 @@ function drawUnit(p,pos,view,t,acting=false){
   if(fullArtwork){
    // Ally targeting uses the same full-body front artwork across the entire party.
    ctx.drawImage(img,x,top,w,h);
-  }else if(art==='soul'||art==='soulBattleStandard'||art==='soulBattlePremium'||art==='zeroBattle'||art==='lilyBack'||art==='loganBattle'||art==='cloudWindcallBattle'||art==='cloudNineBattle'){
+  }else if(art==='soul'||art==='soulBattleStandard'||art==='soulBattlePremium'||art==='zeroBattle'||art==='lilyBack'||art==='lilyStandardBattle'||art==='lilySignatureBattle'||art==='loganBattle'||art==='cloudWindcallBattle'||art==='cloudNineBattle'){
    // Fit the visible cutout to the same enlarged battle-stage height across
    // playable characters, removing transparent source-image margins.
    const b=spriteAlphaBounds(img),scale=(h*1.12)/b.h,drawW=b.w*scale,drawH=b.h*scale;
