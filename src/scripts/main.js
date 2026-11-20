@@ -1432,12 +1432,12 @@ function drawLoadoutWeapons(){
  const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId),w=record.weapon;
  loadoutPanel(model.name+' • WEAPONS',`Each weapon levels independently. Enchanted Books: S ${itemInventory.books.small} • M ${itemInventory.books.medium} • L ${itemInventory.books.large}.`);
  const cap=weaponLevelCap();
- const cards=[{x:145,label:model.id==='cloud'?'WINDCALL':model.id==='soul'?'ASHBLADE':model.id==='lily'?'LILY STANDARD':'STANDARD SIGNATURE',selected:w.selected==='standard',potential:w.standardPotential,type:'standard'},
-              {x:825,label:model.id==='cloud'?'CLOUD-NINE':model.id==='soul'?'SOULBOUND':model.id==='lily'?'LILY SIGNATURE':'PREMIUM SIGNATURE',selected:w.selected==='premium',potential:w.premiumPotential,type:'premium'}];
+ const cards=[{x:145,label:model.id==='cloud'?'WINDCALL':model.id==='soul'?'ASHBLADE':model.id==='lily'?'PETAL':'STANDARD SIGNATURE',selected:w.selected==='standard',potential:w.standardPotential,type:'standard'},
+              {x:825,label:model.id==='cloud'?'CLOUD-NINE':model.id==='soul'?'SOULBOUND':model.id==='lily'?'EVERBLOSSOM':'PREMIUM SIGNATURE',selected:w.selected==='premium',potential:w.premiumPotential,type:'premium'}];
  for(const c of cards){
   const level=w[c.type+'Level'],exp=w[c.type+'Exp'],needed=requiredExp(level),bonus=weaponPotentialMultiplier(c.type,c.potential,level)*100,atGate=ASCENSION_GATES.includes(level)&&!w[c.type+'Ascended'].includes(level);
   rect(c.x,205,630,470,'rgba(25,37,58,.94)',c.selected?'#edcf98':'#718ba4',14);
-  const characterWeaponName=model.id==='soul'?(c.type==='standard'?'ASHBLADE':'SOULBOUND'):model.id==='cloud'?(c.type==='standard'?'WINDCALL':'CLOUD-NINE'):model.id==='lily'?(c.type==='standard'?'LILY STANDARD':'LILY SIGNATURE'):null;
+  const characterWeaponName=model.id==='soul'?(c.type==='standard'?'ASHBLADE':'SOULBOUND'):model.id==='cloud'?(c.type==='standard'?'WINDCALL':'CLOUD-NINE'):model.id==='lily'?(c.type==='standard'?'PETAL':'EVERBLOSSOM'):null;
   text(characterWeaponName||c.label,c.x+30,245,22,'#f3dfb9','850');
   text(c.type==='standard'?'Included with '+model.name:'Acquired in the Store',c.x+30,278,15,'#c4d6e5','550');
   const weaponArt=model.id==='soul'?images[c.type==='premium'?'soulWeaponPremium':'soulWeaponStandard']:model.id==='cloud'?images[c.type==='premium'?'cloudNine':'cloudWindcall']:model.id==='lily'?images[c.type==='premium'?'lilyWeaponSignature':'lilyWeaponStandard']:null;
@@ -1592,7 +1592,7 @@ function drawLoadoutDetailsPanel(model,record,progress,cap){
 }
 function drawLoadoutWeaponsPanel(model,record){
  const w=record.weapon,type=w.selected,level=w[type+'Level'],cap=weaponLevelCap(),exp=w[type+'Exp'],needed=requiredExp(level),potential=w[type+'Potential'],bonus=weaponPotentialMultiplier(type,potential,level)*100,owned=type==='standard'||w.premiumOwned,gate=ASCENSION_GATES.includes(level)&&!w[type+'Ascended'].includes(level);
- const weaponName=model.id==='soul'?(type==='premium'?'SOULBOUND':'ASHBLADE'):model.id==='cloud'?(type==='premium'?'CLOUD-NINE':'WINDCALL'):model.id==='lily'?(type==='premium'?'LILY SIGNATURE':'LILY STANDARD'):(type==='premium'?'PREMIUM SIGNATURE':'STANDARD SIGNATURE');
+ const weaponName=model.id==='soul'?(type==='premium'?'SOULBOUND':'ASHBLADE'):model.id==='cloud'?(type==='premium'?'CLOUD-NINE':'WINDCALL'):model.id==='lily'?(type==='premium'?'EVERBLOSSOM':'PETAL'):(type==='premium'?'PREMIUM SIGNATURE':'STANDARD SIGNATURE');
  text(weaponName,1090,151,17,'#e8d6af','850');
  const weaponArt=model.id==='soul'?images[type==='premium'?'soulWeaponPremium':'soulWeaponStandard']:model.id==='cloud'?images[type==='premium'?'cloudNine':'cloudWindcall']:model.id==='lily'?images[type==='premium'?'lilyWeaponSignature':'lilyWeaponStandard']:null;if(weaponArt?.complete&&weaponArt.naturalWidth)drawStoreBannerImage(weaponArt,1090,171,445,300);
  text('POTENTIAL '+potential+' / 5     •     LEVEL '+level+' / '+cap,1090,490,14,'#e1e8f0','750');
@@ -1838,7 +1838,7 @@ function storeBannerButton(x,y,w,h,action,label,sub,enabled,primary=false){
 function storeBannerEntries(rotation){
  const entries=[];
  for(const id of rotation.featuredCharacters){const model=ROSTER.find(item=>item.id===id);if(model)entries.push({type:'character',id,name:model.name,model})}
- for(const id of rotation.featuredWeapons){const model=ROSTER.find(item=>item.id===id.replace(/^premium-/,''));if(model)entries.push({type:'weapon',id,name:model.id==='soul'?'Soulbound':model.id==='cloud'?'Cloud-nine':model.id==='lily'?'Lily Signature':model.name+' Premium',model})}
+ for(const id of rotation.featuredWeapons){const model=ROSTER.find(item=>item.id===id.replace(/^premium-/,''));if(model)entries.push({type:'weapon',id,name:model.id==='soul'?'Soulbound':model.id==='cloud'?'Cloud-nine':model.id==='lily'?'Everblossom':model.name+' Premium',model})}
  return entries;
 }
 function drawStoreBannerSidebar(entries,state){
