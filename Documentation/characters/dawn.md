@@ -1,6 +1,6 @@
 # Dawn Character Sheet
 
-Battle-stage artwork uses the side-facing `assets/dawn-battle.png`; her HUD and party portrait use `assets/dawn-front.png`.
+Dawn's standard weapon is **Radiant Pearl** and her premium weapon is **Radiant Diamond**. Her loadout, HUD, and party portrait use `assets/dawn-artwork.png`. Her battle pose follows her equipped weapon: `assets/dawn-radiant-pearl-battle.png` with Radiant Pearl and `assets/dawn-radiant-diamond-battle.png` with Radiant Diamond. The matching weapon artwork is `assets/dawn-radiant-pearl.png` and `assets/dawn-radiant-diamond.png`.
 
 ## Identity and base stats
 

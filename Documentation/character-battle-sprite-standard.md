@@ -21,7 +21,7 @@ This standard applies to full-body character art rendered in battle-stage and al
 |---|---|---|---|
 | Soul | `assets/soul-battle.png` | `assets/soul-portrait.png` | `assets/soul-portrait.png` |
 | Lily | `assets/lily-standard-battle.png` with her standard weapon; `assets/lily-signature-battle.png` with her signature weapon | `assets/lily-front.png` | `assets/lily-front.png` |
-| Dawn | `assets/dawn-battle.png` (side-facing) | `assets/dawn-front.png` | `assets/dawn-front.png` |
+| Dawn | `assets/dawn-radiant-pearl-battle.png` with Radiant Pearl; `assets/dawn-radiant-diamond-battle.png` with Radiant Diamond | `assets/dawn-artwork.png` | `assets/dawn-artwork.png` |
 | Logan | `assets/logan.png` (rear-facing) | `assets/logan-front.png` (front-facing) | `assets/logan-front.png` (head-and-shoulders crop) |
 | Zero | `assets/zero-battle.png` (northeast-facing) | `assets/zero.png` (front-facing full-body artwork) | `assets/zero.png` |
 
