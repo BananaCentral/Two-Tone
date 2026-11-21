@@ -4,7 +4,7 @@
 
 - Every battle uses a stable area ID from the `BATTLE_AREAS` registry in `src/scripts/main.js`.
 - An area entry contains a display name and a registered background image key. Encounters pass the area ID when starting a battle; the current default is `area-1`.
-- A campaign battle that begins in the same location and at the same time as its preceding story scene uses the same image asset. Register a dedicated battle area when the existing area depicts a different setting.
+- A campaign battle that begins in the same location and at the same time as the final story beat uses that beat’s effective background image, including any override. Register a dedicated battle area when the existing area depicts a different setting.
 - An area may define `reverseBackground` when it has a separate image for the opposite camera view. If omitted, reuse the main background mirrored horizontally.
 
 ## Rendering
@@ -20,3 +20,4 @@
 |---|---|---|---|
 | `area-1` | Area 1 | `assets/area-1-meadow.png` | Mirrored main background |
 | `prologue-campsite` | Prologue Campsite | `assets/prologue-1a-campsite.jpg` | Mirrored main background |
+| `prologue-campsite-sunrise` | Prologue Campsite at Sunrise | `assets/prologue-1b-campsite-sunrise.png` | Mirrored main background |

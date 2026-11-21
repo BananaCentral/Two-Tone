@@ -21,7 +21,13 @@ Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The title scre
 
 Continue advances the opening one paragraph at a time. Begin Battle appears on the final paragraph and hands control to the existing combat engine. Campaign units begin each attempt at full health. They use their profile progression and equipment, and encounter damage stays within the attempt.
 
+## Story backgrounds
+
+Set a default `story.background` for the entry. Set `background` on individual beats when a change in time, location, or viewpoint needs different art. The image changes when the player advances to that beat. Each override applies to its own beat. Repeat the path on consecutive beats that share an image, and omit the override to return to the default.
+
 When a battle starts in the same location and at the same time as the preceding scene, use the same background asset for the story and its registered battle area. If the transition changes location or time, assign the battle area that matches the encounter. See the [Battle Area Background Standard](../battle-area-background-standard.md) for battle camera behavior.
+
+## Encounter results
 
 Defeat offers Retry, which starts the same encounter from wave one. Victory submits the entry ID to the authenticated player action route. The server checks the prerequisite before recording a clear. Continue opens the linked entry after the victory is saved. The server looks up the reward and saves the clear and balance together under the profile lock. Older profiles start with an empty list of clears. A replay can be completed again with zero additional coins. A failed save can be retried with the same request ID.
 
@@ -38,6 +44,8 @@ Combat currently resolves in the browser. The server accepts the authenticated c
 |---|---|
 | `eyes-closed` | Asleep, stirring, or resting with eyes closed. |
 | `focused` | Listening, assessing a threat, or preparing to act. |
+| `composed` | Calm again after the immediate threat has passed. |
+| `hopeful` | A quiet smile at a promising sight. |
 | `startled` | Reacting to a sudden sound or movement. |
 
 ## Prologue 1A
@@ -48,4 +56,4 @@ Soul’s portraits appear in this order: eyes closed as he stirs, focused as he 
 
 ## Prologue 1B
 
-`prologue_1b` opens after the saved clear of Prologue 1A. Soul cleans his sword, packs his tent, and spots a distant village before three wolves approach the campsite. The first two beats use the moonlit campsite. The final three beats and the battle share the Area 1 meadow as temporary artwork for sunrise. The battle consists of one wave of three level 1 Wolves. The first victory grants 100 coins. The next entry is unset.
+`prologue_1b` opens after the saved clear of Prologue 1A. Soul cleans his sword, packs his tent, and spots a distant village before three wolves approach the campsite. The first two beats use the moonlit campsite and Soul’s composed portrait. When he packs up, the art changes to the sunrise campsite and the portrait is omitted. Soul looks hopeful at the village and startled as the wolves approach. The final three beats and the wolf battle share `assets/prologue-1b-campsite-sunrise.png`. The battle consists of one wave of three level 1 Wolves. The first victory grants 100 coins. The next entry is unset.

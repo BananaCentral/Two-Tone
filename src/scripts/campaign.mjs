@@ -1,11 +1,14 @@
 export const FIRST_CAMPAIGN_ENTRY_ID = 'prologue_1a';
 
 export const PROLOGUE_CAMPSITE_BACKGROUND = '/assets/prologue-1a-campsite.jpg';
+export const PROLOGUE_SUNRISE_BACKGROUND = '/assets/prologue-1b-campsite-sunrise.png';
 
 export const STORY_PORTRAITS = Object.freeze({
   soul: Object.freeze({
     'eyes-closed': '/assets/soul-story-eyes-closed.png',
     focused: '/assets/soul-story-focused.png',
+    composed: '/assets/soul-story-composed.png',
+    hopeful: '/assets/soul-story-hopeful.png',
     startled: '/assets/soul-story-startled.png',
   }),
 });
@@ -60,30 +63,30 @@ const prologue1b = {
     beats: [
       {
         text: 'Soul’s sword struck the Slime one last time. It went still in the dirt.',
-        portrait: { characterId: 'soul', reactionId: 'focused' },
+        portrait: { characterId: 'soul', reactionId: 'composed' },
       },
       {
         text: 'He flicked the slime from his blade and slid it back into its sheath.',
-        portrait: { characterId: 'soul', reactionId: 'focused' },
+        portrait: { characterId: 'soul', reactionId: 'composed' },
       },
       {
         text: 'The sky was beginning to pale by the time Soul pulled up the last tent peg. He rolled the canvas and strapped it to his pack.',
-        background: '/assets/area-1-meadow.png',
+        background: PROLOGUE_SUNRISE_BACKGROUND,
       },
       {
         text: 'He slung the pack over one shoulder and looked out across the meadow. Beyond the low hills, he could make out the rooftops of a village.',
-        background: '/assets/area-1-meadow.png',
-        portrait: { characterId: 'soul', reactionId: 'focused' },
+        background: PROLOGUE_SUNRISE_BACKGROUND,
+        portrait: { characterId: 'soul', reactionId: 'hopeful' },
       },
       {
         text: 'As the sun broke over the hills, a low growl drew his attention back to the campsite. Three wolves stepped out of the bushes beside the cold fire pit. Soul’s hand went to his sword.',
-        background: '/assets/area-1-meadow.png',
+        background: PROLOGUE_SUNRISE_BACKGROUND,
         portrait: { characterId: 'soul', reactionId: 'startled' },
       },
     ],
   },
   encounter: {
-    areaId: 'area-1',
+    areaId: 'prologue-campsite-sunrise',
     party: ['soul'],
     waves: [[{ enemyId: 'wolf', quantity: 3, level: 1 }]],
   },

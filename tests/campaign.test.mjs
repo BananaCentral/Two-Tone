@@ -45,6 +45,17 @@ test('Prologue 1B unlocks after 1A and grants a separate first-clear reward', ()
   assert.equal(awardCampaignClear(profile, FIRST_CAMPAIGN_ENTRY_ID), 100);
   assert.equal(getCampaignResumeEntry(profile.clearedCampaignEntries).id, entry.id);
   assert.equal(entry.story.beats.length, 5);
+  assert.deepEqual(entry.story.beats.map(beat => beat.background ?? entry.story.background), [
+    '/assets/prologue-1a-campsite.jpg',
+    '/assets/prologue-1a-campsite.jpg',
+    '/assets/prologue-1b-campsite-sunrise.png',
+    '/assets/prologue-1b-campsite-sunrise.png',
+    '/assets/prologue-1b-campsite-sunrise.png',
+  ]);
+  assert.deepEqual(entry.story.beats.map(beat => beat.portrait?.reactionId), [
+    'composed', 'composed', undefined, 'hopeful', 'startled',
+  ]);
+  assert.equal(entry.encounter.areaId, 'prologue-campsite-sunrise');
   assert.deepEqual(entry.encounter.waves, [[{ enemyId: 'wolf', quantity: 3, level: 1 }]]);
   assert.equal(awardCampaignClear(profile, entry.id), 100);
   assert.equal(awardCampaignClear(profile, entry.id), 0);
