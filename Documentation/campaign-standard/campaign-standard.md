@@ -2,7 +2,7 @@
 
 ## Campaign entries
 
-Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). Story opens the entry named by `FIRST_CAMPAIGN_ENTRY_ID`.
+Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The Campaign tile opens the entry named by `FIRST_CAMPAIGN_ENTRY_ID`. The title screen also opens this entry for accounts that have yet to clear it. The saved first clear unlocks the main menu.
 
 | Field | Meaning |
 |---|---|
@@ -28,4 +28,4 @@ Combat currently resolves in the browser. The server accepts the authenticated c
 
 ## Prologue 1A
 
-`prologue_1a` opens Story. The five paragraphs use the moonlit campsite photo (`assets/prologue-1a-campsite.jpg`) and end as the gelatinous creature springs at Soul. Begin Battle keeps the campsite as the battlefield background and reveals one Slime in one wave against Soul. The first victory grants 100 coins. The next entry is unset.
+`prologue_1a` is the first campaign entry. The five paragraphs use the moonlit campsite photo (`assets/prologue-1a-campsite.jpg`) and end as the gelatinous creature springs at Soul. Begin Battle keeps the campsite as the battlefield background and reveals one Slime in one wave against Soul. The first victory grants 100 coins. The next entry is unset.

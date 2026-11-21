@@ -11,7 +11,7 @@ Use the [UI Layout Standard](../project-standard/ui-layout-standard.md) for cons
 
 Show these sections in this order:
 
-1. Story
+1. Campaign
 2. Events
 3. Store
 4. Loadout
@@ -27,14 +27,16 @@ Regular Mode is the only mode currently available to players. Dev Mode requires 
 
 - Use a dark, translucent phone-menu panel over the game background, with a grid of icon tiles.
 - Start the grid near the top of the panel. Do not place a title, profile card, Rank, UID, status bar, or other header content above it.
-- On the 1600×900 canvas, use four columns and three rows. Place Story, Events, Store, and Loadout first; Party, Inventory, Challenges, and Daily Reward next; use Settings in the remaining tile.
+- On the 1600×900 canvas, use four columns and three rows. Place Campaign, Events, Store, and Loadout first; Party, Inventory, Challenges, and Daily Reward next; use Settings in the remaining tile.
 - Give each tile one large, simple line icon, a clear section name, and at most one short supporting line. Keep tiles large enough for touch input.
 - The Daily Reward tile shows **Claim 100 Coins** while available and a concise claimed/reset state after claiming. It remains on the main menu.
 - Events remains a visibly inactive placeholder until implemented. Other tiles open their corresponding game sections directly.
 
 ## Startup and Account
 
-- Google sign-in loads the player's server profile before the game starts.
+- Google sign-in loads the player's server profile. Signed-in players start at the Two-Tone title screen in portrait or landscape.
+- **Start** opens Prologue 1A on accounts without a saved first clear. The main menu becomes available from the victory screen once the clear is saved.
+- **Start** opens the main menu on accounts that have already cleared Prologue 1A.
 - Regular Mode has no player-facing save-file export or import. Account data follows the verified Google identity across devices.
 - Settings provides sign-out and account deletion.
 
@@ -50,7 +52,7 @@ Regular Mode is the only mode currently available to players. Dev Mode requires 
 - An unimplemented section is visible but inactive and does not navigate elsewhere.
 - Make it clear when a section is a placeholder.
 
-## Story
+## Campaign
 
-- Story opens Prologue 1A, the first playable campaign entry.
+- Campaign opens the first paragraph of Prologue 1A. The battle begins when the player selects **Begin Battle** on the final paragraph.
 - See the [Campaign Standard](../campaign-standard/campaign-standard.md) for story scenes, battles, and first-clear rewards.

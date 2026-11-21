@@ -58,7 +58,7 @@
    account={user,profile:profileData.profile};
    namespaceGameStorage(user.id);
    seedLocalProfile(profileData.profile);
-   window.TwoToneAccount={user,profile:profileData.profile,signOut,deleteAccount,action,createRequestId};
+   window.TwoToneAccount={user,get profile(){return account.profile},signOut,deleteAccount,action,createRequestId};
    await loadScript('/src/scripts/featured-lottery.js');
    await loadScript('/src/scripts/main.js');
    gate.hidden=true;
