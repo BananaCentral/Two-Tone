@@ -1824,8 +1824,11 @@ function drawStoreBannerImage(img,x,y,w,h){
 }
 function drawCharacterPortrait(img,id,x,y,size){
  if(!img?.complete||!img.naturalWidth)return;
- const crops={soul:[50,0,400],zero:[223,0,440],lily:[32,0,192],dawn:[23,0,210],logan:[220,0,447],cloud:[143,0,600]},[sx,sy,side]=crops[id]||[0,0,Math.min(img.naturalWidth,img.naturalHeight)];
- ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(img,sx,sy,Math.min(side,img.naturalWidth-sx),Math.min(side,img.naturalHeight-sy),x,y,size,size);ctx.restore();
+ // Portrait sources are full-body character art, so crop the centered head-and-shoulders
+ // region proportionally instead of relying on offsets from the retired sprite sheets.
+ const side=Math.min(img.naturalWidth,Math.round(img.naturalHeight*.34));
+ const sx=Math.round((img.naturalWidth-side)/2),sy=0;
+ ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(img,sx,sy,side,side,x,y,size,size);ctx.restore();
 }
 function storeBannerButton(x,y,w,h,action,label,sub,enabled,primary=false){
  choiceRects.push({x,y,w,h,action,enabled});
