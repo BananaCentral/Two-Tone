@@ -10,7 +10,7 @@ Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The Campaign t
 | `title` | Display title. |
 | `story.perspective` and `story.viewpointCharacterId` | Narrative perspective and viewpoint character. The main story follows Soul in third-person limited. |
 | `story.background` | Public image path. The scene displays it throughout the opening and crops it to fill the canvas. |
-| `story.paragraphs` | Ordered story beats, one paragraph per screen. |
+| `story.beats` | Ordered story beats. Each beat has one paragraph of `text` and may include a `portrait` reference. |
 | `encounter.areaId` and `encounter.party` | Registered battle area and fixed party for the encounter. |
 | `encounter.waves` | Ordered waves, each containing enemy archetype IDs and positive quantities. Existing encounter limits apply. |
 | `firstClearCoins` | Coins the account earns on its first victory. |
@@ -26,6 +26,21 @@ Defeat offers Retry, which starts the same encounter from wave one. Victory subm
 
 Combat currently resolves in the browser. The server accepts the authenticated client's victory report and enforces the one-time payout. Independent server verification of the combat outcome is pending.
 
+## Reaction portraits
+
+- Add transparent, square portraits to the shared `STORY_PORTRAITS` registry in `campaign.mjs`. Match head and shoulder framing across a character’s expressions.
+- Reference a portrait by `characterId` and `reactionId` on each beat that needs it. Repeat the reference to hold an expression across beats. Omit the reference for narration alone.
+- The portrait appears on the right as its paragraph is shown and stays there until the player advances. Reserve space for the complete paragraph and its buttons. Keep the background visible around the panel.
+- A failed portrait load leaves the paragraph and controls usable. **Begin Battle** clears the story portrait at the combat handoff.
+
+| Soul reaction | Use |
+|---|---|
+| `eyes-closed` | Asleep, stirring, or resting with eyes closed. |
+| `focused` | Listening, assessing a threat, or preparing to act. |
+| `startled` | Reacting to a sudden sound or movement. |
+
 ## Prologue 1A
 
 `prologue_1a` is the first campaign entry. The five paragraphs use the moonlit campsite photo (`assets/prologue-1a-campsite.jpg`) and end as the gelatinous creature springs at Soul. Begin Battle keeps the campsite as the battlefield background and reveals one Slime in one wave against Soul. The first victory grants 100 coins. The next entry is unset.
+
+Soul’s portraits appear in this order: eyes closed as he stirs, focused as he listens, startled at the branch crack, focused as he grabs his sword, and startled as the creature lunges.
