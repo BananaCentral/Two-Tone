@@ -1,6 +1,6 @@
 # Cloud Character Sheet
 
-Cloud's front-facing full-body artwork is used for his loadout, portraits, and ally targeting. His battle sprite changes with his equipped signature weapon: Windcall uses the Windcall battle sprite, while Cloud-nine uses the Cloud-nine battle sprite.
+Cloud's front-facing full-body artwork is `assets/cloud-artwork.png` and is used for his loadout, portraits, and ally targeting. His battle pose changes with his equipped weapon: Windcall uses `assets/cloud-windcall-battle.png`, while Cloud-nine uses `assets/cloud-nine-battle.png`.
 
 ## Identity
 
@@ -83,4 +83,4 @@ Calculated stats scale with Level and follow the shared character, Attack, Defen
 ## Availability and Assets
 
 - Cloud is included in the playable character roster and featured-character rotation. A new account does not receive him automatically.
-- Asset files: `assets/cloud-front.png`, `assets/cloud-windcall.png`, `assets/cloud-windcall-battle.png`, `assets/cloud-nine.png`, and `assets/cloud-nine-battle.png`.
+- Asset files: `assets/cloud-artwork.png`, `assets/cloud-windcall.png`, `assets/cloud-windcall-battle.png`, `assets/cloud-nine.png`, and `assets/cloud-nine-battle.png`.

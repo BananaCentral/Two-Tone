@@ -22,6 +22,7 @@ This standard applies to full-body character art rendered in battle-stage and al
 | Soul | `assets/soul-battle.png` | `assets/soul-portrait.png` | `assets/soul-portrait.png` |
 | Lily | `assets/lily-petal-battle.png` with Petal; `assets/lily-everblossom-battle.png` with Everblossom | `assets/lily-artwork.png` | `assets/lily-artwork.png` |
 | Dawn | `assets/dawn-radiant-pearl-battle.png` with Radiant Pearl; `assets/dawn-radiant-diamond-battle.png` with Radiant Diamond | `assets/dawn-artwork.png` | `assets/dawn-artwork.png` |
+| Cloud | `assets/cloud-windcall-battle.png` with Windcall; `assets/cloud-nine-battle.png` with Cloud-nine | `assets/cloud-artwork.png` | `assets/cloud-artwork.png` |
 | Logan | `assets/logan.png` (rear-facing) | `assets/logan-front.png` (front-facing) | `assets/logan-front.png` (head-and-shoulders crop) |
 | Zero | `assets/zero-battle.png` (northeast-facing) | `assets/zero.png` (front-facing full-body artwork) | `assets/zero.png` |
 
