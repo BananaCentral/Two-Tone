@@ -1,6 +1,6 @@
 # Soul Character Sheet
 
-Battle-stage artwork uses `assets/soul-battle.png` under the shared Character Battle Sprite Standard. The HUD portrait uses `assets/soul-portrait.png`.
+Soul's front-facing artwork is `assets/soul-artwork.png`. His standard weapon is **Ashblade**, with matching weapon art at `assets/soul-ashblade.png` and battle pose at `assets/soul-ashblade-battle.png`. His premium weapon is **Soulbound**, with matching weapon art at `assets/soulbound.png` and battle pose at `assets/soulbound-battle.png`. The equipped weapon determines his battle pose.
 
 ## Identity
 

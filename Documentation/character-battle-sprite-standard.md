@@ -19,7 +19,7 @@ This standard applies to full-body character art rendered in battle-stage and al
 
 | Character | Battle-stage view | Ally-target full-body view | HUD portrait |
 |---|---|---|---|
-| Soul | `assets/soul-battle.png` | `assets/soul-portrait.png` | `assets/soul-portrait.png` |
+| Soul | `assets/soul-ashblade-battle.png` with Ashblade; `assets/soulbound-battle.png` with Soulbound | `assets/soul-artwork.png` | `assets/soul-artwork.png` |
 | Lily | `assets/lily-petal-battle.png` with Petal; `assets/lily-everblossom-battle.png` with Everblossom | `assets/lily-artwork.png` | `assets/lily-artwork.png` |
 | Dawn | `assets/dawn-radiant-pearl-battle.png` with Radiant Pearl; `assets/dawn-radiant-diamond-battle.png` with Radiant Diamond | `assets/dawn-artwork.png` | `assets/dawn-artwork.png` |
 | Cloud | `assets/cloud-windcall-battle.png` with Windcall; `assets/cloud-nine-battle.png` with Cloud-nine | `assets/cloud-artwork.png` | `assets/cloud-artwork.png` |
