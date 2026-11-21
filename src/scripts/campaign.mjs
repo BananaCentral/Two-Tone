@@ -1,15 +1,15 @@
 export const FIRST_CAMPAIGN_ENTRY_ID = 'prologue_1a';
 
 export const PROLOGUE_CAMPSITE_BACKGROUND = '/assets/prologue-1a-campsite.jpg';
-export const PROLOGUE_SUNRISE_BACKGROUND = '/assets/prologue-1b-campsite-sunrise.png';
+export const PROLOGUE_SUNRISE_BACKGROUND = '/assets/prologue-1b-campsite-sunrise.webp';
 
 export const STORY_PORTRAITS = Object.freeze({
   soul: Object.freeze({
-    'eyes-closed': '/assets/soul-story-eyes-closed.png',
-    focused: '/assets/soul-story-focused.png',
-    composed: '/assets/soul-story-composed.png',
-    hopeful: '/assets/soul-story-hopeful.png',
-    startled: '/assets/soul-story-startled.png',
+    'eyes-closed': '/assets/soul-story-eyes-closed.webp',
+    focused: '/assets/soul-story-focused.webp',
+    composed: '/assets/soul-story-composed.webp',
+    hopeful: '/assets/soul-story-hopeful.webp',
+    startled: '/assets/soul-story-startled.webp',
   }),
 });
 

@@ -20,4 +20,4 @@
 |---|---|---|---|
 | `area-1` | Area 1 | `assets/area-1-meadow.png` | Mirrored main background |
 | `prologue-campsite` | Prologue Campsite | `assets/prologue-1a-campsite.jpg` | Mirrored main background |
-| `prologue-campsite-sunrise` | Prologue Campsite at Sunrise | `assets/prologue-1b-campsite-sunrise.png` | Mirrored main background |
+| `prologue-campsite-sunrise` | Prologue Campsite at Sunrise | `assets/prologue-1b-campsite-sunrise.webp` | Mirrored main background |

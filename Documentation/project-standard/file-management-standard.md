@@ -25,6 +25,7 @@ This standard defines where project files belong and how they are grouped.
 - Group code by feature where that makes related behavior easy to find. Keep shared utilities in a clearly named shared folder.
 - Keep browser-served static files in `public/assets`, grouped by type or feature as appropriate.
 - Use the project’s naming scheme for source files, folders, and assets.
+- Follow the [Artwork Loading Standard](artwork-loading-standard.md) for browser requests and full-resolution delivery formats.
 
 ## Example Layout
 

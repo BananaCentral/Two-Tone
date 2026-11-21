@@ -48,9 +48,9 @@ test('Prologue 1B unlocks after 1A and grants a separate first-clear reward', ()
   assert.deepEqual(entry.story.beats.map(beat => beat.background ?? entry.story.background), [
     '/assets/prologue-1a-campsite.jpg',
     '/assets/prologue-1a-campsite.jpg',
-    '/assets/prologue-1b-campsite-sunrise.png',
-    '/assets/prologue-1b-campsite-sunrise.png',
-    '/assets/prologue-1b-campsite-sunrise.png',
+    '/assets/prologue-1b-campsite-sunrise.webp',
+    '/assets/prologue-1b-campsite-sunrise.webp',
+    '/assets/prologue-1b-campsite-sunrise.webp',
   ]);
   assert.deepEqual(entry.story.beats.map(beat => beat.portrait?.reactionId), [
     'composed', 'composed', undefined, 'hopeful', 'startled',
