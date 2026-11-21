@@ -1,6 +1,6 @@
 # Lily Character Sheet
 
-Lily's standard weapon is **Petal**, and her premium signature weapon is **Everblossom**. Battle-stage artwork follows the equipped weapon: `assets/lily-standard-battle.png` with Petal and `assets/lily-signature-battle.png` with Everblossom. Their matching weapon artwork is `assets/lily-standard-weapon.png` and `assets/lily-signature-weapon.png`. Her HUD and party portrait continues to use the front-facing `assets/lily-front.png`.
+Lily's artwork is `assets/lily-artwork.png`. Her standard weapon is **Petal**, and her premium signature weapon is **Everblossom**. Battle-stage artwork follows the equipped weapon: `assets/lily-petal-battle.png` with Petal and `assets/lily-everblossom-battle.png` with Everblossom. Their matching weapon artwork is `assets/lily-petal.png` and `assets/lily-everblossom.png`.
 
 ## Identity and base stats
 
