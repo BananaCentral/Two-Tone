@@ -43,16 +43,72 @@ const prologue = {
   encounter: {
     areaId: 'prologue-campsite',
     party: ['soul'],
-    waves: [[{ enemyId: 'slime', quantity: 1 }]],
+    waves: [[{ enemyId: 'slime', quantity: 1, level: 1 }]],
+  },
+  firstClearCoins: 100,
+  nextEntryId: 'prologue_1b',
+};
+
+const prologue1b = {
+  id: 'prologue_1b',
+  title: 'Prologue 1B',
+  prerequisiteEntryId: prologue.id,
+  story: {
+    perspective: 'third-person-limited',
+    viewpointCharacterId: 'soul',
+    background: PROLOGUE_CAMPSITE_BACKGROUND,
+    beats: [
+      {
+        text: 'Soul’s sword struck the Slime one last time. It went still in the dirt.',
+        portrait: { characterId: 'soul', reactionId: 'focused' },
+      },
+      {
+        text: 'He flicked the slime from his blade and slid it back into its sheath.',
+        portrait: { characterId: 'soul', reactionId: 'focused' },
+      },
+      {
+        text: 'The sky was beginning to pale by the time Soul pulled up the last tent peg. He rolled the canvas and strapped it to his pack.',
+        background: '/assets/area-1-meadow.png',
+      },
+      {
+        text: 'He slung the pack over one shoulder and looked out across the meadow. Beyond the low hills, he could make out the rooftops of a village.',
+        background: '/assets/area-1-meadow.png',
+        portrait: { characterId: 'soul', reactionId: 'focused' },
+      },
+      {
+        text: 'As the sun broke over the hills, a low growl drew his attention back to the campsite. Three wolves stepped out of the bushes beside the cold fire pit. Soul’s hand went to his sword.',
+        background: '/assets/area-1-meadow.png',
+        portrait: { characterId: 'soul', reactionId: 'startled' },
+      },
+    ],
+  },
+  encounter: {
+    areaId: 'area-1',
+    party: ['soul'],
+    waves: [[{ enemyId: 'wolf', quantity: 3, level: 1 }]],
   },
   firstClearCoins: 100,
   nextEntryId: null,
 };
 
-export const CAMPAIGN_ENTRIES = Object.freeze({ [prologue.id]: prologue });
+export const CAMPAIGN_ENTRIES = Object.freeze({ [prologue.id]: prologue, [prologue1b.id]: prologue1b });
 
 export function getCampaignEntry(entryId) {
   return Object.hasOwn(CAMPAIGN_ENTRIES, entryId) ? CAMPAIGN_ENTRIES[entryId] : null;
+}
+
+export function isCampaignEntryUnlocked(entry, cleared = []) {
+  return !entry.prerequisiteEntryId || cleared.includes(entry.prerequisiteEntryId);
+}
+
+export function getCampaignResumeEntry(cleared = []) {
+  let entry = getCampaignEntry(FIRST_CAMPAIGN_ENTRY_ID);
+  while (entry.nextEntryId && cleared.includes(entry.id)) {
+    const next = getCampaignEntry(entry.nextEntryId);
+    if (!next || !isCampaignEntryUnlocked(next, cleared)) break;
+    entry = next;
+  }
+  return entry;
 }
 
 export function awardCampaignClear(profile, entryId) {
@@ -60,6 +116,7 @@ export function awardCampaignClear(profile, entryId) {
   if (!entry) return null;
 
   const cleared = profile.clearedCampaignEntries ?? [];
+  if (!isCampaignEntryUnlocked(entry, cleared)) return null;
   if (cleared.includes(entryId)) return 0;
 
   profile.clearedCampaignEntries = [...cleared, entryId];

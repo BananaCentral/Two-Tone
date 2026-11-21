@@ -2,17 +2,18 @@
 
 ## Campaign entries
 
-Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The Campaign tile opens the entry named by `FIRST_CAMPAIGN_ENTRY_ID`. The title screen also opens this entry for accounts that have yet to clear it. The saved first clear unlocks the main menu.
+Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The title screen opens the entry named by `FIRST_CAMPAIGN_ENTRY_ID` for accounts that have yet to clear it. The saved first clear unlocks the main menu. The Campaign tile follows the chapter links to the next unlocked, uncleared entry. If all available entries are cleared, it opens the last entry for replay.
 
 | Field | Meaning |
 |---|---|
 | `id` | Stable entry ID used for saved progress. Keep it stable after release. |
 | `title` | Display title. |
+| `prerequisiteEntryId` | Earlier entry that must have a saved clear. Omit for the opening entry. |
 | `story.perspective` and `story.viewpointCharacterId` | Narrative perspective and viewpoint character. The main story follows Soul in third-person limited. |
-| `story.background` | Public image path. The scene displays it throughout the opening and crops it to fill the canvas. |
+| `story.background` | Public image path. The scene uses it by default and crops it to fill the canvas. A beat may specify a `background` to show a change in setting or time. |
 | `story.beats` | Ordered story beats. Each beat has one paragraph of `text` and may include a `portrait` reference. |
 | `encounter.areaId` and `encounter.party` | Registered battle area and fixed party for the encounter. |
-| `encounter.waves` | Ordered waves, each containing enemy archetype IDs and positive quantities. Existing encounter limits apply. |
+| `encounter.waves` | Ordered waves, each containing enemy groups with an archetype ID, a positive quantity, and an optional level. Specify the level for authored encounters. When omitted, use the archetype’s default. Existing encounter limits apply. |
 | `firstClearCoins` | Coins the account earns on its first victory. |
 | `nextEntryId` | Entry opened by Continue after the victory is saved. Use `null` for the last available entry. |
 
@@ -22,7 +23,7 @@ Continue advances the opening one paragraph at a time. Begin Battle appears on t
 
 When a battle starts in the same location and at the same time as the preceding scene, use the same background asset for the story and its registered battle area. If the transition changes location or time, assign the battle area that matches the encounter. See the [Battle Area Background Standard](../battle-area-background-standard.md) for battle camera behavior.
 
-Defeat offers Retry, which starts the same encounter from wave one. Victory submits the entry ID to the authenticated player action route. The server looks up the reward and saves the clear and balance together under the profile lock. Older profiles start with an empty list of clears. A replay can be completed again with zero additional coins. A failed save can be retried with the same request ID.
+Defeat offers Retry, which starts the same encounter from wave one. Victory submits the entry ID to the authenticated player action route. The server checks the prerequisite before recording a clear. Continue opens the linked entry after the victory is saved. The server looks up the reward and saves the clear and balance together under the profile lock. Older profiles start with an empty list of clears. A replay can be completed again with zero additional coins. A failed save can be retried with the same request ID.
 
 Combat currently resolves in the browser. The server accepts the authenticated client's victory report and enforces the one-time payout. Independent server verification of the combat outcome is pending.
 
@@ -41,6 +42,10 @@ Combat currently resolves in the browser. The server accepts the authenticated c
 
 ## Prologue 1A
 
-`prologue_1a` is the first campaign entry. The five paragraphs use the moonlit campsite photo (`assets/prologue-1a-campsite.jpg`) and end as the gelatinous creature springs at Soul. Begin Battle keeps the campsite as the battlefield background and reveals one Slime in one wave against Soul. The first victory grants 100 coins. The next entry is unset.
+`prologue_1a` is the first campaign entry. The five paragraphs use the moonlit campsite photo (`assets/prologue-1a-campsite.jpg`) and end as the gelatinous creature springs at Soul. Begin Battle keeps the campsite as the battlefield background and reveals one level 1 Slime in one wave against Soul. The first victory grants 100 coins and unlocks Prologue 1B.
 
 Soul’s portraits appear in this order: eyes closed as he stirs, focused as he listens, startled at the branch crack, focused as he grabs his sword, and startled as the creature lunges.
+
+## Prologue 1B
+
+`prologue_1b` opens after the saved clear of Prologue 1A. Soul cleans his sword, packs his tent, and spots a distant village before three wolves approach the campsite. The first two beats use the moonlit campsite. The final three beats and the battle share the Area 1 meadow as temporary artwork for sunrise. The battle consists of one wave of three level 1 Wolves. The first victory grants 100 coins. The next entry is unset.

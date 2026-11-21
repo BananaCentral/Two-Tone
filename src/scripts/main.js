@@ -1,4 +1,4 @@
-import { CAMPAIGN_ENTRIES, FIRST_CAMPAIGN_ENTRY_ID, PROLOGUE_CAMPSITE_BACKGROUND, STORY_PORTRAITS, getCampaignEntry } from './campaign.mjs';
+import { CAMPAIGN_ENTRIES, FIRST_CAMPAIGN_ENTRY_ID, PROLOGUE_CAMPSITE_BACKGROUND, STORY_PORTRAITS, getCampaignEntry, getCampaignResumeEntry, isCampaignEntryUnlocked } from './campaign.mjs';
 import { CHARACTER_COMBAT_DATA, CHARACTER_ROSTER, COMBAT_RESOURCE_STANDARD, ENEMY_ARCHETYPES, ENEMY_COMBAT_DATA, RUNE_COMBAT_RULES, enemyStatsAtLevel, getActiveCharacterUpgradeEffect } from './combat-definitions.mjs';
 import { TwoToneBattleEngine, TwoToneTurnTimeline } from './combat-engine-api.mjs';
 'use strict';
@@ -10,10 +10,12 @@ const BATTLE_AREAS=Object.freeze({
 const DEFAULT_BATTLE_AREA_ID='area-1';
 const storyBackgrounds = new Map();
 for (const {story} of Object.values(CAMPAIGN_ENTRIES)) {
- if (storyBackgrounds.has(story.background)) continue;
- const image = new Image();
- image.src = story.background;
- storyBackgrounds.set(story.background, image);
+ for (const path of [story.background,...story.beats.map(beat=>beat.background)]) {
+  if (!path||storyBackgrounds.has(path)) continue;
+  const image = new Image();
+  image.src = path;
+  storyBackgrounds.set(path, image);
+ }
 }
 const storyPortraitImages = new Map();
 for (const path of Object.values(STORY_PORTRAITS).flatMap(Object.values)) {
@@ -693,8 +695,9 @@ function buildWavePlan(sizes,authoredWaves=null){
   const mixedCommon=['slime','wolf','hawk'][(wi+i)%3],commonId=enemyRosterMode==='mixed'?mixedCommon:enemyRosterMode==='wolf'?'wolf':enemyRosterMode==='hawk'?'hawk':'slime';
   const finalMixedWave=enemyRosterMode==='mixed'&&wi===sizes.length-1,firstMixedWave=enemyRosterMode==='mixed'&&sizes.length>1&&wi===0;
   const mixedBoss=finalMixedWave&&i===0,mixedBossElite=finalMixedWave&&(i===1||i===2),mixedLeader=firstMixedWave&&i===0;
-  const model=authoredWaves?ENEMY_ARCHETYPES[authoredWaves[wi][i]]:enemyRosterMode==='goblin'?(i<ENCOUNTER_LIMITS.elitesPerWave?ENEMY_ARCHETYPES.goblin:ENEMY_ARCHETYPES.slime):enemyRosterMode==='geode'?(i<ENCOUNTER_LIMITS.elitesPerWave?ENEMY_ARCHETYPES.geode:ENEMY_ARCHETYPES.slime):enemyRosterMode==='bear'?(i===0?ENEMY_ARCHETYPES.bear:ENEMY_ARCHETYPES.slime):enemyRosterMode==='hawk'?ENEMY_ARCHETYPES.hawk:mixedBoss?ENEMY_ARCHETYPES.bear:finalMixedWave&&i===2?ENEMY_ARCHETYPES.geode:(mixedBossElite||mixedLeader)?ENEMY_ARCHETYPES.goblin:ENEMY_ARCHETYPES[commonId];
-  const category=validateEnemyCategory(model.category),tags=validateEnemyTags(model.tags,category),level=model.level??1;
+  const authoredEnemy=authoredWaves?.[wi][i];
+  const model=authoredEnemy?ENEMY_ARCHETYPES[authoredEnemy.enemyId]:enemyRosterMode==='goblin'?(i<ENCOUNTER_LIMITS.elitesPerWave?ENEMY_ARCHETYPES.goblin:ENEMY_ARCHETYPES.slime):enemyRosterMode==='geode'?(i<ENCOUNTER_LIMITS.elitesPerWave?ENEMY_ARCHETYPES.geode:ENEMY_ARCHETYPES.slime):enemyRosterMode==='bear'?(i===0?ENEMY_ARCHETYPES.bear:ENEMY_ARCHETYPES.slime):enemyRosterMode==='hawk'?ENEMY_ARCHETYPES.hawk:mixedBoss?ENEMY_ARCHETYPES.bear:finalMixedWave&&i===2?ENEMY_ARCHETYPES.geode:(mixedBossElite||mixedLeader)?ENEMY_ARCHETYPES.goblin:ENEMY_ARCHETYPES[commonId];
+  const category=validateEnemyCategory(model.category),tags=validateEnemyTags(model.tags,category),level=authoredEnemy?.level??model.level??1;
   const stats=enemyStatsAtLevel({hp:model.hp,attack:model.baseAttack,physicalDefense:model.basePhysicalDefense,magicalDefense:model.baseMagicalDefense,speed:model.speed},level);
   return {id:`wave${wi+1}-enemy${i+1}`,archetypeId:model.id,name:model.name,tags,
    wave:wi+1,order:i+1,category,healthBars:validateEnemyHealthBars(category,model.healthBars??1),level,maxHp:stats.hp,speed:model.speed,baseSpeed:model.speed,
@@ -748,7 +751,7 @@ function beginWave(index){saveVitals();
  log=`Wave ${index+1}/${wavePlan.length}: ${wavePlan[index].length} enemies • ${count} deployed.`;
 }
 function resetEnemies(){
- const authoredWaves=campaignEntry?.encounter.waves.map(wave=>wave.flatMap(({enemyId,quantity})=>Array(quantity).fill(enemyId)));
+ const authoredWaves=campaignEntry?.encounter.waves.map(wave=>wave.flatMap(group=>Array(group.quantity).fill(group)));
  wavePlan=authoredWaves?buildWavePlan(authoredWaves.map(wave=>wave.length),authoredWaves):buildWavePlan(waveOverride||WAVE_PRESETS[wavePreset]);waveIndex=-1;waveQueue=[];waveKills=0;
  for(const ally of party){ally.residueStacks=0;ally.residueTurns=0;ally.residueMaxStacks=null;ally.residueDamageReductionPerStack=null;ally.residueResistanceReductionPerStack=null}
  totalEnemyDefeats=0;encounterCleared=false;spawnHistory=[];enemies=[];selectedEnemyId=null;actingEnemyId=null;pendingVacancies=[];attackInProgress=false;lastAttack=null;supportDemo=null;supportTestHistory=[];
@@ -1005,7 +1008,7 @@ function addUnit(id){if(phase!=='partySetup')return;if(!isCharacterOwned(id)){sa
 function removeUnit(index){if(phase!=='partySetup')return;if(draft.length<=1){say('A party must contain at least one character.');return}draft.splice(index,1);}
 function openCampaignEntry(entryId=FIRST_CAMPAIGN_ENTRY_ID){
  const entry=getCampaignEntry(entryId);
- if(!entry)return;
+ if(!entry||!isCampaignEntryUnlocked(entry,window.TwoToneAccount?.profile?.clearedCampaignEntries))return;
  campaignEntry=entry;
  campaignReward=null;
  storyBeatIndex=0;
@@ -2718,7 +2721,7 @@ function drawHud(t){
  const focus=chosenEnemy();
  if(phase==='player'&&cameraPreview!=='party'&&focus&&focus.category!=='boss'){
   rect(938,22,399,72,'rgba(10,16,31,.78)','rgba(210,213,220,.40)',14);
-  text(focus.name,961,44,19,'#fff3db','750');
+  text(`${focus.name}  LV. ${focus.level}`,961,44,19,'#fff3db','750');
   text(`HP ${focus.hp} / ${focus.maxHp}`,1315,44,15,'#f0e7eb','700','right');
   shieldedHealthBar(961,65,310,9,focus.hp,focus.maxHp,focus.shield,'#f38382','#343d51');
  }else if(cameraPreview==='party'&&!bossOnField){
@@ -2785,12 +2788,12 @@ function drawPause(){
 }
 function drawStory(){
  const {title,story}=campaignEntry;
+ const beat=story.beats[storyBeatIndex];
  rect(0,0,W,H,'#101829');
- drawCoverImage(storyBackgrounds.get(story.background));
+ drawCoverImage(storyBackgrounds.get(beat.background??story.background));
  rect(0,0,W,H,'rgba(3,7,15,.28)');
  rect(180,514,1240,330,'rgba(13,21,38,.94)','#d8c38f',20);
  text(title,238,565,34,'#fff0d4','850');
- const beat=story.beats[storyBeatIndex];
  const portrait=beat.portrait;
  if(portrait){
   const path=STORY_PORTRAITS[portrait.characterId]?.[portrait.reactionId];
@@ -2870,7 +2873,7 @@ function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='startup'){dra
   drawCameraStage(t);drawFx(t);drawHud(t)
  }else{drawCameraStage(t);drawSetup()}drawHint(t);requestAnimationFrame(loop)}
 function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('roster-')){if(DEV_MODE)setEnemyRoster(cmd.slice(7));return}if(cmd.startsWith('loadout:')){handleLoadoutAction(cmd.slice(8));return}if(cmd.startsWith('store:')){handleStoreAction(cmd);return}if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'&&DEV_MODE){devPanelOpen=!devPanelOpen;return}if(cmd==='cancel-target'){cancelTargetSelection();return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(cameraPreview==='party'&&(phase==='player'||pendingTargetAction?.targetSide==='ally')){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(pendingTargetAction?.targetSide==='ally'&&pendingTargetAction.targetScope==='all'){if(!p||p.hp<=0){say('Choose a living party member to confirm the team skill.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;return executeCombatAction(actor,pending.action)}if(pendingTargetAction?.targetSide==='ally'){if(!p||p.hp<=0){say('Tune and Dawn’s Ultimate need a living ally.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;if(pending.action==='ultimate')return queueUltimate(pending.actorId,id);return executeCombatAction(actor,pending.action,null,id)}if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){if(DEV_MODE)setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){beginTargetSelection('ultimate',cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){if(DEV_MODE)chargeUltimateForTest(cmd.slice(11));return}
- switch(cmd){case 'startup-start':startFromTitle();break;case 'claim-daily-reward':claimDailyReward();break;case 'open-inventory':phase='inventory';hint='';break;case 'open-challenges':phase='challenges';hint='';break;case 'open-settings':phase='settings';hint='';break;case 'account-sign-out':window.TwoToneAccount?.signOut?.();break;case 'account-delete':window.TwoToneAccount?.deleteAccount?.();break;case 'open-store':phase='store';lastStoreNotice='';break;case 'open-campaign':if(phase==='menu'&&canAccessMainMenu())openCampaignEntry();break;case 'advance-story':advanceCampaignStory();break;case 'retry-campaign-save':saveCampaignVictory();break;case 'next-campaign-entry':openCampaignEntry(campaignEntry?.nextEntryId);break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'toggle-fullscreen':toggleFullscreen();break;case 'support-heal':if(DEV_MODE)startSupportDemo('heal');break;case 'support-revive':if(DEV_MODE)startSupportDemo('revive');break;case 'confirm-support':if(DEV_MODE)confirmSupportDemo();break;case 'cancel-support':if(DEV_MODE)cancelSupportDemo();break;case 'camera-party':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':if(DEV_MODE)toggleWavePreset();break;case 'toggle-recovery':if(DEV_MODE)setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':if(DEV_MODE)testKO();break;case 'test-revive':if(DEV_MODE)testRevive();break;case 'skill':play('skill');break;case 'cap-test':if(DEV_MODE)cycleSpCapTest();break;case 'hud-status-test':if(DEV_MODE)toggleHudStatusDemo();break;case 'f05-advance':if(DEV_MODE)addActionAdvance(activeId,25);break;case 'f05-delay':if(DEV_MODE)addActionDelay(activeId,25);break;case 'f05-speed':if(DEV_MODE)setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':if(DEV_MODE)queueSummonForTest('independent');break;case 'f05-summon-controlled':if(DEV_MODE)queueSummonForTest('controlled');break;
+ switch(cmd){case 'startup-start':startFromTitle();break;case 'claim-daily-reward':claimDailyReward();break;case 'open-inventory':phase='inventory';hint='';break;case 'open-challenges':phase='challenges';hint='';break;case 'open-settings':phase='settings';hint='';break;case 'account-sign-out':window.TwoToneAccount?.signOut?.();break;case 'account-delete':window.TwoToneAccount?.deleteAccount?.();break;case 'open-store':phase='store';lastStoreNotice='';break;case 'open-campaign':if(phase==='menu'&&canAccessMainMenu())openCampaignEntry(getCampaignResumeEntry(window.TwoToneAccount.profile.clearedCampaignEntries).id);break;case 'advance-story':advanceCampaignStory();break;case 'retry-campaign-save':saveCampaignVictory();break;case 'next-campaign-entry':openCampaignEntry(campaignEntry?.nextEntryId);break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'toggle-fullscreen':toggleFullscreen();break;case 'support-heal':if(DEV_MODE)startSupportDemo('heal');break;case 'support-revive':if(DEV_MODE)startSupportDemo('revive');break;case 'confirm-support':if(DEV_MODE)confirmSupportDemo();break;case 'cancel-support':if(DEV_MODE)cancelSupportDemo();break;case 'camera-party':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':if(DEV_MODE)toggleWavePreset();break;case 'toggle-recovery':if(DEV_MODE)setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':if(DEV_MODE)testKO();break;case 'test-revive':if(DEV_MODE)testRevive();break;case 'skill':play('skill');break;case 'cap-test':if(DEV_MODE)cycleSpCapTest();break;case 'hud-status-test':if(DEV_MODE)toggleHudStatusDemo();break;case 'f05-advance':if(DEV_MODE)addActionAdvance(activeId,25);break;case 'f05-delay':if(DEV_MODE)addActionDelay(activeId,25);break;case 'f05-speed':if(DEV_MODE)setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':if(DEV_MODE)queueSummonForTest('independent');break;case 'f05-summon-controlled':if(DEV_MODE)queueSummonForTest('controlled');break;
  case 'progress-test-level':{if(DEV_MODE){const a=active(),p=a&&progressFor(a.id);if(a&&p){const cost=Math.max(1,requiredExp(a.level)-p.exp),result=testGrantExp(a.id,cost);say(result?`TEST ONLY: level ${result.level}, ${cost} EXP injected.`:'Ascension required or level cap reached.');}}break}
  case 'progress-test-ascend':{if(DEV_MODE){const a=active();if(a)say(testAscend(a.id)?`TEST ONLY: level ${a.level} ascension unlocked (no materials).`:'Not at a locked ascension gate.');}break}
  case 'hp-test-flat':{if(DEV_MODE){const a=active();if(a)setHpBonusForTest(a.id,'debug-flat','flat',(a.hpFlatModifiers['debug-flat']||0)+20);}break}
@@ -2894,7 +2897,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)c
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 if(DEV_MODE){
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,archetypeId:e.archetypeId,level:e.level,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,speed:speedOf(e),barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,momentumStacks:e.momentumStacks||0,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.1.5',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.1.6',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneEchoStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,echoPercent:echoPercentOf(unit)}));
 window.twoToneReflectStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,reflectPercent:reflectPercentOf(unit)}));
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,

@@ -1,4 +1,4 @@
-import { awardCampaignClear } from "../../src/scripts/campaign.mjs";
+import { awardCampaignClear, getCampaignEntry, isCampaignEntryUnlocked } from "../../src/scripts/campaign.mjs";
 import { randomInt } from "node:crypto";
 import { auth } from "../../lib/auth.js";
 import { CHARACTER_IDS_PUBLIC, withLockedProfile } from "../../lib/player-profile.js";
@@ -152,9 +152,11 @@ export default async function handler(req,res){
    const receipt=(rewards=[])=>({requestId:body.requestId,action:body.action,result:{rewards}});
    if(body.action==="complete-campaign-entry"){
     if(typeof body.entryId!=="string")return {ok:false,status:400,error:"invalid_campaign_entry"};
+    const entry=getCampaignEntry(body.entryId);
+    if(!entry)return {ok:false,status:400,error:"invalid_campaign_entry"};
     const previousClears=state.clearedCampaignEntries;
+    if(!isCampaignEntryUnlocked(entry,previousClears))return {ok:false,status:409,error:"campaign_entry_locked"};
     const coins=awardCampaignClear(state,body.entryId);
-    if(coins===null)return {ok:false,status:400,error:"invalid_campaign_entry"};
     const rewards=coins>0?[{coins}]:[];
     return {ok:true,save:state.clearedCampaignEntries!==previousClears?state:null,rewards,receipt:receipt(rewards)};
    }
