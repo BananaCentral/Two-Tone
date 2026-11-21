@@ -4,7 +4,7 @@
 
 - Every battle uses a stable area ID from the `BATTLE_AREAS` registry in `src/scripts/main.js`.
 - An area entry contains a display name and a registered background image key. Encounters pass the area ID when starting a battle; the current default is `area-1`.
-- Area 1 uses `assets/area-1-meadow.jpg`.
+- Area 1 uses `assets/area-1-meadow.png`.
 - An area may define `reverseBackground` when it has a separate image for the opposite camera view. If omitted, reuse the main background mirrored horizontally.
 
 ## Rendering
@@ -18,4 +18,4 @@
 
 | Area ID | Display name | Main background | Reverse background |
 |---|---|---|---|
-| `area-1` | Area 1 | `assets/area-1-meadow.jpg` | Mirrored main background |
+| `area-1` | Area 1 | `assets/area-1-meadow.png` | Mirrored main background |

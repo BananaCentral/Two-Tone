@@ -58,7 +58,7 @@
    account={user,profile:profileData.profile};
    namespaceGameStorage(user.id);
    seedLocalProfile(profileData.profile);
-   window.TwoToneAccount={user,profile:profileData.profile,signOut,deleteAccount,action};
+   window.TwoToneAccount={user,profile:profileData.profile,signOut,deleteAccount,action,createRequestId};
    await loadScript('/src/scripts/featured-lottery.js');
    await loadScript('/src/scripts/main.js');
    gate.hidden=true;
@@ -91,8 +91,7 @@
   localStorage.removeItem('__two-tone-account-id');location.reload();
  }
 
- async function action(name,payload={}){
-  const requestId=createRequestId();
+ async function action(name,payload={},requestId=createRequestId()){
   const response=await request('/api/player/action',{method:'POST',body:JSON.stringify({action:name,requestId,...payload})});
   const result=await response.json();
   if(!response.ok||!result.ok){

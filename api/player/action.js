@@ -1,3 +1,4 @@
+import { awardCampaignClear } from "../../src/scripts/campaign.mjs";
 import { randomInt } from "node:crypto";
 import { auth } from "../../lib/auth.js";
 import { CHARACTER_IDS_PUBLIC, withLockedProfile } from "../../lib/player-profile.js";
@@ -149,6 +150,14 @@ export default async function handler(req,res){
     return {ok:true,rewards:prior.rows[0].result.rewards||[],duplicate:true};
    }
    const receipt=(rewards=[])=>({requestId:body.requestId,action:body.action,result:{rewards}});
+   if(body.action==="complete-campaign-entry"){
+    if(typeof body.entryId!=="string")return {ok:false,status:400,error:"invalid_campaign_entry"};
+    const previousClears=state.clearedCampaignEntries;
+    const coins=awardCampaignClear(state,body.entryId);
+    if(coins===null)return {ok:false,status:400,error:"invalid_campaign_entry"};
+    const rewards=coins>0?[{coins}]:[];
+    return {ok:true,save:state.clearedCampaignEntries!==previousClears?state:null,rewards,receipt:receipt(rewards)};
+   }
    if(body.action==="claim-daily"){
     const period=dailyKey();
     if(state.dailyRewardClaimedPeriod===period)return {ok:false,status:409,error:"already_claimed"};

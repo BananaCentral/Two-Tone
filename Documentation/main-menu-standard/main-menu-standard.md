@@ -52,5 +52,5 @@ Regular Mode is the only mode currently available to players. Dev Mode requires 
 
 ## Story
 
-- Story contains the current battle prototype as the initial playable content.
-- The battle prototype remains available while the rest of Story is developed.
+- Story opens Prologue 1A, the first playable campaign entry.
+- See the [Campaign Standard](../campaign-standard/campaign-standard.md) for story scenes, battles, and first-clear rewards.
