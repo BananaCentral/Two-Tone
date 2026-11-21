@@ -8,6 +8,7 @@ test('the campaign opens with Soul facing one Slime after the gelatinous creatur
   assert.equal(entry.story.background, '/assets/prologue-1a-campsite.jpg');
   assert.equal(entry.story.paragraphs.length, 5);
   assert.match(entry.story.paragraphs.at(-1), /flattened against the dirt, then sprang\.$/);
+  assert.equal(entry.encounter.areaId, 'prologue-campsite');
   assert.deepEqual(entry.encounter.party, ['soul']);
   assert.deepEqual(entry.encounter.waves, [[{ enemyId: 'slime', quantity: 1 }]]);
 });

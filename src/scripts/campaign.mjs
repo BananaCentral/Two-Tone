@@ -1,12 +1,14 @@
 export const FIRST_CAMPAIGN_ENTRY_ID = 'prologue_1a';
 
+export const PROLOGUE_CAMPSITE_BACKGROUND = '/assets/prologue-1a-campsite.jpg';
+
 const prologue = {
   id: FIRST_CAMPAIGN_ENTRY_ID,
   title: 'Prologue 1A',
   story: {
     perspective: 'third-person-limited',
     viewpointCharacterId: 'soul',
-    background: '/assets/prologue-1a-campsite.jpg',
+    background: PROLOGUE_CAMPSITE_BACKGROUND,
     paragraphs: [
       'A rustle in the bushes woke Soul.',
       'He lay still beneath his blanket, listening. Through the gap in the tent flap, he could see the glow of the campfire. He waited for the sound of a rabbit scrambling away.',
@@ -16,7 +18,7 @@ const prologue = {
     ],
   },
   encounter: {
-    areaId: 'area-1',
+    areaId: 'prologue-campsite',
     party: ['soul'],
     waves: [[{ enemyId: 'slime', quantity: 1 }]],
   },

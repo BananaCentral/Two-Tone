@@ -20,10 +20,12 @@ Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). Story opens th
 
 Continue advances the opening one paragraph at a time. Begin Battle appears on the final paragraph and hands control to the existing combat engine. Campaign units begin each attempt at full health. They use their profile progression and equipment, and encounter damage stays within the attempt.
 
+When a battle starts in the same location and at the same time as the preceding scene, use the same background asset for the story and its registered battle area. If the transition changes location or time, assign the battle area that matches the encounter. See the [Battle Area Background Standard](../battle-area-background-standard.md) for battle camera behavior.
+
 Defeat offers Retry, which starts the same encounter from wave one. Victory submits the entry ID to the authenticated player action route. The server looks up the reward and saves the clear and balance together under the profile lock. Older profiles start with an empty list of clears. A replay can be completed again with zero additional coins. A failed save can be retried with the same request ID.
 
 Combat currently resolves in the browser. The server accepts the authenticated client's victory report and enforces the one-time payout. Independent server verification of the combat outcome is pending.
 
 ## Prologue 1A
 
-`prologue_1a` opens Story. The five paragraphs use the moonlit campsite photo (`assets/prologue-1a-campsite.jpg`) and end as the gelatinous creature springs at Soul. Begin Battle reveals one Slime in one wave against Soul. The first victory grants 100 coins. The next entry is unset.
+`prologue_1a` opens Story. The five paragraphs use the moonlit campsite photo (`assets/prologue-1a-campsite.jpg`) and end as the gelatinous creature springs at Soul. Begin Battle keeps the campsite as the battlefield background and reveals one Slime in one wave against Soul. The first victory grants 100 coins. The next entry is unset.
