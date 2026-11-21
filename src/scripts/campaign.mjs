@@ -6,7 +6,7 @@ const prologue = {
   story: {
     perspective: 'third-person-limited',
     viewpointCharacterId: 'soul',
-    background: '/assets/area-1-meadow.png',
+    background: '/assets/prologue-1a-campsite.jpg',
     paragraphs: [
       'A rustle in the bushes woke Soul.',
       'He lay still beneath his blanket, listening. Through the gap in the tent flap, he could see the glow of the campfire. He waited for the sound of a rabbit scrambling away.',

@@ -5,7 +5,7 @@ import { FIRST_CAMPAIGN_ENTRY_ID, awardCampaignClear, getCampaignEntry } from '.
 test('the campaign opens with Soul facing one Slime after the gelatinous creature lunges', () => {
   const entry = getCampaignEntry(FIRST_CAMPAIGN_ENTRY_ID);
   assert.equal(entry.id, 'prologue_1a');
-  assert.equal(entry.story.background, '/assets/area-1-meadow.png');
+  assert.equal(entry.story.background, '/assets/prologue-1a-campsite.jpg');
   assert.equal(entry.story.paragraphs.length, 5);
   assert.match(entry.story.paragraphs.at(-1), /flattened against the dirt, then sprang\.$/);
   assert.deepEqual(entry.encounter.party, ['soul']);

@@ -26,4 +26,4 @@ Combat currently resolves in the browser. The server accepts the authenticated c
 
 ## Prologue 1A
 
-`prologue_1a` opens Story. The five paragraphs use the Area 1 meadow photo and end as the gelatinous creature springs at Soul. Begin Battle reveals one Slime in one wave against Soul. The first victory grants 100 coins. The next entry is unset.
+`prologue_1a` opens Story. The five paragraphs use the moonlit campsite photo (`assets/prologue-1a-campsite.jpg`) and end as the gelatinous creature springs at Soul. Begin Battle reveals one Slime in one wave against Soul. The first victory grants 100 coins. The next entry is unset.
