@@ -19,6 +19,7 @@ export const STORY_PORTRAITS = Object.freeze({
 const prologue = {
   id: FIRST_CAMPAIGN_ENTRY_ID,
   title: 'Prologue 1A',
+  summary: 'A rustle outside Soul’s tent interrupts a quiet night at camp.',
   story: {
     perspective: 'third-person-limited',
     viewpointCharacterId: 'soul',
@@ -62,6 +63,7 @@ const prologue = {
 const prologue1b = {
   id: 'prologue_1b',
   title: 'Prologue 1B',
+  summary: 'At sunrise, Soul packs up camp and spots a village beyond the hills.',
   prerequisiteEntryId: prologue.id,
   story: {
     perspective: 'third-person-limited',
@@ -118,6 +120,7 @@ const prologue1b = {
 const prologue1c = {
   id: 'prologue_1c',
   title: 'Prologue 1C',
+  summary: 'On his way to the village, Soul stops at a river to wash up and take a short rest.',
   prerequisiteEntryId: prologue1b.id,
   story: {
     perspective: 'third-person-limited',

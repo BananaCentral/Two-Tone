@@ -10,6 +10,7 @@ Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The title scre
 |---|---|
 | `id` | Stable entry ID used for saved progress. Keep it stable after release. |
 | `title` | Display title. |
+| `summary` | One or two short, spoiler-free sentences shown in the part preview. |
 | `prerequisiteEntryId` | Earlier entry that must have a saved clear. Omit for the opening entry. |
 | `story.perspective` and `story.viewpointCharacterId` | Narrative perspective and viewpoint character. The main story follows Soul in third-person limited. |
 | `story.background` | Public image path. The scene uses it by default and crops it to fill the canvas. A beat may specify a `background` to show a change in setting or time. |
@@ -24,8 +25,12 @@ Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The title scre
 - Organize the selector as **Arc → Chapter → Part**. An arc contains an ordered list of chapters. A chapter contains an ordered list of lettered parts. Each part references a playable entry by its existing entry ID.
 - Define this hierarchy in `CAMPAIGN_ARCS`. Give arcs and chapters stable IDs and display titles. List part letters and entry IDs in the order players should see them.
 - Arc One contains the **Prologue** chapter. Part A opens `prologue_1a`, Part B opens `prologue_1b`, and Part C opens `prologue_1c`.
-- Every time players open Campaign from the main menu, show **Select Arc**. Selecting an arc opens **Select Chapter**, then selecting a chapter opens **Select Part**. Back returns to the previous level. The arc screen links back to the main menu. Lists with more than five choices use additional pages.
-- Mark a part **Available** when its prerequisite is satisfied and **Cleared** after its first saved victory. A part with an unmet prerequisite is visible and marked **Locked**. Both available and cleared parts open at the first story beat. Replays do not award first-clear coins again.
+- Display arcs, chapters, and parts in a left sidebar styled like the Loadout tabs. Expand or collapse arcs and chapters in place. Use indentation for hierarchy and highlight the selected part. Paginate the sidebar when the expanded tree exceeds eight rows.
+- On entry, expand the first arc and chapter and preview its first available uncleared part, or its first part if none qualify.
+- Mark parts **Available**, **Cleared**, or **Locked** in the sidebar. Selecting a row keeps the player in Campaign and updates the preview panel on the right.
+- Show the part title and its spoiler-free summary for available and cleared parts. **Start Part** and **Replay Part** open the first story beat. Replays do not award first-clear coins again.
+- Selecting a locked part shows the title of the prerequisite part the player must clear.
+
 - Selector order controls browsing. `nextEntryId` controls **Continue** from a saved victory, and `prerequisiteEntryId` controls unlocks.
 
 ## Play and save flow

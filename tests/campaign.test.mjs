@@ -90,5 +90,8 @@ test('Arc One lists Prologue parts A through C in order with stable entry IDs', 
     { label: 'B', entryId: 'prologue_1b' },
     { label: 'C', entryId: 'prologue_1c' },
   ]);
-  for (const part of chapter.parts) assert.ok(getCampaignEntry(part.entryId));
+  for (const part of chapter.parts) {
+    const entry = getCampaignEntry(part.entryId);
+    assert.ok(entry?.summary.trim(), part.entryId);
+  }
 });

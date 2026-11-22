@@ -1034,41 +1034,61 @@ function enterMainMenu(){
 }
 function addUnit(id){if(phase!=='partySetup')return;if(!isCharacterOwned(id)){say('This character is not owned.');return}if(draft.includes(id)){say('Already in the party.');return}if(draft.length>=MAX_PARTY_SIZE){say('A party can contain no more than four characters.');return}draft.push(id);}
 function removeUnit(index){if(phase!=='partySetup')return;if(draft.length<=1){say('A party must contain at least one character.');return}draft.splice(index,1);}
-const CAMPAIGN_CHOICES_PER_PAGE=5;
-let selectedCampaignArc=null,selectedCampaignChapter=null,campaignPage=0;
+const CAMPAIGN_CHOICES_PER_PAGE=8;
+let expandedCampaignArc=null,expandedCampaignChapter=null,previewedCampaignEntry=null,campaignPage=0;
+
+function campaignSelectorRows(){
+ const rows=[];
+ for(const arc of CAMPAIGN_ARCS){
+  rows.push({title:arc.title,depth:0,arc,expanded:arc===expandedCampaignArc});
+  if(arc!==expandedCampaignArc)continue;
+  for(const chapter of arc.chapters){
+   rows.push({title:chapter.title,depth:1,chapter,expanded:chapter===expandedCampaignChapter});
+   if(chapter!==expandedCampaignChapter)continue;
+   for(const part of chapter.parts){
+    rows.push({title:'Part '+part.label,depth:2,entry:getCampaignEntry(part.entryId)});
+   }
+  }
+ }
+ return rows;
+}
 
 function openCampaignSelector(){
  if(phase!=='menu'||!canAccessMainMenu())return;
- selectedCampaignArc=null;
- selectedCampaignChapter=null;
+ expandedCampaignArc=CAMPAIGN_ARCS[0]??null;
+ expandedCampaignChapter=expandedCampaignArc?.chapters[0]??null;
+ const entries=(expandedCampaignChapter?.parts??[]).map(part=>getCampaignEntry(part.entryId)).filter(Boolean);
+ const cleared=window.TwoToneAccount.profile.clearedCampaignEntries??[];
+ previewedCampaignEntry=entries.find(entry=>!cleared.includes(entry.id)&&isCampaignEntryUnlocked(entry,cleared))??entries[0]??null;
  campaignPage=0;
+ choiceRects=[];
  phase='campaign';
  hint='';
 }
 
 function chooseCampaignOption(index){
  if(phase!=='campaign')return;
+ const row=campaignSelectorRows()[index];
+ if(!row)return;
  choiceRects=[];
- if(selectedCampaignChapter){
-  const part=selectedCampaignChapter.parts[index];
-  if(part)openCampaignEntry(part.entryId);
+ if(row.entry){
+  previewedCampaignEntry=row.entry;
   return;
  }
- if(selectedCampaignArc){
-  selectedCampaignChapter=selectedCampaignArc.chapters[index]??null;
- }else{
-  selectedCampaignArc=CAMPAIGN_ARCS[index]??null;
+ if(row.arc){
+  expandedCampaignArc=row.expanded?null:row.arc;
+  expandedCampaignChapter=null;
+ }else if(row.chapter){
+  expandedCampaignChapter=row.expanded?null:row.chapter;
  }
- campaignPage=0;
+ const lastPage=Math.max(0,Math.ceil(campaignSelectorRows().length/CAMPAIGN_CHOICES_PER_PAGE)-1);
+ campaignPage=Math.min(campaignPage,lastPage);
 }
 
-function backFromCampaignSelector(){
- if(phase!=='campaign')return;
+function startPreviewedCampaignPart(){
+ if(phase!=='campaign'||!previewedCampaignEntry)return;
  choiceRects=[];
- if(selectedCampaignChapter)selectedCampaignChapter=null;
- else if(selectedCampaignArc)selectedCampaignArc=null;
- else {enterMainMenu();return}
- campaignPage=0;
+ openCampaignEntry(previewedCampaignEntry.id);
 }
 
 function openCampaignEntry(entryId=FIRST_CAMPAIGN_ENTRY_ID){
@@ -2143,25 +2163,50 @@ function drawItemInventory(){
 function drawCampaignSelector(){
  drawBackground();
  rect(0,0,W,H,'rgba(5,9,22,.74)');
- rect(180,100,1240,700,'rgba(13,20,39,.98)','#ccb88e',20);
- addButton(225,137,165,62,'campaign-back',selectedCampaignArc?'BACK':'MAIN MENU','');
- const heading=selectedCampaignChapter?'Select Part':selectedCampaignArc?'Select Chapter':'Select Arc';
- text(heading,800,167,38,'#ffedd1','850','center');
- const context=[selectedCampaignArc?.title,selectedCampaignChapter?.title].filter(Boolean).join('  /  ');
- if(context)text(context,800,220,23,'#d6e2ef','650','center');
+ text('CAMPAIGN',64,83,34,'#ffedd1','850');
+ addButton(1316,53,220,58,'main-menu','MAIN MENU','');
+ rect(64,148,454,660,'rgba(13,20,39,.96)','#718ba4',18);
+ rect(550,148,986,660,'rgba(13,20,39,.96)','#718ba4',18);
 
- const choices=selectedCampaignChapter?.parts??selectedCampaignArc?.chapters??CAMPAIGN_ARCS;
+ const rows=campaignSelectorRows();
  const cleared=window.TwoToneAccount.profile.clearedCampaignEntries??[];
  const offset=campaignPage*CAMPAIGN_CHOICES_PER_PAGE;
- choices.slice(offset,offset+CAMPAIGN_CHOICES_PER_PAGE).forEach((choice,index)=>{
-  const entry=choice.entryId?getCampaignEntry(choice.entryId):null;
-  const unlocked=!entry||isCampaignEntryUnlocked(entry,cleared);
-  const status=entry?(cleared.includes(entry.id)?'CLEARED':unlocked?'AVAILABLE':'LOCKED'):'';
-  const label=entry?'Part '+choice.label+'  ·  '+entry.title:choice.title;
-  addButton(430,265+84*index,740,68,'campaign-option:'+String(offset+index),label,status,unlocked,25);
+ rows.slice(offset,offset+CAMPAIGN_CHOICES_PER_PAGE).forEach((row,index)=>{
+  const y=165+70*index,x=80+28*row.depth,w=422-28*row.depth;
+  const selected=row.entry&&row.entry===previewedCampaignEntry;
+  const locked=row.entry&&!isCampaignEntryUnlocked(row.entry,cleared);
+  const status=row.entry?(cleared.includes(row.entry.id)?'CLEARED':locked?'LOCKED':'AVAILABLE'):'';
+  if(selected)rect(x,y,w,56,'rgba(228,195,130,.14)','#d2b77e',12);
+  else rect(x,y,w,56,'rgba(25,37,58,.76)',null,12);
+  const label=row.entry?row.title:(row.expanded?'▾  ':'▸  ')+row.title;
+  text(label,x+18,y+28,23,selected?'#f4d99c':'#dce6f1',selected?'800':'650');
+  if(status)text(status,x+w-16,y+28,13,locked?'#aab7c9':'#dfc894','750','right');
+  choiceRects.push({x,y,w,h:56,action:'campaign-option:'+String(offset+index),enabled:true});
  });
- if(campaignPage>0)addButton(430,710,180,58,'campaign-previous','PREVIOUS','');
- if(offset+CAMPAIGN_CHOICES_PER_PAGE<choices.length)addButton(990,710,180,58,'campaign-next','NEXT','');
+ if(campaignPage>0)addButton(80,744,152,48,'campaign-previous','PREVIOUS','');
+ if(offset+CAMPAIGN_CHOICES_PER_PAGE<rows.length)addButton(350,744,152,48,'campaign-next','NEXT','');
+
+ const entry=previewedCampaignEntry;
+ if(!entry){text('Select a part',604,220,36,'#ffedd1','800');return}
+ text(entry.title,604,223,44,'#ffedd1','850');
+ const unlocked=isCampaignEntryUnlocked(entry,cleared);
+ if(!unlocked){
+  const prerequisite=getCampaignEntry(entry.prerequisiteEntryId);
+  text('Clear '+prerequisite.title+' to unlock.',604,321,29,'#d6e2ef','650');
+  return;
+ }
+ let line='',y=318;
+ ctx.font='600 30px system-ui,-apple-system,Segoe UI,sans-serif';
+ for(const word of entry.summary.split(' ')){
+  const next=line?line+' '+word:word;
+  if(line&&ctx.measureText(next).width>850){
+   text(line,604,y,30,'#d6e2ef');
+   line=word;
+   y+=42;
+  }else line=next;
+ }
+ if(line)text(line,604,y,30,'#d6e2ef');
+ addButton(1218,707,262,62,'campaign-start',cleared.includes(entry.id)?'REPLAY PART':'START PART','');
 }
 
 function drawChallenges(){
@@ -2978,7 +3023,7 @@ function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='startup'){dra
   drawCameraStage(t);drawFx(t);drawHud(t)
  }else{drawCameraStage(t);drawSetup()}drawHint(t);requestAnimationFrame(loop)}
 function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('campaign-option:')){chooseCampaignOption(Number(cmd.slice(16)));return}if(cmd.startsWith('roster-')){if(DEV_MODE)setEnemyRoster(cmd.slice(7));return}if(cmd.startsWith('loadout:')){handleLoadoutAction(cmd.slice(8));return}if(cmd.startsWith('store:')){handleStoreAction(cmd);return}if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'&&DEV_MODE){devPanelOpen=!devPanelOpen;return}if(cmd==='cancel-target'){cancelTargetSelection();return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(cameraPreview==='party'&&(phase==='player'||pendingTargetAction?.targetSide==='ally')){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(pendingTargetAction?.targetSide==='ally'&&pendingTargetAction.targetScope==='all'){if(!p||p.hp<=0){say('Choose a living party member to confirm the team skill.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;return executeCombatAction(actor,pending.action)}if(pendingTargetAction?.targetSide==='ally'){if(!p||p.hp<=0){say('Tune and Dawn’s Ultimate need a living ally.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;if(pending.action==='ultimate')return queueUltimate(pending.actorId,id);return executeCombatAction(actor,pending.action,null,id)}if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){if(DEV_MODE)setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){beginTargetSelection('ultimate',cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){if(DEV_MODE)chargeUltimateForTest(cmd.slice(11));return}
- switch(cmd){case 'startup-start':startFromTitle();break;case 'claim-daily-reward':claimDailyReward();break;case 'open-inventory':phase='inventory';hint='';break;case 'open-challenges':phase='challenges';hint='';break;case 'open-settings':phase='settings';hint='';break;case 'account-sign-out':window.TwoToneAccount?.signOut?.();break;case 'account-delete':window.TwoToneAccount?.deleteAccount?.();break;case 'open-store':phase='store';lastStoreNotice='';break;case 'open-campaign':openCampaignSelector();break;case 'campaign-back':backFromCampaignSelector();break;case 'campaign-previous':campaignPage--;choiceRects=[];break;case 'campaign-next':campaignPage++;choiceRects=[];break;case 'advance-story':advanceCampaignStory();break;case 'retry-campaign-save':saveCampaignVictory();break;case 'next-campaign-entry':openCampaignEntry(campaignEntry?.nextEntryId);break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'toggle-fullscreen':toggleFullscreen();break;case 'support-heal':if(DEV_MODE)startSupportDemo('heal');break;case 'support-revive':if(DEV_MODE)startSupportDemo('revive');break;case 'confirm-support':if(DEV_MODE)confirmSupportDemo();break;case 'cancel-support':if(DEV_MODE)cancelSupportDemo();break;case 'camera-party':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':if(DEV_MODE)toggleWavePreset();break;case 'toggle-recovery':if(DEV_MODE)setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':if(DEV_MODE)testKO();break;case 'test-revive':if(DEV_MODE)testRevive();break;case 'skill':play('skill');break;case 'cap-test':if(DEV_MODE)cycleSpCapTest();break;case 'hud-status-test':if(DEV_MODE)toggleHudStatusDemo();break;case 'f05-advance':if(DEV_MODE)addActionAdvance(activeId,25);break;case 'f05-delay':if(DEV_MODE)addActionDelay(activeId,25);break;case 'f05-speed':if(DEV_MODE)setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':if(DEV_MODE)queueSummonForTest('independent');break;case 'f05-summon-controlled':if(DEV_MODE)queueSummonForTest('controlled');break;
+ switch(cmd){case 'startup-start':startFromTitle();break;case 'claim-daily-reward':claimDailyReward();break;case 'open-inventory':phase='inventory';hint='';break;case 'open-challenges':phase='challenges';hint='';break;case 'open-settings':phase='settings';hint='';break;case 'account-sign-out':window.TwoToneAccount?.signOut?.();break;case 'account-delete':window.TwoToneAccount?.deleteAccount?.();break;case 'open-store':phase='store';lastStoreNotice='';break;case 'open-campaign':openCampaignSelector();break;case 'campaign-start':startPreviewedCampaignPart();break;case 'campaign-previous':campaignPage--;choiceRects=[];break;case 'campaign-next':campaignPage++;choiceRects=[];break;case 'advance-story':advanceCampaignStory();break;case 'retry-campaign-save':saveCampaignVictory();break;case 'next-campaign-entry':openCampaignEntry(campaignEntry?.nextEntryId);break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'toggle-fullscreen':toggleFullscreen();break;case 'support-heal':if(DEV_MODE)startSupportDemo('heal');break;case 'support-revive':if(DEV_MODE)startSupportDemo('revive');break;case 'confirm-support':if(DEV_MODE)confirmSupportDemo();break;case 'cancel-support':if(DEV_MODE)cancelSupportDemo();break;case 'camera-party':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':if(DEV_MODE)toggleWavePreset();break;case 'toggle-recovery':if(DEV_MODE)setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':if(DEV_MODE)testKO();break;case 'test-revive':if(DEV_MODE)testRevive();break;case 'skill':play('skill');break;case 'cap-test':if(DEV_MODE)cycleSpCapTest();break;case 'hud-status-test':if(DEV_MODE)toggleHudStatusDemo();break;case 'f05-advance':if(DEV_MODE)addActionAdvance(activeId,25);break;case 'f05-delay':if(DEV_MODE)addActionDelay(activeId,25);break;case 'f05-speed':if(DEV_MODE)setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':if(DEV_MODE)queueSummonForTest('independent');break;case 'f05-summon-controlled':if(DEV_MODE)queueSummonForTest('controlled');break;
  case 'progress-test-level':{if(DEV_MODE){const a=active(),p=a&&progressFor(a.id);if(a&&p){const cost=Math.max(1,requiredExp(a.level)-p.exp),result=testGrantExp(a.id,cost);say(result?`TEST ONLY: level ${result.level}, ${cost} EXP injected.`:'Ascension required or level cap reached.');}}break}
  case 'progress-test-ascend':{if(DEV_MODE){const a=active();if(a)say(testAscend(a.id)?`TEST ONLY: level ${a.level} ascension unlocked (no materials).`:'Not at a locked ascension gate.');}break}
  case 'hp-test-flat':{if(DEV_MODE){const a=active();if(a)setHpBonusForTest(a.id,'debug-flat','flat',(a.hpFlatModifiers['debug-flat']||0)+20);}break}
@@ -3002,7 +3047,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)c
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 if(DEV_MODE){
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,archetypeId:e.archetypeId,level:e.level,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,speed:speedOf(e),barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,momentumStacks:e.momentumStacks||0,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.1.11',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.1.12',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneEchoStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,echoPercent:echoPercentOf(unit)}));
 window.twoToneReflectStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,reflectPercent:reflectPercentOf(unit)}));
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,

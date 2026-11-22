@@ -54,5 +54,5 @@ Regular Mode is the only mode currently available to players. Dev Mode requires 
 
 ## Campaign
 
-- Campaign opens the Arc → Chapter → Part selector. Players can start any available part or replay a cleared one. Locked parts are visible.
+- Campaign opens an Arc → Chapter → Part sidebar and a preview panel. Players select a part to see its summary or unlock requirement, then use **Start Part** or **Replay Part** when available.
 - See the [Campaign Standard](../campaign-standard/campaign-standard.md) for story scenes, battles, and first-clear rewards.
