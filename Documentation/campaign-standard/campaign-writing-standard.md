@@ -17,7 +17,7 @@ The Dylan chapter excerpt is the style reference. Two-Tone follows Soul in close
 
 ## Write for the campaign screen
 
-- Group related paragraphs into one story beat. Separate paragraphs with a blank line in the beat’s text. Advance to a new beat when the focus, expression, setting, or time changes enough to warrant another screen.
+- Give each paragraph its own story beat and Continue screen. This includes standalone reactions, lines of dialogue, and punchlines. Let text wrap within the screen. Repeat the portrait and any background override when they carry across consecutive beats.
 - Check that each beat fits beside its portrait and above the controls. Split a crowded beat at a natural pause.
 - Choose a portrait for the reaction the player should notice. Let the artwork show the expression when the text already makes the feeling clear.
 - End a pre-battle scene as the encounter begins, then show **Begin Battle** and let the player take over. Store wave counts, enemy levels, and rewards in the encounter setup.

@@ -14,7 +14,7 @@ Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The title scre
 | `prerequisiteEntryId` | Earlier entry that must have a saved clear. Omit for the opening entry. |
 | `story.perspective` and `story.viewpointCharacterId` | Narrative perspective and viewpoint character. The main story follows Soul in third-person limited. |
 | `story.background` | Public image path. The scene uses it by default and crops it to fill the canvas. A beat may specify a `background` to show a change in setting or time. |
-| `story.beats` | Ordered story beats. Each beat has one or more paragraphs of `text` and may include a `portrait` reference. |
+| `story.beats` | Ordered story beats. Each beat has one paragraph of `text` and may include a `portrait` reference. A standalone line of narration or dialogue counts as its own paragraph. |
 | `encounter.areaId` and `encounter.party` | Registered battle area and fixed party for the encounter. |
 | `encounter.waves` | Ordered waves, each containing enemy groups with an archetype ID, a positive quantity, and an optional level. Specify the level for authored encounters. When omitted, use the archetype’s default. Existing encounter limits apply. |
 | `firstClearCoins` | Coins the account earns on its first victory. |
@@ -35,7 +35,7 @@ Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The title scre
 
 ## Play and save flow
 
-Continue advances one beat at a time. Begin Battle appears on the final beat and hands control to the existing combat engine. Campaign units begin each attempt at full health. They use their profile progression and equipment, and encounter damage stays within the attempt.
+Each screen shows one paragraph or standalone line. Continue replaces it with the next beat. Text can wrap within a screen. Begin Battle appears on the final beat and hands control to the existing combat engine. Campaign units begin each attempt at full health. They use their profile progression and equipment, and encounter damage stays within the attempt.
 
 ## Story backgrounds
 

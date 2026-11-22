@@ -26,15 +26,27 @@ const prologue = {
     background: PROLOGUE_CAMPSITE_BACKGROUND,
     beats: [
       {
-        text: "Soul lay asleep in his tent, his blanket pulled up to his chin. Outside, the campfire had nearly burned out.\n\nA rustle in the bushes woke him.",
+        text: "Soul lay asleep in his tent, his blanket pulled up to his chin. Outside, the campfire had nearly burned out.",
         portrait: { characterId: 'soul', reactionId: 'eyes-closed' },
       },
       {
-        text: "His eyes slowly opened. He glanced toward the tent flap, where he could see a faint glow from the fire, then closed them again.\n\nIt was probably a rabbit. Whatever it was, he hoped it would be gone by the time he had to get up.",
+        text: "A rustle in the bushes woke him.",
+        portrait: { characterId: 'soul', reactionId: 'eyes-closed' },
+      },
+      {
+        text: "His eyes slowly opened. He glanced toward the tent flap, where he could see a faint glow from the fire, then closed them again.",
         portrait: { characterId: 'soul', reactionId: 'focused' },
       },
       {
-        text: "Suddenly, a branch snapped.\n\nSoul opened his eyes again. He stayed still for a moment, listening. Something scraped against the ground just outside the tent.",
+        text: "It was probably a rabbit. Whatever it was, he hoped it would be gone by the time he had to get up.",
+        portrait: { characterId: 'soul', reactionId: 'focused' },
+      },
+      {
+        text: "Suddenly, a branch snapped.",
+        portrait: { characterId: 'soul', reactionId: 'startled' },
+      },
+      {
+        text: "Soul opened his eyes again. He stayed still for a moment, listening. Something scraped against the ground just outside the tent.",
         portrait: { characterId: 'soul', reactionId: 'startled' },
       },
       {
@@ -42,11 +54,19 @@ const prologue = {
         portrait: { characterId: 'soul', reactionId: 'focused' },
       },
       {
-        text: "At first, all he could see was the fire. As his eyes adjusted, he noticed a creature crouched just beyond it.\n\nSoul raised his sword. The creature’s eyes followed the movement.",
+        text: "At first, all he could see was the fire. As his eyes adjusted, he noticed a creature crouched just beyond it.",
         portrait: { characterId: 'soul', reactionId: 'focused' },
       },
       {
-        text: "For a moment, neither of them moved.\n\nThen the creature flattened itself against the dirt and sprang at him.",
+        text: "Soul raised his sword. The creature’s eyes followed the movement.",
+        portrait: { characterId: 'soul', reactionId: 'focused' },
+      },
+      {
+        text: "For a moment, neither of them moved.",
+        portrait: { characterId: 'soul', reactionId: 'startled' },
+      },
+      {
+        text: "Then the creature flattened itself against the dirt and sprang at him.",
         portrait: { characterId: 'soul', reactionId: 'startled' },
       },
     ],
@@ -71,11 +91,19 @@ const prologue1b = {
     background: PROLOGUE_CAMPSITE_BACKGROUND,
     beats: [
       {
-        text: "Soul brought his sword down one last time. The Slime collapsed beside the fire and went still.\n\nHe kept his sword raised for a few seconds. When the Slime showed no sign of moving, he lowered it and looked at the blade.",
+        text: "Soul brought his sword down one last time. The Slime collapsed beside the fire and went still.",
         portrait: { characterId: 'soul', reactionId: 'composed' },
       },
       {
-        text: "Some of the slime was still clinging to it.\n\nSoul gave the sword a quick flick. Most of it came off, though a thin streak remained along one side. He wiped it away before sliding the sword back into its sheath.",
+        text: "He kept his sword raised for a few seconds. When the Slime showed no sign of moving, he lowered it and looked at the blade.",
+        portrait: { characterId: 'soul', reactionId: 'composed' },
+      },
+      {
+        text: "Some of the slime was still clinging to it.",
+        portrait: { characterId: 'soul', reactionId: 'composed' },
+      },
+      {
+        text: "Soul gave the sword a quick flick. Most of it came off, though a thin streak remained along one side. He wiped it away before sliding the sword back into its sheath.",
         portrait: { characterId: 'soul', reactionId: 'composed' },
       },
       {
@@ -87,7 +115,12 @@ const prologue1b = {
         background: PROLOGUE_SUNRISE_BACKGROUND,
       },
       {
-        text: "Once it was strapped to his pack, Soul put out the last of the fire and stood up. He took a moment to look around before deciding which way to go.\n\nBeyond the low hills, he could just make out the rooftops of a village.",
+        text: "Once it was strapped to his pack, Soul put out the last of the fire and stood up. He took a moment to look around before deciding which way to go.",
+        background: PROLOGUE_SUNRISE_BACKGROUND,
+        portrait: { characterId: 'soul', reactionId: 'hopeful' },
+      },
+      {
+        text: "Beyond the low hills, he could just make out the rooftops of a village.",
         background: PROLOGUE_SUNRISE_BACKGROUND,
         portrait: { characterId: 'soul', reactionId: 'hopeful' },
       },
@@ -102,7 +135,12 @@ const prologue1b = {
         portrait: { characterId: 'soul', reactionId: 'startled' },
       },
       {
-        text: "Three wolves stepped out of the bushes beside the cold fire pit. Soul stood there with one hand still on his pack strap.\n\nHe hadn’t even started walking yet.",
+        text: "Three wolves stepped out of the bushes beside the cold fire pit. Soul stood there with one hand still on his pack strap.",
+        background: PROLOGUE_SUNRISE_BACKGROUND,
+        portrait: { characterId: 'soul', reactionId: 'startled' },
+      },
+      {
+        text: "He hadn’t even started walking yet.",
         background: PROLOGUE_SUNRISE_BACKGROUND,
         portrait: { characterId: 'soul', reactionId: 'startled' },
       },
@@ -135,7 +173,10 @@ const prologue1c = {
         text: "He had been walking for a while when he heard water running nearby. By then, the sun was well above the hills. He followed the sound until he reached the river, about halfway to the village.",
       },
       {
-        text: "Soul stopped on the bank and looked down at his clothes. There was dirt on his knees, grass stuck to one sleeve, and a patch of slime he’d somehow missed.\n\nHe glanced at the river again. He could spare a few minutes.",
+        text: "Soul stopped on the bank and looked down at his clothes. There was dirt on his knees, grass stuck to one sleeve, and a patch of slime he’d somehow missed.",
+      },
+      {
+        text: "He glanced at the river again. He could spare a few minutes.",
       },
       {
         text: "Soul set his pack and sword down on the bank, removed his clothes, and stepped into the water. It was colder than he’d expected. He stood still until he got used to it, then waded in a little farther and began washing himself.",
@@ -144,7 +185,11 @@ const prologue1c = {
         text: "Once he was done, he scrubbed his clothes in the shallows. He had to go over the same patch twice before the last of the slime came out.",
       },
       {
-        text: "Soul climbed back onto the bank, wrung out his clothes, and spread them over a flat rock in the sun. He sat down beside them and listened to the water while he waited.\n\nFor a little while, it was quiet.",
+        text: "Soul climbed back onto the bank, wrung out his clothes, and spread them over a flat rock in the sun. He sat down beside them and listened to the water while he waited.",
+        portrait: { characterId: 'soul', reactionId: 'relaxed' },
+      },
+      {
+        text: "For a little while, it was quiet.",
         portrait: { characterId: 'soul', reactionId: 'relaxed' },
       },
       {
@@ -152,7 +197,11 @@ const prologue1c = {
         portrait: { characterId: 'soul', reactionId: 'startled' },
       },
       {
-        text: "He looked up. Five hawks were circling low over the bank.\n\n“Seriously?”",
+        text: "He looked up. Five hawks were circling low over the bank.",
+        portrait: { characterId: 'soul', reactionId: 'startled' },
+      },
+      {
+        text: "“Seriously?”",
         portrait: { characterId: 'soul', reactionId: 'startled' },
       },
       {

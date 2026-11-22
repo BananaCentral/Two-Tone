@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import test from 'node:test';
-import { CAMPAIGN_ARCS, FIRST_CAMPAIGN_ENTRY_ID, STORY_PORTRAITS, awardCampaignClear, getCampaignEntry, isCampaignEntryUnlocked } from '../src/scripts/campaign.mjs';
+import { CAMPAIGN_ARCS, CAMPAIGN_ENTRIES, FIRST_CAMPAIGN_ENTRY_ID, STORY_PORTRAITS, awardCampaignClear, getCampaignEntry, isCampaignEntryUnlocked } from '../src/scripts/campaign.mjs';
 
 test('the campaign opens with Soul facing one Slime after the gelatinous creature lunges', () => {
   const entry = getCampaignEntry(FIRST_CAMPAIGN_ENTRY_ID);
   assert.equal(entry.id, 'prologue_1a');
   assert.equal(entry.story.background, '/assets/prologue-1a-campsite.jpg');
-  assert.equal(entry.story.beats.length, 6);
+  assert.equal(entry.story.beats.length, 11);
   assert.match(entry.story.beats.at(-1).text, /flattened itself against the dirt and sprang at him\.$/);
   assert.equal(entry.encounter.areaId, 'prologue-campsite');
   assert.deepEqual(entry.encounter.party, ['soul']);
@@ -17,7 +17,8 @@ test('the campaign opens with Soul facing one Slime after the gelatinous creatur
 test('Prologue 1A assigns a registered Soul portrait to each story beat', () => {
   const { beats } = getCampaignEntry(FIRST_CAMPAIGN_ENTRY_ID).story;
   assert.deepEqual(beats.map(beat => beat.portrait.reactionId), [
-    'eyes-closed', 'focused', 'startled', 'focused', 'focused', 'startled',
+    'eyes-closed', 'eyes-closed', 'focused', 'focused', 'startled', 'startled',
+    'focused', 'focused', 'focused', 'startled', 'startled',
   ]);
   for (const { portrait: { characterId, reactionId } } of beats) {
     assert.equal(characterId, 'soul');
@@ -44,19 +45,14 @@ test('Prologue 1B unlocks after 1A and grants a separate first-clear reward', ()
   assert.deepEqual(profile, { coins: 0 });
   assert.equal(awardCampaignClear(profile, FIRST_CAMPAIGN_ENTRY_ID), 100);
   assert.equal(isCampaignEntryUnlocked(entry, profile.clearedCampaignEntries), true);
-  assert.equal(entry.story.beats.length, 8);
+  assert.equal(entry.story.beats.length, 12);
   assert.deepEqual(entry.story.beats.map(beat => beat.background ?? entry.story.background), [
-    '/assets/prologue-1a-campsite.jpg',
-    '/assets/prologue-1a-campsite.jpg',
-    '/assets/prologue-1b-campsite-sunrise.webp',
-    '/assets/prologue-1b-campsite-sunrise.webp',
-    '/assets/prologue-1b-campsite-sunrise.webp',
-    '/assets/prologue-1b-campsite-sunrise.webp',
-    '/assets/prologue-1b-campsite-sunrise.webp',
-    '/assets/prologue-1b-campsite-sunrise.webp',
+    ...Array(4).fill('/assets/prologue-1a-campsite.jpg'),
+    ...Array(8).fill('/assets/prologue-1b-campsite-sunrise.webp'),
   ]);
   assert.deepEqual(entry.story.beats.map(beat => beat.portrait?.reactionId), [
-    'composed', 'composed', undefined, undefined, 'hopeful', 'hopeful', 'startled', 'startled',
+    'composed', 'composed', 'composed', 'composed', undefined, undefined,
+    'hopeful', 'hopeful', 'hopeful', 'startled', 'startled', 'startled',
   ]);
   assert.equal(entry.encounter.areaId, 'prologue-campsite-sunrise');
   assert.deepEqual(entry.encounter.waves, [[{ enemyId: 'wolf', quantity: 3, level: 1 }]]);
@@ -74,7 +70,7 @@ test('Prologue 1C unlocks after the wolves and stages five Hawks at the river', 
   assert.equal(isCampaignEntryUnlocked(entry, profile.clearedCampaignEntries), true);
   assert.equal(entry.story.beats[0].background, '/assets/prologue-1b-campsite-sunrise.webp');
   assert.equal(entry.story.background, '/assets/prologue-1c-riverbank.webp');
-  assert.equal(entry.story.beats[5].portrait.reactionId, 'relaxed');
+  assert.equal(entry.story.beats[6].portrait.reactionId, 'relaxed');
   assert.equal(entry.encounter.areaId, 'prologue-riverbank');
   assert.deepEqual(entry.encounter.waves, [[{ enemyId: 'hawk', quantity: 5, level: 1 }]]);
   assert.equal(awardCampaignClear(profile, entry.id), 100);
@@ -94,4 +90,12 @@ test('Arc One lists Prologue parts A through C in order with stable entry IDs', 
     const entry = getCampaignEntry(part.entryId);
     assert.ok(entry?.summary.trim(), part.entryId);
   }
+});
+
+test('each story screen contains a single paragraph, including standalone reactions', () => {
+  for (const entry of Object.values(CAMPAIGN_ENTRIES)) {
+    for (const beat of entry.story.beats) assert.doesNotMatch(beat.text, /[\r\n]/);
+  }
+  assert.equal(getCampaignEntry('prologue_1b').story.beats.at(-1).text, 'He hadn’t even started walking yet.');
+  assert.equal(getCampaignEntry('prologue_1c').story.beats.at(-2).text, '“Seriously?”');
 });
