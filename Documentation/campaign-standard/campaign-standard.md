@@ -24,7 +24,7 @@ Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The title scre
 
 - Organize the selector as **Arc → Chapter → Part**. An arc contains an ordered list of chapters. A chapter contains an ordered list of lettered parts. Each part references a playable entry by its existing entry ID.
 - Define this hierarchy in `CAMPAIGN_ARCS`. Give arcs and chapters stable IDs and display titles. List part letters and entry IDs in the order players should see them.
-- Arc One contains the **Prologue** chapter. Part A opens `prologue_1a`, Part B opens `prologue_1b`, and Part C opens `prologue_1c`.
+- Arc One contains the **Prologue** chapter. Part A opens `prologue_1a`, Part B opens `prologue_1b`, Part C opens `prologue_1c`, and Part D opens `prologue_1d`.
 - Display arcs, chapters, and parts in a left sidebar styled like the Loadout tabs. Expand or collapse arcs and chapters in place. Use indentation for hierarchy and highlight the selected part. Paginate the sidebar when the expanded tree exceeds eight rows.
 - On entry, expand the first arc and chapter and preview its first available uncleared part, or its first part if none qualify.
 - Mark parts **Available**, **Cleared**, or **Locked** in the sidebar. Selecting a row keeps the player in Campaign and updates the preview panel on the right.
@@ -61,6 +61,9 @@ Combat currently resolves in the browser. The server accepts the authenticated c
 | `eyes-closed` | Asleep, stirring, or resting with eyes closed. |
 | `focused` | Listening, assessing a threat, or preparing to act. |
 | `composed` | Calm again after the immediate threat has passed. |
+| `worried` | Uneasy at the signs of damage or danger. |
+| `angry` | Visibly angry and ready to act. |
+| `delighted` | Pleased by a small success or surprise. |
 | `relaxed` | A quiet moment after washing at the river. |
 | `hopeful` | A quiet smile at a promising sight. |
 | `startled` | Reacting to a sudden sound or movement. |
@@ -77,4 +80,8 @@ Soul’s portraits appear in this order: eyes closed as he stirs, focused as he 
 
 ## Prologue 1C
 
-`prologue_1c` opens after the saved clear of Prologue 1B. Soul leaves the sunrise campsite and reaches the riverbank in full morning. The riverbank background stays through the story and battle. Use Soul’s relaxed portrait while he dries and his startled portrait as the hawks circle and dive. The encounter is one wave of five level 1 Hawks against Soul. The first victory grants 100 coins. The next entry is unset.
+`prologue_1c` opens after the saved clear of Prologue 1B. Soul leaves the sunrise campsite and reaches the riverbank in full morning. The riverbank background stays through the story and battle. Use Soul’s relaxed portrait while he dries and his startled portrait as the hawks circle and dive. The encounter is one wave of five level 1 Hawks against Soul. The first victory grants 100 coins. The saved victory unlocks Prologue 1D.
+
+## Prologue 1D
+
+`prologue_1d` opens after the saved clear of Prologue 1C. Soul cooks and eats at the riverbank before continuing to the village. The background switches to the village on arrival and carries into combat. The goblin leader steps forward alone. Soul faces one level 1 Goblin in one wave. The first victory grants 100 coins. The next entry is unset.

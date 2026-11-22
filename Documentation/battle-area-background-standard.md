@@ -22,3 +22,4 @@
 | `prologue-campsite` | Prologue Campsite | `assets/prologue-1a-campsite.jpg` | Mirrored main background |
 | `prologue-campsite-sunrise` | Prologue Campsite at Sunrise | `assets/prologue-1b-campsite-sunrise.webp` | Mirrored main background |
 | `prologue-riverbank` | Prologue Riverbank | `assets/prologue-1c-riverbank.webp` | Mirrored main background |
+| `prologue-village` | Prologue Village | `assets/prologue-1d-village.webp` | Mirrored main background |

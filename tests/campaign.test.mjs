@@ -78,13 +78,14 @@ test('Prologue 1C unlocks after the wolves and stages five Hawks at the river', 
   assert.equal(profile.coins, 300);
 });
 
-test('Arc One lists Prologue parts A through C in order with stable entry IDs', () => {
+test('Arc One lists Prologue parts A through D in order with stable entry IDs', () => {
   const arc = CAMPAIGN_ARCS.find(arc => arc.id === 'arc_1');
   const chapter = arc.chapters.find(chapter => chapter.id === 'prologue');
   assert.deepEqual(chapter.parts, [
     { label: 'A', entryId: 'prologue_1a' },
     { label: 'B', entryId: 'prologue_1b' },
     { label: 'C', entryId: 'prologue_1c' },
+    { label: 'D', entryId: 'prologue_1d' },
   ]);
   for (const part of chapter.parts) {
     const entry = getCampaignEntry(part.entryId);
@@ -98,4 +99,21 @@ test('each story screen contains a single paragraph, including standalone reacti
   }
   assert.equal(getCampaignEntry('prologue_1b').story.beats.at(-1).text, 'He hadn’t even started walking yet.');
   assert.equal(getCampaignEntry('prologue_1c').story.beats.at(-2).text, '“Seriously?”');
+});
+
+test('Prologue 1D follows the Hawks and stages a single Goblin in the village', () => {
+  const profile = { coins: 200, clearedCampaignEntries: ['prologue_1a', 'prologue_1b'] };
+  const entry = getCampaignEntry('prologue_1d');
+  assert.equal(getCampaignEntry('prologue_1c').nextEntryId, entry.id);
+  assert.equal(awardCampaignClear(profile, entry.id), null);
+  assert.equal(awardCampaignClear(profile, 'prologue_1c'), 100);
+  assert.equal(entry.story.beats.length, 16);
+  assert.equal(entry.story.beats[1].text, 'His stomach growled.');
+  assert.equal(entry.story.background, '/assets/prologue-1c-riverbank.webp');
+  assert.equal(entry.story.beats.at(-1).background, '/assets/prologue-1d-village.webp');
+  assert.equal(entry.encounter.areaId, 'prologue-village');
+  assert.deepEqual(entry.encounter.waves, [[{ enemyId: 'goblin', quantity: 1, level: 1 }]]);
+  assert.equal(awardCampaignClear(profile, entry.id), 100);
+  assert.equal(awardCampaignClear(profile, entry.id), 0);
+  assert.equal(profile.coins, 400);
 });

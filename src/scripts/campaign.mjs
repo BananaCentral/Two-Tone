@@ -5,6 +5,8 @@ export const PROLOGUE_SUNRISE_BACKGROUND = '/assets/prologue-1b-campsite-sunrise
 
 export const PROLOGUE_RIVERBANK_BACKGROUND = '/assets/prologue-1c-riverbank.webp';
 
+export const PROLOGUE_VILLAGE_BACKGROUND = '/assets/prologue-1d-village.webp';
+
 export const STORY_PORTRAITS = Object.freeze({
   soul: Object.freeze({
     'eyes-closed': '/assets/soul-story-eyes-closed.webp',
@@ -12,6 +14,9 @@ export const STORY_PORTRAITS = Object.freeze({
     composed: '/assets/soul-story-composed.webp',
     hopeful: '/assets/soul-story-hopeful.webp',
     relaxed: '/assets/soul-story-relaxed.webp',
+    worried: '/assets/soul-story-worried.webp',
+    angry: '/assets/soul-story-angry.webp',
+    delighted: '/assets/soul-story-delighted.webp',
     startled: '/assets/soul-story-startled.webp',
   }),
 });
@@ -216,6 +221,96 @@ const prologue1c = {
     waves: [[{ enemyId: 'hawk', quantity: 5, level: 1 }]],
   },
   firstClearCoins: 100,
+  nextEntryId: 'prologue_1d',
+};
+
+const prologue1d = {
+  id: 'prologue_1d',
+  title: 'Prologue 1D',
+  summary: 'Soul takes a break by the river before continuing to the village.',
+  prerequisiteEntryId: prologue1c.id,
+  story: {
+    perspective: 'third-person-limited',
+    viewpointCharacterId: 'soul',
+    background: PROLOGUE_RIVERBANK_BACKGROUND,
+    beats: [
+      {
+        text: "After the last hawk fell, Soul stood by the river for a moment, catching his breath.",
+        portrait: { characterId: 'soul', reactionId: 'composed' },
+      },
+      {
+        text: "His stomach growled.",
+        portrait: { characterId: 'soul', reactionId: 'startled' },
+      },
+      {
+        text: "He looked down at the hawks. He’d been hoping to get breakfast in the village, but it was already getting late for breakfast.",
+        portrait: { characterId: 'soul', reactionId: 'hopeful' },
+      },
+      {
+        text: "He gathered some dry branches and started a fire. While it was catching, he skinned the hawks and prepared the meat.",
+      },
+      {
+        text: "Once the fire had settled, Soul set the meat over the coals. He sat back on the rock where he’d dried his clothes and waited, getting up every so often to turn it.",
+      },
+      {
+        text: "When the meat was ready, he took a bite and smiled. It was better than he’d expected. He sat there a little longer and finished his meal.",
+        portrait: { characterId: 'soul', reactionId: 'delighted' },
+      },
+      {
+        text: "After putting out the fire, Soul picked up his pack and continued toward the village.",
+      },
+      {
+        text: "It was afternoon by the time he arrived. He’d expected to see someone out on the road, but the village street was empty.",
+        background: PROLOGUE_VILLAGE_BACKGROUND,
+        portrait: { characterId: 'soul', reactionId: 'worried' },
+      },
+      {
+        text: "As he walked past the first few houses, he noticed broken shutters and a door hanging off one hinge. A cart had been overturned in the middle of the street, its contents scattered across the dirt.",
+        background: PROLOGUE_VILLAGE_BACKGROUND,
+      },
+      {
+        text: "Soul heard voices farther ahead. He moved closer and looked around the corner of a house.",
+        background: PROLOGUE_VILLAGE_BACKGROUND,
+        portrait: { characterId: 'soul', reactionId: 'focused' },
+      },
+      {
+        text: "Several goblins had gathered in the square. Behind them were wooden cages, with villagers crowded inside. One of them looked up and caught sight of him.",
+        background: PROLOGUE_VILLAGE_BACKGROUND,
+        portrait: { characterId: 'soul', reactionId: 'worried' },
+      },
+      {
+        text: "Soul glanced down. Human bones lay scattered near the cages, and he could see gnaw marks on some of them.",
+        background: PROLOGUE_VILLAGE_BACKGROUND,
+        portrait: { characterId: 'soul', reactionId: 'worried' },
+      },
+      {
+        text: "He started to step back. His heel caught a loose stone, sending it clattering into the square.",
+        background: PROLOGUE_VILLAGE_BACKGROUND,
+        portrait: { characterId: 'soul', reactionId: 'startled' },
+      },
+      {
+        text: "The voices stopped. The goblins turned toward him.",
+        background: PROLOGUE_VILLAGE_BACKGROUND,
+        portrait: { characterId: 'soul', reactionId: 'startled' },
+      },
+      {
+        text: "One of them stepped away from the others. The rest made room as he walked toward Soul, then stopped and pointed his spear at him.",
+        background: PROLOGUE_VILLAGE_BACKGROUND,
+        portrait: { characterId: 'soul', reactionId: 'focused' },
+      },
+      {
+        text: "Soul drew his sword.",
+        background: PROLOGUE_VILLAGE_BACKGROUND,
+        portrait: { characterId: 'soul', reactionId: 'angry' },
+      },
+    ],
+  },
+  encounter: {
+    areaId: 'prologue-village',
+    party: ['soul'],
+    waves: [[{ enemyId: 'goblin', quantity: 1, level: 1 }]],
+  },
+  firstClearCoins: 100,
   nextEntryId: null,
 };
 
@@ -223,6 +318,7 @@ export const CAMPAIGN_ENTRIES = Object.freeze({
   [prologue.id]: prologue,
   [prologue1b.id]: prologue1b,
   [prologue1c.id]: prologue1c,
+  [prologue1d.id]: prologue1d,
 });
 
 export const CAMPAIGN_ARCS = [
@@ -237,6 +333,7 @@ export const CAMPAIGN_ARCS = [
           { label: 'A', entryId: prologue.id },
           { label: 'B', entryId: prologue1b.id },
           { label: 'C', entryId: prologue1c.id },
+          { label: 'D', entryId: prologue1d.id },
         ],
       },
     ],
