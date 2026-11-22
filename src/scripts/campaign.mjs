@@ -173,22 +173,30 @@ export const CAMPAIGN_ENTRIES = Object.freeze({
   [prologue1c.id]: prologue1c,
 });
 
+export const CAMPAIGN_ARCS = [
+  {
+    id: 'arc_1',
+    title: 'Arc One',
+    chapters: [
+      {
+        id: 'prologue',
+        title: 'Prologue',
+        parts: [
+          { label: 'A', entryId: prologue.id },
+          { label: 'B', entryId: prologue1b.id },
+          { label: 'C', entryId: prologue1c.id },
+        ],
+      },
+    ],
+  },
+];
+
 export function getCampaignEntry(entryId) {
   return Object.hasOwn(CAMPAIGN_ENTRIES, entryId) ? CAMPAIGN_ENTRIES[entryId] : null;
 }
 
 export function isCampaignEntryUnlocked(entry, cleared = []) {
   return !entry.prerequisiteEntryId || cleared.includes(entry.prerequisiteEntryId);
-}
-
-export function getCampaignResumeEntry(cleared = []) {
-  let entry = getCampaignEntry(FIRST_CAMPAIGN_ENTRY_ID);
-  while (entry.nextEntryId && cleared.includes(entry.id)) {
-    const next = getCampaignEntry(entry.nextEntryId);
-    if (!next || !isCampaignEntryUnlocked(next, cleared)) break;
-    entry = next;
-  }
-  return entry;
 }
 
 export function awardCampaignClear(profile, entryId) {

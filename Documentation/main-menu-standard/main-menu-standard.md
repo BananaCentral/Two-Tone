@@ -54,5 +54,5 @@ Regular Mode is the only mode currently available to players. Dev Mode requires 
 
 ## Campaign
 
-- Campaign resumes at the first beat of the next unlocked, uncleared entry. After all available entries are cleared, it opens the latest entry for replay. The battle begins when the player selects **Begin Battle** on the final beat.
+- Campaign opens the Arc → Chapter → Part selector. Players can start any available part or replay a cleared one. Locked parts are visible.
 - See the [Campaign Standard](../campaign-standard/campaign-standard.md) for story scenes, battles, and first-clear rewards.

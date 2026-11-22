@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import test from 'node:test';
-import { FIRST_CAMPAIGN_ENTRY_ID, STORY_PORTRAITS, awardCampaignClear, getCampaignEntry, getCampaignResumeEntry } from '../src/scripts/campaign.mjs';
+import { CAMPAIGN_ARCS, FIRST_CAMPAIGN_ENTRY_ID, STORY_PORTRAITS, awardCampaignClear, getCampaignEntry, isCampaignEntryUnlocked } from '../src/scripts/campaign.mjs';
 
 test('the campaign opens with Soul facing one Slime after the gelatinous creature lunges', () => {
   const entry = getCampaignEntry(FIRST_CAMPAIGN_ENTRY_ID);
@@ -38,12 +38,12 @@ test('a legacy profile receives the reward once and unknown entries leave it int
 test('Prologue 1B unlocks after 1A and grants a separate first-clear reward', () => {
   const profile = { coins: 0 };
   const entry = getCampaignEntry('prologue_1b');
-  assert.equal(getCampaignResumeEntry().id, FIRST_CAMPAIGN_ENTRY_ID);
+  assert.equal(isCampaignEntryUnlocked(entry), false);
   assert.equal(getCampaignEntry(FIRST_CAMPAIGN_ENTRY_ID).nextEntryId, entry.id);
   assert.equal(awardCampaignClear(profile, entry.id), null);
   assert.deepEqual(profile, { coins: 0 });
   assert.equal(awardCampaignClear(profile, FIRST_CAMPAIGN_ENTRY_ID), 100);
-  assert.equal(getCampaignResumeEntry(profile.clearedCampaignEntries).id, entry.id);
+  assert.equal(isCampaignEntryUnlocked(entry, profile.clearedCampaignEntries), true);
   assert.equal(entry.story.beats.length, 8);
   assert.deepEqual(entry.story.beats.map(beat => beat.background ?? entry.story.background), [
     '/assets/prologue-1a-campsite.jpg',
@@ -63,7 +63,7 @@ test('Prologue 1B unlocks after 1A and grants a separate first-clear reward', ()
   assert.equal(awardCampaignClear(profile, entry.id), 100);
   assert.equal(awardCampaignClear(profile, entry.id), 0);
   assert.equal(profile.coins, 200);
-  assert.equal(getCampaignResumeEntry(profile.clearedCampaignEntries).id, 'prologue_1c');
+  assert.equal(isCampaignEntryUnlocked(getCampaignEntry('prologue_1c'), profile.clearedCampaignEntries), true);
 });
 
 test('Prologue 1C unlocks after the wolves and stages five Hawks at the river', () => {
@@ -71,7 +71,7 @@ test('Prologue 1C unlocks after the wolves and stages five Hawks at the river', 
   const entry = getCampaignEntry('prologue_1c');
   assert.equal(awardCampaignClear(profile, entry.id), null);
   assert.equal(awardCampaignClear(profile, 'prologue_1b'), 100);
-  assert.equal(getCampaignResumeEntry(profile.clearedCampaignEntries).id, entry.id);
+  assert.equal(isCampaignEntryUnlocked(entry, profile.clearedCampaignEntries), true);
   assert.equal(entry.story.beats[0].background, '/assets/prologue-1b-campsite-sunrise.webp');
   assert.equal(entry.story.background, '/assets/prologue-1c-riverbank.webp');
   assert.equal(entry.story.beats[5].portrait.reactionId, 'relaxed');
@@ -80,4 +80,15 @@ test('Prologue 1C unlocks after the wolves and stages five Hawks at the river', 
   assert.equal(awardCampaignClear(profile, entry.id), 100);
   assert.equal(awardCampaignClear(profile, entry.id), 0);
   assert.equal(profile.coins, 300);
+});
+
+test('Arc One lists Prologue parts A through C in order with stable entry IDs', () => {
+  const arc = CAMPAIGN_ARCS.find(arc => arc.id === 'arc_1');
+  const chapter = arc.chapters.find(chapter => chapter.id === 'prologue');
+  assert.deepEqual(chapter.parts, [
+    { label: 'A', entryId: 'prologue_1a' },
+    { label: 'B', entryId: 'prologue_1b' },
+    { label: 'C', entryId: 'prologue_1c' },
+  ]);
+  for (const part of chapter.parts) assert.ok(getCampaignEntry(part.entryId));
 });

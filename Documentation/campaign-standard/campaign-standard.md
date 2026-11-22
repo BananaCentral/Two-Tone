@@ -4,7 +4,7 @@ Follow the [Campaign Writing Standard](campaign-writing-standard.md) for narrati
 
 ## Campaign entries
 
-Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The title screen opens the entry named by `FIRST_CAMPAIGN_ENTRY_ID` for accounts that have yet to clear it. The saved first clear unlocks the main menu. The Campaign tile follows the chapter links to the next unlocked, uncleared entry. If all available entries are cleared, it opens the last entry for replay.
+Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The title screen opens the entry named by `FIRST_CAMPAIGN_ENTRY_ID` for accounts that have yet to clear it. The saved first clear unlocks the main menu. After the main menu unlocks, its Campaign tile opens the campaign selector.
 
 | Field | Meaning |
 |---|---|
@@ -18,6 +18,15 @@ Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The title scre
 | `encounter.waves` | Ordered waves, each containing enemy groups with an archetype ID, a positive quantity, and an optional level. Specify the level for authored encounters. When omitted, use the archetype’s default. Existing encounter limits apply. |
 | `firstClearCoins` | Coins the account earns on its first victory. |
 | `nextEntryId` | Entry opened by Continue after the victory is saved. Use `null` for the last available entry. |
+
+## Campaign selector
+
+- Organize the selector as **Arc → Chapter → Part**. An arc contains an ordered list of chapters. A chapter contains an ordered list of lettered parts. Each part references a playable entry by its existing entry ID.
+- Define this hierarchy in `CAMPAIGN_ARCS`. Give arcs and chapters stable IDs and display titles. List part letters and entry IDs in the order players should see them.
+- Arc One contains the **Prologue** chapter. Part A opens `prologue_1a`, Part B opens `prologue_1b`, and Part C opens `prologue_1c`.
+- Every time players open Campaign from the main menu, show **Select Arc**. Selecting an arc opens **Select Chapter**, then selecting a chapter opens **Select Part**. Back returns to the previous level. The arc screen links back to the main menu. Lists with more than five choices use additional pages.
+- Mark a part **Available** when its prerequisite is satisfied and **Cleared** after its first saved victory. A part with an unmet prerequisite is visible and marked **Locked**. Both available and cleared parts open at the first story beat. Replays do not award first-clear coins again.
+- Selector order controls browsing. `nextEntryId` controls **Continue** from a saved victory, and `prerequisiteEntryId` controls unlocks.
 
 ## Play and save flow
 
