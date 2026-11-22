@@ -20,7 +20,7 @@ function pick(items){return items[randomInt(items.length)]}
 function buildPools(type,state){
  const ids=CHARACTER_IDS_PUBLIC;
  const target=trackFor(state,type).target;
- const map=id=>type==="character"?{id,name:id.toUpperCase()}:{id:`premium-${id}`,name:id==="soul"?"Soulbound":`${id.toUpperCase()} Premium Weapon`};
+ const map=id=>type==="character"?{id,name:id.toUpperCase()}:{id:`premium-${id}`,name:id==="soul"?"Soulbound":id==="zero"?"Nightshade":`${id.toUpperCase()} Premium Weapon`};
  return {
   featured:ids.filter(id=>map(id).id===target).map(map),
   offFeature:ids.filter(id=>map(id).id!==target).map(map),
