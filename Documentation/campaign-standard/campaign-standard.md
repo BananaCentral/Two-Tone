@@ -53,7 +53,7 @@ Combat currently resolves in the browser. The server accepts the authenticated c
 
 - Add transparent, square portraits to the shared `STORY_PORTRAITS` registry in `campaign.mjs`. Match head and shoulder framing across a character’s expressions.
 - Reference a portrait by `characterId` and `reactionId` on each beat that needs it. Repeat the reference to hold an expression across beats. Omit the reference for narration alone.
-- The portrait appears on the right as its paragraph is shown and stays there until the player advances. Reserve space for the complete paragraph and its buttons. Keep the background visible around the panel.
+- Place story portraits in a fixed slot on the left, with the title and narration to their right. The portrait stays in place until the player advances. Beats without a portrait use the full text width. Keep the paragraph above the controls and the background visible around the panel.
 - A failed portrait load leaves the paragraph and controls usable. **Begin Battle** clears the story portrait at the combat handoff.
 
 | Soul reaction | Use |
