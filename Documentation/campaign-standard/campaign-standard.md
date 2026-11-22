@@ -1,5 +1,7 @@
 # Campaign Standard
 
+Follow the [Campaign Writing Standard](campaign-writing-standard.md) for narration, tone, and paragraph breaks.
+
 ## Campaign entries
 
 Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The title screen opens the entry named by `FIRST_CAMPAIGN_ENTRY_ID` for accounts that have yet to clear it. The saved first clear unlocks the main menu. The Campaign tile follows the chapter links to the next unlocked, uncleared entry. If all available entries are cleared, it opens the last entry for replay.
@@ -11,7 +13,7 @@ Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The title scre
 | `prerequisiteEntryId` | Earlier entry that must have a saved clear. Omit for the opening entry. |
 | `story.perspective` and `story.viewpointCharacterId` | Narrative perspective and viewpoint character. The main story follows Soul in third-person limited. |
 | `story.background` | Public image path. The scene uses it by default and crops it to fill the canvas. A beat may specify a `background` to show a change in setting or time. |
-| `story.beats` | Ordered story beats. Each beat has one paragraph of `text` and may include a `portrait` reference. |
+| `story.beats` | Ordered story beats. Each beat has one or more paragraphs of `text` and may include a `portrait` reference. |
 | `encounter.areaId` and `encounter.party` | Registered battle area and fixed party for the encounter. |
 | `encounter.waves` | Ordered waves, each containing enemy groups with an archetype ID, a positive quantity, and an optional level. Specify the level for authored encounters. When omitted, use the archetype’s default. Existing encounter limits apply. |
 | `firstClearCoins` | Coins the account earns on its first victory. |
@@ -19,7 +21,7 @@ Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The title scre
 
 ## Play and save flow
 
-Continue advances the opening one paragraph at a time. Begin Battle appears on the final paragraph and hands control to the existing combat engine. Campaign units begin each attempt at full health. They use their profile progression and equipment, and encounter damage stays within the attempt.
+Continue advances one beat at a time. Begin Battle appears on the final beat and hands control to the existing combat engine. Campaign units begin each attempt at full health. They use their profile progression and equipment, and encounter damage stays within the attempt.
 
 ## Story backgrounds
 
@@ -51,13 +53,13 @@ Combat currently resolves in the browser. The server accepts the authenticated c
 
 ## Prologue 1A
 
-`prologue_1a` is the first campaign entry. The five paragraphs use the moonlit campsite photo (`assets/prologue-1a-campsite.jpg`) and end as the gelatinous creature springs at Soul. Begin Battle keeps the campsite as the battlefield background and reveals one level 1 Slime in one wave against Soul. The first victory grants 100 coins and unlocks Prologue 1B.
+`prologue_1a` is the first campaign entry. The story beats use the moonlit campsite photo (`assets/prologue-1a-campsite.jpg`) and end as the gelatinous creature springs at Soul. Begin Battle keeps the campsite as the battlefield background and reveals one level 1 Slime in one wave against Soul. The first victory grants 100 coins and unlocks Prologue 1B.
 
 Soul’s portraits appear in this order: eyes closed as he stirs, focused as he listens, startled at the branch crack, focused as he grabs his sword, and startled as the creature lunges.
 
 ## Prologue 1B
 
-`prologue_1b` opens after the saved clear of Prologue 1A. Soul cleans his sword, packs his tent, and spots a distant village before three wolves approach the campsite. The first two beats use the moonlit campsite and Soul’s composed portrait. When he packs up, the art changes to the sunrise campsite and the portrait is omitted. Soul looks hopeful at the village and startled as the wolves approach. The final three beats and the wolf battle share `assets/prologue-1b-campsite-sunrise.webp`. The battle consists of one wave of three level 1 Wolves. The first victory grants 100 coins. The saved victory unlocks Prologue 1C.
+`prologue_1b` opens after the saved clear of Prologue 1A. Soul cleans his sword, packs his tent, and spots a distant village before three wolves approach the campsite. The first two beats use the moonlit campsite and Soul’s composed portrait. When he packs up, the art changes to the sunrise campsite and the portrait is omitted. Soul looks hopeful at the village and startled as the wolves approach. The sunrise beats and the wolf battle share `assets/prologue-1b-campsite-sunrise.webp`. The battle consists of one wave of three level 1 Wolves. The first victory grants 100 coins. The saved victory unlocks Prologue 1C.
 
 ## Prologue 1C
 
