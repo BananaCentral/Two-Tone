@@ -3,12 +3,15 @@ export const FIRST_CAMPAIGN_ENTRY_ID = 'prologue_1a';
 export const PROLOGUE_CAMPSITE_BACKGROUND = '/assets/prologue-1a-campsite.jpg';
 export const PROLOGUE_SUNRISE_BACKGROUND = '/assets/prologue-1b-campsite-sunrise.webp';
 
+export const PROLOGUE_RIVERBANK_BACKGROUND = '/assets/prologue-1c-riverbank.webp';
+
 export const STORY_PORTRAITS = Object.freeze({
   soul: Object.freeze({
     'eyes-closed': '/assets/soul-story-eyes-closed.webp',
     focused: '/assets/soul-story-focused.webp',
     composed: '/assets/soul-story-composed.webp',
     hopeful: '/assets/soul-story-hopeful.webp',
+    relaxed: '/assets/soul-story-relaxed.webp',
     startled: '/assets/soul-story-startled.webp',
   }),
 });
@@ -91,10 +94,53 @@ const prologue1b = {
     waves: [[{ enemyId: 'wolf', quantity: 3, level: 1 }]],
   },
   firstClearCoins: 100,
+  nextEntryId: 'prologue_1c',
+};
+
+const prologue1c = {
+  id: 'prologue_1c',
+  title: 'Prologue 1C',
+  prerequisiteEntryId: prologue1b.id,
+  story: {
+    perspective: 'third-person-limited',
+    viewpointCharacterId: 'soul',
+    background: PROLOGUE_RIVERBANK_BACKGROUND,
+    beats: [
+      {
+        text: 'After the fight with the wolves, Soul shouldered his pack and set off toward the village.',
+        background: PROLOGUE_SUNRISE_BACKGROUND,
+      },
+      {
+        text: 'By the time he reached the river halfway there, the sun was well above the hills. He looked down at his clothes. He could still tell which stains had come from the Slime.',
+      },
+      {
+        text: 'Soul set his sword on the bank, undressed, and waded in. He washed himself, scrubbed his clothes, then wrung them out and spread them over a sun-warmed rock. He sat beside them to dry.',
+        portrait: { characterId: 'soul', reactionId: 'relaxed' },
+      },
+      {
+        text: 'He was halfway through wrapping a fresh bandage around his forearm when a shadow swept across the rock. Five hawks circled low over the bank. Soul had just enough time to think, Seriously?',
+        portrait: { characterId: 'soul', reactionId: 'startled' },
+      },
+      {
+        text: 'The hawks swooped all at once. Soul punched the first one away and grabbed his sword. The loose end of his bandage fluttered from his wrist.',
+        portrait: { characterId: 'soul', reactionId: 'startled' },
+      },
+    ],
+  },
+  encounter: {
+    areaId: 'prologue-riverbank',
+    party: ['soul'],
+    waves: [[{ enemyId: 'hawk', quantity: 5, level: 1 }]],
+  },
+  firstClearCoins: 100,
   nextEntryId: null,
 };
 
-export const CAMPAIGN_ENTRIES = Object.freeze({ [prologue.id]: prologue, [prologue1b.id]: prologue1b });
+export const CAMPAIGN_ENTRIES = Object.freeze({
+  [prologue.id]: prologue,
+  [prologue1b.id]: prologue1b,
+  [prologue1c.id]: prologue1c,
+});
 
 export function getCampaignEntry(entryId) {
   return Object.hasOwn(CAMPAIGN_ENTRIES, entryId) ? CAMPAIGN_ENTRIES[entryId] : null;

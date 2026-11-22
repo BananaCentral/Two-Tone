@@ -60,5 +60,21 @@ test('Prologue 1B unlocks after 1A and grants a separate first-clear reward', ()
   assert.equal(awardCampaignClear(profile, entry.id), 100);
   assert.equal(awardCampaignClear(profile, entry.id), 0);
   assert.equal(profile.coins, 200);
+  assert.equal(getCampaignResumeEntry(profile.clearedCampaignEntries).id, 'prologue_1c');
+});
+
+test('Prologue 1C unlocks after the wolves and stages five Hawks at the river', () => {
+  const profile = { coins: 100, clearedCampaignEntries: ['prologue_1a'] };
+  const entry = getCampaignEntry('prologue_1c');
+  assert.equal(awardCampaignClear(profile, entry.id), null);
+  assert.equal(awardCampaignClear(profile, 'prologue_1b'), 100);
   assert.equal(getCampaignResumeEntry(profile.clearedCampaignEntries).id, entry.id);
+  assert.equal(entry.story.beats[0].background, '/assets/prologue-1b-campsite-sunrise.webp');
+  assert.equal(entry.story.background, '/assets/prologue-1c-riverbank.webp');
+  assert.equal(entry.story.beats[2].portrait.reactionId, 'relaxed');
+  assert.equal(entry.encounter.areaId, 'prologue-riverbank');
+  assert.deepEqual(entry.encounter.waves, [[{ enemyId: 'hawk', quantity: 5, level: 1 }]]);
+  assert.equal(awardCampaignClear(profile, entry.id), 100);
+  assert.equal(awardCampaignClear(profile, entry.id), 0);
+  assert.equal(profile.coins, 300);
 });

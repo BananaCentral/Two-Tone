@@ -45,6 +45,7 @@ Combat currently resolves in the browser. The server accepts the authenticated c
 | `eyes-closed` | Asleep, stirring, or resting with eyes closed. |
 | `focused` | Listening, assessing a threat, or preparing to act. |
 | `composed` | Calm again after the immediate threat has passed. |
+| `relaxed` | A quiet moment after washing at the river. |
 | `hopeful` | A quiet smile at a promising sight. |
 | `startled` | Reacting to a sudden sound or movement. |
 
@@ -56,4 +57,8 @@ Soul’s portraits appear in this order: eyes closed as he stirs, focused as he 
 
 ## Prologue 1B
 
-`prologue_1b` opens after the saved clear of Prologue 1A. Soul cleans his sword, packs his tent, and spots a distant village before three wolves approach the campsite. The first two beats use the moonlit campsite and Soul’s composed portrait. When he packs up, the art changes to the sunrise campsite and the portrait is omitted. Soul looks hopeful at the village and startled as the wolves approach. The final three beats and the wolf battle share `assets/prologue-1b-campsite-sunrise.webp`. The battle consists of one wave of three level 1 Wolves. The first victory grants 100 coins. The next entry is unset.
+`prologue_1b` opens after the saved clear of Prologue 1A. Soul cleans his sword, packs his tent, and spots a distant village before three wolves approach the campsite. The first two beats use the moonlit campsite and Soul’s composed portrait. When he packs up, the art changes to the sunrise campsite and the portrait is omitted. Soul looks hopeful at the village and startled as the wolves approach. The final three beats and the wolf battle share `assets/prologue-1b-campsite-sunrise.webp`. The battle consists of one wave of three level 1 Wolves. The first victory grants 100 coins. The saved victory unlocks Prologue 1C.
+
+## Prologue 1C
+
+`prologue_1c` opens after the saved clear of Prologue 1B. Soul leaves the sunrise campsite and reaches the riverbank in full morning. The riverbank background stays through the story and battle. Use Soul’s relaxed portrait while he dries and his startled portrait as the hawks circle and dive. The encounter is one wave of five level 1 Hawks against Soul. The first victory grants 100 coins. The next entry is unset.
