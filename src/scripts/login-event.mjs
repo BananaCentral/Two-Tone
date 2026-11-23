@@ -1,4 +1,4 @@
-export const LOGIN_EVENT_START_DATE = '2026-11-23';
+export const LOGIN_EVENT_START_DATE = '2026-01-01';
 export const LOGIN_EVENT_CYCLE_DAYS = 28;
 export const LOGIN_EVENT_REWARDS = Object.freeze([200, 100, 100, 200, 100, 100, 200]);
 
@@ -19,7 +19,10 @@ export function getLoginEventState(progress, now = new Date()) {
   const day = Date.parse(dayKey) / DAY_MS;
   const cycle = Math.floor((day - firstDay) / LOGIN_EVENT_CYCLE_DAYS);
   const resetDate = cycle < 0 ? LOGIN_EVENT_START_DATE : new Date((firstDay + (cycle + 1) * LOGIN_EVENT_CYCLE_DAYS) * DAY_MS).toISOString().slice(0, 10);
-  const activeProgress = progress?.cycle === cycle ? progress : null;
+  const cycleStart = firstDay + cycle * LOGIN_EVENT_CYCLE_DAYS;
+  const lastClaimDay = Date.parse(progress?.lastClaimDay) / DAY_MS;
+  const activeProgress = lastClaimDay >= cycleStart && lastClaimDay < cycleStart + LOGIN_EVENT_CYCLE_DAYS
+    ? progress : null;
   const claims = activeProgress?.claims ?? 0;
   const status = cycle < 0 ? 'upcoming'
     : claims >= LOGIN_EVENT_REWARDS.length ? 'complete'
