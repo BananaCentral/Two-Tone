@@ -2087,31 +2087,47 @@ function drawSoulGift(){
  text(SOUL_GIFT.title.toUpperCase(),906,62,36,'#ffedd1','850','center');
  const x=360,y=110,w=1092,h=458;
  const backdrop=ctx.createLinearGradient(x,y,x+w,y+h);
- backdrop.addColorStop(0,'#16223b');
- backdrop.addColorStop(.55,'#2b3657');
- backdrop.addColorStop(1,'#54405f');
+ backdrop.addColorStop(0,'#10172a');
+ backdrop.addColorStop(.52,'#20283e');
+ backdrop.addColorStop(1,'#34314b');
  rect(x,y,w,h,backdrop,'#c6a873',18);
+
  ctx.save();
  ctx.beginPath();
  ctx.roundRect(x+1,y+1,w-2,h-2,17);
  ctx.clip();
- const halo=ctx.createRadialGradient(1072,333,40,1072,333,310);
- halo.addColorStop(0,'rgba(244,207,145,.53)');
- halo.addColorStop(1,'rgba(244,207,145,0)');
- ctx.fillStyle=halo;
+
+ const light=ctx.createRadialGradient(1090,282,20,1090,282,400);
+ light.addColorStop(0,'rgba(193,165,133,.46)');
+ light.addColorStop(.56,'rgba(115,128,170,.17)');
+ light.addColorStop(1,'rgba(115,128,170,0)');
+ ctx.fillStyle=light;
  ctx.fillRect(x,y,w,h);
- ctx.strokeStyle='rgba(251,222,167,.33)';
- ctx.lineWidth=2;
- for(const radius of [150,180,210]){
-  ctx.beginPath();
-  ctx.arc(1072,333,radius,0,Math.PI*2);
-  ctx.stroke();
- }
- drawStoreBannerImage(images.soulWeaponPremium,1083,132,305,380);
- drawStoreBannerImage(images.soulFront,813,120,465,448);
+
+ // Frame the weapon separately so its silhouette stays clear of Soul.
+ ctx.save();
+ ctx.translate(1125,495);
+ ctx.rotate(-Math.PI/4);
+ ctx.fillStyle='rgba(185,180,218,.09)';
+ ctx.fillRect(0,-42,440,84);
+ ctx.fillStyle='rgba(223,212,241,.18)';
+ ctx.fillRect(0,-43,440,1);
+ ctx.fillRect(0,42,440,1);
  ctx.restore();
- text('A gift from Soul',408,295,43,'#fff4e1','850');
- text('Claim once per account',409,345,22,'#f0d8b3','650');
+
+ drawStoreBannerImage(images.soulWeaponPremium,1120,163,324,324);
+ // Extend the full-resolution character art below the clip for a closer crop.
+ drawStoreBannerImage(images.soulFront,811,136,330,660);
+
+ const fade=ctx.createLinearGradient(0,416,0,y+h);
+ fade.addColorStop(0,'rgba(16,23,42,0)');
+ fade.addColorStop(1,'rgba(16,23,42,.86)');
+ ctx.fillStyle=fade;
+ ctx.fillRect(x,416,w,y+h-416);
+ ctx.restore();
+
+ text('A gift from Soul',420,295,43,'#fff4e1','850');
+ text('Claim once per account',421,345,22,'#f0d8b3','650');
 
  const claimed=hasClaimedSoulGift(window.TwoToneAccount.profile);
  const rewards=[{name:'Coins',image:'coin',quantity:SOUL_GIFT.coins},...SOUL_GIFT.items];
@@ -3037,7 +3053,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)c
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 if(DEV_MODE){
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,archetypeId:e.archetypeId,level:e.level,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,speed:speedOf(e),barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,momentumStacks:e.momentumStacks||0,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.1.28',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.1.29',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneEchoStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,echoPercent:echoPercentOf(unit)}));
 window.twoToneReflectStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,reflectPercent:reflectPercentOf(unit)}));
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
