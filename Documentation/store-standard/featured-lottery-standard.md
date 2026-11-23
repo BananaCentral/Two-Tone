@@ -40,9 +40,15 @@ Each draw has the following base tier chances:
 | Rare | 10% |
 | Common | 89% |
 
-Within a tier, every item in that tier's reward pool has an equal chance. Tier chances are independent of the number of items in a pool.
+Tier chances are independent of the number of rewards in each pool. Rare draws award one Core or one Gem with equal probability.
 
-Common lottery rewards include bundles of five Large Enchanted Bottles in character lotteries and five Large Enchanted Books in premium weapon lotteries. Rare lottery rewards include Cores and Gems. See the [Item Standard](../item-standard/item-standard.md) for item effects and other acquisition sources.
+| Common bundle | Chance within Common | Quantity |
+| --- | ---: | ---: |
+| Small | 60% | 15 |
+| Medium | 30% | 7 |
+| Large | 10% | 1 |
+
+Character banners award Enchanted Bottles. Premium weapon banners award Enchanted Books. See the [Item Standard](../item-standard/item-standard.md) for XP values.
 
 For a mythic reward, there is a 75% chance to receive the player's selected featured target and a 25% chance to receive an off-feature reward of the same type. Character lotteries award off-feature characters; premium weapon lotteries award off-feature premium weapons. The first character reward for an unowned character unlocks that character; subsequent copies add character duplicates. Soul is the only character owned at the start.
 

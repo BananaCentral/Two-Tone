@@ -12,7 +12,7 @@ Enchanted Bottles grant Character XP when used on a selected character:
 | Medium Enchanted Bottle | 100 |
 | Large Enchanted Bottle | 1,000 |
 
-Enchanted Bottles can be acquired from Challenges and lotteries. A Common character-lottery drop awards a bundle of five Large Enchanted Bottles. Players cannot buy them directly from the Store.
+Enchanted Bottles can be acquired from Challenges and lotteries. The [Featured Lottery Standard](../store-standard/featured-lottery-standard.md#reward-tiers) defines the Common bottle bundles. Players cannot buy them directly from the Store.
 
 Bottle artwork uses blue for Small, purple for Medium, and gold for Large.
 
@@ -26,7 +26,7 @@ Enchanted Books grant Weapon XP when used on a selected weapon:
 | Medium Enchanted Book | 100 |
 | Large Enchanted Book | 1,000 |
 
-Enchanted Books can be acquired from Challenges and lotteries. A Common premium-weapon-lottery drop awards a bundle of five Large Enchanted Books. Players cannot buy them directly from the Store.
+Enchanted Books can be acquired from Challenges and lotteries. The [Featured Lottery Standard](../store-standard/featured-lottery-standard.md#reward-tiers) defines the Common book bundles. Players cannot buy them directly from the Store.
 
 Book artwork uses blue for Small, purple for Medium, and gold for Large.
 

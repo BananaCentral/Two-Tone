@@ -1,3 +1,4 @@
+import { commonStoreReward } from "../../lib/store-rewards.js";
 import { claimLoginEvent, easternDayKey } from "../../src/scripts/login-event.mjs";
 import { awardCampaignClear, getCampaignEntry, isCampaignEntryUnlocked } from "../../src/scripts/campaign.mjs";
 import { randomInt } from "node:crypto";
@@ -19,7 +20,6 @@ function buildPools(type,state){
   featured:ids.filter(id=>map(id).id===target).map(map),
   offFeature:ids.filter(id=>map(id).id!==target).map(map),
   rare:[itemReward("core","Core",1),itemReward("gem","Gem",1)],
-  common:[type==="character"?itemReward("bottle:large","Large Enchanted Bottles",5):itemReward("book:large","Large Enchanted Books",5)],
  };
 }
 function addInventory(state,itemId,quantity){
@@ -117,7 +117,7 @@ function drawOne(state,type){
  }else if(tier==="rare"){
   track.sinceRare=0;reward=pick(pools.rare);addInventory(state,reward.inventoryItem,reward.quantity);result=`${reward.quantity} ${reward.name}`;
  }else{
-  reward=pick(pools.common);addInventory(state,reward.inventoryItem,reward.quantity);result=`${reward.quantity} ${reward.name}`;
+  reward=commonStoreReward(type,roll());addInventory(state,reward.inventoryItem,reward.quantity);result=`${reward.quantity} ${reward.name}`;
  }
  return {tier,reward,featured,result};
 }
