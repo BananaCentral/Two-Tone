@@ -323,11 +323,6 @@ function resolveBleedTick(state,target){
  return total;
 }
 function tauntRateOf(attacker,target){return Math.max(0,...(attacker.tauntEffects||[]).filter(effect=>effect.turns>0&&effect.targetId===target.id).map(effect=>effect.rate))}
-function defenseValue(unit, type) {
-  if (type === 'physical') return unit.stats.physicalDefense;
-  if (type === 'magical') return unit.stats.magicalDefense;
-  return (unit.stats.physicalDefense + unit.stats.magicalDefense) / 2;
-}
 function damageFor(state,attacker, target, type, multiplier, runeEffects = {}) {
   const attack = attackValue(attacker);
   if (attack <= 0) return 0;
@@ -350,13 +345,6 @@ function damageFor(state,attacker, target, type, multiplier, runeEffects = {}) {
     exposedStacks:target.marks.filter(mark=>mark.id==='exposed').length,
     exposedDefenseReduction:CHARACTER_COMBAT_DATA.lily.passives.find(passive=>passive.type==='exposed')?.defenseReduction??.2
   })?.damage??0;
-}
-function rollCritical(state,unit,damage,forceCritical=false,criticalDamageBonus=0){
- if(damage<=0)return {damage,critical:false};
- const rate=Math.min(1,Math.max(0,(unit.criticalRate??.1)+(unit.criticalRateBonus||0)+(unit.tune?.criticalRateBonus||0)));
- const roll=state.random(),critical=forceCritical||roll<rate;
- if(critical){state.criticalHits++;unit.criticalHits=(unit.criticalHits||0)+1}
- return {damage:critical?roundStat(damage*(1+(unit.criticalDamage??.5)+(unit.criticalDamageBonus||0)+(unit.tune?.criticalDamageBonus||0)+criticalDamageBonus)):damage,critical};
 }
 function applyRicochet(state,sourceActor,sourceId,hits){
  const triggered=hits.filter(hit=>hit.damage>0&&hit.target.marks.some(m=>m.id==='ricochet'));

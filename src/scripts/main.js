@@ -136,7 +136,6 @@ function availableCharacters(){return ROSTER.filter(model=>isCharacterOwned(mode
 const combatEngine=new TwoToneBattleEngine();
 function roundHp(value){return combatEngine.roundHp(value)}
 function roundStatQuarter(value){return combatEngine.roundStatQuarter(value)}
-function formatCombatStat(value){return Number.isFinite(value)?(Number.isInteger(value)?String(value):value.toFixed(2).replace(/\.?0+$/,'')):'—'}
 function calculateLevelScaledStat(base,level,flat={},percent={},equipmentFlat={}){
  if(!Number.isFinite(base)||base<0||!Number.isInteger(level)||level<1||level>CHARACTER_MAX_LEVEL)return null;
  const flats=Object.values(flat),percents=Object.values(percent),equipment=Object.values(equipmentFlat);
@@ -302,7 +301,6 @@ function setPlayerRankForTest(rank){
  }
  saveProgress();savePlayerRank();return true;
 }
-function hpModifiers(unit){return {flat:unit.hpFlatModifiers||{},percent:unit.hpPercentModifiers||{}}}
 function calculateMaxHp(baseHp,level,flat={},percent={},equipmentFlat={}){
  if(!Number.isFinite(baseHp)||baseHp<=0)return null;
  const max=calculateLevelScaledStat(baseHp,level,flat,percent,equipmentFlat);
@@ -1000,7 +998,6 @@ const savedTeam=loadTeam();
 let draft=[...savedTeam];
 function validTeam(ids,ownedIds=ownedCharacterIds){return Array.isArray(ids)&&ids.length>=1&&ids.length<=MAX_PARTY_SIZE&&ids.every(id=>ROSTER_IDS.has(id)&&ownedIds.has(id))&&new Set(ids).size===ids.length}
 function loadTeam(){try{const a=JSON.parse(localStorage.getItem(TEAM_KEY)||'null');if(validTeam(a))return a.slice(0,MAX_PARTY_SIZE)}catch(e){}return ['soul']}
-function saveTeam(){if(!validTeam(draft))return false;try{localStorage.setItem(TEAM_KEY,JSON.stringify(draft));return true}catch(e){return false}}
 function roster(id){return ROSTER.find(x=>x.id===id)}
 function alive(){return party.filter(x=>x.hp>0)}
 function active(){return party.find(x=>x.id===activeId)}
@@ -1205,7 +1202,6 @@ function applyDawnTune(ally,plan=combatEngine.resolveActionPlan({kit:combatKit('
  const result=combatEngine.resolveDawnTune({actor:party.find(member=>member.id==='dawn'),target:ally,plan,characterDuplicates:duplicates,premiumWeaponDuplicates:weaponDuplicates,weaponType:weapon.selected});
  if(!result)return false;syncTurnTimeline();return true;
 }
-function clearDawnTune(ally){if(!ally?.tune)return false;ally.tune=null;syncTurnTimeline();return true}
 function applyLoganBloodShield(logan,plan=combatEngine.resolveActionPlan({kit:combatKit('logan'),action:'skill',characterId:'logan',characterDuplicates:characterDuplicateRank('logan')})){
  if(!logan||logan.hp<=0)return false;
  const weapon=loadoutFor('logan').weapon,recipients=party.filter(ally=>ally.hp>0),result=combatEngine.resolveLoganBloodShield({actor:logan,allies:recipients,enemies:liveEnemies(),plan,characterDuplicates:characterDuplicateRank('logan'),premiumWeaponDuplicates:premiumWeaponDuplicateRank('logan'),weaponType:weapon.selected});
@@ -1275,10 +1271,6 @@ function testRevive(){if(!paused||phase!=='player')return;const p=party.find(p=>
 function rect(x,y,w,h,fill,stroke=null,r=0){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke()}}
 function text(s,x,y,size=24,fill=color.white,weight='600',align='left'){ctx.textAlign=align;ctx.textBaseline='middle';ctx.fillStyle=fill;ctx.font=`${weight} ${size}px system-ui,-apple-system,Segoe UI,sans-serif`;ctx.fillText(String(s),x,y)}
 function line(x,y,w,f=1,c='#72e3ae',bg='#303649',h=13){rect(x,y,w,h,bg,null,6);rect(x,y,Math.max(0,w*Math.min(1,Math.max(0,f))),h,c,null,6)}
-function segmentedHealthBar(x,y,w,h,hp,maxHp,bars=1,fill='#ff8276',background='#4b2637'){
- const count=Math.max(1,Math.min(3,Number.isInteger(bars)?bars:1)),gap=count>1?3:0,segmentWidth=(w-gap*(count-1))/count,segmentMax=maxHp/count;
- for(let i=0;i<count;i++){const amount=Math.max(0,Math.min(segmentMax,hp-i*segmentMax));line(x+i*(segmentWidth+gap),y,segmentWidth,segmentMax?amount/segmentMax:0,fill,background,h)}
-}
 function shieldedHealthBar(x,y,w,h,hp,maxHp,shield,fill='#72e3ae',background='#303649'){
  line(x,y,w,maxHp?hp/maxHp:0,fill,background,h);
  if(!(shield>0)||!(maxHp>0))return;
@@ -1382,19 +1374,7 @@ function grantItem(itemId,amount=1){
  else return false;
  saveItemInventory();return true;
 }
-function consumeItem(itemId,amount=1){
- if(!Number.isSafeInteger(amount)||amount<1)return false;
- const match=/^(bottle|book):(small|medium|large)$/.exec(itemId||'');
- if(match){const group=match[1]==='bottle'?'bottles':'books';if(itemInventory[group][match[2]]<amount)return false;itemInventory[group][match[2]]-=amount}
- else if(['core','gem'].includes(itemId)){const key=itemId==='core'?'cores':'gems';if(itemInventory[key]<amount)return false;itemInventory[key]-=amount}
- else if(typeof itemId==='string'&&itemId.startsWith('rune:')){const runes=itemInventory.runes[itemId.slice(5)];if(!runes||runes.length<amount)return false;runes.splice(-amount,amount)}
- else return false;
- saveItemInventory();return true;
-}
-function takeRuneFromInventory(setId){const runes=itemInventory.runes[setId];if(!Array.isArray(runes)||!runes.length)return null;const rune=runes.pop();saveItemInventory();return rune}
-function returnRuneToInventory(rune){if(!rune||!Object.hasOwn(RUNE_SET_DEFINITIONS,rune.setId)||!Array.isArray(itemInventory.runes[rune.setId]))return false;itemInventory.runes[rune.setId].push(normalizeRune(rune));saveItemInventory();return true}
 if(DEV_MODE)globalThis.TwoToneItems=Object.freeze({grant:grantItem,getInventory:()=>JSON.parse(JSON.stringify(itemInventory)),grantCoins:grantStoreCoins,getCoins:()=>storeCoins});
-if(DEV_MODE)FeaturedLottery.setRewardGrant(grantItem);
 window.twoToneApplyProfile=profile=>{
  if(!profile||!Number.isSafeInteger(profile.coins)||profile.coins<0)return false;
  storeCoins=profile.coins;saveStoreCoins();
@@ -1415,7 +1395,6 @@ function weaponPotentialMultiplier(type,potential,level){
  const levelOnePercent=type==='premium'?51+(potential-1)*25:31+(potential-1)*5;
  return (levelOnePercent+level-1)/100;
 }
-function weaponProgress(record,type){const w=record.weapon;return {level:w[type+'Level'],exp:w[type+'Exp']}}
 function weaponBonus(record,id=loadoutCharacterId){
  const w=record.weapon,type=w.selected==='premium'&&w.premiumOwned?'premium':'standard';
  return weaponPotentialMultiplier(type,type==='premium'?w.premiumPotential:w.standardPotential,w[type+'Level']);
@@ -1446,34 +1425,6 @@ function grantWeaponXp(id,type,amount){
  return {level:weapon[levelKey],exp:weapon[expKey],levelsGained,nextExp:requiredExp(weapon[levelKey])};
 }
 const ITEM_XP=Object.freeze({small:10,medium:100,large:1000});
-function useCharacterBottle(id,size){
- const amount=ITEM_XP[size];if(!amount||!consumeItem('bottle:'+size))return false;
- const result=grantCharacterXp(id,amount);if(!result){grantItem('bottle:'+size);return false}
- return result;
-}
-function useWeaponBook(id,type,size){
- const amount=ITEM_XP[size];if(!amount||!consumeItem('book:'+size))return false;
- const result=grantWeaponXp(id,type,amount);if(!result){grantItem('book:'+size);return false}
- return result;
-}
-function upgradeRuneWithCore(id,index){
- const rune=loadoutFor(id).runes[index];if(!rune||rune.level>=5||!consumeItem('core'))return false;
- rune.level++;saveLoadouts();return rune.level;
-}
-function upgradeCelestialWithCore(id,key){
- const record=loadoutFor(id),level=record.celestials[key];if(!Number.isInteger(level)||level>=10||!consumeItem('core'))return false;
- record.celestials[key]++;saveLoadouts();return record.celestials[key];
-}
-function ascendCharacterWithGem(id){
- const progress=progressFor(id);if(!progress||!ASCENSION_GATES.includes(progress.level)||progress.ascended.includes(progress.level)||!consumeItem('gem'))return false;
- if(testAscend(id))return true;grantItem('gem');return false;
-}
-function ascendWeaponWithGem(id,type){
- if(!ROSTER_IDS.has(id)||!['standard','premium'].includes(type))return false;
- const weapon=loadoutFor(id).weapon,level=weapon[type+'Level'],ascended=weapon[type+'Ascended'];
- if(type==='premium'&&!weapon.premiumOwned||!ASCENSION_GATES.includes(level)||ascended.includes(level)||!consumeItem('gem'))return false;
- ascended.push(level);settleWeaponProgress(weapon,type);saveLoadouts();return true;
-}
 function loadoutStatModifiers(id,characterLevel=1){
  const record=loadoutFor(id),bonus=weaponBonus(record,id),totals=Object.fromEntries(RUNE_STATS.map(k=>[k,0]));
  for(const rune of record.runes){if(!rune)continue;totals[rune.main]+=RUNE_STAT_INFO[rune.main].main*rune.level;for(const sub of rune.subs)totals[sub]+=RUNE_STAT_INFO[sub].main*.25*rune.level;if(rune.legacyAttackBonus)totals.attack+=20*.25*rune.level*rune.legacyAttackBonus}
@@ -1534,9 +1485,6 @@ async function handleLoadoutAction(action){
   if(weapon.premiumOwned&&!loadoutActionPending){loadoutActionPending=true;try{await window.TwoToneAccount.action('set-weapon',{id:loadoutCharacterId,type:weapon.selected==='premium'?'standard':'premium'});weaponBookSelection={small:0,medium:0,large:0}}catch(e){say('Weapon selection could not be saved.')}finally{loadoutActionPending=false}}return
  }
  if(kind==='character-duplicate'&&DEV_MODE)record.characterDuplicates=Math.max(0,Math.min(4,record.characterDuplicates+Number(arg)));
- else if(kind==='weapon-standard'||kind==='weapon-premium'){
-  const type=kind==='weapon-standard'?'standard':'premium';if((type==='standard'||weapon.premiumOwned)&&!loadoutActionPending){loadoutActionPending=true;try{await window.TwoToneAccount.action('set-weapon',{id:loadoutCharacterId,type});weaponBookSelection={small:0,medium:0,large:0}}catch(e){say('Weapon selection could not be saved.')}finally{loadoutActionPending=false}}return
- }
  else if(kind==='potential'&&DEV_MODE){const [type,delta]=arg.split(','),key=type==='premium'?'premiumPotential':'standardPotential';weapon[key]=Math.max(1,Math.min(5,weapon[key]+Number(delta)))}
  else if(kind==='rune-select'){selectedLoadoutRune=Math.max(0,Math.min(3,Number(arg)||0));runePanelMode=record.runes[selectedLoadoutRune]?'detail':'inventory';runeStatPicker=null}
  else if(kind==='rune-equip'){
@@ -1557,79 +1505,10 @@ async function handleLoadoutAction(action){
  }
  else if(kind==='celestial'){const [key,delta]=arg.split(',');if(Number(delta)===1&&!loadoutActionPending){loadoutActionPending=true;try{await window.TwoToneAccount.action('upgrade-core',{kind:'celestial',id:loadoutCharacterId,key});say(`${key} Celestial upgraded.`)}catch(e){say('A Core is required and the Celestial must be below Level 10.')}finally{loadoutActionPending=false}}return}
  else if(kind==='bottle'){if(loadoutActionPending)return;loadoutActionPending=true;try{await window.TwoToneAccount.action('use-xp-item',{itemType:'bottle',id:loadoutCharacterId,size:arg});say(`${arg[0].toUpperCase()+arg.slice(1)} Enchanted Bottle used.`)}catch(e){say('Bottle unavailable or character is at their level cap.')}finally{loadoutActionPending=false}return}
- else if(kind==='book'){const [type,size]=arg.split(',');if(loadoutActionPending)return;loadoutActionPending=true;try{await window.TwoToneAccount.action('use-xp-item',{itemType:'book',id:loadoutCharacterId,weaponType:type,size});say(`${size[0].toUpperCase()+size.slice(1)} Enchanted Book used.`)}catch(e){say('Book unavailable, weapon locked, or weapon is at its level cap.')}finally{loadoutActionPending=false}return}
- else if(kind==='ascend-character'||kind==='ascend-weapon'){if(loadoutActionPending)return;loadoutActionPending=true;try{await window.TwoToneAccount.action('ascend',{kind:kind==='ascend-character'?'character':'weapon',id:loadoutCharacterId,weaponType:arg});say('Ascension completed.')}catch(e){say('One Gem is required at a valid Ascension gate.')}finally{loadoutActionPending=false}return}
+ else if(kind==='ascend-character'){if(loadoutActionPending)return;loadoutActionPending=true;try{await window.TwoToneAccount.action('ascend',{kind:'character',id:loadoutCharacterId});say('Ascension completed.')}catch(e){say('One Gem is required at a valid Ascension gate.')}finally{loadoutActionPending=false}return}
  saveLoadouts()
 }
-function loadoutPanel(title,subtitle,backLabel='BACK'){
- drawBackground();rect(0,0,W,H,'rgba(5,9,22,.76)');rect(74,40,1452,820,'rgba(13,20,39,.98)','#ccb88e',20);
- text(title,120,100,40,'#ffedd1','850');text(subtitle,120,139,17,'#c4d6e5','550');
- addButton(1300,66,180,54,'loadout:back',backLabel);
-}
 function loadoutCharacter(){return roster(loadoutCharacterId)}
-function drawLoadoutCharacters(){
- loadoutPanel('LOADOUT','Choose a character to open their equipment and progression menus.','MAIN MENU');
- const characters=availableCharacters();for(let i=0;i<characters.length;i++){
-  const p=characters[i],y=190+i*125,active=loadoutCharacterId===p.id;
-  rect(150,y,1300,118,'rgba(25,37,58,.94)',active?'#edcf98':'#718ba4',14);
-  addButton(174,y+20,1252,78,'loadout:character:'+p.id,p.name,p.test?'PLACEHOLDER • NO LOADOUT':'LEVEL '+(progressFor(p.id)?.level||1),!p.test);
- }
-}
-function drawLoadoutMenu(){
- const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId),progress=progressFor(loadoutCharacterId);
- loadoutPanel(model.name+' • LOADOUT','Choose what you want to configure. Current character level: '+(progress?.level||1)+'.');
- const cards=[
-  ['weapons','WEAPONS','Standard and premium signature weapon'],
-  ['runes','RUNES','Four rune slots and stat customization'],
-  ['celestials','CELESTIALS','Ability multipliers • four upgrades'],
-  ['levels','LEVELS','Character progression and combat stats']
- ];
- for(let i=0;i<cards.length;i++){
-  const [key,label,sub]=cards[i],x=190+(i%2)*620,y=210+Math.floor(i/2)*275;
-  rect(x,y,570,230,'rgba(25,37,58,.94)','#718ba4',14);
-  addButton(x+28,y+28,514,174,'loadout:page:'+key,label,sub);
- }
- text('WEAPON • '+record.weapon.selected.toUpperCase()+'     RUNES • '+record.runes.filter(Boolean).length+'/4     CELESTIALS • '+Object.values(record.celestials).map(v=>v+'/10').join('  '),800,790,14,'#c4d6e5','650','center');
-}
-function drawLoadoutWeapons(){
- const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId),w=record.weapon;
- loadoutPanel(model.name+' • WEAPONS',`Each weapon levels independently. Enchanted Books: S ${itemInventory.books.small} • M ${itemInventory.books.medium} • L ${itemInventory.books.large}.`);
- const cap=weaponLevelCap();
- const cards=[{x:145,label:model.id==='cloud'?'WINDCALL':model.id==='soul'?'ASHBLADE':model.id==='lily'?'PETAL':model.id==='dawn'?'RADIANT PEARL':model.id==='zero'?'SILENT EDGE':'STANDARD SIGNATURE',selected:w.selected==='standard',potential:w.standardPotential,type:'standard'},
-              {x:825,label:model.id==='cloud'?'CLOUD-NINE':model.id==='soul'?'SOULBOUND':model.id==='lily'?'EVERBLOSSOM':model.id==='dawn'?'RADIANT DIAMOND':model.id==='zero'?'NIGHTSHADE':'PREMIUM SIGNATURE',selected:w.selected==='premium',potential:w.premiumPotential,type:'premium'}];
- for(const c of cards){
-  const level=w[c.type+'Level'],exp=w[c.type+'Exp'],needed=requiredExp(level),bonus=weaponPotentialMultiplier(c.type,c.potential,level)*100,atGate=ASCENSION_GATES.includes(level)&&!w[c.type+'Ascended'].includes(level);
-  rect(c.x,205,630,470,'rgba(25,37,58,.94)',c.selected?'#edcf98':'#718ba4',14);
-  const characterWeaponName=model.id==='soul'?(c.type==='standard'?'ASHBLADE':'SOULBOUND'):model.id==='cloud'?(c.type==='standard'?'WINDCALL':'CLOUD-NINE'):model.id==='lily'?(c.type==='standard'?'PETAL':'EVERBLOSSOM'):model.id==='dawn'?(c.type==='standard'?'RADIANT PEARL':'RADIANT DIAMOND'):model.id==='zero'?(c.type==='standard'?'SILENT EDGE':'NIGHTSHADE'):null;
-  text(characterWeaponName||c.label,c.x+30,245,22,'#f3dfb9','850');
-  text(c.type==='standard'?'Included with '+model.name:'Acquired in the Store',c.x+30,278,15,'#c4d6e5','550');
-  const weaponArt=model.id==='soul'?images[c.type==='premium'?'soulWeaponPremium':'soulWeaponStandard']:model.id==='cloud'?images[c.type==='premium'?'cloudNine':'cloudWindcall']:model.id==='lily'?images[c.type==='premium'?'lilyWeaponSignature':'lilyWeaponStandard']:model.id==='dawn'?images[c.type==='premium'?'dawnWeaponPremium':'dawnWeaponStandard']:model.id==='zero'?images[c.type==='premium'?'zeroWeaponPremium':'zeroWeaponStandard']:null;
-  if(weaponArt?.complete&&weaponArt.naturalWidth){ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(weaponArt,c.x+386,215,220,220);ctx.restore()}
-  text('+'+bonus.toFixed(2).replace(/0+$/,'').replace(/\.$/,'')+'% to all six stats',c.x+30,340,26,'#f4d99c','800');
-  text('POTENTIAL '+c.potential+' / 5   •   LEVEL '+level+' / '+cap,c.x+30,382,17,'#d6e2ef','750');
-  text(atGate?'ASCENSION REQUIRED':level>=cap?'WEAPON LEVEL CAP REACHED':`XP  ${exp} / ${needed}  •  ${needed-exp} XP TO NEXT LEVEL`,c.x+30,414,15,'#c4d6e5','600');
-  const usable=c.type==='standard'||w.premiumOwned;
-  addButton(c.x+30,442,570,58,c.type==='standard'?'loadout:weapon-standard':'loadout:weapon-premium',
-    usable?(c.selected?'EQUIPPED':'EQUIP'): 'PREMIUM • STORE LOCKED',
-    usable?'Signature weapon • character locked':'Premium weapon is not owned',usable);
-  if(c.type==='standard'||w.premiumOwned){
-   if(DEV_MODE){addButton(c.x+180,515,90,50,'loadout:potential:'+c.type+',-1','−','',c.potential>1);addButton(c.x+360,515,90,50,'loadout:potential:'+c.type+',1','+','',c.potential<5)}
-  }
-  if(atGate)addButton(c.x+145,570,340,34,'loadout:ascend-weapon:'+c.type,'ASCEND • 1 GEM','GEMS ×'+itemInventory.gems,itemInventory.gems>0&&(c.type==='standard'||w.premiumOwned));
-  addButton(c.x+26,610,178,48,'loadout:book:'+c.type+',small','SMALL ENCHANTED BOOK','×'+itemInventory.books.small,itemInventory.books.small>0&&usable&&level<cap,14);
-  addButton(c.x+216,610,178,48,'loadout:book:'+c.type+',medium','MEDIUM ENCHANTED BOOK','×'+itemInventory.books.medium,itemInventory.books.medium>0&&usable&&level<cap,14);
-  addButton(c.x+406,610,178,48,'loadout:book:'+c.type+',large','LARGE ENCHANTED BOOK','×'+itemInventory.books.large,itemInventory.books.large>0&&usable&&level<cap,14);
- }
- rect(145,705,1310,95,'rgba(25,37,58,.94)','#536983',12);
- const zeroPremiumEffect=['Ultimate restores 1 Skill Point and 20 Energy.','Duplicate 1: Basic applies 1 Bleed stack.','Duplicate 2: Ultimate delays all enemies by 20%.','Duplicate 3: Ultimate costs 80 Energy.','Duplicate 4: Ignore 40% of enemy Physical and Magical Defense.'];
- const soulPremiumEffect=['Enhance refunds 1 Skill Point per 3 spent; a triple-enhanced Basic can trigger Follow Up.','Follow Up capacity increases to 7.','Critical Rate +10% and Critical Damage +25%.','Triple-enhanced Basic becomes AoE.','Restore 1 Follow Up charge every 2 triggers.'];
- const loganPremiumEffect=['Logan heals when an ally is healed by Taste for Blood.','Basic applies 2 Bleed stacks.','Ultimate applies 2 Bleed stacks and restores 1 Skill Point.','Blood Shield Taunt becomes 50% for 3 turns.','Shielded allies deal 20% more damage of all types.'];
- const dawnPremiumEffect=['Tuned allies ignore 20% of enemy Physical and Magical Defense.','Tuned allies take 20% less damage.','Tuned allies deal 20% more damage to barriers.','Ultimate restores 3 Skill Points instead of 1.','Tune advances its target by 50%.'];
- const lilyPremiumEffect=['Teammate and summon hits on Exposed enemies restore 5 Energy to Lily; Ultimate restores 1 Skill Point.','Ultimate and Hauntling damage reduce hit enemies’ damage by 20% for 1 turn.','Enemies entering the field receive Soul Mark and Ricochet for 2 turns.','Each Exposed stack increases damage to barriers by 10%.','Each Exposed stack adds 5 percentage points to barrier-shatter damage.'];
- const cloudPremiumEffect=['Ultimate applies a 20% Speed slow to all enemies for 2 turns, up to 5 stacks.','Basic Attack multiplier doubles.','Ultimate multiplier doubles.','Ultimate slow increases to 40% per stack.','Restoration healing multiplier doubles.'];
- const premiumEffect=model.id==='soul'?soulPremiumEffect[Math.min(4,premiumWeaponDuplicateRank('soul'))]:model.id==='zero'?zeroPremiumEffect[Math.min(4,premiumWeaponDuplicateRank('zero'))]:model.id==='logan'?loganPremiumEffect[Math.min(4,premiumWeaponDuplicateRank('logan'))]:model.id==='dawn'?dawnPremiumEffect[Math.min(4,premiumWeaponDuplicateRank('dawn'))]:model.id==='lily'?lilyPremiumEffect[Math.min(4,premiumWeaponDuplicateRank('lily'))]:model.id==='cloud'?cloudPremiumEffect[Math.min(4,premiumWeaponDuplicateRank('cloud'))]:'Character-specific Premium effects are listed in the character sheet.';
- text('PREMIUM EFFECT • '+premiumEffect,175,755,16,'#d6e2ef','650');
-}
 function drawRuneStatPicker(rune){
  if(!runeStatPicker)return;
  rect(0,0,W,H,'rgba(4,8,18,.80)');
@@ -1647,56 +1526,6 @@ function drawRuneStatPicker(rune){
   addButton(x,y,390,155,'loadout:rune-stat-choice:'+runeStatPicker.slot+','+key,info.label,note+'  •  +'+value,enabled);
   if(selected)rect(x-3,y-3,396,161,'rgba(0,0,0,0)','#edcf98',12);
  }
-}
-function drawLoadoutCelestials(){
- const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId);
- loadoutPanel(model.name+' • CELESTIALS',`Four ability upgrades. Each level adds 10% to its base multiplier. Cores: ${itemInventory.cores}.`);
- for(let i=0;i<CELESTIALS.length;i++){
-  const [key,label]=CELESTIALS[i],x=165+(i%2)*650,y=195+Math.floor(i/2)*292,level=record.celestials[key];
-  rect(x,y,600,258,'rgba(25,37,58,.94)','#718ba4',14);
-  text(label.toUpperCase(),x+30,y+48,22,'#f3dfb9','850');
-  text('LEVEL '+level+' / 10',x+30,y+100,20,'#d6e2ef','700');
-  text('+'+(level*10)+'% base multiplier',x+30,y+145,17,'#f4d99c','750');
-  addButton(x+390,y+75,150,70,'loadout:celestial:'+key+',1','UPGRADE','',level<10&&itemInventory.cores>0);
- }
-}
-function drawLoadoutLevels(){
- const model=loadoutCharacter(),progress=progressFor(loadoutCharacterId),record=loadoutFor(loadoutCharacterId),cap=characterLevelCap(),stats=loadoutStats(loadoutCharacterId);
- loadoutPanel(model.name+' • LEVELS','Review character level, level cap, and current combat stats.');
- rect(130,190,610,650,'rgba(25,37,58,.94)','#718ba4',14);
- text('CHARACTER LEVEL',165,235,20,'#f3dfb9','850');
- text('LEVEL '+progress.level+' / '+cap,165,290,30,'#fff1d5','850');
- const expNeeded=requiredExp(progress.level),atGate=ASCENSION_GATES.includes(progress.level)&&!progress.ascended.includes(progress.level);
- text(progress.level>=cap?'Current level cap reached':atGate?'Ascension required at this level':'EXP  '+progress.exp+' / '+expNeeded,165,345,18,'#d6e2ef','700');
- text('Account rank '+playerRank+' sets the current level cap.',165,398,15,'#aebfd0','550');
- text('Ascensions completed: '+(progress.ascended.length?progress.ascended.join(', '):'none'),165,434,14,'#aebfd0','550');
- if(atGate)addButton(165,448,250,42,'loadout:ascend-character','ASCEND • 1 GEM','GEMS ×'+itemInventory.gems,itemInventory.gems>0);
- text('Level scaling multiplies base stats by character level.',165,490,14,'#c4d6e5','550');
- text('ENCHANTED BOTTLES  •  S '+itemInventory.bottles.small+'   M '+itemInventory.bottles.medium+'   L '+itemInventory.bottles.large,165,520,14,'#c4d6e5','650');
- const canUseBottle=progress.level<cap;
- addButton(165,536,165,38,'loadout:bottle:small','SMALL BOTTLE','10 XP • ×'+itemInventory.bottles.small,itemInventory.bottles.small>0&&canUseBottle);
- addButton(340,536,165,38,'loadout:bottle:medium','MEDIUM BOTTLE','100 XP • ×'+itemInventory.bottles.medium,itemInventory.bottles.medium>0&&canUseBottle);
- addButton(515,536,165,38,'loadout:bottle:large','LARGE BOTTLE','1,000 XP • ×'+itemInventory.bottles.large,itemInventory.bottles.large>0&&canUseBottle);
- text('CURRENT COMBAT STATS',165,580,17,'#f3dfb9','800');
- const statList=Object.entries(stats||{});
- for(let i=0;i<statList.length;i++){
-  const [name,value]=statList[i],x=165+(i%2)*275,y=610+Math.floor(i/2)*28;
-  text(name+'  '+formatCombatStat(value),x,y,14,'#d6dceb','650');
- }
- rect(790,190,680,450,'rgba(25,37,58,.94)','#718ba4',14);
- text(DEV_MODE?'CHARACTER DUPLICATES • TEST':'CHARACTER DUPLICATES',830,240,21,'#f3dfb9','850');
- text(`${DEV_MODE?'PREVIEW':'OWNED'}  ${record.characterDuplicates} / 4`,830,295,19,'#d6e2ef','700');
- if(DEV_MODE){addButton(830,335,95,58,'loadout:character-duplicate:-1','−','',record.characterDuplicates>0);addButton(940,335,95,58,'loadout:character-duplicate:1','+','',record.characterDuplicates<4)}
- const zeroDuplicates=['Cutthroat’s Critical Rate and Critical Damage bonuses double.','Basic multiplier +100%.','Ultimate multiplier +100%.','First Strike multipliers +100%, including its first-hit bonus.'];
- const soulDuplicates=['Follow Up damage multiplier doubles.','Basic Attack multiplier doubles.','Ultimate multiplier doubles.','Each Enhance stack adds +200% Basic damage.'];
- const loganDuplicates=['Basic Attack multiplier doubles.','Taste for Blood Lifesteal increases to 20%.','Ultimate multiplier doubles.','Blood Shield value doubles.'];
- const dawnDuplicates=['Ultimate restores 100% of the target’s maximum Energy.','Tune grants +20 percentage points of Critical Rate and +50 percentage points of Critical Damage.','Tune grants +20% Attack and lasts two target turns.','Tune’s Basic Attack damage bonus increases from +40% to +80%.'];
- const lilyDuplicates=['Exposed stacks up to 2 and lasts 3 turns.','Ultimate and Hauntling damage double; Hauntling lasts 1 additional turn.','Ultimate advances all teammates by 20% and restores 20 Energy to each.','Ricochet triggers twice per unique source attack; the second hit deals 50% damage.'];
- const cloudDuplicates=['Weightless advances Cloud by 40% after each action.','Basic Speed boost becomes 40% per stack and lasts 3 turns.','Restoration advances its target by 80%.','Ultimate delays its target by 80% and costs 80 Energy.'];
- const duplicateSet=model.id==='zero'?zeroDuplicates:model.id==='soul'?soulDuplicates:model.id==='logan'?loganDuplicates:model.id==='dawn'?dawnDuplicates:model.id==='lily'?lilyDuplicates:model.id==='cloud'?cloudDuplicates:null;
- text(record.characterDuplicates&&duplicateSet?`DUPLICATE ${record.characterDuplicates} • ${duplicateSet[record.characterDuplicates-1]}`:DEV_MODE?'Duplicate effects preview without resource costs.':'No duplicate effects unlocked.',830,430,14,'#aebfd0','550');
- text('Levels affect all six base combat stats.',830,490,16,'#d6e2ef','650');
- text('Current loadout bonuses are included in the stat values.',830,525,14,'#aebfd0','550');
 }
 function drawLoadout(){
  const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId),progress=progressFor(loadoutCharacterId),cap=characterLevelCap();
@@ -1919,22 +1748,6 @@ const STORE_REVEAL_TIMING=Object.freeze({cardEnterMs:1000,cardFlipMs:500});
 function getStoreRotation(){
  const ids=ROSTER.filter(model=>!model.test).map(model=>model.id);
  return FeaturedLottery.rotate(ids,new Date());
-}
-function storeRewardPools(type,rotation){
- const models=ROSTER.filter(model=>!model.test),featuredIds=type==='character'?rotation.featuredCharacters:rotation.featuredWeapons;
- const idFor=model=>type==='character'?model.id:'premium-'+model.id;
- const make=model=>({id:idFor(model),name:type==='character'?model.name:model.id==='soul'?'Soulbound':model.id==='cloud'?'Cloud-nine':model.id==='zero'?'Nightshade':model.name+' Premium Weapon'});
- return {featured:models.filter(model=>featuredIds.includes(idFor(model))).map(make),offFeature:models.filter(model=>!featuredIds.includes(idFor(model))).map(make)};
-}
-function awardStoreReward(type,reward){
- if(type==='character'){
-  if(!ROSTER_IDS.has(reward.id))return reward.name+' character reward.';
-  if(!isCharacterOwned(reward.id)){ownedCharacterIds.add(reward.id);saveOwnedCharacters();return reward.name+' acquired.'}
-  const record=loadoutFor(reward.id);record.characterDuplicates=Math.min(4,record.characterDuplicates+1);saveLoadouts();return reward.name+' character duplicate.';
- }
- const id=reward.id.replace(/^premium-/,'');if(!ROSTER_IDS.has(id))return reward.name+' weapon reward.';
- const weapon=loadoutFor(id).weapon;if(weapon.premiumOwned)weapon.premiumPotential=Math.min(5,weapon.premiumPotential+1);else weapon.premiumOwned=true;
- saveLoadouts();return reward.name+(weapon.premiumPotential>1?' • Premium Potential '+weapon.premiumPotential:' • Premium acquired');
 }
 async function drawStoreLottery(type,count=1){
  if(storeActionPending)return false;
@@ -3047,7 +2860,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)c
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 if(DEV_MODE){
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,archetypeId:e.archetypeId,level:e.level,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,speed:speedOf(e),barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,momentumStacks:e.momentumStacks||0,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.1.18',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.1.19',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneEchoStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,echoPercent:echoPercentOf(unit)}));
 window.twoToneReflectStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,reflectPercent:reflectPercentOf(unit)}));
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,

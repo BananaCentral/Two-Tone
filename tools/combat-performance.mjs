@@ -614,7 +614,6 @@ function writeBenchmarkArtifacts(outputPath, samples, coverage, expectedBenchmar
     for (const row of scoreRows) console.log(`  ${row.character}: ${row.outcomeScore.toFixed(1)}/100 ensemble win rate (policy ${row.policyMinimum.toFixed(1)}–${row.policyMaximum.toFixed(1)}).`);
   }
 }
-function totalAllyHp(result) { return result.finalHp.allies; }
 function sumAllyMetric(result, key) {
   return Object.values(result.unitStats || {}).reduce((sum, unit) => sum + (Number(unit[key]) || 0), 0);
 }
