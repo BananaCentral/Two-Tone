@@ -25,7 +25,7 @@ Each player has a persistent game profile that follows their Google account acro
 
 The authenticated server profile is authoritative for:
 
-- Coins, daily claim periods, and login event progress
+- Coins, daily claim periods, login event progress, and permanent event claims
 - Campaign part clears and first-clear rewards
 - Owned characters and weapons, duplicates, and potential
 - Item inventory, including cores, gems, enchanted bottles, and enchanted books

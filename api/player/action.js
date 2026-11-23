@@ -1,3 +1,4 @@
+import { claimSoulGift } from "../../src/scripts/permanent-event.mjs";
 import { commonStoreReward } from "../../lib/store-rewards.js";
 import { claimLoginEvent, easternDayKey } from "../../src/scripts/login-event.mjs";
 import { awardCampaignClear, getCampaignEntry, isCampaignEntryUnlocked } from "../../src/scripts/campaign.mjs";
@@ -153,6 +154,11 @@ export default async function handler(req,res){
     const coins=awardCampaignClear(state,body.entryId);
     const rewards=coins>0?[{coins}]:[];
     return {ok:true,save:state.clearedCampaignEntries!==previousClears?state:null,rewards,receipt:receipt(rewards)};
+   }
+   if(body.action==="claim-soul-gift"){
+    const rewards=claimSoulGift(state,addInventory);
+    if(!rewards)return {ok:false,status:409,error:"already_claimed"};
+    return {ok:true,save:state,rewards,receipt:receipt(rewards)};
    }
    if(body.action==="claim-login-event"){
     const reward=claimLoginEvent(state);
