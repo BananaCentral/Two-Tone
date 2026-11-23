@@ -1,3 +1,4 @@
+import { claimLoginEvent, easternDayKey } from "../../src/scripts/login-event.mjs";
 import { awardCampaignClear, getCampaignEntry, isCampaignEntryUnlocked } from "../../src/scripts/campaign.mjs";
 import { randomInt } from "node:crypto";
 import { auth } from "../../lib/auth.js";
@@ -6,13 +7,6 @@ import { CHARACTER_IDS_PUBLIC, withLockedProfile } from "../../lib/player-profil
 const RULES={ticketCost:100,mythic:.01,heightenedMythic:.02,rare:.10,featured:.75,characterPity:100,heightenedCharacterPity:50,weaponPity:50,heightenedWeaponPity:25,rarePity:10};
 const ASCENSION_GATES=[10,20,30,40],RUNE_SETS=["radiant-moon","eternal-sun","celestial-star","dark-matter","clear-skies","infinite-space","recycle","amplify","united"],RUNE_STATS=["hp","attack","physicalDefense","magicalDefense","speed"];
 const itemReward=(id,name,quantity)=>({id,name,inventoryItem:id,quantity});
-const ROTATION_TZ="America/New_York";
-
-function dailyKey(now=new Date()){
- const parts=new Intl.DateTimeFormat("en-US",{timeZone:ROTATION_TZ,year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(now);
- const value=kind=>parts.find(part=>part.type===kind)?.value;
- return `${value("year")}-${value("month")}-${value("day")}`;
-}
 function lotteryIds(type,state){return type==="character"?state.lottery.currentFeatured:state.lottery.currentFeatured.map(id=>`premium-${id}`)}
 function trackFor(state,type){return type==="character"?state.lottery.character:state.lottery.weapon}
 function roll(){return randomInt(1_000_000)/1_000_000}
@@ -160,8 +154,14 @@ export default async function handler(req,res){
     const rewards=coins>0?[{coins}]:[];
     return {ok:true,save:state.clearedCampaignEntries!==previousClears?state:null,rewards,receipt:receipt(rewards)};
    }
+   if(body.action==="claim-login-event"){
+    const reward=claimLoginEvent(state);
+    if(reward.status!=="claimed")return {ok:false,status:409,error:reward.status};
+    const rewards=[{coins:reward.coins}];
+    return {ok:true,save:state,rewards,receipt:receipt(rewards)};
+   }
    if(body.action==="claim-daily"){
-    const period=dailyKey();
+    const period=easternDayKey();
     if(state.dailyRewardClaimedPeriod===period)return {ok:false,status:409,error:"already_claimed"};
     state.dailyRewardClaimedPeriod=period;state.coins+=100;
     return {ok:true,save:state,receipt:receipt()};

@@ -28,7 +28,7 @@ Show these sections in this order:
 - On the 1600×900 canvas, use three columns and three rows. Fill the tiles from left to right in the section order above.
 - Give each tile one large, simple line icon, a clear section name, and at most one short supporting line. Keep tiles large enough for touch input.
 - Keep the **Daily Reward** tile on the main menu. See the [Daily Coin Reward Standard](../daily-reward-standard.md) for its available and claimed states.
-- Events remains a visibly inactive placeholder until implemented. Other tiles open their corresponding game sections directly.
+- Events opens the [28-Day Login Event](../event-standard/login-event-standard.md).
 
 ## Startup and Account
 
