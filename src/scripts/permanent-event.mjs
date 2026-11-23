@@ -1,7 +1,7 @@
 export const SOUL_GIFT = Object.freeze({
   id: 'soul-gift',
   title: 'Soul’s Gift',
-  coins: 20_000,
+  coins: 2_000,
   items: Object.freeze([
     Object.freeze({ id: 'book:small', name: 'Small Enchanted Books', image: 'enchantedBookSmall', quantity: 200 }),
     Object.freeze({ id: 'bottle:small', name: 'Small Enchanted Bottles', image: 'enchantedBottleSmall', quantity: 200 }),

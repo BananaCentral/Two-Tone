@@ -15,7 +15,7 @@ Soul’s Gift is a permanent event. Use Soul’s character artwork as the focus 
 
 | Reward | Quantity |
 |---|---:|
-| Coins | 20,000 |
+| Coins | 2,000 |
 | Small Enchanted Books | 200 |
 | Small Enchanted Bottles | 200 |
 | Gems | 2 |

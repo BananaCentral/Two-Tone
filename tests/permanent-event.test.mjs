@@ -11,7 +11,7 @@ test('Soul’s Gift awards the full grant once, including on legacy profiles', (
   assert.equal(hasClaimedSoulGift(profile), false);
   const rewards = claimSoulGift(profile, addInventory);
   assert.equal(rewards.length, 5);
-  assert.equal(profile.coins, 20_037);
+  assert.equal(profile.coins, 2_037);
   assert.deepEqual(profile.inventory, { 'book:small': 200, 'bottle:small': 200, gem: 2, core: 2 });
   assert.deepEqual(profile.loginEvent, { cycle: 3, claims: 2 });
 
