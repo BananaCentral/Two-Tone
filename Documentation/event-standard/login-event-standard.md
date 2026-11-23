@@ -22,7 +22,8 @@ The shared cycle starts on November 23, 2026, Eastern Time and rolls over every 
 
 Follow the [UI Layout Standard](../project-standard/ui-layout-standard.md) and [UI Copy Standard](../project-standard/ui-copy-standard.md).
 
-- Center the title above the artwork. Keep the reset date and maximum reward in clear space on the banner.
+- List available events in a left tab rail styled like Loadout and Campaign. Highlight the selected tab and open the first event by default. The 28-Day Login Event is the first tab.
+- Show the selected event in the right panel. Center its title above the artwork. Keep the reset date and maximum reward in clear space on the banner.
 - Use the Store’s current featured characters as full-body banner art. Place one larger character in front and offset the others behind at different heights. Keep faces visible. Use shared lighting and compose the banner around the available lineup when fewer than three characters are featured.
 - The art follows the Store’s weekly rotation. Claim eligibility follows the event calendar.
 - Arrange the seven reward cards in an evenly spaced row below the banner. Mark claimed rewards and highlight the next claim. Align the available reward value above the **Claim** button. Show **Claimed today** or **Cycle complete** as appropriate. Keep the artwork visible in every state.
