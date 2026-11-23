@@ -3,8 +3,10 @@ export const LOGIN_EVENT_CYCLE_DAYS = 28;
 export const LOGIN_EVENT_REWARDS = Object.freeze([200, 100, 100, 200, 100, 100, 200]);
 
 const DAY_MS = 86_400_000;
+const timeZone = 'America/New_York';
+const easternOffset = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longOffset' });
 const easternDate = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+  timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
 });
 const firstDay = Date.parse(LOGIN_EVENT_START_DATE) / DAY_MS;
 
@@ -28,6 +30,20 @@ export function getLoginEventState(progress, now = new Date()) {
     : claims >= LOGIN_EVENT_REWARDS.length ? 'complete'
     : activeProgress?.lastClaimDay >= dayKey ? 'claimed-today' : 'available';
   return { dayKey, cycle, resetDate, claims, status, nextCoins: LOGIN_EVENT_REWARDS[claims] ?? 0 };
+}
+
+export function formatLoginEventCountdown(resetDate, now = new Date()) {
+  const utcMidnight = Date.parse(resetDate + 'T00:00:00Z');
+  // In New York the offset at UTC midnight remains in effect through local midnight.
+  const offset = easternOffset.formatToParts(utcMidnight).find(part => part.type === 'timeZoneName').value.slice(3);
+  const resetTime = Date.parse(resetDate + 'T00:00:00' + offset);
+  const totalSeconds = Math.max(0, Math.ceil((resetTime - now.getTime()) / 1_000));
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor(totalSeconds / 3_600) % 24;
+  const minutes = Math.floor(totalSeconds / 60) % 60;
+  const seconds = totalSeconds % 60;
+  const time = [hours, minutes, seconds].map(value => String(value).padStart(2, '0')).join(':');
+  return days ? `${days}d ${time}` : time;
 }
 
 export function claimLoginEvent(profile, now = new Date()) {

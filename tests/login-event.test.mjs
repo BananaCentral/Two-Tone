@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { claimLoginEvent, getLoginEventState } from '../src/scripts/login-event.mjs';
+import { claimLoginEvent, formatLoginEventCountdown, getLoginEventState } from '../src/scripts/login-event.mjs';
 
 test('seven nonconsecutive Eastern daily claims earn exactly 1,000 coins', () => {
   const profile = { coins: 0 };
@@ -38,4 +38,10 @@ test('progress from the original launch schedule carries over without another sa
   assert.equal(claimLoginEvent(profile, new Date('2026-11-24T05:00:00Z')).coins, 100);
   assert.equal(profile.coins, 300);
   assert.equal(claimLoginEvent(profile, new Date('2026-12-03T05:00:00Z')).coins, 200);
+});
+
+test('the countdown reaches Eastern midnight across winter and daylight saving offsets', () => {
+  assert.equal(formatLoginEventCountdown('2026-12-03', new Date('2026-11-23T18:00:00Z')), '9d 11:00:00');
+  assert.equal(formatLoginEventCountdown('2026-03-26', new Date('2026-03-26T03:59:59.500Z')), '00:00:01');
+  assert.equal(formatLoginEventCountdown('2026-03-26', new Date('2026-03-26T04:00:00Z')), '00:00:00');
 });

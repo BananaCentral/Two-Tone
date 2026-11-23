@@ -1,4 +1,4 @@
-import { getLoginEventState, LOGIN_EVENT_REWARDS } from './login-event.mjs';
+import { formatLoginEventCountdown, getLoginEventState, LOGIN_EVENT_REWARDS } from './login-event.mjs';
 import { CAMPAIGN_ARCS, FIRST_CAMPAIGN_ENTRY_ID, PROLOGUE_CAMPSITE_BACKGROUND, PROLOGUE_SUNRISE_BACKGROUND, PROLOGUE_RIVERBANK_BACKGROUND, PROLOGUE_VILLAGE_BACKGROUND, STORY_PORTRAITS, getCampaignEntry, isCampaignEntryUnlocked } from './campaign.mjs';
 import { CHARACTER_COMBAT_DATA, CHARACTER_ROSTER, COMBAT_RESOURCE_STANDARD, ENEMY_ARCHETYPES, ENEMY_COMBAT_DATA, RUNE_COMBAT_RULES, enemyStatsAtLevel, getActiveCharacterUpgradeEffect } from './combat-definitions.mjs';
 import { TwoToneBattleEngine, TwoToneTurnTimeline } from './combat-engine-api.mjs';
@@ -1998,7 +1998,8 @@ function drawEvents(){
 
 function drawLoginEvent(){
  text('28-DAY LOGIN EVENT',906,62,36,'#ffedd1','850','center');
- const event=getLoginEventState(window.TwoToneAccount.profile.loginEvent);
+ const now=new Date();
+ const event=getLoginEventState(window.TwoToneAccount.profile.loginEvent,now);
  const featured=getStoreRotation().featuredCharacters;
  const bannerX=360,bannerY=110,bannerW=1092,bannerH=458;
  const backdrop=ctx.createLinearGradient(bannerX,bannerY,bannerX+bannerW,bannerY+bannerH);
@@ -2037,6 +2038,9 @@ function drawLoginEvent(){
   drawStoreBannerImage(images[STORE_BANNER_PORTRAITS[id]],pose.x,pose.y,pose.w,pose.h);
  }
  ctx.restore();
+ rect(1230,128,204,72,'rgba(13,21,38,.92)','#c6a873',12);
+ text(event.status==='upcoming'?'OPENS IN':'CYCLE RESETS IN',1415,148,13,'#f5d99d','800','right');
+ text(formatLoginEventCountdown(event.resetDate,now),1415,175,24,'#fff4e1','850','right');
  text('Claim up to 1,000 coins',408,329,35,'#fff4e1','850');
 
  const coin=images.coin;
@@ -2963,7 +2967,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)c
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 if(DEV_MODE){
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,archetypeId:e.archetypeId,level:e.level,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,speed:speedOf(e),barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,momentumStacks:e.momentumStacks||0,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.1.23',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.1.24',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneEchoStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,echoPercent:echoPercentOf(unit)}));
 window.twoToneReflectStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,reflectPercent:reflectPercentOf(unit)}));
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
