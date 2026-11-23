@@ -24,6 +24,8 @@ Each banner offers a single draw for 100 coins and a ten-draw option for 1,000 c
 
 For the reveal, each ticket rises into view showing its back over 1,000 ms, then waits for the player to tap or click it. The card flips to reveal the reward over 500 ms. Keep the reward face visible for as long as the player wants. In a ten-draw, tapping or clicking the revealed card brings out the next ticket; after the tenth reward, the next tap opens the summary. The summary remains open until the player presses **Done**, which is available immediately. These durations follow the 250 ms animation timing unit in the [Combat Action Resolution Standard](../combat-action-resolution-standard.md).
 
+Keep the card back free of text. On the revealed card, give the artwork and item quantity the most space. Show the rarity, artwork, and reward name once. For inventory items, place the quantity in large type beneath the name, such as **×15**. For characters and weapons, show the draw outcome when it adds information. Place a single interaction prompt below the card. Follow the [UI Layout Standard](../project-standard/ui-layout-standard.md) and [UI Copy Standard](../project-standard/ui-copy-standard.md).
+
 ## Featured Rotation
 
 The Store may feature up to three character and signature premium weapon pairs at once. A player chooses one featured target for each lottery type they use. The character and weapon in each pair correspond to one another.

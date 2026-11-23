@@ -1910,7 +1910,7 @@ function drawStoreReveal(now){
   ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle=i%3===0?color:'#dff6ff';ctx.translate(x,y);ctx.rotate(a+spin);ctx.fillRect(-3,-9,6,18);ctx.restore();
  }
  rect(448,192,704,525,'rgba(12,20,38,.96)',color,22);
- text(summary?'TEN DRAW RESULTS':batch?`DRAW ${reveal.index+1} OF ${rewards.length}`:'FEATURED LOTTERY',800,summary?238:216,15,'#b9cbe0','800','center');
+ if(summary||batch)text(summary?'TEN DRAW RESULTS':`DRAW ${reveal.index+1} OF ${rewards.length}`,800,summary?238:216,15,'#b9cbe0','800','center');
  if(summary){
   text(`${rewards.length} REWARDS • ${rewards.length*FeaturedLottery.RULES.ticketCost} COINS`,800,262,12,'#e6d2aa','750','center');
   rewards.forEach((item,i)=>{const col=i%2,row=Math.floor(i/2),x=468+col*334,y=278+row*76,tierColor=item.tier==='mythic'?'#ffd778':item.tier==='rare'?'#d8a4ff':'#83dcff';rect(x,y,326,66,'rgba(35,48,69,.96)',tierColor,9);text(item.tier.toUpperCase(),x+12,y+24,12,tierColor,'850');text(item.reward.name||item.reward.id,x+105,y+23,15,'#fff3de','750');text(item.result+(item.featured?' • FEATURED':''),x+105,y+45,11,'#c2d0dd','550')});
@@ -1929,25 +1929,32 @@ function drawStoreReveal(now){
  const diamond=(x,y,r,fill)=>{ctx.save();ctx.fillStyle=fill;ctx.beginPath();ctx.moveTo(x,y-r);ctx.lineTo(x+r,y);ctx.lineTo(x,y+r);ctx.lineTo(x-r,y);ctx.closePath();ctx.fill();ctx.restore()};
  for(const x of [-111,111])for(const y of [-162,162])diamond(x,y,6,faceShown?color:'#f0d58e');
  if(faceShown){
-  text('✦  '+current.tier.toUpperCase()+'  ✦',0,-147,22,current.tier==='common'?'#45627c':current.tier==='rare'?'#79509a':'#9a6913','950','center');
-  ctx.save();ctx.strokeStyle=color;ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,-24,73,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='rgba(255,255,255,.65)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,-24,64,0,Math.PI*2);ctx.stroke();ctx.restore();
-  const rewardSprite=images[STORE_ITEM_SPRITES[current.reward.inventoryItem]||STORE_REWARD_SPRITES[current.reward.id]];if(rewardSprite?.complete&&rewardSprite.naturalWidth)ctx.drawImage(rewardSprite,-58,-82,116,116);else text(current.tier==='mythic'?'✦':'✧',0,-24,70,current.tier==='common'?'#45627c':current.tier==='rare'?'#79509a':'#9a6913','900','center');
-  const rewardName=current.reward.name||current.reward.id;text(rewardName,0,78,17,'#1b3047','850','center');
-  text(current.result,0,108,11,'#344b61','650','center');
-  ctx.save();ctx.strokeStyle='rgba(129,96,49,.62)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-74,137);ctx.lineTo(74,137);ctx.stroke();ctx.restore();
-  text('TWO-TONE • SUMMON',0,158,11,'#6d5734','800','center');
+  text(current.tier.toUpperCase(),0,-145,22,current.tier==='common'?'#45627c':current.tier==='rare'?'#79509a':'#9a6913','950','center');
+  ctx.save();
+  ctx.strokeStyle=color;
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.arc(0,-32,84,0,Math.PI*2);
+  ctx.stroke();
+  ctx.restore();
+  const rewardSprite=images[STORE_ITEM_SPRITES[current.reward.inventoryItem]||STORE_REWARD_SPRITES[current.reward.id]];
+  if(rewardSprite?.complete&&rewardSprite.naturalWidth)drawStoreBannerImage(rewardSprite,-72,-104,144,144);
+  else text(current.tier==='mythic'?'✦':'✧',0,-32,70,'#45627c','900','center');
+  const rewardName=current.reward.name||current.reward.id;
+  text(rewardName,0,82,18,'#1b3047','850','center');
+  if(current.reward.inventoryItem){
+   text('×'+(current.reward.quantity??1).toLocaleString('en-US'),0,137,50,'#1b3047','900','center');
+  }else if(current.result&&current.result!==rewardName){
+   text(current.result,0,126,15,'#344b61','750','center');
+  }
  }else{
   ctx.save();ctx.strokeStyle='rgba(232,201,135,.86)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,-15,69,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='rgba(127,171,210,.68)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(0,-15,57,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(-82,-15);ctx.lineTo(82,-15);ctx.moveTo(0,-97);ctx.lineTo(0,67);ctx.stroke();ctx.restore();
   text('✦',0,-15,58,'#f0d58e','900','center');
-  text('TWO-TONE',0,93,19,'#fff1d1','900','center');
-  text('FEATURED SUMMON',0,119,12,'#bed4e7','750','center');
-  text('TAP OR CLICK TO TURN',0,150,11,'#e5ca91','700','center');
  }
  ctx.restore();
  const prompt=reveal.phase==='ready'?'TAP OR CLICK TO FLIP':reveal.phase==='flip'?'FLIPPING…':faceShown?(batch?'TAP OR CLICK FOR NEXT CARD':'TAP OR CLICK TO RETURN'):'DRAWING YOUR REWARD';
  text(prompt,800,665,16,'#fff0c9','850','center');
  if(reveal.phase==='ready'||faceShown)choiceRects.push({x:652,y:245,w:296,h:400,action:reveal.phase==='ready'?'store:reveal:flip':batch?'store:reveal:next':'store:reveal:close',enabled:true});
- if(faceShown&&batch)text('TAP OR CLICK THE CARD WHEN READY',800,692,13,'#c4d6e5','600','center');
 }
 function drawStore(){
  drawBackground();rect(0,0,W,H,'rgba(5,9,22,.84)');
@@ -3053,7 +3060,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)c
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 if(DEV_MODE){
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,archetypeId:e.archetypeId,level:e.level,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,speed:speedOf(e),barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,momentumStacks:e.momentumStacks||0,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.1.31',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.1.32',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneEchoStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,echoPercent:echoPercentOf(unit)}));
 window.twoToneReflectStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,reflectPercent:reflectPercentOf(unit)}));
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,

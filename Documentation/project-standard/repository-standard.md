@@ -17,11 +17,12 @@
 - Use a category heading followed by bullets describing the changes.
 - Use a separate heading for each affected category.
 
-## Committing and Pushing
+## Committing and Releasing
 
 - Create a commit only after the user approves the general addition.
 - Commit the completed addition to `prototype`, including only changes related to that addition.
-- Do not push commits to GitHub; the user handles pushes manually.
+- After verifying an approved change, push `prototype` to GitHub without waiting for a separate push request.
+- Confirm that Vercel serves the pushed commit on the production game. If the Git integration does not publish it, deploy the same commit to the existing production project and verify the result.
 
 ## Player Accounts and Saved Data
 
