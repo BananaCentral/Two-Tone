@@ -33,7 +33,7 @@ test('a legacy profile receives the reward once and unknown entries leave it int
   assert.deepEqual(profile, { coins: 25 });
   assert.equal(awardCampaignClear(profile, FIRST_CAMPAIGN_ENTRY_ID), 100);
   assert.equal(awardCampaignClear(profile, FIRST_CAMPAIGN_ENTRY_ID), 0);
-  assert.deepEqual(profile, { coins: 125, clearedCampaignEntries: [FIRST_CAMPAIGN_ENTRY_ID] });
+  assert.deepEqual(profile, { coins: 125, clearedCampaignEntries: [FIRST_CAMPAIGN_ENTRY_ID], playerRank: 2, rankXp: 0 });
 });
 
 test('Prologue 1B unlocks after 1A and grants a separate first-clear reward', () => {
@@ -116,4 +116,14 @@ test('Prologue 1D follows the Hawks and stages a single Goblin in the village', 
   assert.equal(awardCampaignClear(profile, entry.id), 100);
   assert.equal(awardCampaignClear(profile, entry.id), 0);
   assert.equal(profile.coins, 400);
+});
+
+test('Prologue first clears each award five Rank XP and replays award none', () => {
+  const profile = { coins: 0 };
+  for (const [part, rank, xp] of [['a', 2, 0], ['b', 2, 5], ['c', 3, 0], ['d', 3, 5]]) {
+    assert.equal(awardCampaignClear(profile, 'prologue_1' + part), 100);
+    assert.equal(awardCampaignClear(profile, 'prologue_1' + part), 0);
+    assert.equal(profile.playerRank, rank);
+    assert.equal(profile.rankXp, xp);
+  }
 });

@@ -22,8 +22,12 @@ This standard defines player rank as account progression. Rank belongs to the pl
 - Rank determines multiple aspects of the game. The specific effects are defined as those systems are designed.
 - Rank data is part of the player's local save. The storage method is an implementation detail and is not prescribed by this standard.
 
+## Campaign Rewards
+
+Each first clear of Prologue 1A–1D grants 5 Rank XP. The server saves Rank XP and any resulting rank increase with the campaign clear.
+
 ## Open Design Decisions
 
-- Which activities grant Rank XP and how much they grant.
+- Which future activities grant Rank XP and how much they grant.
 - Which game systems and rewards are determined by rank.
 - Whether rank data will eventually use online account storage.

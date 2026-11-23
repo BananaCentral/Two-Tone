@@ -82,6 +82,7 @@ const prologue = {
     waves: [[{ enemyId: 'slime', quantity: 1, level: 1 }]],
   },
   firstClearCoins: 100,
+  firstClearRankXp: 5,
   nextEntryId: 'prologue_1b',
 };
 
@@ -157,6 +158,7 @@ const prologue1b = {
     waves: [[{ enemyId: 'wolf', quantity: 3, level: 1 }]],
   },
   firstClearCoins: 100,
+  firstClearRankXp: 5,
   nextEntryId: 'prologue_1c',
 };
 
@@ -221,6 +223,7 @@ const prologue1c = {
     waves: [[{ enemyId: 'hawk', quantity: 5, level: 1 }]],
   },
   firstClearCoins: 100,
+  firstClearRankXp: 5,
   nextEntryId: 'prologue_1d',
 };
 
@@ -311,6 +314,7 @@ const prologue1d = {
     waves: [[{ enemyId: 'goblin', quantity: 1, level: 1 }]],
   },
   firstClearCoins: 100,
+  firstClearRankXp: 5,
   nextEntryId: null,
 };
 
@@ -358,5 +362,15 @@ export function awardCampaignClear(profile, entryId) {
 
   profile.clearedCampaignEntries = [...cleared, entryId];
   profile.coins += entry.firstClearCoins;
+  if (entry.firstClearRankXp) {
+    profile.playerRank ??= 1;
+    profile.rankXp = (profile.rankXp ?? 0) + entry.firstClearRankXp;
+    while (profile.playerRank < 50) {
+      const requiredXp = profile.playerRank * 5 * (1 + Math.floor(profile.playerRank / 5));
+      if (profile.rankXp < requiredXp) break;
+      profile.rankXp -= requiredXp;
+      profile.playerRank++;
+    }
+  }
   return entry.firstClearCoins;
 }

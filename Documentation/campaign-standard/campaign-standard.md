@@ -28,7 +28,7 @@ Author entries in [campaign.mjs](../../src/scripts/campaign.mjs). The title scre
 - Display arcs, chapters, and parts in a left sidebar styled like the Loadout tabs. Expand or collapse arcs and chapters in place. Use indentation for hierarchy and highlight the selected part. Paginate the sidebar when the expanded tree exceeds eight rows.
 - On entry, expand the first arc and chapter and preview its first available uncleared part, or its first part if none qualify.
 - Mark parts **Available**, **Cleared**, or **Locked** in the sidebar. Selecting a row keeps the player in Campaign and updates the preview panel on the right.
-- Show the part title and its spoiler-free summary for available and cleared parts. **Start Part** and **Replay Part** open the first story beat. Replays do not award first-clear coins again.
+- Show the part title and its spoiler-free summary for available and cleared parts. **Start Part** and **Replay Part** open the first story beat. Replays do not award first-clear rewards again. Each first clear of Prologue 1A–1D awards 5 Rank XP in addition to coins.
 - Selecting a locked part shows the title of the prerequisite part the player must clear.
 
 - Selector order controls browsing. `nextEntryId` controls **Continue** from a saved victory, and `prerequisiteEntryId` controls unlocks.

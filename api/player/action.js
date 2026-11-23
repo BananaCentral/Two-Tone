@@ -152,7 +152,7 @@ export default async function handler(req,res){
     const previousClears=state.clearedCampaignEntries;
     if(!isCampaignEntryUnlocked(entry,previousClears))return {ok:false,status:409,error:"campaign_entry_locked"};
     const coins=awardCampaignClear(state,body.entryId);
-    const rewards=coins>0?[{coins}]:[];
+    const rewards=state.clearedCampaignEntries!==previousClears?[{coins,rankXp:entry.firstClearRankXp??0}]:[];
     return {ok:true,save:state.clearedCampaignEntries!==previousClears?state:null,rewards,receipt:receipt(rewards)};
    }
    if(body.action==="claim-soul-gift"){
