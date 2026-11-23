@@ -39,11 +39,14 @@ export function formatLoginEventCountdown(resetDate, now = new Date()) {
   const resetTime = Date.parse(resetDate + 'T00:00:00' + offset);
   const totalSeconds = Math.max(0, Math.ceil((resetTime - now.getTime()) / 1_000));
   const days = Math.floor(totalSeconds / 86_400);
-  const hours = Math.floor(totalSeconds / 3_600) % 24;
+  if (days) return days === 1 ? '1 day' : `${days} days`;
+  if (totalSeconds <= 60) return `${totalSeconds}s`;
+
+  const hours = Math.floor(totalSeconds / 3_600);
   const minutes = Math.floor(totalSeconds / 60) % 60;
   const seconds = totalSeconds % 60;
-  const time = [hours, minutes, seconds].map(value => String(value).padStart(2, '0')).join(':');
-  return days ? `${days}d ${time}` : time;
+  const [major, minor] = hours ? [hours, minutes] : [minutes, seconds];
+  return `${major}:${String(minor).padStart(2, '0')}`;
 }
 
 export function claimLoginEvent(profile, now = new Date()) {

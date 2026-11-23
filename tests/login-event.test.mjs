@@ -41,7 +41,24 @@ test('progress from the original launch schedule carries over without another sa
 });
 
 test('the countdown reaches Eastern midnight across winter and daylight saving offsets', () => {
-  assert.equal(formatLoginEventCountdown('2026-12-03', new Date('2026-11-23T18:00:00Z')), '9d 11:00:00');
-  assert.equal(formatLoginEventCountdown('2026-03-26', new Date('2026-03-26T03:59:59.500Z')), '00:00:01');
-  assert.equal(formatLoginEventCountdown('2026-03-26', new Date('2026-03-26T04:00:00Z')), '00:00:00');
+  assert.equal(formatLoginEventCountdown('2026-12-03', new Date('2026-11-23T18:00:00Z')), '9 days');
+  assert.equal(formatLoginEventCountdown('2026-03-26', new Date('2026-03-26T03:59:59.500Z')), '1s');
+  assert.equal(formatLoginEventCountdown('2026-03-26', new Date('2026-03-26T04:00:00Z')), '0s');
+});
+
+test('the countdown switches formats as each larger unit runs out', () => {
+  const reset = '2026-12-03';
+  const examples = [
+    ['2026-12-02T05:00:00Z', '1 day'],
+    ['2026-12-02T05:00:01Z', '23:59'],
+    ['2026-12-02T16:30:00Z', '12:30'],
+    ['2026-12-03T04:00:00Z', '1:00'],
+    ['2026-12-03T04:53:30Z', '6:30'],
+    ['2026-12-03T04:58:59Z', '1:01'],
+    ['2026-12-03T04:59:00Z', '60s'],
+    ['2026-12-03T04:59:59Z', '1s'],
+  ];
+  for (const [now, expected] of examples) {
+    assert.equal(formatLoginEventCountdown(reset, new Date(now)), expected, now);
+  }
 });
