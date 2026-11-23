@@ -7,6 +7,8 @@ The main menu is the player's primary way to navigate the game. It replaces over
 Use the [UI Copy Standard](../project-standard/ui-copy-standard.md) to keep menu labels concise and remove redundant helper text.
 Use the [UI Layout Standard](../project-standard/ui-layout-standard.md) for consistent panel hierarchy, spacing, and alignment.
 
+Display the player’s current [Rank](../rank-standard/rank-standard.md) at the upper left of the main menu.
+
 ## Main Menu Sections
 
 Show these sections in this order:

@@ -60,7 +60,7 @@
    seedLocalProfile(profileData.profile);
    window.TwoToneAccount={user,get profile(){return account.profile},signOut,deleteAccount,action,createRequestId};
    await loadScript('/src/scripts/featured-lottery.js');
-   await loadScript('/src/scripts/main.js?v=0.1.34');
+   await loadScript('/src/scripts/main.js?v=0.1.35');
    gate.hidden=true;
   }catch(error){
    gate.hidden=false;
