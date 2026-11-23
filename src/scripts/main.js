@@ -1481,7 +1481,13 @@ async function handleLoadoutAction(action){
   return;
  }
  if(kind==='book-select'){
-  const [size,delta]=arg.split(',');if(['small','medium','large'].includes(size)){weaponBookSelection[size]=Math.max(0,Math.min(itemInventory.books[size],weaponBookSelection[size]+Number(delta)||0))}return;
+  if(loadoutActionPending)return;
+  if(['small','medium','large'].includes(arg)&&weaponBookSelection[arg]<itemInventory.books[arg])weaponBookSelection[arg]++;
+  return;
+ }
+ if(kind==='book-clear'){
+  if(!loadoutActionPending)weaponBookSelection={small:0,medium:0,large:0};
+  return;
  }
  if(kind==='weapon-switch'){
   if(weapon.premiumOwned&&!loadoutActionPending){loadoutActionPending=true;try{await window.TwoToneAccount.action('set-weapon',{id:loadoutCharacterId,type:weapon.selected==='premium'?'standard':'premium'});weaponBookSelection={small:0,medium:0,large:0}}catch(e){say('Weapon selection could not be saved.')}finally{loadoutActionPending=false}}return
@@ -1595,13 +1601,14 @@ function drawLoadoutWeaponsPanel(model,record){
  if(DEV_MODE&&owned){addButton(1400,542,56,36,'loadout:potential:'+type+',-1','−','',potential>1);addButton(1464,542,56,36,'loadout:potential:'+type+',1','+','',potential<5)}
  const upgradeLabel=gate?'ASCEND':level>=cap?'MAX LEVEL':'UPGRADE',bookSelectionCount=weaponBookSelection.small+weaponBookSelection.medium+weaponBookSelection.large;
  text(owned?'+'+bonus.toFixed(2).replace(/0+$/,'').replace(/\.$/,'')+'% ALL STATS':'PREMIUM WEAPON NOT OWNED',1090,580,16,owned?'#f4d99c':'#aebed0','800');
- addButton(1090,600,214,48,'loadout:upgrade:weapon',upgradeLabel,'',owned&&(gate?itemInventory.gems>0:level<cap&&bookSelectionCount>0),14);
+ addButton(1090,600,214,48,'loadout:upgrade:weapon',upgradeLabel,'',owned&&!loadoutActionPending&&(gate?itemInventory.gems>0:level<cap&&bookSelectionCount>0),14);
  addButton(1320,600,214,48,'loadout:weapon-switch','SWITCH','',w.premiumOwned,14);
  if(gate){
   text('GEMS',1090,675,12,'#d9c797','750');drawLoadoutMaterialCard(1090,684,139,151,'gem','GEM',itemInventory.gems);
  }else{
   text('ENCHANTED BOOKS',1090,675,12,'#d9c797','750');
-  for(let i=0;i<3;i++)drawLoadoutBookCard(1090+i*150,684,139,151,type,['small','medium','large'][i],owned&&level<cap);
+  if(bookSelectionCount>0)addButton(1430,653,104,26,'loadout:book-clear','CLEAR','',!loadoutActionPending,12);
+  for(let i=0;i<3;i++)drawLoadoutBookCard(1090+i*150,684,139,151,['small','medium','large'][i],owned&&level<cap&&!loadoutActionPending);
  }
 }
 function drawLoadoutMaterialCard(x,y,w,h,item,label,qty){
@@ -1610,15 +1617,16 @@ function drawLoadoutMaterialCard(x,y,w,h,item,label,qty){
  text(label,x+w/2,y+96,11,'#f3e5c9','800','center');
  text('×'+qty,x+w/2,y+130,13,'#f0f3f7','750','center');
 }
-function drawLoadoutBookCard(x,y,w,h,type,size,enabled){
- const upper=size[0].toUpperCase()+size.slice(1),qty=itemInventory.books[size],selected=weaponBookSelection[size],xp=ITEM_XP[size],buttonY=y+103;
- rect(x,y,w,h,'rgba(24,32,49,.78)',enabled?'rgba(121,143,168,.65)':'rgba(121,143,168,.45)',10);
- const icon=images['enchantedBook'+upper];if(icon?.complete&&icon.naturalWidth)drawStoreBannerImage(icon,x+48,y+4,w-96,54);
+function drawLoadoutBookCard(x,y,w,h,size,enabled){
+ const upper=size[0].toUpperCase()+size.slice(1),qty=itemInventory.books[size],selected=weaponBookSelection[size];
+ const canAdd=enabled&&selected<qty;
+ rect(x,y,w,h,selected?'#29384e':'rgba(24,32,49,.78)',selected?'#d2b77e':canAdd?'#a5c9dc':'rgba(121,143,168,.45)',10);
+ choiceRects.push({x,y,w,h,action:'loadout:book-select:'+size,enabled:canAdd});
+
+ drawStoreBannerImage(images['enchantedBook'+upper],x+48,y+4,w-96,54);
  text(upper.toUpperCase(),x+w/2,y+67,11,'#f3e5c9','800','center');
- text(xp+' XP',x+w/2,y+84,10,'#c4d0dd','600','center');
- addButton(x+12,buttonY,34,30,'loadout:book-select:'+size+',-1','−','',enabled&&selected>0,14);
- text(selected+' / '+qty,x+w/2,buttonY+15,11,'#f0f3f7','750','center');
- addButton(x+w-46,buttonY,34,30,'loadout:book-select:'+size+',1','+','',enabled&&selected<qty,14);
+ text(ITEM_XP[size]+' XP',x+w/2,y+84,10,'#c4d0dd','600','center');
+ text(selected+' / '+qty+' selected',x+w/2,y+118,11,'#f0f3f7','750','center');
 }
 function drawLoadoutRunesPanel(record){
  if(runePanelMode==='inventory'){drawRuneInventoryPicker(record);return}
@@ -3029,7 +3037,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)c
 // Read-only instrumentation and explicitly labeled testing helpers for verification.
 if(DEV_MODE){
 window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,archetypeId:e.archetypeId,level:e.level,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,speed:speedOf(e),barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,momentumStacks:e.momentumStacks||0,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.1.27',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
+window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.1.28',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
 window.twoToneEchoStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,echoPercent:echoPercentOf(unit)}));
 window.twoToneReflectStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,reflectPercent:reflectPercentOf(unit)}));
 window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:false,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
