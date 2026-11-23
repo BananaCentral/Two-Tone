@@ -41,7 +41,7 @@ Each screen shows one paragraph or standalone line. Continue replaces it with th
 
 Set a default `story.background` for the entry. Set `background` on individual beats when a change in time, location, or viewpoint needs different art. The image changes when the player advances to that beat. Each override applies to its own beat. Repeat the path on consecutive beats that share an image, and omit the override to return to the default.
 
-When a battle starts in the same location and at the same time as the preceding scene, use the same background asset for the story and its registered battle area. If the transition changes location or time, assign the battle area that matches the encounter. See the [Battle Area Background Standard](../battle-area-background-standard.md) for battle camera behavior.
+Use the [Battle Area Background Standard](../battle-area-background-standard.md#area-assignment) to assign the encounter background at the story-to-battle handoff.
 
 ## Encounter results
 

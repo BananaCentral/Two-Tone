@@ -30,6 +30,7 @@ export const COMBAT_TRIGGER_EVENTS = Object.freeze([
   'on_basic', 'on_skill', 'on_ultimate', 'on_successful_hit', 'on_incoming_attack',
   'on_ally_damage_to_enemy', 'on_ally_damage_dealt', 'on_enemy_enter', 'on_self_enhanced_basic', 'on_linked_ally_action', 'after_link_expired', 'on_tuned_basic_used', 'on_action',
   'every_nth_basic', 'after_attack', 'battle_start', 'always_on', 'event_defined',
+  'on_damaging_skill', 'on_ultimate_and_next_action', 'after_next_action', 'while_ready', 'on_critical_strike', 'while_shielded',
   'on_direct_damage', 'on_ally_skill', 'on_ability_hit', 'on_turn_start', 'on_ability_damage', 'on_barrier_break', 'on_first_hit_per_target', 'on_shield_applied'
 ]);
 

@@ -15,14 +15,14 @@ This standard applies to full-body character art rendered in battle-stage and al
 - Ally-target selection uses each character's full-body front-facing artwork, scaled to the same party-stage slot. Do not crop this view to a head-and-shoulders portrait.
 - Character portraits in HUD cards use the character's front-facing portrait asset and the Battle Character Card Standard. Their crop and dimensions are independent of the battle-stage sprite.
 
-## Current Character Assets
+## Served Character Assets
 
 | Character | Battle-stage view | Ally-target full-body view | HUD portrait |
 |---|---|---|---|
-| Soul | `assets/soul-ashblade-battle.png` with Ashblade; `assets/soulbound-battle.png` with Soulbound | `assets/soul-artwork.png` | `assets/soul-artwork.png` |
+| Soul | `assets/soul-ashblade-battle.webp` with Ashblade; `assets/soulbound-battle.png` with Soulbound | `assets/soul-artwork.webp` | `assets/soul-artwork.webp` |
 | Lily | `assets/lily-petal-battle.png` with Petal; `assets/lily-everblossom-battle.png` with Everblossom | `assets/lily-artwork.png` | `assets/lily-artwork.png` |
 | Dawn | `assets/dawn-radiant-pearl-battle.png` with Radiant Pearl; `assets/dawn-radiant-diamond-battle.png` with Radiant Diamond | `assets/dawn-artwork.png` | `assets/dawn-artwork.png` |
 | Cloud | `assets/cloud-windcall-battle.png` with Windcall; `assets/cloud-nine-battle.png` with Cloud-nine | `assets/cloud-artwork.png` | `assets/cloud-artwork.png` |
-| Logan | `assets/logan.png` (rear-facing) | `assets/logan-front.png` (front-facing) | `assets/logan-front.png` (head-and-shoulders crop) |
-| Zero | `assets/zero-battle.png` (northeast-facing) | `assets/zero.png` (front-facing full-body artwork) | `assets/zero.png` |
+| Logan | `assets/logan.png` with Crimson Edge; `assets/logan-bloodmoon-battle.png` with Bloodmoon | `assets/logan-front.png` (front-facing) | `assets/logan-front.png` (head-and-shoulders crop) |
+| Zero | `assets/zero-battle.png` with Silent Edge; `assets/zero-nightshade-battle.png` with Nightshade | `assets/zero.png` (front-facing full-body artwork) | `assets/zero.png` |
 

@@ -1,19 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { ENEMY_DIFFICULTY_STANDARD } from '../src/scripts/combat-definitions.mjs';
 import { archetypeLibrary, candidateSpecs, impactDeltas, makeBaseConfig, makeBranches } from '../tools/combat-performance.mjs';
 
 test('upgrade performance candidates cover individually tagged duplicate and weapon effects', () => {
   const upgrades = candidateSpecs('all-upgrade-effects');
   assert.ok(upgrades.length >= 40);
-  assert.ok(upgrades.some(candidate => candidate.id === 'soul.duplicate.2.follow-up-damage'));
+  assert.ok(upgrades.some(candidate => candidate.id === 'soul.duplicate.2.basic-damage'));
   assert.ok(upgrades.some(candidate => candidate.id === 'dawn.signature.tune-defense-ignore'));
   assert.ok(upgrades.some(candidate => candidate.id === 'logan.premium-duplicate.4.shielded-damage'));
-  assert.deepEqual(candidateSpecs('upgrade:soul.duplicate.2.follow-up-damage'), [
-    { type: 'upgrade', id: 'soul.duplicate.2.follow-up-damage', character: 'soul', source: { kind: 'character_duplicate', rank: 2 } }
+  assert.deepEqual(candidateSpecs('upgrade:soul.duplicate.2.basic-damage'), [
+    { type: 'upgrade', id: 'soul.duplicate.2.basic-damage', character: 'soul', source: { kind: 'character_duplicate', rank: 2 } }
   ]);
 
-  const base = makeBaseConfig(archetypeLibrary(), ['soul', 'lily'], ['slime'], 'medium', 'short');
-  const spec = upgrades.find(candidate => candidate.id === 'soul.duplicate.2.follow-up-damage');
+  const normal = ENEMY_DIFFICULTY_STANDARD.find(difficulty => difficulty.id === 'normal');
+  const base = makeBaseConfig(archetypeLibrary(), ['soul', 'lily'], ['slime'], normal);
+  const spec = upgrades.find(candidate => candidate.id === 'soul.duplicate.2.basic-damage');
   const { control, treatment } = makeBranches(base, spec, 'soul');
   assert.equal(control.teams.allies[0].characterDuplicates, 2);
   assert.equal(treatment.teams.allies[0].characterDuplicates, 2);

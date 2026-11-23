@@ -33,7 +33,7 @@
       },
       "ultimate": {
         "damageType": "true",
-        "multiplier": 2,
+        "multiplier": 1.5,
         "target": "aoe",
         "energyCost": 100,
         "refillFollowUps": true
@@ -84,7 +84,7 @@
       "skill": {
         "type": "ricochet",
         "damageType": "magical",
-        "multiplier": 0.5,
+        "multiplier": 0.75,
         "target": "aoe",
         "energyGain": 20,
         "markTurns": 2,
@@ -92,20 +92,20 @@
       },
       "ultimate": {
         "damageType": "magical",
-        "multiplier": 1,
+        "multiplier": 0.75,
         "target": "aoe",
         "energyCost": 100,
         "summonDuration": 3,
         "summonSpeed": 30,
         "summonHp": 1,
         "summonDamageType": "true",
-        "summonMultiplier": 1,
+        "summonMultiplier": 0.75,
         "summonTarget": "aoe"
       },
       "passives": [
         {
           "type": "exposed",
-          "defenseReduction": 0.1,
+          "defenseReduction": 0.2,
           "duration": 2
         }
       ],

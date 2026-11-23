@@ -33,7 +33,7 @@
       },
       "ultimate": {
         "damageType": "true",
-        "multiplier": 2,
+        "multiplier": 1.5,
         "target": "aoe",
         "energyCost": 100,
         "refillFollowUps": true

@@ -1,6 +1,6 @@
 # Rune balance: win rate and combat value
 
-> **Historical study:** This was an exploratory report from an earlier simulator and scenario design. It is superseded by the shared-engine, passive-only comparison in [Rune balance current](../rune-balance-current/README.md). Do not combine these older figures with the current benchmark.
+> **Historical study:** This was an exploratory report from an earlier simulator and scenario design. It is superseded by the shared-engine, passive-only comparison in [Rune balance current](../../Documentation/rune-balance-current/README.md). Do not combine these older figures with the current benchmark.
 
 ## What was measured
 
@@ -58,7 +58,7 @@ Dark Matter is especially effective on Soul in the current model: +8.4% wearer d
 To rerun from the repository root:
 
 ```sh
-node Documentation/rune-balance-winrate-and-value/source/run-study.mjs
+node Archive/rune-balance-winrate-and-value/source/run-study.mjs
 ```
 
-The runner writes the full, unaggregated results to `Documentation/rune-balance-winrate-and-value/raw-run.json`.
+The runner writes the full, unaggregated results to `Archive/rune-balance-winrate-and-value/raw-run.json`.

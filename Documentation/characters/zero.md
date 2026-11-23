@@ -1,6 +1,6 @@
 # Zero Character Sheet
 
-Zero is a playable Physical damage dealer. The front-facing full-body artwork in `assets/zero.png` is used for his HUD portrait and ally-target view. His northeast-facing battle sprite is `assets/zero-battle.png`.
+Zero is a playable Physical damage dealer. The front-facing full-body artwork in `assets/zero.png` is used for his HUD portrait and ally-target view. See the [Character Battle Sprite Standard](../character-battle-sprite-standard.md) for poses by weapon.
 
 ## Identity and base stats
 
@@ -29,7 +29,7 @@ Costs 100 Energy and deals Physical AoE damage at a 1.0× multiplier. It advance
 3. Ultimate's multiplier increases by 100%, from 1.0× to 2.0×.
 4. First Strike's normal and first-hit multipliers increase by 100%, from 1.0×/2.0× to 2.0×/4.0×.
 
-## Premium signature weapon
+## Premium signature weapon · Nightshade
 
 The Premium weapon's Potential 1 effect restores 1 party Skill Point and 20 Energy to Zero when he uses his Ultimate. Premium Potential 2–5 correspond to weapon Duplicates 1–4:
 

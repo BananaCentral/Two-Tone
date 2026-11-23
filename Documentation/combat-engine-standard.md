@@ -28,15 +28,11 @@ The headless runner must call the same deterministic combat runtime as a live ba
 
 The live UI should provide presentation callbacks around this runtime; it must not own a second set of combat outcomes. Randomness must be injectable so paired simulation branches can replay identical seeds.
 
-## Current migration status
-
-The browser game and runner share authored character/enemy sheets, typed damage math, direct-hit intake, barrier damage and break resolution, complete Reflect/Echo event sequencing, Bleed stacks and tick resolution, Exposed/Bleed/Ricochet hit effects, Follow-Up charge and target allocation, Shield/healing application, Dawn Tune/Ultimate, Logan Blood Shield, Zero/Lily/Logan ultimate effects, Lily summon plans and duration, shared mark/debuff/taunt/tune/residue updates, action intents, target plans, skill-point and Energy settlement, Rune effects and cooldown timing, enemy basic-attack plans, battle outcome checks, turn scheduling, and status-duration/cleanse operations. Both call `TwoToneBattleEngine` for those state changes. The engine owns shared combat formulas and state transitions; callers provide derived equipment/stat context and retain presentation/metrics bookkeeping.
-
-Timed effects advance on explicit lifecycle clocks. Both live battles and simulations call `ageUnitEffects` once at the affected unit's turn end; Bleed separately resolves at turn start before the action. Rune cooldowns and summon lifetime use owner-turn and summon-action clocks as specified in the [Combat Effect Lifecycle Standard](combat-effect-lifecycle-standard.md).
-
 ## Runtime boundary
 
 The player controller and simulator policy choose different actions by design. They submit those intents to `TwoToneBattleEngine`, which owns action planning and resource commitment, typed damage and intake, character hit effects, support actions, ultimate effects, Rune cooldowns, Follow-Up and Ricochet allocation, summon duration, enemy attack plans, status state, turn scheduling, and battle outcome decisions. The browser retains animation, input, and wave presentation; the simulator retains its AI policy, scenario loop, and metrics collection. The standardized policy probabilities live in shared combat definitions; policy rolls use an independent seeded random stream so a change to policy sampling does not perturb battle-resolution randomness. Adapters may choose targets or attach presentation/metrics, but must not add alternate damage, resource, status, or ability-effect rules.
+
+Timed effects use explicit lifecycle clocks. Live battles and simulations call `ageUnitEffects` at the affected unit’s turn end. Bleed resolves before the action at turn start. Rune cooldowns and summon durations follow their own clocks in the [Combat Effect Lifecycle Standard](combat-effect-lifecycle-standard.md).
 
 ## Mechanic event attribution
 

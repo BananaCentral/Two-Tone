@@ -20,7 +20,7 @@
       },
       "basic": {
         "damageType": "physical",
-        "multiplier": 0.5,
+        "multiplier": 0.75,
         "target": "blast",
         "energyGain": 20,
         "skillPointGain": 1
@@ -30,7 +30,7 @@
         "target": "single",
         "damageType": "physical",
         "multiplier": 1,
-        "firstHitMultiplier": 1.5,
+        "firstHitMultiplier": 2,
         "energyGain": 20
       },
       "ultimate": {

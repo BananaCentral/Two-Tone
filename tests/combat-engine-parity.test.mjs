@@ -164,8 +164,8 @@ test('shared support, ultimate, Follow-Up, summon, and timed-status handlers res
 test('each Rune trigger is resolved by the shared Rune table', () => {
   const engine = new TwoToneBattleEngine();
   const cases = [
-    ['radiant-moon', 'directDamage'], ['eternal-sun', 'passive'], ['celestial-star', 'ultimate'],
-    ['dark-matter', 'skill'], ['clear-skies', 'reflect'], ['infinite-space', 'ultimate'],
+    ['radiant-moon', 'damagingSkill'], ['eternal-sun', 'ultimate'], ['celestial-star', 'criticalStrike'],
+    ['dark-matter', 'abilityDamage'], ['clear-skies', 'reflect'], ['infinite-space', 'ultimate'],
     ['recycle', 'skill'], ['amplify', 'basic'], ['united', 'allySkill']
   ];
   for (const [setId, trigger] of cases) {
@@ -176,10 +176,10 @@ test('each Rune trigger is resolved by the shared Rune table', () => {
 test('shared Rune cooldowns and outcome resolution are deterministic', () => {
   const engine = new TwoToneBattleEngine();
   const state = { cooldowns: {}, cooldownStartedTurn: {} };
-  const effect = engine.resolveRuneTrigger({ setId: 'celestial-star', trigger: 'ultimate', state,
+  const effect = engine.resolveRuneTrigger({ setId: 'celestial-star', trigger: 'criticalStrike', state,
     effectId: 'celestial-star', turn: 3 });
-  assert.equal(effect.actionAdvance, 100);
-  assert.equal(engine.resolveRuneTrigger({ setId: 'celestial-star', trigger: 'ultimate', state,
+  assert.deepEqual(effect, { forceCritical: true, criticalDamageBonus: .25, cooldownTurns: 2 });
+  assert.equal(engine.resolveRuneTrigger({ setId: 'celestial-star', trigger: 'criticalStrike', state,
     effectId: 'celestial-star', turn: 3 }), null);
   assert.equal(engine.resolveBattleOutcome({ allies: [{ hp: 10 }], enemies: [{ hp: 0 }] }), 'victory');
   assert.equal(engine.resolveBattleOutcome({ allies: [{ hp: 0 }], enemies: [{ hp: 10 }] }), 'defeat');

@@ -68,12 +68,8 @@ One Core raises one Celestial by one level, up to its Level 10 cap. See the [Ite
 
 Character Duplicates are separate from weapon Potential and persist on each character's Loadout. Each playable character's Duplicate effects are listed in their Character Sheet.
 
-Soul's Premium signature effect at Potential 1 and above refunds 1 Skill Point after each three Skill Points spent on Enhance. Soul's Premium signature duplicates map to Premium Potential 2–5: each potential above 1 is one duplicate. Duplicate 1 doubles Basic's base multiplier; Duplicate 2 adds 10 percentage points of Critical Rate and 25 percentage points of Critical Damage; Duplicate 3 makes a 3-stack Enhanced Basic AoE; Duplicate 4 restores one Follow Up after every two Follow Up activations. Premium weapon effects only apply while Soul owns and has selected the Premium weapon.
+Premium Potential 2–5 correspond to weapon Duplicates 1–4. Character-specific effects are defined in the character sheets, including [Soul](../characters/soul.md), [Dawn](../characters/dawn.md), and [Zero](../characters/zero.md). Premium effects require that the weapon be owned and equipped.
 
-Dawn's Standard and Premium signature weapons let Tuned allies ignore 20% of enemy defenses. While the owned Premium weapon is equipped, Duplicates 1–4 add Tune damage reduction, Barrier damage, 20% Advance for its target, and Critical Rate/Critical Damage, respectively.
+## Saved equipment and progression
 
-Zero's Premium signature weapon restores 1 Skill Point when he uses his Ultimate. Its Duplicates 1–4 add Basic Attack Bleed, reduce Ultimate Energy cost to 80, grant 20% defense ignore, and double Cutthroat's Critical Rate/Critical Damage bonuses. See the [Zero Character Sheet](../characters/zero.md) for exact values and trigger rules.
-
-## Prototype boundaries
-
-The Loadout screen persists weapon Potential, Level and XP, per-slot Rune equipment and Rune configuration, Celestial levels, and character Duplicate level locally. Potential upgrades do not charge resources because their coin costs have not been defined. Weapon XP comes from Enchanted Books. Premium weapons remain locked until Store acquisition is implemented. Rune Set combat effects and battle durations follow the [Rune Set Standard](../rune-standard/rune-standard.md). Weapon effects without character-specific definitions remain pending. Premium Potential 2–5 map to weapon Duplicates 1–4. Premium effects require an owned, equipped Premium weapon.
+The authenticated player profile stores weapon ownership, Potential, Level and XP, Rune configuration and equipment, Celestial levels, and character Duplicates. Players acquire premium weapons and their duplicates through the [Featured Lottery](../store-standard/featured-lottery-standard.md). See the [Account and Player Data Standard](../account-and-player-data-standard.md) for persistence.

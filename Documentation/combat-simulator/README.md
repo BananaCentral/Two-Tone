@@ -20,7 +20,7 @@ node tools/combat-simulator.mjs --config path/to/scenario.json --runs 1000 --see
 
 `Documentation/combat-simulator/example-soul-lily-vs-slimes.json` is a Level 1 Soul and Lily team scenario against five Slimes. `Documentation/combat-simulator/example-logan-party-vs-bear-boss.json` includes Soul, Lily, Dawn, and Logan against the Bear boss.
 
-`Documentation/combat-simulator/example-zero-vs-slime.json` provides a single-target Zero baseline. His current base multipliers are 0.5× Basic, 1.0× First Strike (1.5× the first time he damages a given enemy), and 1.0× Ultimate. Zero scenarios support Cutthroat Critical bonuses, per-enemy First Strike scaling, Physical Blast Basic attacks with Energy gain and shared Skill Point recovery, Ultimate self-advance and enemy delay, and configured character and Premium weapon duplicates.
+`Documentation/combat-simulator/example-zero-vs-slime.json` provides a single-target Zero baseline. See the [Zero Character Sheet](../characters/zero.md) for current multipliers. Zero scenarios support Cutthroat Critical bonuses, per-enemy First Strike scaling, Physical Blast Basic attacks with Energy gain and shared Skill Point recovery, Ultimate self-advance and enemy delay, and configured character and Premium weapon duplicates.
 
 ## Standard character benchmark suite
 
@@ -70,7 +70,7 @@ Presets are `quick` (23 sampled strata × 5 seeds per policy), `balanced` (45 ×
 
 The game supports integer enemy Levels 1–50, with all five base stats scaling by Level. Performance benchmark difficulties scale the Level 1 enemy stat line uniformly: Easy ×0.75, Normal ×1, Hard ×1.5, rounding to the nearest 0.25. No separate encounter-length, HP, Attack, or Defense multipliers are applied; mechanics stay the same. See the [Enemy Level Standard](../enemy-level-standard.md).
 
-The [November 19 four-person policy comparison](character-policy-comparison-2026-11-19.md) records the previous benchmark version. New Level-scaled ensemble runs write per-policy scores and policy spread alongside the ensemble result.
+The [November 19 four-person policy comparison](../../Archive/combat-simulator/character-policy-comparison-2026-11-19.md) records the previous benchmark version. New Level-scaled ensemble runs write per-policy scores and policy spread alongside the ensemble result.
 
 ## Scenario structure
 
@@ -88,7 +88,7 @@ Optional `weapon` settings accept `type: standard|premium`, `potential: 1–5`, 
 
 Supported attack damage types are `physical`, `magical`, and `true`. True Damage uses the full Attack stat. Its defense reduction combines half of the Physical and half of the Magical defense contribution. Basic and Ultimate attacks define a multiplier and target shape (`single`, `blast`, or `aoe`). `random` and `lowestHp` are primary-target selection policies. Allies default to 40 starting Energy and enemies to 0; `energy.start` or an instance `energy` can override this. Energy is capped at 120 by default.
 
-All simulated units default to 10% Critical Rate and 50% Critical Damage. These are hidden stats. An archetype or instance may override them with `critical: { "rate": 0.25, "damage": 0.75 }`; `criticalRateBonus` and `criticalDamageBonus` add temporary or other source bonuses. Soul's Premium Weapon Duplicate 2 adds 10 percentage points of Critical Rate and 25 percentage points of Critical Damage. Zero adds 10 and 25 percentage points from Cutthroat; Premium Weapon Duplicate 4 doubles those passive bonuses. Each damage instance rolls independently, including AoE targets and multi-hit actions. Use `--seed` to reproduce crit rolls. Batch output includes average Critical Hits.
+All simulated units default to 10% Critical Rate and 50% Critical Damage. These are hidden stats. An archetype or instance may override them with `critical: { "rate": 0.25, "damage": 0.75 }`; `criticalRateBonus` and `criticalDamageBonus` add temporary or other source bonuses. Soul's Premium Weapon Duplicate 2 adds 10 percentage points of Critical Rate and 25 percentage points of Critical Damage. See the [Zero Character Sheet](../characters/zero.md) for Cutthroat and Nightshade effects. Each damage instance rolls independently, including AoE targets and multi-hit actions. Use `--seed` to reproduce crit rolls. Batch output includes average Critical Hits.
 
 Lifesteal is another hidden stat and defaults to 0 for all units. Set `lifesteal` to a decimal rate (for example, `0.1` for 10%); `lifestealBonus` adds a rate bonus. Healing is based on actual HP damage after all damage modifiers, Shield absorption, and HP caps, including Barrier shatter HP damage but excluding Barrier damage. Healing is capped at the source's missing HP. Battle and batch output report Lifesteal healing by side, and ally `averageUnitStats` include healing per archetype. Logan's Taste for Blood adds his party Lifesteal aura; his Premium weapon echoes allied healing back to him.
 

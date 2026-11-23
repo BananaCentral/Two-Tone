@@ -26,6 +26,7 @@ Each player has a persistent game profile that follows their Google account acro
 The authenticated server profile is authoritative for:
 
 - Coins and daily claim periods
+- Campaign part clears and first-clear rewards
 - Owned characters and weapons, duplicates, and potential
 - Item inventory, including cores, gems, enchanted bottles, and enchanted books
 - Character and weapon levels, XP, ascensions, and celestial progression
@@ -33,7 +34,7 @@ The authenticated server profile is authoritative for:
 - Rune ownership, set, and equipped slots
 - Lottery targets, pity counters, heightened state, and rotation state
 
-The client may request a game action, but it must not submit a replacement balance, inventory, ownership list, lottery result, or progression total. Economy-changing actions are validated and committed by the server as one transaction.
+The client may request a game action, but it must not submit a replacement balance, inventory, ownership list, lottery result, or progression total. The server validates action-specific rules and commits economy changes in a transaction. Campaign battles currently resolve in the browser. The server accepts the reported victory, checks prerequisites and previous clears, and records the reward together with the clear. See the [Campaign Standard](campaign-standard/campaign-standard.md#encounter-results).
 
 ## Persistence and saves
 
@@ -52,4 +53,4 @@ The client may request a game action, but it must not submit a replacement balan
 
 ## Current implementation status
 
-The public client no longer enables Dev Mode from `?dev=1`, and the save/load file controls and handlers have been removed. Dev Mode is disabled for all accounts until a server-side developer role is configured. Google sign-in is required before the game loads. Player profiles, Store draws, daily claims, team selections, vitals, and loadout upgrades use authenticated server routes; browser `localStorage` is a per-account cache. Google OAuth credentials and a production database must be configured before the live flow can start. The browser does not provide a general profile replacement endpoint.
+Player profiles, campaign clears, Store draws, daily claims, team selections, vitals, and Loadout changes use authenticated server routes. The browser uses local storage as a per-account cache. See the [Account and Player Data Setup](account-and-player-data-setup.md) for deployment configuration.
