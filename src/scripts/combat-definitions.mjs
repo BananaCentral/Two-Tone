@@ -303,7 +303,7 @@ export const CHARACTER_ROSTER = Object.freeze([
   ),
   character(
     { id: 'zero', name: 'ZERO', label: 'Character', hp: 50, baseAttack: 40, basePhysicalDefense: 2, baseMagicalDefense: 2, speed: 30, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'zeroBattle', test: false, passive: { id: 'cutthroat', criticalRateBonus: .1, criticalDamageBonus: .25 } },
-    { name: 'Zero', role: 'mainDps', level: 1, basic: { damageType: 'physical', multiplier: .75, target: 'blast', energyGain: 20, skillPointGain: 1 }, skill: { type: 'firstStrike', target: 'single', damageType: 'physical', multiplier: 1, firstHitMultiplier: 2, energyGain: 20 }, ultimate: { damageType: 'physical', multiplier: 1.2, target: 'aoe', energyCost: 100, actionAdvance: 100, mechanicTargets: { 'tempo.action_advance': { side: 'self', acquisition: 'self', coverage: 'single' } } }, passives: [{ type: 'cutthroat', criticalRateBonus: .1, criticalDamageBonus: .25 }] }
+    { name: 'Zero', role: 'mainDps', level: 1, basic: { damageType: 'physical', multiplier: .75, target: 'blast', energyGain: 20, skillPointGain: 1 }, skill: { type: 'firstStrike', target: 'single', damageType: 'physical', multiplier: 1, firstHitMultiplier: 2, energyGain: 20 }, ultimate: { damageType: 'physical', multiplier: 1.25, target: 'aoe', energyCost: 100, actionAdvance: 100, mechanicTargets: { 'tempo.action_advance': { side: 'self', acquisition: 'self', coverage: 'single' } } }, passives: [{ type: 'cutthroat', criticalRateBonus: .1, criticalDamageBonus: .25 }] }
   ),
   character(
     { id: 'lily', name: 'LILY', label: 'Character', hp: 100, baseAttack: 20, basePhysicalDefense: 4, baseMagicalDefense: 4, speed: 20, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'lily', test: false },

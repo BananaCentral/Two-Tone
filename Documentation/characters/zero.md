@@ -20,13 +20,13 @@ Costs 1 party Skill Point, deals Physical damage to one selected enemy, and rest
 
 ## Ultimate
 
-Costs 100 Energy and deals Physical AoE damage at a 1.2× multiplier. It advances Zero's next turn by 100% after the Ultimate resolves. The advance makes him ready for his next turn at the current action boundary. Character Duplicate 3 doubles the Ultimate multiplier to 2.4×.
+Costs 100 Energy and deals Physical AoE damage at a 1.25× multiplier. It advances Zero's next turn by 100% after the Ultimate resolves. The advance makes him ready for his next turn at the current action boundary. Character Duplicate 3 doubles the Ultimate multiplier to 2.5×.
 
 ## Character duplicates
 
 1. Cutthroat's Critical Rate and Critical Damage bonuses double, becoming +20 percentage points Critical Rate and +50 percentage points Critical Damage.
 2. Basic Attack's multiplier increases by 100%, from 0.75× to 1.5×.
-3. Ultimate's multiplier increases by 100%, from 1.2× to 2.4×.
+3. Ultimate's multiplier increases by 100%, from 1.25× to 2.5×.
 4. First Strike's normal and first-hit multipliers increase by 100%, from 1.0×/2.0× to 2.0×/4.0×.
 
 ## Premium signature weapon · Nightshade
