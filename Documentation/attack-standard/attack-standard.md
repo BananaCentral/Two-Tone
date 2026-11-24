@@ -14,8 +14,8 @@ Attack increases from character Level, weapons, Tune, shields, and Attack Runes 
 - Magical damage uses Attack and the target's Magical Defense.
 - True damage uses full Attack. Its defense reduction combines both defenses:
 
-  `True damage reduction = 0.5 × min(Physical Defense ÷ Attack, 1) + 0.5 × min(Magical Defense ÷ Attack, 1)`
+  `True damage reduction = 0.5 × clamp(effective Physical Defense ÷ Attack, −1, 1) + 0.5 × clamp(effective Magical Defense ÷ Attack, −1, 1)`
 
-Apply damage-type-specific defense ignores to their matching defense contributions before calculating the True damage reduction. The total reduction cannot exceed 100%.
+Apply damage-type-specific defense ignores and reduction effects before calculating damage. Effective defense can be negative. For Physical and Magical hits, use `damage factor = clamp(1 − effective Defense ÷ Attack, 0, 2)`. For True hits, use `damage factor = clamp(1 − True damage reduction, 0, 2)`. This means zero defense leaves damage unchanged, and negative defense amplifies it, up to 2× damage per hit. Defense equal to or greater than Attack blocks that hit.
 
 Calculated stats round to the nearest 0.25 without rounding to whole numbers. Damage and HP changes use their separate whole-number rounding rules. See the [Damage Type Standard](../damage-type-standard/damage-type-standard.md).

@@ -11,12 +11,12 @@ export const COMBAT_MECHANIC_TAGS = Object.freeze([
   'damage.conditional_multiplier', 'damage.over_time', 'damage.echo', 'damage.reflect',
   'damage.follow_up', 'damage.barrier_break',
   'buff.attack', 'buff.speed', 'buff.critical', 'buff.next_basic', 'buff.damage', 'buff.barrier_damage', 'buff.barrier_break_damage', 'buff.defense_ignore',
-  'debuff.defense', 'debuff.damage', 'debuff.mark', 'debuff.speed',
+  'debuff.defense', 'debuff.damage', 'debuff.mark', 'debuff.speed', 'debuff.stun', 'debuff.attack',
   'defense.shield', 'defense.barrier', 'defense.damage_reduction', 'defense.stealth',
   'recovery.healing', 'recovery.lifesteal',
   'resource.energy', 'resource.skill_point', 'resource.capacity', 'resource.hp_cost',
   'tempo.action_advance', 'tempo.action_delay', 'tempo.taunt',
-  'status.bleed', 'status.exposed', 'status.ricochet', 'status.tune', 'status.residue', 'status.broken',
+  'status.bleed', 'status.exposed', 'status.ricochet', 'status.tune', 'status.residue', 'status.broken', 'status.stun', 'status.slow_start',
   'summon.create', 'summon.action',
   'trigger.per_hit', 'trigger.first_hit_per_target', 'trigger.per_action', 'trigger.per_source', 'trigger.periodic',
   'limit.duration', 'limit.stacks', 'limit.charges', 'limit.cooldown'
@@ -92,12 +92,14 @@ export const COMBAT_DAMAGE_EVENT_TYPES = Object.freeze([
   'direct_hit', 'follow_up_hit', 'ricochet_hit', 'summon_hit',
   'echo_hit', 'reflect_hit', 'damage_over_time', 'barrier_break'
 ]);
+export const COMBAT_STUN_STANDARD = Object.freeze({ chanceRange: Object.freeze([0, 1]), durationUnit: 'affected scheduled turns', attemptLimit: 'once_per_target_per_action', eligibleEvents: Object.freeze(['direct_hit', 'follow_up_hit', 'ricochet_hit', 'summon_hit']), reapply: 'replace_refresh_duration', effectsOnTurn: 'skip_action_and_off_turn_ultimate' });
 export const COMBAT_TRIGGER_ELIGIBILITY = Object.freeze({
   echo: Object.freeze({ from: Object.freeze(['direct_hit', 'follow_up_hit', 'ricochet_hit', 'summon_hit']),
     requires: 'hp_damage', recursive: false }),
   reflect: Object.freeze({ from: Object.freeze(['direct_hit', 'follow_up_hit', 'ricochet_hit', 'summon_hit', 'echo_hit']),
     requires: 'hp_or_shield_damage', recursive: false }),
   attackEffects: Object.freeze({ from: Object.freeze(['direct_hit', 'follow_up_hit', 'ricochet_hit', 'summon_hit']) }),
+  stun: Object.freeze({ from: Object.freeze(['direct_hit', 'follow_up_hit', 'ricochet_hit', 'summon_hit']), uniqueBy: 'target_action', requires: 'successful_non_dodged_hit' }),
   soulFollowUp: Object.freeze({ from: Object.freeze(['direct_hit', 'summon_hit']), uniqueBy: 'source_action', recursive: false }),
   lilyRicochet: Object.freeze({ from: Object.freeze(['direct_hit', 'summon_hit']), uniqueBy: 'source_action', recursive: false }),
   lifesteal: Object.freeze({ from: COMBAT_DAMAGE_EVENT_TYPES, requires: 'actual_hp_damage' })
@@ -119,8 +121,13 @@ export const COMBAT_EFFECT_LIFECYCLE = Object.freeze({
   'cloud-tempo': Object.freeze({ storage: 'marks', kind: 'timed_stacks', clock: 'affected_turn_end', reapply: 'add_stack_refresh_duration', removeOn: Object.freeze(['cleanse', 'defeat']) }),
   'cloud-slow': Object.freeze({ storage: 'marks', kind: 'timed_stacks', clock: 'affected_turn_end', reapply: 'add_stack_refresh_duration', removeOn: Object.freeze(['cleanse', 'defeat']) }),
   ricochet: Object.freeze({ storage: 'marks', kind: 'timed_mark', clock: 'affected_turn_end', reapply: 'refresh_duration_reset_source_history', consume: 'once_per_target_per_source', removeOn: Object.freeze(['cleanse', 'defeat']) }),
+  'luna-erosion': Object.freeze({ storage: 'marks', kind: 'timed_stacks', clock: 'affected_turn_end', reapply: 'add_stack_refresh_duration', removeOn: Object.freeze(['cleanse', 'defeat']) }),
+  'tsunade-slow-start': Object.freeze({ storage: 'marks', kind: 'timed_stacks', defaultMaxStacks: 10, clock: 'affected_turn_end', reapply: 'add_stack_refresh_duration', removeOn: Object.freeze(['cleanse', 'defeat']) }),
+  'tsunade-physical-defense-down': Object.freeze({ storage: 'debuffs', kind: 'timed_debuff', clock: 'affected_turn_end', reapply: 'replace_refresh_duration', removeOn: Object.freeze(['cleanse', 'defeat']) }),
+  'tsunade-attack-down': Object.freeze({ storage: 'debuffs', kind: 'timed_debuff', clock: 'affected_turn_end', reapply: 'replace_refresh_duration', removeOn: Object.freeze(['cleanse', 'defeat']) }),
   'soul-mark': Object.freeze({ storage: 'marks', kind: 'timed_mark', clock: 'affected_turn_end', reapply: 'refresh_duration', removeOn: Object.freeze(['cleanse', 'defeat']) }),
   'lily-weakened': Object.freeze({ storage: 'debuffs', kind: 'timed_debuff', clock: 'affected_turn_end', reapply: 'replace_refresh_duration', removeOn: Object.freeze(['cleanse', 'defeat']) }),
+  stun: Object.freeze({ storage: 'debuffs', kind: 'control_debuff', clock: 'affected_turn_end', reapply: 'replace_refresh_duration', removeOn: Object.freeze(['cleanse', 'defeat']) }),
   tune: Object.freeze({ storage: 'tune', kind: 'timed_buff', clock: 'affected_turn_end', reapply: 'replace', consume: 'next_basic', removeOn: Object.freeze(['duration_expired', 'defeat']) }),
   taunt: Object.freeze({ storage: 'tauntEffects', kind: 'timed_redirect', clock: 'affected_turn_end', reapply: 'replace_same_source_and_target', removeOn: Object.freeze(['duration_expired', 'cleanse', 'defeat']) }),
   residue: Object.freeze({ storage: 'residue', kind: 'timed_stacks', defaultMaxStacks: 5, defaultDurationTurns: 2, clock: 'affected_turn_end', reapply: 'add_stack_refresh_duration', removeOn: Object.freeze(['duration_expired', 'cleanse', 'defeat']) }),
@@ -153,7 +160,8 @@ const TYPE_MECHANIC_TAGS = Object.freeze({
   tune: ['status.tune', 'buff.next_basic', 'buff.damage', 'resource.skill_point', 'resource.energy', 'limit.duration'],
   bloodShield: ['defense.shield', 'resource.hp_cost', 'tempo.taunt', 'resource.energy'],
   dawnSupport: ['resource.energy', 'resource.skill_point', 'tempo.action_advance'],
-  residue: ['status.residue', 'debuff.damage', 'debuff.defense', 'limit.stacks', 'limit.duration']
+  residue: ['status.residue', 'debuff.damage', 'debuff.defense', 'limit.stacks', 'limit.duration'],
+  slowStart: ['status.slow_start', 'buff.speed', 'trigger.per_action', 'limit.duration', 'limit.stacks']
 });
 const TYPE_MECHANIC_TARGETS = Object.freeze({
   followUp: { 'damage.follow_up': ['opponent', 'event_defined', 'event_defined'] },
@@ -172,7 +180,8 @@ const TYPE_MECHANIC_TARGETS = Object.freeze({
   tune: { 'buff.next_basic': ['ally', 'selected', 'single'], 'resource.skill_point': ['team', 'battle_pool', 'global'], 'resource.energy': ['self', 'self', 'single'] },
   bloodShield: { 'defense.shield': ['actor_team', 'all', 'all'], 'tempo.taunt': ['opponent', 'all', 'all'], 'resource.hp_cost': ['self', 'self', 'single'], 'resource.skill_point': ['team', 'battle_pool', 'global'], 'resource.energy': ['self', 'self', 'single'] },
   dawnSupport: { 'resource.energy': ['ally', 'selected', 'single'], 'tempo.action_advance': ['ally', 'selected', 'single'], 'resource.skill_point': ['team', 'battle_pool', 'global'] },
-  residue: { 'status.residue': ['self', 'self', 'single'], 'debuff.damage': ['opponent', 'event_defined', 'event_defined'], 'debuff.defense': ['opponent', 'event_defined', 'event_defined'] }
+  residue: { 'status.residue': ['self', 'self', 'single'], 'debuff.damage': ['opponent', 'event_defined', 'event_defined'], 'debuff.defense': ['opponent', 'event_defined', 'event_defined'] },
+  slowStart: { 'status.slow_start': ['self', 'self', 'single'], 'buff.speed': ['self', 'self', 'single'], 'trigger.per_action': ['self', 'self', 'single'], 'limit.duration': ['self', 'self', 'single'], 'limit.stacks': ['self', 'self', 'single'] }
 });
 const TYPE_MECHANIC_TRIGGERS = Object.freeze({
   followUp: { 'damage.follow_up': 'on_ally_damage_to_enemy' },
@@ -191,7 +200,8 @@ const TYPE_MECHANIC_TRIGGERS = Object.freeze({
   tune: { 'status.tune': 'on_skill', 'buff.next_basic': 'on_skill', 'buff.damage': 'on_skill', 'resource.skill_point': 'on_tuned_basic_used', 'resource.energy': 'on_skill' },
   bloodShield: { 'defense.shield': 'on_skill', 'tempo.taunt': 'on_skill', 'resource.hp_cost': 'on_skill', 'resource.energy': 'on_skill', 'resource.skill_point': 'on_skill' },
   dawnSupport: { 'resource.energy': 'on_ultimate', 'tempo.action_advance': 'on_ultimate', 'resource.skill_point': 'on_ultimate' },
-  residue: { 'status.residue': 'on_incoming_attack', 'debuff.damage': 'on_incoming_attack', 'debuff.defense': 'on_incoming_attack' }
+  residue: { 'status.residue': 'on_incoming_attack', 'debuff.damage': 'on_incoming_attack', 'debuff.defense': 'on_incoming_attack' },
+  slowStart: { 'status.slow_start': 'on_action', 'buff.speed': 'on_action', 'trigger.per_action': 'on_action' }
 });
 
 function targetingFor(target, slot, defaultSide = 'enemy') {
@@ -224,12 +234,16 @@ function mechanicTriggersFor(effect, slot, mechanicTags) {
   const defaultEvent = slot === 'basic' ? 'on_basic' : slot === 'skill' ? 'on_skill' : slot === 'ultimate' ? 'on_ultimate' : 'event_defined';
   const triggers = Object.fromEntries(mechanicTags.map(tag => [tag, defaultEvent]));
   if (mechanicTags.includes('damage.barrier_break')) triggers['damage.barrier_break'] = 'on_barrier_break';
+  if (effect.stunChance !== undefined) triggers['status.stun'] = 'on_successful_hit';
   Object.assign(triggers, TYPE_MECHANIC_TRIGGERS[effect.type] || {}, effect.mechanicTriggers || {});
   return Object.freeze(triggers);
 }
 
 function tagCombatEffect(effect, slot, defaultSide = 'enemy') {
   if (!effect) return effect;
+  if (effect.stunChance !== undefined || effect.stunTurns !== undefined) {
+    if (!Number.isFinite(effect.stunChance) || effect.stunChance <= 0 || effect.stunChance > 1 || !Number.isInteger(effect.stunTurns) || effect.stunTurns < 1) throw new Error(`Stun on ${effect.id || effect.type || slot} needs a chance from 0 (exclusive) to 1 and a positive integer stunTurns.`);
+  }
   if (effect.type && !['basic', 'ultimate'].includes(effect.type) && !Object.hasOwn(TYPE_MECHANIC_TAGS, effect.type) && !effect.mechanicTags?.length) {
     throw new Error(`Combat effect type ${effect.type} needs explicit mechanicTags before it can be used in analysis.`);
   }
@@ -251,6 +265,7 @@ function tagCombatEffect(effect, slot, defaultSide = 'enemy') {
   if (Number.isFinite(effect.duration) || Number.isFinite(effect.markTurns) || Number.isFinite(effect.tauntTurns)) tags.add('limit.duration');
   if (Number.isFinite(effect.charges)) tags.add('limit.charges');
   if (Number.isFinite(effect.maxStacks)) tags.add('limit.stacks');
+  if (effect.stunChance !== undefined) { tags.add('status.stun'); tags.add('debuff.stun'); tags.add('limit.duration'); }
   for (const tag of tags) if (!COMBAT_MECHANIC_TAGS.includes(tag)) throw new Error(`Unknown combat mechanic tag ${tag} on ${effect.id || effect.type || slot}.`);
   const targeting = effect.target !== undefined ? targetingFor(effect.target, slot, defaultSide) :
     slot === 'passive' ? targetingFor(undefined, slot, defaultSide) : null;
@@ -288,7 +303,7 @@ export const CHARACTER_ROSTER = Object.freeze([
   ),
   character(
     { id: 'zero', name: 'ZERO', label: 'Character', hp: 50, baseAttack: 40, basePhysicalDefense: 2, baseMagicalDefense: 2, speed: 30, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'zeroBattle', test: false, passive: { id: 'cutthroat', criticalRateBonus: .1, criticalDamageBonus: .25 } },
-    { name: 'Zero', role: 'mainDps', level: 1, basic: { damageType: 'physical', multiplier: .75, target: 'blast', energyGain: 20, skillPointGain: 1 }, skill: { type: 'firstStrike', target: 'single', damageType: 'physical', multiplier: 1, firstHitMultiplier: 2, energyGain: 20 }, ultimate: { damageType: 'physical', multiplier: 1, target: 'aoe', energyCost: 100, actionAdvance: 100, mechanicTargets: { 'tempo.action_advance': { side: 'self', acquisition: 'self', coverage: 'single' } } }, passives: [{ type: 'cutthroat', criticalRateBonus: .1, criticalDamageBonus: .25 }] }
+    { name: 'Zero', role: 'mainDps', level: 1, basic: { damageType: 'physical', multiplier: .75, target: 'blast', energyGain: 20, skillPointGain: 1 }, skill: { type: 'firstStrike', target: 'single', damageType: 'physical', multiplier: 1, firstHitMultiplier: 2, energyGain: 20 }, ultimate: { damageType: 'physical', multiplier: 1.2, target: 'aoe', energyCost: 100, actionAdvance: 100, mechanicTargets: { 'tempo.action_advance': { side: 'self', acquisition: 'self', coverage: 'single' } } }, passives: [{ type: 'cutthroat', criticalRateBonus: .1, criticalDamageBonus: .25 }] }
   ),
   character(
     { id: 'lily', name: 'LILY', label: 'Character', hp: 100, baseAttack: 20, basePhysicalDefense: 4, baseMagicalDefense: 4, speed: 20, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'lily', test: false },
@@ -308,7 +323,7 @@ export const CHARACTER_ROSTER = Object.freeze([
     { id: 'cloud', name: 'CLOUD', label: 'Character', hp: 50, baseAttack: 10, basePhysicalDefense: 2, baseMagicalDefense: 2, speed: 60, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'cloudFront', test: false },
     { name: 'Cloud', role: 'support', level: 1,
       basic: { damageType: 'magical', multiplier: .25, target: 'aoe', energyGain: 10, skillPointGain: 1,
-        speedBonus: .2, speedDuration: 2, speedMaxStacks: 5,
+        speedBonus: .15, speedDuration: 2, speedMaxStacks: 5,
         mechanicTags: ['buff.speed', 'limit.duration', 'limit.stacks'],
         mechanicTargets: {
           'buff.speed': { side: 'ally', acquisition: 'all', coverage: 'all' },
@@ -320,7 +335,7 @@ export const CHARACTER_ROSTER = Object.freeze([
       skill: { type: 'cloudRestoration', target: 'ally', healMultiplier: 1, adjacentHealMultiplier: .5, actionAdvance: 40, energyGain: 20,
         mechanicTags: ['recovery.healing', 'tempo.action_advance'],
         effects: [{ id: 'cloud.skill.restoration', mechanicTags: ['recovery.healing', 'tempo.action_advance'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', measures: ['healing', 'actionAdvance'] }] },
-      ultimate: { damageType: 'magical', multiplier: 1.25, target: 'single', energyCost: 100, actionDelay: 40, slowPercent: .2, slowDuration: 2, slowMaxStacks: 5,
+      ultimate: { damageType: 'magical', multiplier: 1.75, target: 'single', energyCost: 100, actionDelay: 40, slowPercent: .2, slowDuration: 2, slowMaxStacks: 5,
         mechanicTags: ['tempo.action_delay', 'debuff.speed', 'limit.duration', 'limit.stacks'],
         effects: [{ id: 'cloud.ultimate.control', mechanicTags: ['tempo.action_delay', 'debuff.speed', 'limit.duration', 'limit.stacks'], targeting: { side: 'enemy', acquisition: 'selected', coverage: 'single' }, trigger: 'on_ultimate', measures: ['actionDelay', 'slowPercent', 'duration', 'maxStacks'] }] },
       passives: [{ type: 'cloudWeightless', id: 'weightless', actionAdvance: 20, mechanicTags: ['tempo.action_advance', 'trigger.per_action'], mechanicTriggers: { 'tempo.action_advance': 'on_action', 'trigger.per_action': 'on_action' } }] }
@@ -332,6 +347,43 @@ export const CHARACTER_ROSTER = Object.freeze([
         { id: 'logan.blood-shield.protection', mechanicTags: ['defense.shield'], targeting: { side: 'ally', acquisition: 'all', coverage: 'all' }, trigger: 'on_skill', measures: ['shieldGranted', 'shieldPerAlly'] },
         { id: 'logan.blood-shield.taunt', mechanicTags: ['tempo.taunt'], targeting: { side: 'enemy', acquisition: 'all', coverage: 'all' }, trigger: 'on_skill', measures: ['tauntRate', 'duration', 'tauntsApplied'] }
       ] }, ultimate: { damageType: 'physical', multiplier: 1.25, target: 'aoe', energyCost: 100, mechanicTags: ['status.bleed', 'damage.over_time', 'trigger.per_hit', 'limit.stacks'], mechanicTriggers: { 'status.bleed': 'on_successful_hit', 'damage.over_time': 'on_turn_start', 'trigger.per_hit': 'on_successful_hit' } }, passives: [{ type: 'tasteForBlood', lifesteal: .1 }] }
+  ),
+  character(
+    { id: 'luna', name: 'LUNA', label: 'Character', hp: 50, baseAttack: 25, basePhysicalDefense: 1, baseMagicalDefense: 6, speed: 30, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'luna', test: false },
+    { name: 'Luna', role: 'subDps', level: 1,
+      basic: { damageType: 'magical', multiplier: .3, target: 'aoe', energyGain: 20, skillPointGain: 1,
+        mechanicTags: ['damage.magical', 'damage.direct', 'debuff.mark', 'debuff.defense', 'limit.duration', 'limit.stacks'],
+        mechanicTargets: { 'debuff.mark': { side: 'enemy', acquisition: 'all', coverage: 'all' }, 'debuff.defense': { side: 'enemy', acquisition: 'all', coverage: 'all' }, 'limit.duration': { side: 'enemy', acquisition: 'all', coverage: 'all' }, 'limit.stacks': { side: 'enemy', acquisition: 'all', coverage: 'all' } },
+        effects: [{ id: 'luna.basic.erosion', mechanicTags: ['debuff.mark', 'debuff.defense', 'limit.duration', 'limit.stacks'], targeting: { side: 'enemy', acquisition: 'all', coverage: 'all' }, trigger: 'on_basic', measures: ['stacksApplied', 'defenseReductionPerStack', 'maxStacks', 'duration'] }] },
+      skill: { type: 'lunaArcaneBurst', target: 'aoe', energyGain: 20,
+        mechanicTags: ['buff.damage', 'debuff.mark', 'resource.energy', 'limit.duration'],
+        effects: [{ id: 'luna.skill.arcane-burst', mechanicTags: ['buff.damage', 'debuff.mark', 'resource.energy', 'limit.duration'], targeting: { side: 'enemy', acquisition: 'all', coverage: 'all' }, trigger: 'on_skill', measures: ['stacksConsumed', 'damageBonusPerStack', 'damageBonus', 'duration', 'energyGained'] }] },
+      ultimate: { type: 'lunaEclipse', target: 'self', energyCost: 100, attackBonus: 1, duration: 2, selfActionAdvance: 50, enemyActionDelay: 50,
+        mechanicTags: ['buff.attack', 'tempo.action_advance', 'tempo.action_delay', 'limit.duration'],
+        mechanicTargets: { 'buff.attack': { side: 'self', acquisition: 'self', coverage: 'single' }, 'tempo.action_advance': { side: 'self', acquisition: 'self', coverage: 'single' }, 'tempo.action_delay': { side: 'enemy', acquisition: 'all', coverage: 'all' }, 'limit.duration': { side: 'self', acquisition: 'self', coverage: 'single' } },
+        effects: [{ id: 'luna.ultimate.eclipse', mechanicTags: ['buff.attack', 'tempo.action_advance', 'tempo.action_delay', 'limit.duration'], targeting: { side: 'self', acquisition: 'self', coverage: 'single' }, trigger: 'on_ultimate', measures: ['attackBonus', 'duration', 'actionAdvance', 'actionDelay', 'targetsAffected'] }] },
+      passives: [{ type: 'moonlight', id: 'moonlight', magicalDefenseIgnore: .6,
+        mechanicTags: ['buff.defense_ignore'], mechanicTriggers: { 'buff.defense_ignore': 'always_on' } }] }
+  ),
+  character(
+    { id: 'tsunade', name: 'TSUNADE', label: 'Character', hp: 125, baseAttack: 30, basePhysicalDefense: 4, baseMagicalDefense: 4, speed: 5, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'portrait', test: false },
+    { name: 'Tsunade', role: 'subDps', level: 1,
+      basic: { name: 'Brute Force', damageType: 'physical', multiplier: 1, target: 'single', energyGain: 10, skillPointGain: 1, stunChance: .25, stunTurns: 1,
+        mechanicTags: ['damage.direct', 'damage.physical', 'status.stun', 'debuff.stun', 'trigger.per_hit', 'limit.duration', 'resource.energy', 'resource.skill_point'],
+        mechanicTargets: { 'status.stun': { side: 'enemy', acquisition: 'selected', coverage: 'single' }, 'debuff.stun': { side: 'enemy', acquisition: 'selected', coverage: 'single' } },
+        mechanicTriggers: { 'status.stun': 'on_successful_hit', 'debuff.stun': 'on_successful_hit' },
+        effects: [{ id: 'tsunade.basic.brute-force-stun', mechanicTags: ['status.stun', 'debuff.stun', 'trigger.per_hit', 'limit.duration'], targeting: { side: 'enemy', acquisition: 'selected', coverage: 'single' }, trigger: 'on_successful_hit', measures: ['stunChance', 'stunTurns', 'slowStartStacksRemoved'] }] },
+      skill: { name: 'Intense Smash', type: 'tsunadeIntenseSmash', damageType: 'physical', multiplier: 1.5, target: 'blast', energyGain: 20, physicalDefenseDebuffChance: .25, physicalDefenseReduction: .25, physicalDefenseDebuffTurns: 2,
+        mechanicTags: ['damage.direct', 'damage.physical', 'debuff.defense', 'trigger.per_hit', 'limit.duration', 'resource.energy', 'resource.skill_point'],
+        mechanicTargets: { 'debuff.defense': { side: 'enemy', acquisition: 'selected', coverage: 'blast' } },
+        effects: [{ id: 'tsunade.skill.intense-smash-defense-down', mechanicTags: ['debuff.defense', 'trigger.per_hit', 'limit.duration'], targeting: { side: 'enemy', acquisition: 'selected', coverage: 'blast' }, trigger: 'on_skill', measures: ['debuffChance', 'physicalDefenseReduction', 'duration', 'slowStartStacksRemoved'] }] },
+      ultimate: { name: 'Sudden Impact', damageType: 'physical', multiplier: 2, target: 'aoe', energyCost: 120, attackDebuffChance: .25, attackDamageMultiplier: .75, attackDebuffTurns: 2,
+        mechanicTags: ['damage.direct', 'damage.physical', 'debuff.attack', 'trigger.per_hit', 'limit.duration', 'resource.energy'],
+        mechanicTargets: { 'debuff.attack': { side: 'enemy', acquisition: 'all', coverage: 'aoe' } },
+        effects: [{ id: 'tsunade.ultimate.sudden-impact-attack-down', mechanicTags: ['debuff.attack', 'trigger.per_hit', 'limit.duration'], targeting: { side: 'enemy', acquisition: 'all', coverage: 'aoe' }, trigger: 'on_ultimate', measures: ['debuffChance', 'attackReduction', 'duration', 'slowStartStacksRemoved'] }] },
+      passives: [{ type: 'slowStart', id: 'slow-start', speedBonus: .5, duration: 2, maxStacks: 10,
+        mechanicTags: ['status.slow_start', 'buff.speed', 'trigger.per_action', 'limit.duration', 'limit.stacks'],
+        mechanicTriggers: { 'status.slow_start': 'on_action', 'buff.speed': 'on_action', 'trigger.per_action': 'on_action' } }] }
   )
 ]);
 
@@ -480,7 +532,7 @@ const upgradeComponents = [
   upgradeComponent({ id: 'dawn.premium-duplicate.4.tune-action-advance', character: 'dawn', source: { kind: 'premium_weapon_duplicate', rank: 4 }, mechanicTags: ['tempo.action_advance'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', values: { tuneActionAdvance: 50 } }),
 
   upgradeComponent({ id: 'cloud.duplicate.1.weightless-advance', character: 'cloud', source: { kind: 'character_duplicate', rank: 1 }, mechanicTags: ['tempo.action_advance'], targeting: selfTarget, trigger: 'on_action', values: { actionAdvance: 40 } }),
-  upgradeComponent({ id: 'cloud.duplicate.2.basic-tempo', character: 'cloud', source: { kind: 'character_duplicate', rank: 2 }, mechanicTags: ['buff.speed', 'limit.duration', 'limit.stacks'], targeting: { side: 'ally', acquisition: 'all', coverage: 'all' }, trigger: 'on_basic', values: { speedBonus: .4, speedDuration: 3, speedMaxStacks: 5 } }),
+  upgradeComponent({ id: 'cloud.duplicate.2.basic-tempo', character: 'cloud', source: { kind: 'character_duplicate', rank: 2 }, mechanicTags: ['buff.speed', 'limit.duration', 'limit.stacks'], targeting: { side: 'ally', acquisition: 'all', coverage: 'all' }, trigger: 'on_basic', values: { speedBonus: .3, speedDuration: 3, speedMaxStacks: 5 } }),
   upgradeComponent({ id: 'cloud.duplicate.3.restoration-advance', character: 'cloud', source: { kind: 'character_duplicate', rank: 3 }, mechanicTags: ['recovery.healing', 'tempo.action_advance'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', values: { actionAdvance: 80 } }),
   upgradeComponent({ id: 'cloud.duplicate.4.ultimate-control', character: 'cloud', source: { kind: 'character_duplicate', rank: 4 }, mechanicTags: ['tempo.action_delay', 'resource.energy'], targeting: { side: 'enemy', acquisition: 'selected', coverage: 'single' }, trigger: 'on_ultimate', values: { actionDelay: 80, ultimateEnergyCost: 80 } }),
   upgradeComponent({ id: 'cloud.premium-duplicate.1.basic-damage', character: 'cloud', source: { kind: 'premium_weapon_duplicate', rank: 1 }, mechanicTags: ['damage.direct', 'buff.damage'], targeting: enemyOnEvent, trigger: 'on_basic', values: { basicDamageMultiplier: 2 } }),

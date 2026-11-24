@@ -53,12 +53,12 @@ Use separate IDs for distinct outcomes of a compound action when you want to kno
 | `damage.echo`, `damage.reflect`, `damage.follow_up` | Secondary damage mechanics |
 | `damage.barrier_break` | Automatic damage caused when barrier health is depleted; not an attack property |
 | `buff.attack`, `buff.critical`, `buff.next_basic`, `buff.damage`, `buff.barrier_damage`, `buff.barrier_break_damage`, `buff.defense_ignore` | Ally or self bonuses |
-| `debuff.defense`, `debuff.damage`, `debuff.mark` | Enemy weakening or a mark used by another effect |
+| `debuff.defense`, `debuff.attack`, `debuff.damage`, `debuff.mark`, `debuff.stun` | Enemy weakening, attack reduction, a mark used by another effect, or action control |
 | `defense.shield`, `defense.barrier`, `defense.damage_reduction`, `defense.stealth` | Damage prevention or avoidance |
 | `recovery.healing`, `recovery.lifesteal` | HP recovery |
 | `resource.energy`, `resource.skill_point`, `resource.capacity`, `resource.hp_cost` | Resource gains, costs, caps, or starting amounts |
 | `tempo.action_advance`, `tempo.action_delay`, `tempo.taunt` | Turn order or attack redirection |
-| `status.bleed`, `status.exposed`, `status.ricochet`, `status.tune`, `status.residue`, `status.broken` | Combat statuses and marks |
+| `status.bleed`, `status.exposed`, `status.ricochet`, `status.tune`, `status.residue`, `status.broken`, `status.stun`, `status.slow_start` | Combat statuses and marks |
 | `summon.create`, `summon.action` | Summon creation and its actions |
 | `trigger.per_hit`, `trigger.first_hit_per_target`, `trigger.per_action`, `trigger.per_source`, `trigger.periodic` | Activation conditions |
 | `limit.duration`, `limit.stacks`, `limit.charges`, `limit.cooldown` | Effect lifetime or activation limits |

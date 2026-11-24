@@ -105,9 +105,11 @@ export class TwoToneBattleEngine {
     this.maxMechanicEvents = Number.isInteger(maxMechanicEvents) && maxMechanicEvents > 0 ? maxMechanicEvents : 10000;
     this.mechanicEvents = [];
     this.droppedMechanicEvents = 0;
+    this.stunAttempts = new Set();
+    this.chanceEffectAttempts = new Set();
     this.disabledCombatEffectIds = new Set(Array.isArray(disabledCombatEffectIds) ? disabledCombatEffectIds : []);
   }
-  resetBattle() { this.timeline.reset(); this.turnCount = 0; this.mechanicEvents = []; this.droppedMechanicEvents = 0; }
+  resetBattle() { this.timeline.reset(); this.turnCount = 0; this.mechanicEvents = []; this.droppedMechanicEvents = 0; this.stunAttempts.clear(); this.chanceEffectAttempts.clear(); }
   isCombatEffectEnabled(effectId) { return typeof effectId === 'string' && Boolean(COMBAT_EFFECT_CATALOG[effectId]) && !this.disabledCombatEffectIds.has(effectId); }
   recordCombatEffect(effectId, { status = 'applied', actorId = null, targetIds = [], trigger, values = {}, actionId = null } = {}) {
     const definition = COMBAT_EFFECT_CATALOG[effectId];
@@ -296,8 +298,8 @@ export class TwoToneBattleEngine {
   // disagree about Bleed, Exposed, Ricochet marks, or character-duplicate
   // triggers. Clients report the resolved hit and equipment state.
   resolveHitEffects({ actor, target, hit, action, eventType = 'direct_hit', passives = actor?.passives || [],
-    characterDuplicates = actor?.characterDuplicates || 0, premiumWeaponDuplicates = 0,
-    hasPremiumWeapon = false, allies = [], isEnemyTarget = actor?.side !== target?.side } = {}) {
+    ability: authoredAbility = null, characterDuplicates = actor?.characterDuplicates || 0, premiumWeaponDuplicates = 0,
+    hasPremiumWeapon = false, allies = [], isEnemyTarget = actor?.side !== target?.side, random = Math.random } = {}) {
     if (!actor || !target || !hit || hit.dodged || !eventCanTrigger('attackEffects', eventType) || !Array.isArray(passives)) return Object.freeze([]);
     const results = [], archetypeId = actor.archetypeId || actor.id;
     const passiveSource = passive => {
@@ -318,6 +320,11 @@ export class TwoToneBattleEngine {
     const upgradeState = { characterDuplicates, premiumWeaponDuplicates,
       weaponType: hasPremiumWeapon ? 'premium' : actor.weapon?.type || null,
       disabledUpgradeEffectIds: actor.disabledUpgradeEffectIds };
+    const ability = authoredAbility || (CHARACTER_COMBAT_DATA[archetypeId] || ENEMY_COMBAT_DATA[archetypeId])?.[action];
+    if (ability) {
+      const stun = this.attemptStun({ actor, target, ability, action, hit, random });
+      if (stun) results.push(stun);
+    }
     if (Array.isArray(allies) && allies.includes(actor) && (actor.id !== 'lily' || action === 'summon') &&
         target.marks?.some(mark => mark.id === 'exposed')) {
       const lily = allies.find(unit => unit?.archetypeId === 'lily' && unit.hp > 0 && unit.id !== actor.id &&
@@ -395,12 +402,12 @@ export class TwoToneBattleEngine {
     for (let index = 0; index < stacks; index++) target.marks.push({ ...mark, ...(Array.isArray(mark.sources) ? { sources: [...mark.sources] } : {}) });
     return true;
   }
-  applyStackingTimedMark({ target, id, turns, maxStacks } = {}) {
+  applyStackingTimedMark({ target, id, turns, maxStacks, markData = {} } = {}) {
     const lifecycle = COMBAT_EFFECT_LIFECYCLE[id];
     if (!target || target.hp <= 0 || typeof id !== 'string' || !id || lifecycle?.storage !== 'marks' || lifecycle.kind !== 'timed_stacks' || !Number.isInteger(turns) || turns < 1 || !Number.isInteger(maxStacks) || maxStacks < 1) return 0;
     const current = Array.isArray(target.marks) ? target.marks.filter(mark => mark.id === id).length : 0;
     const stacks = Math.min(maxStacks, current + 1);
-    this.setTimedMark({ target, mark: { id, turns }, stacks });
+    this.setTimedMark({ target, mark: { id, turns, ...markData }, stacks });
     return stacks;
   }
   setTimedDebuff({ target, debuff } = {}) {
@@ -409,6 +416,71 @@ export class TwoToneBattleEngine {
     target.debuffs = Array.isArray(target.debuffs) ? target.debuffs.filter(existing => existing.id !== debuff.id) : [];
     target.debuffs.push({ ...debuff });
     return true;
+  }
+  applyTsunadeSlowStart({ actor } = {}) {
+    if (!actor || actor.hp <= 0 || (actor.archetypeId || actor.id) !== 'tsunade') return 0;
+    const passive = CHARACTER_COMBAT_DATA.tsunade.passives.find(effect => effect.type === 'slowStart');
+    const stacks = this.applyStackingTimedMark({ target: actor, id: 'tsunade-slow-start', turns: passive.duration,
+      maxStacks: passive.maxStacks, markData: { speedBonus: passive.speedBonus, skipFirstTick: true } });
+    if (stacks) this.recordMechanicEvent({ componentId: 'passive:tsunade/slow-start', mechanicTags: passive.mechanicTags,
+      trigger: 'on_action', status: 'applied', actorId: actor.id, targetIds: [actor.id],
+      values: { speedBonusPerStack: passive.speedBonus, duration: passive.duration, maxStacks: passive.maxStacks, stacks } });
+    return stacks;
+  }
+  consumeTsunadeSlowStart({ actor, target = null, actionId = null, trigger = 'on_successful_hit' } = {}) {
+    if (!actor || (actor.archetypeId || actor.id) !== 'tsunade' || !Array.isArray(actor.marks)) return 0;
+    const index = actor.marks.findIndex(mark => mark.id === 'tsunade-slow-start');
+    if (index < 0) return 0;
+    actor.marks.splice(index, 1);
+    const stacks = actor.marks.filter(mark => mark.id === 'tsunade-slow-start').length;
+    this.recordMechanicEvent({ componentId: 'passive:tsunade/slow-start', mechanicTags: ['status.slow_start', 'buff.speed', 'limit.stacks'],
+      trigger, status: 'resolved', actorId: actor.id, targetIds: [actor.id, target?.id].filter(Boolean), actionId,
+      values: { stacksRemoved: 1, stacks, speedBonusPerStack: .5 } });
+    return 1;
+  }
+  resolveTsunadeAbilityEffect({ actor, target, ability, action, hit = {}, random = Math.random } = {}) {
+    const isTsunade = (actor?.archetypeId || actor?.id) === 'tsunade';
+    const skillEffect = isTsunade && action === 'skill' ? {
+      chance: ability?.physicalDefenseDebuffChance, turns: ability?.physicalDefenseDebuffTurns,
+      id: 'tsunade-physical-defense-down', physicalDefenseReduction: ability?.physicalDefenseReduction,
+      tags: ['debuff.defense', 'trigger.per_hit', 'limit.duration'], valueKey: 'physicalDefenseReduction'
+    } : null;
+    const ultimateEffect = isTsunade && action === 'ultimate' ? {
+      chance: ability?.attackDebuffChance, turns: ability?.attackDebuffTurns,
+      id: 'tsunade-attack-down', damageMultiplier: ability?.attackDamageMultiplier,
+      tags: ['debuff.attack', 'trigger.per_hit', 'limit.duration'], valueKey: 'damageMultiplier', measureKey: 'attackDamageMultiplier'
+    } : null;
+    const effect = skillEffect || ultimateEffect;
+    if (!effect || !target || target.hp <= 0 || hit.dodged || !eventCanTrigger('attackEffects', hit.eventType || 'direct_hit') ||
+        !Number.isFinite(effect.chance) || effect.chance <= 0 || effect.chance > 1 || !Number.isInteger(effect.turns) || effect.turns < 1 || typeof random !== 'function') return false;
+    const actionId = hit.actionId ?? `${actor.id}:${action}:${this.turnCount}`;
+    const attemptKey = `${effect.id}:${actionId}:${target.id}`;
+    if (this.chanceEffectAttempts.has(attemptKey)) return false;
+    this.chanceEffectAttempts.add(attemptKey);
+    const succeeded = random() < effect.chance;
+    const applied = succeeded && this.setTimedDebuff({ target, debuff: { id: effect.id, turns: effect.turns,
+      sourceId: actor.id, [effect.valueKey]: effect[effect.valueKey] } });
+    const slowStartStacksRemoved = applied ? this.consumeTsunadeSlowStart({ actor, target, actionId }) : 0;
+    this.recordMechanicEvent({ componentId: `action:tsunade/${action}`, mechanicTags: effect.tags,
+      trigger: action === 'skill' ? 'on_skill' : 'on_ultimate', status: applied ? 'applied' : 'resolved',
+      actorId: actor.id, targetIds: [target.id], actionId,
+      values: { debuffChance: effect.chance, [effect.measureKey || effect.valueKey]: effect[effect.valueKey], duration: effect.turns,
+        succeeded: applied ? 1 : 0, slowStartStacksRemoved } });
+    return !!applied;
+  }
+  attemptStun({ actor, target, ability, action = 'basic', hit = {}, random = Math.random } = {}) {
+    const chance = ability?.stunChance, turns = ability?.stunTurns;
+    if (!actor || !target || target.hp <= 0 || !Number.isFinite(chance) || chance <= 0 || !Number.isInteger(turns) || turns < 1 || typeof random !== 'function') return null;
+    const actionId = hit.actionId ?? `${actor.id}:${action}:${this.turnCount}`;
+    const attemptKey = `${actionId}:${target.id}`;
+    if (this.stunAttempts.has(attemptKey)) return null;
+    this.stunAttempts.add(attemptKey);
+    const probability = Math.min(1, chance), succeeded = random() < probability;
+    const archetypeId = actor.archetypeId || actor.id;
+    const slowStartStacksRemoved = succeeded && archetypeId === 'tsunade' ? this.consumeTsunadeSlowStart({ actor, target, actionId }) : 0;
+    this.recordMechanicEvent({ componentId: `action:${archetypeId}/${action}`, mechanicTags: [...(ability.mechanicTags || []), 'status.stun', 'debuff.stun', 'limit.duration'], trigger: 'on_successful_hit', status: succeeded ? 'applied' : 'resolved', actorId: actor.id, targetIds: [target.id], actionId, values: { chance: probability, duration: turns, succeeded: succeeded ? 1 : 0, slowStartStacksRemoved } });
+    if (!succeeded || !this.setTimedDebuff({ target, debuff: { id: 'stun', turns, sourceId: actor.id } })) return null;
+    return Object.freeze({ type: 'stun', turns, target });
   }
   recordUniqueMarkSource({ target, markId, sourceId } = {}) {
     if (!target || typeof markId !== 'string' || !markId || typeof sourceId !== 'string' || !sourceId) return false;

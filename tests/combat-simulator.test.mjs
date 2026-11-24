@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { simulateBatch } from '../tools/combat-simulator.mjs';
+import { simulateBatch, simulateBattle } from '../tools/combat-simulator.mjs';
+import { CHARACTER_COMBAT_DATA } from '../src/scripts/combat-definitions.mjs';
 import { buildSuite } from '../tools/combat-simulator-benchmark.mjs';
 
 const examplePath=fileURLToPath(new URL('../Documentation/combat-simulator/example-logan-party-vs-bear-boss.json',import.meta.url));
@@ -59,6 +60,19 @@ test('simulator respects the four-ally party limit',()=>{
  const config=example();
  config.teams.allies.push({...config.teams.allies[0],id:'extra-ally'});
  assert.throws(()=>simulateBatch(config,1,1),/at most four allies/);
+});
+
+test('Tsunade Skill resolves through the simulator as a blast control attack',()=>{
+ const config=example();
+ config.archetypes.tsunade=CHARACTER_COMBAT_DATA.tsunade;
+ config.teams.allies=[{id:'tsunade-1',archetype:'tsunade'}];
+ config.teams.enemies=[{id:'slime-1',archetype:'slime'}];
+ Object.assign(config.archetypes.slime.stats,{hp:100000,attack:1,speed:1});
+ config.settings.actionOverride={actorId:'tsunade-1',turn:1,action:'skill'};
+ const result=simulateBattle(config,43,80);
+ assert.equal(result.actionOverride.status,'executed');
+ assert.ok(result.unitStats.tsunade.skills>0);
+ assert.ok(result.unitStats.tsunade.damage>0);
 });
 
 test('benchmark suite covers boss, mixed, and multi-target scenarios',()=>{

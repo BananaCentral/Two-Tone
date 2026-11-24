@@ -11,7 +11,7 @@ Effect magnitude and duration values stay on the authored ability or effect. Lif
 | Clock | Advances when | Used for |
 |---|---|---|
 | `affected_turn_start` | An affected unit begins its turn, before its action | Bleed tick timing |
-| `affected_turn_end` | An affected unit finishes its turn, including a skipped turn while Broken | Marks, debuffs, buffs, taunts, and Residue duration |
+| `affected_turn_end` | An affected unit finishes its turn, including a skipped turn while Broken or Stunned | Marks, debuffs, buffs, taunts, and Residue duration |
 | `owner_turn_end` | The effect owner finishes a turn after activating it | Rune cooldowns; the turn that started the cooldown does not consume a cooldown turn |
 | `summon_action_end` | A summon completes one of its own actions | Summon lifetime |
 | `encounter_end` | The battle ends | Shield and Barrier cleanup |
@@ -27,6 +27,9 @@ Effects do not lose duration while another unit acts. A unit defeated before its
 | Ricochet | Refresh the mark duration and clear its used-source history. | Decrement at the marked enemy's turn end. A target can trigger once per unique source action while marked. |
 | Soul Mark | Refresh the mark duration when reapplied. | Decrement at the marked enemy's turn end. |
 | Lily Weakened | Replace the same debuff and refresh its duration. | Decrement at the affected enemy's turn end. |
+| Stun | A successful eligible hit applies it based on the action's `stunChance` (0 to 1) and `stunTurns`; reapplication replaces it and refreshes duration. | Decrement at the affected unit's turn end. Each scheduled turn skipped counts once; removed by cleanse or defeat. |
+| Tsunade Slow Start | Each action adds one 50% Speed stack, up to ten, and refreshes all stacks to two turns. Successful Stun or debuff applications consume one stack per affected target. | Decrement at Tsunade's turn end; removed by cleanse or defeat. |
+| Tsunade Defense Down / Attack Down | A successful Skill or Ultimate proc replaces the same debuff and refreshes its duration. | Decrement at the affected enemy's turn end; removed by cleanse or defeat. |
 | Tune | Replace any existing Tune on the recipient. The next Basic Attack consumes its enhancement. | Decrement at the recipient's turn end if not consumed. |
 | Taunt | Replace the same source and target pair; different sources remain separate. Targeting uses the highest active Taunt chance. | Decrement at the taunted enemy's turn end. |
 | Residue | Add stacks up to its cap and refresh its duration. | Decrement at the affected unit's turn end; clear when duration reaches zero. |
@@ -45,6 +48,7 @@ Lifecycle records declare whether an effect is removed by cleanse, defeat, durat
 - Timed effect entries must have a registered ID, storage location, clock, and reapplication policy.
 - Stack policies must state whether reapplication adds, replaces, refreshes, or resets source history, plus where the cap comes from.
 - Damage-over-time rules must state tick timing, damage basis, and stack consumption.
+- An action with Stun declares `stunChance` and positive integer `stunTurns` together. Stun chance rolls once per target per source action, on that target's first eligible successful hit.
 - Cooldown and summon counts use their own owner's completed turns/actions, not global rounds.
 - The shared engine owns effect application, expiry, cleanse, and defeat cleanup. Game and simulator code may present or record results but must not age effects independently.
 - If a mechanic changes, update this standard and the corresponding lifecycle data together.

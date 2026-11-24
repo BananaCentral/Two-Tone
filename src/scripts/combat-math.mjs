@@ -21,18 +21,21 @@ export function calculateCombatHit({
       !Number.isFinite(physicalDefense) || physicalDefense < 0 ||
       !Number.isFinite(magicalDefense) || magicalDefense < 0) return null;
 
-  const exposedMultiplier = 1 - Math.min(1, Math.max(0, exposedStacks) * exposedDefenseReduction);
+  // Exposed defense reduction can exceed 100%, producing negative effective
+  // defense. Negative defense amplifies damage, with a 2x per-hit cap below.
+  const exposedMultiplier = 1 - Math.max(0, exposedStacks) * exposedDefenseReduction;
   const physicalEffectiveDefense = physicalDefense * defenseMultiplier * (1 - Math.min(1, Math.max(0, physicalDefenseIgnore))) * exposedMultiplier;
   const magicalEffectiveDefense = magicalDefense * defenseMultiplier * (1 - Math.min(1, Math.max(0, magicalDefenseIgnore))) * exposedMultiplier;
   let reduction;
   if (type === 'true') {
-    const physicalReduction = 0.5 * Math.min(physicalEffectiveDefense / attack, 1);
-    const magicalReduction = 0.5 * Math.min(magicalEffectiveDefense / attack, 1);
+    const physicalReduction = 0.5 * Math.max(-1, Math.min(physicalEffectiveDefense / attack, 1));
+    const magicalReduction = 0.5 * Math.max(-1, Math.min(magicalEffectiveDefense / attack, 1));
     reduction = physicalReduction + magicalReduction;
   } else {
     const typedDefense = type === 'physical' ? physicalEffectiveDefense : magicalEffectiveDefense;
-    reduction = Math.min(typedDefense / attack, 1);
+    reduction = Math.max(-1, Math.min(typedDefense / attack, 1));
   }
   const damageBeforeDefense = attack * multiplier * damageMultiplier;
-  return { damageBeforeDefense, reduction, damage: roundCombatHp(damageBeforeDefense * (1 - reduction)) };
+  const damageFactor = Math.max(0, Math.min(2, 1 - reduction));
+  return { damageBeforeDefense, reduction, damageFactor, damage: roundCombatHp(damageBeforeDefense * damageFactor) };
 }

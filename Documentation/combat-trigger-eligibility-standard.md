@@ -28,6 +28,8 @@ Every target hit in an AoE and every hit in a multi-hit action is a separate dam
 | Echo | Direct, Follow-Up, Ricochet, and summon hits | Must deal HP damage. Each event echoes at most once. Echo, Reflect, damage-over-time, and Barrier-break events cannot create Echo. |
 | Reflect | Direct, Follow-Up, Ricochet, summon, and Echo hits | Must cause HP or Shield damage. Barrier damage alone does not count. Reflect damage cannot create another Reflect. |
 | Attack-triggered effects | Direct, Follow-Up, Ricochet, and summon hits | Each effect may narrow its eligible events. Echo, Reflect, damage-over-time, and Barrier-break events are not attacks. |
+| Stun | Direct, Follow-Up, Ricochet, and summon hits | On the first eligible, non-dodged hit to each target in a source action; one chance per target per action. Echo, Reflect, damage-over-time, and Barrier-break events cannot apply Stun. |
+| Tsunade Skill / Ultimate debuffs | Direct hits from the matching ability | One proc roll for each living target hit by the Skill or Ultimate; successful applications replace and refresh that target's matching debuff. A successful application consumes one Slow Start stack. |
 | Soul Follow-Up | Direct and summon hits from an ally action | One activation per unique source action; excludes Soul's own action and cannot chain from another Follow-Up or secondary damage. |
 | Lily Ricochet | Direct and summon hits from an ally action | One activation per unique source action and marked target; cannot chain from Ricochet or secondary damage. |
 | Lifesteal | Any event that deals actual HP damage | Uses the source of that damage event. Shield loss and Barrier damage alone do not heal. |

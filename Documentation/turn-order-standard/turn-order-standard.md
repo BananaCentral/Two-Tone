@@ -32,6 +32,7 @@ This standard defines how combat turns are scheduled and how actions affect turn
 - Enemies take one attack on their scheduled turn. After it resolves, the timeline advances.
 - Enemy damage-over-time effects tick at the start of the affected enemy's scheduled turn, before its action. See the [Bleed Standard](../bleed-standard.md).
 - Taunt duration decreases at the start of its bearer's scheduled turn. Automatic target selection resolves active Taunts by rate before falling back to its normal target. See the [Taunt Standard](../taunt-standard.md).
+- Stun makes a unit lose its scheduled action, including an ally's Basic or Skill and an enemy's attack. Stun also prevents that unit from executing an off-turn Ultimate while active. The skipped turn counts toward Stun duration, which expires at the end of the final skipped turn. Stun does not grant Broken's damage vulnerability, cleanse, or Barrier recovery.
 - Advance moves a unit's next turn earlier; Delay moves it later. Effects stack, and enough Advance can bring a turn forward to the current timeline position.
 - Action Advance is expressed as a percentage of one turn interval. Dawn's Ultimate advances its selected ally by 100%; her Premium Weapon Duplicate 3 advances the selected Tune target by 20% when Tune is applied.
 - An Ultimate user's self-advance applies after that Ultimate resolves. Zero's Ultimate advances Zero by 100%, bringing his next scheduled turn to the current timeline position; Character Duplicate 1 delays each surviving enemy by 20% of that enemy's turn interval.

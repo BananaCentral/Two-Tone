@@ -34,6 +34,8 @@ The player controller and simulator policy choose different actions by design. T
 
 Timed effects use explicit lifecycle clocks. Live battles and simulations call `ageUnitEffects` at the affected unit’s turn end. Bleed resolves before the action at turn start. Rune cooldowns and summon durations follow their own clocks in the [Combat Effect Lifecycle Standard](combat-effect-lifecycle-standard.md).
 
+Stun is a timed debuff. For example, `basic: { stunChance: 0.5, stunTurns: 2 }` gives the Basic Attack a 50% chance to stun for two scheduled turns. Declare `stunChance` from 0 (exclusive) through 1 and `stunTurns` as a positive integer. The shared hit resolver rolls once per target per action on the first eligible successful hit; a multi-hit ability does not get repeated chances. Stunned units skip scheduled actions and cannot execute off-turn Ultimates. The skipped turn ages Stun at turn end. Reapplication replaces and refreshes the duration.
+
 ## Mechanic event attribution
 
 `recordMechanicEvent` is the shared runtime path for performance evidence. An event includes a stable `componentId`, canonical `mechanicTags`, trigger and resolution status, actor/target IDs, optional combat `eventType` and `actionId`, and finite resolved numeric `values`. `recordAuthoredEffect` reads tags from the shared character/enemy definition. Damage, timed status applications and ticks, resource changes, shields, healing, action movement, Rune activations, and summon lifecycle/attacks retain component provenance where those effects resolve.

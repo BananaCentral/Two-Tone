@@ -34,6 +34,21 @@ test('action plans apply tagged upgrade values from the shared catalog', () => {
   assert.equal(zeroLaterHit.multiplier, 2);
 });
 
+test('Cloud updated Ultimate and duplicate scaling match the buffed kit', () => {
+  const engine = new TwoToneBattleEngine();
+  const base = engine.resolveActionPlan({ kit: CHARACTER_COMBAT_DATA.cloud, characterId: 'cloud', action: 'ultimate' });
+  assert.equal(base.multiplier, 1.75);
+  assert.equal(base.actionDelay, 40);
+  assert.equal(base.energyCost, 100);
+
+  const upgraded = engine.resolveActionPlan({ kit: CHARACTER_COMBAT_DATA.cloud, characterId: 'cloud', action: 'ultimate',
+    characterDuplicates: 4, premiumWeaponDuplicates: 3, weaponType: 'premium' });
+  assert.equal(upgraded.multiplier, 3.5);
+  assert.equal(upgraded.actionDelay, 80);
+  assert.equal(upgraded.energyCost, 80);
+  assert.equal(upgraded.slowPercent, 0.4);
+});
+
 test('upgrade component identifiers are unique and include weapon source metadata', () => {
   const effects = Object.values(CHARACTER_UPGRADE_EFFECTS);
   assert.equal(new Set(effects.map(effect => effect.id)).size, effects.length);

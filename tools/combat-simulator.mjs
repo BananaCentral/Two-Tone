@@ -63,7 +63,7 @@ function statAtLevel(value, level) {
 }
 function mean(values) { return values.length ? values.reduce((sum, n) => sum + n, 0) / values.length : 1; }
 function effectiveSpeed(unit) {
- const bonus=(unit.marks||[]).filter(mark=>mark.id==='cloud-tempo').reduce((sum,mark)=>sum+(mark.speedBonus||.2),0);
+ const bonus=(unit.marks||[]).filter(mark=>['cloud-tempo','tsunade-slow-start'].includes(mark.id)).reduce((sum,mark)=>sum+(mark.speedBonus||(mark.id==='tsunade-slow-start'?0.5:0.2)),0);
  const slow=(unit.marks||[]).filter(mark=>mark.id==='cloud-slow').reduce((sum,mark)=>sum+(mark.slowPercent||.2),0);
  return Math.max(1,unit.stats.speed*(1+bonus-slow));
 }
@@ -110,7 +110,7 @@ function validateConfig(config) {
       const taunt=instance.taunt??archetype.taunt;
       assert(taunt===undefined||(taunt&&Number.isFinite(taunt.rate)&&taunt.rate>=0&&taunt.rate<=1&&Number.isInteger(taunt.turns)&&taunt.turns>0),'Taunt needs a rate from 0 to 1 and a positive integer duration.');
       assert(archetype.basic && Number.isFinite(archetype.basic.multiplier) && ['physical', 'magical', 'true'].includes(archetype.basic.damageType), 'Archetype ' + instance.archetype + ' needs a typed Basic Attack.');
-      assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage', 'momentum', 'exposed', 'resourceful', 'residue', 'lethalImpact', 'pursuit', 'sharpClaws', 'bleed', 'cutthroat', 'tasteForBlood', 'cloudWeightless'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
+      assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage', 'momentum', 'exposed', 'resourceful', 'residue', 'lethalImpact', 'pursuit', 'sharpClaws', 'bleed', 'cutthroat', 'tasteForBlood', 'cloudWeightless', 'moonlight', 'slowStart'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
       for (const passive of archetype.passives || []) {
         if (passive.type === 'everyNthBasic') assert(Number.isInteger(passive.every) && passive.every > 0, 'everyNthBasic needs a positive integer interval.');
         if (passive.type === 'followUp') assert(Number.isFinite(passive.multiplier) && passive.multiplier >= 0, 'followUp needs a non-negative multiplier.');
@@ -118,8 +118,8 @@ function validateConfig(config) {
         if (passive.type === 'momentum') assert(Number.isFinite(passive.damageBonus) && passive.damageBonus >= 0 && Number.isInteger(passive.maxStacks) && passive.maxStacks >= 0, 'momentum needs a non-negative damageBonus and a non-negative integer maxStacks.');
         if (passive.type === 'bleed') assert(Number.isInteger(passive.stacksPerHit??1)&&(passive.stacksPerHit??1)>0&&Number.isInteger(passive.maxStacks??5)&&(passive.maxStacks??5)>0,'bleed needs positive integer stacksPerHit and maxStacks.');
       }
-      assert(!archetype.skill || ['enhanceBasic', 'ricochet', 'tune', 'bloodShield', 'firstStrike', 'cloudRestoration'].includes(archetype.skill.type), 'Unsupported skill type in ' + instance.archetype + '.');
-      assert(!archetype.ultimate || archetype.ultimate.type==='dawnSupport'||['physical', 'magical', 'true'].includes(archetype.ultimate.damageType), 'Ultimate needs a supported damage type or support handler.');
+      assert(!archetype.skill || ['enhanceBasic', 'ricochet', 'tune', 'bloodShield', 'firstStrike', 'cloudRestoration', 'lunaArcaneBurst', 'tsunadeIntenseSmash'].includes(archetype.skill.type), 'Unsupported skill type in ' + instance.archetype + '.');
+      assert(!archetype.ultimate || ['dawnSupport', 'lunaEclipse'].includes(archetype.ultimate.type)||['physical', 'magical', 'true'].includes(archetype.ultimate.damageType), 'Ultimate needs a supported damage type or support handler.');
     }
   }
   const disabledPassives=config.settings?.disabledPassives;
@@ -294,7 +294,8 @@ function instantiate(config, side) {
   });
 }
 function attackValue(unit) {
-  return roundStatQuarter(unit.stats.attack * (1 + (unit.tune?.attackBonus || 0)));
+  const lunaUltimateBonus=unit.archetypeId==='luna'&&unit.lunaAttackBuff?.turns>0?unit.lunaAttackBuff.amount:0;
+  return roundStatQuarter(unit.stats.attack * (1 + (unit.tune?.attackBonus || 0) + lunaUltimateBonus));
 }
 function healFromLifesteal(state,attacker,damageDealt,eventType='direct_hit'){
  const logan=state.allies.find(unit=>unit.archetypeId==='logan'&&unit.hp>0&&!unit.disabledPassiveIds?.has('tasteForBlood'));
@@ -338,9 +339,13 @@ function damageFor(state,attacker, target, type, multiplier, runeEffects = {}) {
     ?upgradeValue(logan,'logan.premium-duplicate.4.shielded-damage','shieldedDamageBonus'):0;
   return state.engine.resolveTypedHit({
     type, attack,
-    physicalDefense:target.stats.physicalDefense, magicalDefense:target.stats.magicalDefense,
-    multiplier, physicalDefenseIgnore:physicalIgnore, magicalDefenseIgnore:magicalIgnore,
-    damageMultiplier:(darkMatter?.damageMultiplier||1)*(1-(attacker.residueStacks||0)*(attacker.residueDamageReductionPerStack??.05))*(1+shieldedDamageBonus),
+    physicalDefense:target.stats.physicalDefense*(1-((target.debuffs||[]).find(effect=>effect.id==='tsunade-physical-defense-down')?.physicalDefenseReduction||0)), magicalDefense:target.stats.magicalDefense,
+    multiplier, physicalDefenseIgnore:physicalIgnore,
+    magicalDefenseIgnore:Math.min(1,magicalIgnore+(attacker.archetypeId==='luna'?CHARACTER_COMBAT_DATA.luna.passives.find(passive=>passive.type==='moonlight')?.magicalDefenseIgnore||0:0)),
+    magicalDefense: attacker.archetypeId==='luna'&&type==='magical'
+      ? target.stats.magicalDefense*(1-.1*(target.marks||[]).filter(mark=>mark.id==='luna-erosion').length)
+      : target.stats.magicalDefense,
+    damageMultiplier:(darkMatter?.damageMultiplier||1)*(1-(attacker.residueStacks||0)*(attacker.residueDamageReductionPerStack??.05))*(1+shieldedDamageBonus)*(type==='magical'&&attacker.archetypeId==='luna'&&attacker.lunaDamageBuff?.turns>0?1+attacker.lunaDamageBuff.amount:1),
     defenseMultiplier:resistance,
     exposedStacks:target.marks.filter(mark=>mark.id==='exposed').length,
     exposedDefenseReduction:CHARACTER_COMBAT_DATA.lily.passives.find(passive=>passive.type==='exposed')?.defenseReduction??.2
@@ -431,7 +436,8 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
     attacker.damageBreakdown[options.damageChannel||'direct']+=finalHpDamage;
     state.damageBySide[attacker.side] += finalHpDamage;
     healFromLifesteal(state,attacker,finalHpDamage,eventType);
-    const hitEffects=state.engine.resolveHitEffects({actor:attacker,target,hit:outcome,action,eventType,passives:attacker.passives,characterDuplicates:attacker.characterDuplicates||0,premiumWeaponDuplicates:attacker.premiumWeaponDuplicates||0,hasPremiumWeapon:attacker.weapon?.type==='premium',allies:state.allies,isEnemyTarget:attacker.side!==target.side});
+    const hitEffects=state.engine.resolveHitEffects({actor:attacker,target,hit:outcome,action,eventType,passives:attacker.passives,ability:spec,characterDuplicates:attacker.characterDuplicates||0,premiumWeaponDuplicates:attacker.premiumWeaponDuplicates||0,hasPremiumWeapon:attacker.weapon?.type==='premium',allies:state.allies,isEnemyTarget:attacker.side!==target.side,random:state.random});
+    state.engine.resolveTsunadeAbilityEffect({actor:attacker,target,ability:spec,action,hit:{...outcome,actionId,eventType},random:state.random});
     for(const effect of hitEffects)if(effect.type==='lily-exposed-energy'&&effect.target){effect.target.energyGained=(effect.target.energyGained||0)+effect.energyGained;effect.target.energyGranted=(effect.target.energyGranted||0)+effect.energyGained}
     let reflect=null;
     if(outcome.reflect){const hit=outcome.reflect,reflectShield=hit.shieldDamage+hit.breakShieldDamage;attacker.shieldAbsorbed=(attacker.shieldAbsorbed||0)+reflectShield;if(attacker.runeShieldRemaining>0)attacker.runeShieldRemaining=Math.min(attacker.runeShieldRemaining,Math.max(0,attacker.shield||0));attacker.damageTaken+=hit.healthDamage;target.damageDealt+=hit.healthDamage;target.damageBreakdown.reflect+=hit.healthDamage;state.damageBySide[target.side]+=hit.healthDamage;healFromLifesteal(state,target,hit.healthDamage,'reflect_hit');reflect={damage:hit.damage,healthDamage:hit.healthDamage,shieldDamage:reflectShield,damageType:'true',dodged:!!hit.dodged,eventType:hit.eventType,sourceId:hit.sourceId,actionId:hit.actionId}}
@@ -537,12 +543,37 @@ function applyCloudRestoration(state,actor,plan,actionOverride=null){
  target.turnsAdvanced+=result.actionAdvance/100;actor.restorationUses=(actor.restorationUses||0)+1;
  applyCloudActionPassive(state,actor);useRuneRecycle(state,actor);triggerUnited(state,actor,target);return true;
 }
+function ageLunaBuffs(actor){
+ for(const key of ['lunaDamageBuff','lunaAttackBuff'])if(actor[key]?.turns>0){actor[key].turns--;if(actor[key].turns===0)actor[key]=null}
+}
+function applyLunaErosion(state,actor,hits){
+ const targets=[...new Set(landedTargets(hits).filter(target=>target.hp>0))];
+ for(const target of targets)state.engine.applyStackingTimedMark({target,id:'luna-erosion',turns:2,maxStacks:4});
+ if(targets.length)state.engine.recordMechanicEvent({componentId:'action:luna/basic',mechanicTags:CHARACTER_COMBAT_DATA.luna.basic.mechanicTags.filter(tag=>['debuff.mark','debuff.defense','limit.duration','limit.stacks'].includes(tag)),trigger:'on_basic',status:'applied',actorId:actor.id,targetIds:targets.map(target=>target.id),values:{stacksApplied:1,defenseReductionPerStack:.1,maxStacks:4,duration:2}});
+}
+function resolveLunaSkill(state,actor){
+ const plan=actionPlan(state,actor,'skill');if(!plan||!settleActionResources(state,actor,plan))return false;
+ const enemies=state.enemies.filter(enemy=>enemy.hp>0),stacks=enemies.reduce((sum,enemy)=>sum+(enemy.marks||[]).filter(mark=>mark.id==='luna-erosion').length,0);
+ for(const enemy of enemies)enemy.marks=(enemy.marks||[]).filter(mark=>mark.id!=='luna-erosion');
+ actor.lunaDamageBuff=stacks?{amount:stacks*.1,turns:2}:null;
+ actor.skillUses++;state.skillUses++;
+ state.engine.recordMechanicEvent({componentId:'action:luna/skill',mechanicTags:CHARACTER_COMBAT_DATA.luna.skill.mechanicTags,trigger:'on_skill',status:'applied',actorId:actor.id,targetIds:enemies.map(enemy=>enemy.id),values:{stacksConsumed:stacks,damageBonusPerStack:.1,damageBonus:stacks*.1,duration:stacks?2:0,energyGained:plan.energyGain||0}});
+ useRuneRecycle(state,actor);return true;
+}
 function resolveAllyUltimate(state,actor){
  const ultimate=actor.ultimate;if(!ultimate)return false;
  const basePlan=actionPlan(state,actor,'ultimate'),sunReady=actor.runeSetId==='eternal-sun'&&state.engine.isRuneReady(actor.runeCooldownState,'eternal-sun'),plan=basePlan?{...basePlan,energyCost:Math.max(0,basePlan.energyCost-(sunReady?RUNE_COMBAT_RULES['eternal-sun'].ultimateEnergyReduction:0))}:null,cost=plan?.energyCost??Infinity;
  if(actor.energy<cost||!settleActionResources(state,actor,plan,{payEnergyCost:true}))return false;
  if(sunReady){state.engine.resolveRuneTrigger({setId:'eternal-sun',trigger:'ultimate',actorId:actor.id,targetIds:[actor.id]});actor.eternalSunNextActionPending=true;actor.runeActivations++;}
  actor.ultimateCount++;
+ if(actor.archetypeId==='tsunade')state.engine.applyTsunadeSlowStart({actor});
+ if(actor.archetypeId==='luna'){
+  actor.lunaAttackBuff={amount:ultimate.attackBonus||1,turns:ultimate.duration||2};
+  const enemies=state.enemies.filter(unit=>unit.hp>0);advanceTurn(state,actor,ultimate.selfActionAdvance||50);actor.turnsAdvanced+=(ultimate.selfActionAdvance||50)/100;
+  for(const enemy of enemies)delayTurn(state,enemy,ultimate.enemyActionDelay||50);
+  state.engine.recordMechanicEvent({componentId:'action:luna/ultimate',mechanicTags:CHARACTER_COMBAT_DATA.luna.ultimate.mechanicTags,trigger:'on_ultimate',status:'applied',actorId:actor.id,targetIds:[actor.id,...enemies.map(enemy=>enemy.id)],values:{attackBonus:actor.lunaAttackBuff.amount,duration:actor.lunaAttackBuff.turns,actionAdvance:ultimate.selfActionAdvance||50,actionDelay:ultimate.enemyActionDelay||50,targetsAffected:enemies.length}});
+  applyUltimateRuneEffects(state,actor,[]);return true;
+ }
  if(plan.type==='dawnSupport'){
   const target=chooseSupportTarget(state,actor),result=state.engine.resolveDawnUltimate({actor,target,battle:state,plan,characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:dawnPremiumDuplicates(actor),weaponType:actor.weapon?.type||null});if(!result)return false;
   target.energyGranted+=result.energyGained;target.energyGained+=result.energyGained;actor.skillPointsGenerated+=result.skillPointsGained;actor.skillPointsGranted+=result.skillPointsGained;target.turnsAdvanced+=result.actionAdvance/100;
@@ -579,7 +610,7 @@ function resolveAllyUltimate(state,actor){
 function resolveReadyUltimates(state,scheduledActor){
  const forced=state.actionOverride?.actorId===scheduledActor?.id&&state.actionOverride.turn===scheduledActor.turns&&state.actionOverride.action==='ultimate'?scheduledActor:null;
  for(const actor of state.allies){
-  if(actor.hp<=0||actor.isHauntling||!actor.ultimate)continue;
+  if(actor.hp<=0||actor.isHauntling||!actor.ultimate||actor.debuffs?.some(effect=>effect.id==='stun'))continue;
   const baseCost=actionPlan(state,actor,'ultimate')?.energyCost??Infinity,cost=Math.max(0,baseCost-(actor.runeSetId==='eternal-sun'&&state.engine.isRuneReady(actor.runeCooldownState,'eternal-sun')?RUNE_COMBAT_RULES['eternal-sun'].ultimateEnergyReduction:0));
   if(actor.energy<cost)continue;
   if(state.actionOverride?.actorId===actor.id&&state.actionOverride.action==='ultimate'&&actor!==forced)continue;
@@ -610,6 +641,7 @@ function resolveAllyAction(state, actor) {
   const chooseSkill=actionOverride==='skill'||(actionOverride===null&&state.policyRandom()<policy.skillProbability);
   const canUseSkill=hasSkillResources&&chooseSkill;
   if(canUseSkill){
+  if(actor.archetypeId==='luna'&&skill?.type==='lunaArcaneBurst')return resolveLunaSkill(state,actor);
   if(skill?.type==='bloodShield'&&state.skillPoints>0){
     const plan=actionPlan(state,actor,'skill');if(!settleActionResources(state,actor,plan))return;state.skillUses++;actor.skillUses++;
     const recipients=state.allies.filter(unit=>unit.hp>0),result=state.engine.resolveLoganBloodShield({actor,allies:recipients,enemies:state.enemies,plan,characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0});if(!result)return;
@@ -624,6 +656,12 @@ function resolveAllyAction(state, actor) {
   if(skill?.type==='cloudRestoration'&&state.skillPoints>0){
     const plan=actionPlan(state,actor,'skill');if(!settleActionResources(state,actor,plan))return;state.skillUses++;actor.skillUses++;
     applyCloudRestoration(state,actor,plan,actionOverrideConfig);return;
+  }
+  if(skill?.type==='tsunadeIntenseSmash'&&state.skillPoints>0){
+    const plan=actionPlan(state,actor,'skill');if(!settleActionResources(state,actor,plan))return;state.skillUses++;actor.skillUses++;
+    state.engine.applyTsunadeSlowStart({actor});
+    const sourceId=++state.sourceSerial,hits=runAttack(state,actor,foes,skill,{multiplier:plan.multiplier,targetMode:plan.target||'blast',sourceActionId:sourceId});
+    useRuneRecycle(state,actor);triggerFollowUps(state,sourceId,actor.id,hits);return;
   }
   if(skill?.type==='firstStrike'&&state.skillPoints>0){
     const plan=actionPlan(state,actor,'skill');if(!settleActionResources(state,actor,plan))return;state.skillUses++;actor.skillUses++;
@@ -657,12 +695,14 @@ function resolveAllyAction(state, actor) {
   const amplify=basic.benchmarkSlot?1:amplifyBasic(state,actor);
   const untunedPlan=actor.tune?.basicEnhanced?actionPlan(state,actor,'basic'):plan;
   if(!settleActionResources(state,actor,plan,{enhancedStacks:stacks,payEnergyCost:basic.benchmarkSlot==='ultimate'}))return;
+  if(actor.archetypeId==='tsunade')state.engine.applyTsunadeSlowStart({actor});
   if(actor.archetypeId==='cloud'){
    state.engine.applyCloudBasicTempo({actor,allies:state.allies.filter(unit=>!unit.isHauntling),plan,characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0,weaponType:actor.weapon?.type||null});
    applyCloudActionPassive(state,actor);
   }
   const sourceId=++state.sourceSerial;
   const hits = runAttack(state, actor, foes, basic, { multiplier:basicMultiplier*amplify,unbuffedMultiplier:actor.tune?.basicEnhanced?untunedPlan.multiplier*amplify:undefined,targetMode,sourceActionId:sourceId });
+  if(actor.archetypeId==='luna')applyLunaErosion(state,actor,hits);
   actor.basicAttackCount++;
   if(actor.tune?.basicEnhanced){const tuneSource=state.allies.find(unit=>unit.id===actor.tune.sourceId);actor.tune.basicEnhanced=false;const tunedSpBefore=state.skillPoints;state.skillPoints=Math.min(state.skillPointCap,state.skillPoints+(actor.tune.skillPointReturn||0));const refund=state.skillPoints-tunedSpBefore;actor.skillPointsGenerated+=refund;if(tuneSource){tuneSource.skillPointsGranted+=refund;tuneSource.skillPointsGenerated+=refund;if(refund>0)state.engine.recordMechanicEvent({componentId:'action:dawn/skill',mechanicTags:['resource.skill_point'],trigger:'on_tuned_basic_used',status:'applied',actorId:tuneSource.id,targetIds:[actor.id],actionId:sourceId,values:{skillPointsGained:refund,skillPointsBefore:tunedSpBefore,skillPointsAfter:state.skillPoints}})}}
   actor.enhanceStacks = 0;
@@ -735,10 +775,12 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
       state.allyTurns++;
       resolveBleedTick(state, actor);
       if (actor.hp <= 0) continue;
-      const actionsBeforeEternalSun=[actor.basicAttackCount,actor.skillUses];if(state.enemies.some(unit=>unit.hp>0))resolveAllyAction(state, actor);if(actor.basicAttackCount>actionsBeforeEternalSun[0]||actor.skillUses>actionsBeforeEternalSun[1])completeEternalSunNextAction(state,actor);
+      const stunned=actor.debuffs?.some(effect=>effect.id==='stun');
+      const actionsBeforeEternalSun=[actor.basicAttackCount,actor.skillUses];if(!stunned&&state.enemies.some(unit=>unit.hp>0))resolveAllyAction(state, actor);if(actor.basicAttackCount>actionsBeforeEternalSun[0]||actor.skillUses>actionsBeforeEternalSun[1])completeEternalSunNextAction(state,actor);
       triggerUnitedLinkedBasics(state,actor);
       ageUnitedLinks(state,actor);
-      if(isOverriddenActor){
+      if(isOverriddenActor&&stunned)state.actionOverrideStatus='stunned';
+      else if(isOverriddenActor){
         state.actionOverrideResolved=actor.ultimateCount>priorUltimates?'ultimate':actor.skillUses>priorSkills?'skill':'basic';
         if(state.actionOverrideResolved===state.actionOverride.action)state.actionOverrideStatus='executed';
         else if(state.actionOverride.action==='skill'&&actor.skillUses===priorSkills)state.actionOverrideStatus='insufficient_skill_points';
@@ -748,7 +790,7 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
     } else {
       state.enemyTurns++;
       resolveBleedTick(state,actor);
-      if(actor.hp<=0)continue;
+    if(actor.hp<=0)continue;
       if(!state.enemies.some(unit=>unit.hp>0)){}
       else if (actor.brokenTurns > 0) {
         actor.brokenTurns--;
@@ -757,9 +799,12 @@ function simulateBattle(config, seed = 1, maxActionsOverride = null) {
           cleanse(actor,state);
           state.timeline.modify(actor.id,100);
         }
+      } else if (actor.debuffs?.some(effect=>effect.id==='stun')) {
+        // A stunned enemy loses this scheduled action; the shared lifecycle ages Stun below.
       } else {resolveEnemyAction(state, actor)}
     }
     state.engine.ageUnitEffects(actor,{event:'affected_turn_end'});
+    if(actor.archetypeId==='luna')ageLunaBuffs(actor);
     if(actor.side==='allies'){
       state.engine.ageRuneCooldowns(actor.runeCooldownState,actor.turns,['radiant-moon','eternal-sun','dark-matter','clear-skies','recycle','amplify','celestial-star','united']);
       if(actor.runeShieldTurns>0&&actor.runeShieldStartedTurn<actor.turns){actor.runeShieldTurns--;if(!actor.runeShieldTurns&&actor.runeShieldRemaining>0){actor.shield=Math.max(0,(actor.shield||0)-actor.runeShieldRemaining);actor.runeShieldRemaining=0}}

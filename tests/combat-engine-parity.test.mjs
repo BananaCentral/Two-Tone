@@ -108,6 +108,76 @@ test('shared hit effects apply Exposed, Ricochet, and character Bleed rules', ()
   assert.equal(enemy.bleedStacks.length, 1);
 });
 
+test('Stun chance is once per target per action and timed turns refresh and expire', () => {
+  const engine = new TwoToneBattleEngine();
+  const actor = { id: 'caster', archetypeId: 'caster', hp: 100 };
+  const target = { id: 'target', hp: 100, debuffs: [] };
+  const ability = { stunChance: 0.5, stunTurns: 2, mechanicTags: ['damage.magical'] };
+  let rolls = 0;
+  const hit = { damage: 10, actionId: 'action-1' };
+
+  assert.ok(engine.resolveHitEffects({ actor, target, ability, action: 'skill', hit, passives: [], isEnemyTarget: true, random: () => { rolls++; return 0.49; } }).some(effect => effect.type === 'stun'));
+  assert.equal(engine.resolveHitEffects({ actor, target, ability, action: 'skill', hit, passives: [], isEnemyTarget: true, random: () => { rolls++; return 0; } }).some(effect => effect.type === 'stun'), false);
+  assert.equal(rolls, 1, 'a multi-hit action only rolls once per target');
+  assert.equal(target.debuffs.find(effect => effect.id === 'stun').turns, 2);
+
+  engine.resolveHitEffects({ actor, target, ability: { ...ability, stunTurns: 3 }, action: 'skill', hit: { actionId: 'action-2' }, passives: [], isEnemyTarget: true, random: () => 0.5 });
+  assert.equal(target.debuffs.find(effect => effect.id === 'stun').turns, 2, 'a roll equal to 50% fails and does not refresh');
+  engine.resolveHitEffects({ actor, target, ability: { ...ability, stunTurns: 3 }, action: 'skill', hit: { actionId: 'action-3' }, passives: [], isEnemyTarget: true, random: () => 0.2 });
+  assert.equal(target.debuffs.find(effect => effect.id === 'stun').turns, 3, 'a successful reapplication refreshes duration');
+  engine.ageUnitEffects(target, { event: 'affected_turn_end' });
+  assert.equal(target.debuffs.find(effect => effect.id === 'stun').turns, 2);
+  engine.ageUnitEffects(target, { event: 'affected_turn_end' });
+  engine.ageUnitEffects(target, { event: 'affected_turn_end' });
+  assert.equal(target.debuffs.some(effect => effect.id === 'stun'), false);
+});
+
+test('Tsunade Slow Start stacks and successful effects consume stacks and apply timed debuffs', () => {
+  const engine = new TwoToneBattleEngine();
+  const tsunade = { id: 'tsunade-1', archetypeId: 'tsunade', hp: 125, marks: [], debuffs: [], passives: CHARACTER_COMBAT_DATA.tsunade.passives };
+  const enemy = { id: 'enemy-1', hp: 300, marks: [], debuffs: [] };
+  assert.equal(engine.applyTsunadeSlowStart({ actor: tsunade }), 1);
+  assert.equal(tsunade.marks[0].speedBonus, 0.5);
+  assert.equal(tsunade.marks[0].turns, 2);
+
+  const basicEffects = engine.resolveHitEffects({ actor: tsunade, target: enemy, hit: { actionId: 'basic-1' },
+    action: 'basic', ability: CHARACTER_COMBAT_DATA.tsunade.basic, passives: tsunade.passives,
+    isEnemyTarget: true, random: () => 0.1 });
+  assert.ok(basicEffects.some(effect => effect.type === 'stun'));
+  assert.equal(enemy.debuffs.find(effect => effect.id === 'stun').turns, 1);
+  assert.equal(tsunade.marks.filter(mark => mark.id === 'tsunade-slow-start').length, 0);
+
+  engine.applyTsunadeSlowStart({ actor: tsunade });
+  assert.equal(engine.resolveTsunadeAbilityEffect({ actor: tsunade, target: enemy, action: 'skill',
+    ability: CHARACTER_COMBAT_DATA.tsunade.skill, hit: { actionId: 'skill-1', eventType: 'direct_hit' }, random: () => 0.1 }), true);
+  assert.equal(enemy.debuffs.find(effect => effect.id === 'tsunade-physical-defense-down').physicalDefenseReduction, 0.25);
+  assert.equal(tsunade.marks.filter(mark => mark.id === 'tsunade-slow-start').length, 0);
+
+  engine.applyTsunadeSlowStart({ actor: tsunade });
+  const secondEnemy = { id: 'enemy-2', hp: 300, marks: [], debuffs: [] };
+  assert.equal(engine.resolveTsunadeAbilityEffect({ actor: tsunade, target: secondEnemy, action: 'ultimate',
+    ability: CHARACTER_COMBAT_DATA.tsunade.ultimate, hit: { actionId: 'ultimate-1', eventType: 'direct_hit' }, random: () => 0.1 }), true);
+  assert.equal(secondEnemy.debuffs.find(effect => effect.id === 'tsunade-attack-down').damageMultiplier, 0.75);
+  assert.equal(secondEnemy.debuffs.find(effect => effect.id === 'tsunade-attack-down').turns, 2);
+});
+
+test('Tsunade action plans use the authored targets, costs, and multipliers', () => {
+  const engine = new TwoToneBattleEngine(), kit = CHARACTER_COMBAT_DATA.tsunade;
+  const basic = engine.resolveActionPlan({ kit, characterId: 'tsunade', action: 'basic' });
+  const skill = engine.resolveActionPlan({ kit, characterId: 'tsunade', action: 'skill' });
+  const ultimate = engine.resolveActionPlan({ kit, characterId: 'tsunade', action: 'ultimate' });
+  assert.equal(basic.multiplier, 1);
+  assert.equal(basic.target, 'single');
+  assert.equal(basic.energyGain, 10);
+  assert.equal(kit.basic.stunChance, 0.25);
+  assert.equal(skill.multiplier, 1.5);
+  assert.equal(skill.target, 'blast');
+  assert.equal(skill.energyGain, 20);
+  assert.equal(ultimate.multiplier, 2);
+  assert.equal(ultimate.target, 'aoe');
+  assert.equal(ultimate.energyCost, 120);
+});
+
 test('shared action/resource handling settles costs and Soul Enhance together', () => {
   const engine = new TwoToneBattleEngine();
   const actor = { id: 'soul', archetypeId: 'soul', hp: 100, energy: 20, maxEnergy: 120 };

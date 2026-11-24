@@ -32,9 +32,9 @@ Calculated stats scale with Level and follow the shared character, Attack, Defen
 
 - Deals AoE Magical damage at a 0.25× Attack multiplier.
 - Restores 10 Energy and 1 party Skill Point under the shared Basic Attack defaults.
-- Grants each living ally, including Cloud, +20% Speed for two of that ally's turns. Each use adds one stack, up to five. Reapplying the effect refreshes the stacks' duration.
+- Grants each living ally, including Cloud, +15% Speed for two of that ally's turns. Each use adds one stack, up to five (maximum +75%). Reapplying the effect refreshes the stacks' duration.
 - The Speed bonus is additive with other percentage modifiers and recalculates future turn timing. Cloud's current Speed, including active Speed effects, is used by Restoration.
-- Character Duplicate 2 changes the bonus to +40% per stack and duration to three turns; the five-stack maximum remains.
+- Character Duplicate 2 changes the bonus to +30% per stack and duration to three turns; the five-stack maximum remains.
 - Premium Weapon Duplicate 1 doubles the Basic Attack multiplier to 0.5×.
 - Mechanic tags: `damage.magical`, `buff.speed`, `limit.duration`, `limit.stacks`, `resource.energy`, `resource.skill_point`.
 
@@ -50,7 +50,7 @@ Calculated stats scale with Level and follow the shared character, Attack, Defen
 ## Ultimate
 
 - Costs 100 Energy.
-- Deals single-target Magical damage at a 1.25× Attack multiplier and delays the target's next action by 40 percentage points.
+- Deals single-target Magical damage at a 1.75× Attack multiplier and delays the target's next action by 40 percentage points.
 - Character Duplicate 4 increases the delay to 80 percentage points and reduces the Energy cost to 80.
 - Ultimates are off-turn actions and do not consume a scheduled turn.
 - Mechanic tags: `damage.magical`, `tempo.action_delay`, `debuff.speed`, `limit.duration`, `limit.stacks`, `resource.energy`.
@@ -69,14 +69,14 @@ Calculated stats scale with Level and follow the shared character, Attack, Defen
 ## Character Duplicates
 
 1. Weightless advances Cloud by 40% after each action instead of 20%.
-2. Basic Attack's Speed bonus becomes +40% per stack and lasts three turns instead of two.
+2. Basic Attack's Speed bonus becomes +30% per stack and lasts three turns instead of two.
 3. Restoration advances its selected ally by 80% instead of 40%.
 4. Ultimate action delay increases from 40% to 80% and its Energy cost decreases to 80.
 
 ## Premium Weapon Duplicates
 
 1. Basic Attack multiplier doubles from 0.25× to 0.5×.
-2. Ultimate multiplier doubles from 1.25× to 2.5×.
+2. Ultimate multiplier doubles from 1.75× to 3.5×.
 3. Ultimate's enemy Speed slow increases from 20% to 40% per stack.
 4. Restoration's healing multiplier doubles from 1.0× to 2.0×.
 
