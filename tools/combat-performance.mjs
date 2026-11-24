@@ -274,11 +274,21 @@ function summarizeMechanicEventDeltas(trials, plan, controlDropped, treatmentDro
   });
 }
 function summarizeMechanicEventObservations(trials, plan) {
+  const componentIds = new Set(plan.componentIds);
+  const perTrialByTag = trials.map(trial => {
+    const events = aggregateMechanicEvents({ mechanicEvents: trial.treatmentMechanicEvents });
+    const byTag = new Map();
+    for (const row of events.values()) {
+      if (!componentIds.has(row.componentId)) continue;
+      const rows = byTag.get(row.tag) || [];
+      rows.push(row);
+      byTag.set(row.tag, rows);
+    }
+    return byTag;
+  });
+  const droppedTreatment = trials.reduce((sum, trial) => sum + (trial.treatmentMechanicEvents?.dropped || 0), 0);
   return plan.byTag.map(({ tag, measurementFields, target, trigger, coverage }) => {
-    const perTrial = trials.map(trial => {
-      const events = aggregateMechanicEvents({ mechanicEvents: trial.treatmentMechanicEvents });
-      return [...events.values()].filter(row => row.tag === tag && plan.componentIds.includes(row.componentId));
-    });
+    const perTrial = perTrialByTag.map(byTag => byTag.get(tag) || []);
     const componentIds = [...new Set(perTrial.flatMap(rows => rows.map(row => row.componentId)))].sort();
     const components = componentIds.map(componentId => {
       const rows = perTrial.map(events => events.find(event => event.componentId === componentId));
@@ -292,7 +302,7 @@ function summarizeMechanicEventObservations(trials, plan) {
     return { tag, measurementFields, target, trigger, requiredCoverage: coverage,
       evidenceStatus: observed ? 'event_observed' : 'tagged_but_not_triggered_in_sample', components,
       eventCapture: { truncated: trials.some(trial => trial.treatmentMechanicEvents?.dropped > 0),
-        droppedTreatment: trials.reduce((sum, trial) => sum + (trial.treatmentMechanicEvents?.dropped || 0), 0) } };
+        droppedTreatment } };
   });
 }
 function wearersFor(spec, party) {
