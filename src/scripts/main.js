@@ -361,8 +361,8 @@ function spawnProgressedUnit(id,fullHealth=false){
  const hp=restore?maxHp:savedHp<=0?0:Math.max(0,roundHp(maxHp*(savedHp/savedMax)));
  const passive={...(model.passive||{})};
  if(id==='zero'){
-  passive.criticalRateBonus=.1*upgradeValueFor('zero.duplicate.1.critical-stats','criticalRateMultiplier','zero',1);
-  passive.criticalDamageBonus=.25*upgradeValueFor('zero.duplicate.1.critical-stats','criticalDamageMultiplier','zero',1);
+  passive.criticalRateBonus=.2*upgradeValueFor('zero.duplicate.1.critical-stats','criticalRateMultiplier','zero',1);
+  passive.criticalDamageBonus=.5*upgradeValueFor('zero.duplicate.1.critical-stats','criticalDamageMultiplier','zero',1);
   passive.defenseIgnore=upgradeValueFor('zero.premium-duplicate.4.defense-ignore','defenseIgnore','zero');
  }
  return {...model,passive,baseHp:model.hp,level:progress.level,hp,maxHp,...modifiers,shield:0,tauntEffects:[],energy:COMBAT_RESOURCE_STANDARD.startingEnergy,energyReserved:0};
