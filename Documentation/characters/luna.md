@@ -36,8 +36,7 @@ Calculated stats scale with Level and follow the shared character, Attack, Defen
 
 ## Ultimate: Lunar Eclipse
 
-- Costs 100 Energy and is an off-turn action.
-- Advances Luna's next action by 50 percentage points and delays every living enemy's next action by 50 percentage points.
+- Costs 80 Energy and is an off-turn action.
 - Increases Luna's Attack by 100% for two of her turns.
 
 ## Simulator Notes

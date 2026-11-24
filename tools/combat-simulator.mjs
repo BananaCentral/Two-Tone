@@ -569,9 +569,7 @@ function resolveAllyUltimate(state,actor){
  if(actor.archetypeId==='tsunade')state.engine.applyTsunadeSlowStart({actor});
  if(actor.archetypeId==='luna'){
   actor.lunaAttackBuff={amount:ultimate.attackBonus||1,turns:ultimate.duration||2};
-  const enemies=state.enemies.filter(unit=>unit.hp>0);advanceTurn(state,actor,ultimate.selfActionAdvance||50);actor.turnsAdvanced+=(ultimate.selfActionAdvance||50)/100;
-  for(const enemy of enemies)delayTurn(state,enemy,ultimate.enemyActionDelay||50);
-  state.engine.recordMechanicEvent({componentId:'action:luna/ultimate',mechanicTags:CHARACTER_COMBAT_DATA.luna.ultimate.mechanicTags,trigger:'on_ultimate',status:'applied',actorId:actor.id,targetIds:[actor.id,...enemies.map(enemy=>enemy.id)],values:{attackBonus:actor.lunaAttackBuff.amount,duration:actor.lunaAttackBuff.turns,actionAdvance:ultimate.selfActionAdvance||50,actionDelay:ultimate.enemyActionDelay||50,targetsAffected:enemies.length}});
+  state.engine.recordMechanicEvent({componentId:'action:luna/ultimate',mechanicTags:CHARACTER_COMBAT_DATA.luna.ultimate.mechanicTags,trigger:'on_ultimate',status:'applied',actorId:actor.id,targetIds:[actor.id],values:{attackBonus:actor.lunaAttackBuff.amount,duration:actor.lunaAttackBuff.turns}});
   applyUltimateRuneEffects(state,actor,[]);return true;
  }
  if(plan.type==='dawnSupport'){
