@@ -161,7 +161,8 @@ const TYPE_MECHANIC_TAGS = Object.freeze({
   bloodShield: ['defense.shield', 'resource.hp_cost', 'tempo.taunt', 'resource.energy'],
   dawnSupport: ['resource.energy', 'resource.skill_point', 'tempo.action_advance'],
   residue: ['status.residue', 'debuff.damage', 'debuff.defense', 'limit.stacks', 'limit.duration'],
-  slowStart: ['status.slow_start', 'buff.speed', 'trigger.per_action', 'limit.duration', 'limit.stacks']
+  slowStart: ['status.slow_start', 'buff.speed', 'trigger.per_action', 'limit.duration', 'limit.stacks'],
+  hydration: ['recovery.lifesteal']
 });
 const TYPE_MECHANIC_TARGETS = Object.freeze({
   followUp: { 'damage.follow_up': ['opponent', 'event_defined', 'event_defined'] },
@@ -384,6 +385,21 @@ export const CHARACTER_ROSTER = Object.freeze([
       passives: [{ type: 'slowStart', id: 'slow-start', speedBonus: .5, duration: 2, maxStacks: 10,
         mechanicTags: ['status.slow_start', 'buff.speed', 'trigger.per_action', 'limit.duration', 'limit.stacks'],
         mechanicTriggers: { 'status.slow_start': 'on_action', 'buff.speed': 'on_action', 'trigger.per_action': 'on_action' } }] }
+  ),
+  character(
+    { id: 'angel', name: 'ANGEL', label: 'Character', hp: 75, baseAttack: 25, basePhysicalDefense: 3, baseMagicalDefense: 3, speed: 30, stealth: 0, lifesteal: .1, echoPercent: 0, reflectPercent: 0, art: 'portrait', test: false },
+    { name: 'Angel', role: 'subDps', level: 1,
+      basic: { name: 'Splash', damageType: 'magical', multiplier: 1.25, target: 'blast', energyGain: 10, skillPointGain: 1,
+        mechanicTags: ['damage.direct', 'damage.magical', 'resource.energy', 'resource.skill_point'] },
+      skill: { name: 'Current', type: 'angelCurrent', damageType: 'magical', multiplier: .75, target: 'single', energyGain: 10,
+        cycles: [{ multiplier: .75, target: 'single', energyGain: 10 }, { multiplier: 1.25, target: 'blast', energyGain: 20 }, { multiplier: 1.75, target: 'aoe', energyGain: 30 }],
+        mechanicTags: ['damage.direct', 'damage.magical', 'resource.energy', 'resource.skill_point', 'trigger.per_action'],
+        effects: [{ id: 'angel.skill.current-cycle', mechanicTags: ['trigger.per_action', 'resource.energy'], targeting: { side: 'enemy', acquisition: 'event_defined', coverage: 'event_defined' }, trigger: 'on_skill', measures: ['cycle', 'multiplier', 'energyGained'] }] },
+      ultimate: { name: 'Tsunami', damageType: 'magical', multiplier: 1.5, multiplierChoices: [1.25, 1.5, 1.75], target: 'aoe', energyCost: 100,
+        mechanicTags: ['damage.direct', 'damage.magical', 'damage.conditional_multiplier', 'resource.energy'],
+        effects: [{ id: 'angel.ultimate.tsunami-roll', mechanicTags: ['damage.conditional_multiplier'], targeting: { side: 'enemy', acquisition: 'all', coverage: 'aoe' }, trigger: 'on_ultimate', measures: ['multiplier'] }] },
+      passives: [{ type: 'hydration', id: 'hydration', lifesteal: .1,
+        mechanicTags: ['recovery.lifesteal'], mechanicTriggers: { 'recovery.lifesteal': 'on_ally_damage_dealt' } }] }
   )
 ]);
 

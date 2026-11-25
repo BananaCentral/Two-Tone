@@ -110,7 +110,7 @@ function validateConfig(config) {
       const taunt=instance.taunt??archetype.taunt;
       assert(taunt===undefined||(taunt&&Number.isFinite(taunt.rate)&&taunt.rate>=0&&taunt.rate<=1&&Number.isInteger(taunt.turns)&&taunt.turns>0),'Taunt needs a rate from 0 to 1 and a positive integer duration.');
       assert(archetype.basic && Number.isFinite(archetype.basic.multiplier) && ['physical', 'magical', 'true'].includes(archetype.basic.damageType), 'Archetype ' + instance.archetype + ' needs a typed Basic Attack.');
-      assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage', 'momentum', 'exposed', 'resourceful', 'residue', 'lethalImpact', 'pursuit', 'sharpClaws', 'bleed', 'cutthroat', 'tasteForBlood', 'cloudWeightless', 'moonlight', 'slowStart'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
+      assert(!archetype.passives || archetype.passives.every(p => ['followUp', 'everyNthBasic', 'rampage', 'momentum', 'exposed', 'resourceful', 'residue', 'lethalImpact', 'pursuit', 'sharpClaws', 'bleed', 'cutthroat', 'tasteForBlood', 'cloudWeightless', 'moonlight', 'slowStart', 'hydration'].includes(p.type)), 'Unsupported passive type in ' + instance.archetype + '.');
       for (const passive of archetype.passives || []) {
         if (passive.type === 'everyNthBasic') assert(Number.isInteger(passive.every) && passive.every > 0, 'everyNthBasic needs a positive integer interval.');
         if (passive.type === 'followUp') assert(Number.isFinite(passive.multiplier) && passive.multiplier >= 0, 'followUp needs a non-negative multiplier.');
@@ -118,7 +118,7 @@ function validateConfig(config) {
         if (passive.type === 'momentum') assert(Number.isFinite(passive.damageBonus) && passive.damageBonus >= 0 && Number.isInteger(passive.maxStacks) && passive.maxStacks >= 0, 'momentum needs a non-negative damageBonus and a non-negative integer maxStacks.');
         if (passive.type === 'bleed') assert(Number.isInteger(passive.stacksPerHit??1)&&(passive.stacksPerHit??1)>0&&Number.isInteger(passive.maxStacks??5)&&(passive.maxStacks??5)>0,'bleed needs positive integer stacksPerHit and maxStacks.');
       }
-      assert(!archetype.skill || ['enhanceBasic', 'ricochet', 'tune', 'bloodShield', 'firstStrike', 'cloudRestoration', 'lunaArcaneBurst', 'tsunadeIntenseSmash'].includes(archetype.skill.type), 'Unsupported skill type in ' + instance.archetype + '.');
+      assert(!archetype.skill || ['enhanceBasic', 'ricochet', 'tune', 'bloodShield', 'firstStrike', 'cloudRestoration', 'lunaArcaneBurst', 'tsunadeIntenseSmash', 'angelCurrent'].includes(archetype.skill.type), 'Unsupported skill type in ' + instance.archetype + '.');
       assert(!archetype.ultimate || ['dawnSupport', 'lunaEclipse'].includes(archetype.ultimate.type)||['physical', 'magical', 'true'].includes(archetype.ultimate.damageType), 'Ultimate needs a supported damage type or support handler.');
     }
   }
@@ -230,7 +230,7 @@ function instantiate(config, side) {
       criticalRateBonus:(archetype.criticalRateBonus||0)+(instance.criticalRateBonus||0)+upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'soul.premium-duplicate.2.critical-stats', 'criticalRateBonus')+(!disabledPassiveIds.has('cutthroat')?(archetype.passives?.find(passive=>passive.type==='cutthroat')?.criticalRateBonus||0)*upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'zero.duplicate.1.critical-stats', 'criticalRateMultiplier', 1):0),
       criticalDamageBonus:(archetype.criticalDamageBonus||0)+(instance.criticalDamageBonus||0)+upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'soul.premium-duplicate.2.critical-stats', 'criticalDamageBonus')+(!disabledPassiveIds.has('cutthroat')?(archetype.passives?.find(passive=>passive.type==='cutthroat')?.criticalDamageBonus||0)*upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'zero.duplicate.1.critical-stats', 'criticalDamageMultiplier', 1):0),
       defenseIgnoreBonus:upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'zero.premium-duplicate.4.defense-ignore', 'defenseIgnore'),
-      lifestealRate:(instance.lifesteal??archetype.lifesteal??0)+(instance.lifestealBonus||0)+(archetype.lifestealBonus||0),
+      lifestealRate:(instance.lifesteal??(disabledPassiveIds.has('hydration')?0:(archetype.lifesteal??archetype.passives?.find(passive=>passive.type==='hydration')?.lifesteal??0)))+(instance.lifestealBonus||0)+(archetype.lifestealBonus||0),
       lifestealHealing:0,
       criticalHits:0,
       tune:null,
@@ -302,8 +302,9 @@ function healFromLifesteal(state,attacker,damageDealt,eventType='direct_hit'){
  const passiveRate=attacker.side==='allies'&&logan?upgradeValue(logan,'logan.duplicate.2.lifesteal','lifestealRate',.1):0;
  const rate=Math.max(0,(attacker.lifestealRate||0)+passiveRate);
  if(rate<=0||damageDealt<=0||attacker.hp<=0)return 0;
+ const angelHydration=attacker.archetypeId==='angel'&&!attacker.disabledPassiveIds?.has('hydration');
  const healing=state.engine.resolveLifesteal({attacker,damage:damageDealt,rate,eventType,
-  mechanicSource:passiveRate>0?{componentId:'passive:logan/tasteForBlood',mechanicTags:['recovery.lifesteal'],trigger:'on_ally_damage'}:null,
+  mechanicSource:passiveRate>0?{componentId:'passive:logan/tasteForBlood',mechanicTags:['recovery.lifesteal'],trigger:'on_ally_damage'}:angelHydration?{componentId:'passive:angel/hydration',mechanicTags:['recovery.lifesteal'],trigger:'on_ally_damage_dealt'}:null,
   sourceActorId:logan?.id})?.applied||0;
  attacker.lifestealHealing=(attacker.lifestealHealing||0)+healing;
  if(healing>0&&passiveRate>.1)state.engine.recordUpgradeEffect('logan.duplicate.2.lifesteal',{actorId:logan.id,targetIds:[attacker.id],trigger:'on_ally_damage_dealt',values:{healing,lifestealRate:passiveRate}});
@@ -578,7 +579,9 @@ function resolveAllyUltimate(state,actor){
   applyUltimateRuneEffects(state,actor,[]);triggerUnitedLinkedBasics(state,actor);
  }else{
   const sourceId=++state.sourceSerial;
-  const hits=runAttack(state,actor,state.enemies.filter(unit=>unit.hp>0),ultimate,{multiplier:plan.multiplier,sourceActionId:sourceId});
+  const multiplier=actor.archetypeId==='angel'?ultimate.multiplierChoices[Math.floor(state.random()*ultimate.multiplierChoices.length)]:plan.multiplier;
+  const hits=runAttack(state,actor,state.enemies.filter(unit=>unit.hp>0),ultimate,{multiplier,sourceActionId:sourceId});
+  if(actor.archetypeId==='angel')state.engine.recordMechanicEvent({componentId:'action:angel/ultimate',mechanicTags:ultimate.mechanicTags.filter(tag=>tag==='damage.conditional_multiplier'),trigger:'on_ultimate',status:'resolved',actorId:actor.id,targetIds:[...new Set(landedTargets(hits).map(target=>target.id))],values:{multiplier}});
   if(actor.archetypeId==='cloud'){
    const target=state.enemies.find(unit=>unit.id===hits.find(hit=>hit.target)?.target);
    if(target)state.engine.resolveCloudUltimateEffects({actor,target,enemies:state.enemies,plan,characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0,weaponType:actor.weapon?.type||null});
@@ -640,6 +643,15 @@ function resolveAllyAction(state, actor) {
   const canUseSkill=hasSkillResources&&chooseSkill;
   if(canUseSkill){
   if(actor.archetypeId==='luna'&&skill?.type==='lunaArcaneBurst')return resolveLunaSkill(state,actor);
+  if(actor.archetypeId==='angel'&&skill?.type==='angelCurrent'){
+    const cycleIndex=actor.currentCycle||0,cycle=skill.cycles[cycleIndex]||skill.cycles[0],basePlan=actionPlan(state,actor,'skill');
+    const plan={...basePlan,multiplier:cycle.multiplier,target:cycle.target,energyGain:cycle.energyGain};
+    if(!settleActionResources(state,actor,plan))return;state.skillUses++;actor.skillUses++;
+    const sourceId=++state.sourceSerial,hits=runAttack(state,actor,foes,skill,{multiplier:plan.multiplier,targetMode:plan.target,sourceActionId:sourceId});
+    actor.currentCycle=(cycleIndex+1)%skill.cycles.length;
+    state.engine.recordMechanicEvent({componentId:'action:angel/skill',mechanicTags:skill.mechanicTags.filter(tag=>['trigger.per_action','resource.energy'].includes(tag)),trigger:'on_skill',status:'resolved',actorId:actor.id,targetIds:[...new Set(landedTargets(hits).map(target=>target.id))],values:{cycle:cycleIndex+1,multiplier:cycle.multiplier,energyGained:plan.energyGain}});
+    useRuneRecycle(state,actor);triggerFollowUps(state,sourceId,actor.id,hits);return;
+  }
   if(skill?.type==='bloodShield'&&state.skillPoints>0){
     const plan=actionPlan(state,actor,'skill');if(!settleActionResources(state,actor,plan))return;state.skillUses++;actor.skillUses++;
     const recipients=state.allies.filter(unit=>unit.hp>0),result=state.engine.resolveLoganBloodShield({actor,allies:recipients,enemies:state.enemies,plan,characterDuplicates:actor.characterDuplicates||0,premiumWeaponDuplicates:actor.premiumWeaponDuplicates||0});if(!result)return;
