@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
+import { Worker } from 'node:worker_threads';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { simulateBattle } from './combat-simulator.mjs';
 import { CHARACTER_COMBAT_DATA, CHARACTER_UPGRADE_EFFECTS, COMBAT_EFFECT_CATALOG, COMBAT_MECHANIC_TAGS, COMBAT_PERFORMANCE_POLICY_STANDARD, COMBAT_PERFORMANCE_STANDARD, COMBAT_RESOURCE_STANDARD, ENEMY_COMBAT_DATA, ENEMY_DIFFICULTY_STANDARD, ENEMY_LEVEL_SCALING, enemyStatsAtMultiplier, RUNE_COMBAT_RULES } from '../src/scripts/combat-definitions.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -21,6 +22,47 @@ const BENCHMARK_PARTY_SIZE = 4;
 const RUNE_MAIN = ['hp', 'attack', 'physicalDefense', 'magicalDefense'];
 const BAE_REFERENCE_HP = COMBAT_PERFORMANCE_STANDARD.baseStats.attack * (1 - Math.min(
   COMBAT_PERFORMANCE_STANDARD.baseStats.physicalDefense / COMBAT_PERFORMANCE_STANDARD.baseStats.attack, 1));
+const DEFAULT_WORKERS = Math.max(1, Math.min(8, os.availableParallelism?.() || os.cpus().length));
+
+class SimulationWorkerPool {
+  constructor(size) {
+    this.nextId = 1;
+    this.queue = [];
+    this.workers = Array.from({ length: size }, () => {
+      const slot = { worker: new Worker(new URL('./combat-performance-worker.mjs', import.meta.url)), current: null };
+      slot.worker.on('message', message => {
+        const task = slot.current;
+        slot.current = null;
+        if (task) message.error ? task.reject(new Error(message.error)) : task.resolve(message.result);
+        this.dispatch(slot);
+      });
+      slot.worker.on('error', error => {
+        slot.current?.reject(error);
+        slot.current = null;
+      });
+      return slot;
+    });
+  }
+  runBatch(jobs, maxActions) {
+    return new Promise((resolve, reject) => {
+      this.queue.push({ id: this.nextId++, jobs, maxActions, resolve, reject });
+      for (const slot of this.workers) this.dispatch(slot);
+    });
+  }
+  dispatch(slot) {
+    if (slot.current || !this.queue.length) return;
+    slot.current = this.queue.shift();
+    const { id, jobs, maxActions } = slot.current;
+    try { slot.worker.postMessage({ id, jobs, maxActions }); }
+    catch (error) { slot.current.reject(error); slot.current = null; this.dispatch(slot); }
+  }
+  async close() {
+    await Promise.all(this.workers.map(slot => slot.worker.terminate()));
+  }
+}
+function characterPanelCacheKey(config, seed, maxActions) {
+  return JSON.stringify([config.version, config.teams, config.settings, seed, maxActions]);
+}
 
 // This registry is the contract between authored tags, event evidence, and
 // scenario coverage. It never contributes an extra score weight.
@@ -776,15 +818,15 @@ function makeCharacterScoreSvg(scoreRows) {
   return parts.join('\n');
 }
 function parseArgs(args) {
-  const options = { candidates: [], preset: 'balanced', runs: 10, seed: 1, output: 'Documentation/combat-simulator/performance-results.jsonl', limitScenarios: 45, maxActions: 2000, compact: true, runeImpactReport: false, mechanicRating: false, policyProfile: DEFAULT_POLICY_PROFILE };
+  const options = { candidates: [], preset: 'balanced', runs: 10, seed: 1, output: 'Documentation/combat-simulator/performance-results.jsonl', limitScenarios: 100, maxActions: 2000, workers: DEFAULT_WORKERS, cacheCharacterPanels: true, compact: true, runeImpactReport: false, mechanicRating: false, policyProfile: DEFAULT_POLICY_PROFILE };
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
     if (arg === '--preset') {
       const preset = args[++index];
       options.preset = preset;
-      if (preset === 'quick') Object.assign(options, { runs: 5, limitScenarios: 23, compact: true });
-      else if (preset === 'balanced') Object.assign(options, { runs: 10, limitScenarios: 45, compact: true });
-      else if (preset === 'full') Object.assign(options, { runs: 20, limitScenarios: 90, compact: true });
+      if (preset === 'quick') Object.assign(options, { runs: 5, limitScenarios: 50, compact: true });
+      else if (preset === 'balanced') Object.assign(options, { runs: 10, limitScenarios: 100, compact: true });
+      else if (preset === 'full') Object.assign(options, { runs: 15, limitScenarios: 150, compact: true });
       else fail(`Unknown preset ${preset}. Choose quick, balanced, or full.`);
     }
     else if (arg === '--candidate') {
@@ -803,6 +845,8 @@ function parseArgs(args) {
     else if (arg === '--seed') options.seed = Number(args[++index]);
     else if (arg === '--limit-scenarios') options.limitScenarios = Number(args[++index]);
     else if (arg === '--max-actions') options.maxActions = Number(args[++index]);
+    else if (arg === '--workers') options.workers = Number(args[++index]);
+    else if (arg === '--no-character-cache') options.cacheCharacterPanels = false;
     else if (arg === '--output') options.output = path.resolve(args[++index]);
     else if (arg === '--compact') options.compact = true;
     else if (arg === '--include-trials') options.compact = false;
@@ -818,10 +862,11 @@ function parseArgs(args) {
   assert(Number.isInteger(options.seed) && options.seed >= 0, '--seed must be a non-negative integer.');
   assert(Number.isInteger(options.limitScenarios) && options.limitScenarios >= 0, '--limit-scenarios must be zero (all) or a positive integer.');
   assert(Number.isInteger(options.maxActions) && options.maxActions > 0, '--max-actions must be a positive integer.');
+  assert(Number.isInteger(options.workers) && options.workers >= 1 && options.workers <= 64, '--workers must be an integer from 1 to 64.');
   return options;
 }
 function help() {
-  return `Two-Tone matched combat performance runner\n\nUsage: node tools/combat-performance.mjs [options]\n\nOptions:\n  --preset quick|balanced|full  Select a coverage/run-count preset (default balanced)\n  --candidate all-characters|all-rune-impact|all-rune-ratings|all-runes|all-weapons\n  --candidate all-actions|all-passives|all-effects|all-character-mechanics|all-upgrade-effects\n  --candidate rune:<id>|character:<id>|passive:<character>/<id>\n  --candidate effect:<stable-effect-id>|upgrade:<effect-id>\n  --candidate weapon:standard@P1L1|weapon:premium@P1L50\n  --candidate action:<character>/basic|skill|ultimate\n  --policy ensemble|basic-focused-v1|skill-focused-v1|mixed-v1 (default ensemble)\n  --character <id>           Restrict item tests to this eligible wearer\n  --runs <n>                  Matched seeds per matchup\n  --seed <n>                  First reproducible seed (default 1)\n  --limit-scenarios <n>       Per-character panel cap; use 0 for exhaustive panels\n  --max-actions <n>           Maximum unit actions in one battle (default 2000)\n  --output <path>             JSONL result path\n  --include-trials            Include per-seed details (larger output)\n\nThe roster is read from authored combat definitions. Character studies use four-ally parties, all enemy counts and class bands, and Easy/Normal/Hard difficulty. Enemy HP, Attack, defenses, and Speed use one uniform Level 1 stat multiplier (0.75×/1×/1.5×), rounded to 0.25; mechanics stay unchanged. Balanced samples all 45 enemy-count/class/difficulty strata once; full samples each twice. Basic/Skill action probabilities are 75/25, 25/75, and 50/50 for Basic-focused, Skill-focused, and Mixed policies. Whenever an ally has a ready Ultimate, each scheduled combat turn independently rolls a 75% activation chance; that Ultimate does not consume the actor's normal action. The final rating weights policies 25/25/50 and Easy/Normal/Hard 25/50/25. Per-policy scores are also reported.`;
+  return `Two-Tone matched combat performance runner\n\nUsage: node tools/combat-performance.mjs [options]\n\nOptions:\n  --preset quick|balanced|full  Select a coverage/run-count preset (default balanced)\n  --candidate all-characters|all-rune-impact|all-rune-ratings|all-runes|all-weapons\n  --candidate all-actions|all-passives|all-effects|all-character-mechanics|all-upgrade-effects\n  --candidate rune:<id>|character:<id>|passive:<character>/<id>\n  --candidate effect:<stable-effect-id>|upgrade:<effect-id>\n  --candidate weapon:standard@P1L1|weapon:premium@P1L50\n  --candidate action:<character>/basic|skill|ultimate\n  --policy ensemble|basic-focused-v1|skill-focused-v1|mixed-v1 (default ensemble)\n  --character <id>           Restrict item tests to this eligible wearer\n  --runs <n>                  Matched seeds per matchup\n  --seed <n>                  First reproducible seed (default 1)\n  --limit-scenarios <n>       Per-character panel cap; use 0 for exhaustive panels\n  --workers <n>               Concurrent battle simulations (default ${DEFAULT_WORKERS})\n  --no-character-cache        Disable exact battle reuse across character panels\n  --max-actions <n>           Maximum unit actions in one battle (default 2000)\n  --output <path>             JSONL result path\n  --include-trials            Include per-seed details (larger output)\n\nThe roster is read from authored combat definitions. Character studies use four-ally parties, all enemy counts and class bands, and Easy/Normal/Hard difficulty. Enemy HP, Attack, defenses, and Speed use one uniform Level 1 stat multiplier (0.75×/1×/1.5×), rounded to 0.25; mechanics stay unchanged. Quick samples all 45 enemy-count/class/difficulty strata with up to 50 scenarios and 5 seeds; balanced uses up to 100 scenarios and 10 seeds; full uses up to 150 scenarios and 15 seeds. Basic/Skill action probabilities are 75/25, 25/75, and 50/50 for Basic-focused, Skill-focused, and Mixed policies. Whenever an ally has a ready Ultimate, each scheduled combat turn independently rolls a 75% activation chance; that Ultimate does not consume the actor's normal action. The final rating weights policies 25/25/50 and Easy/Normal/Hard 25/50/25. Per-policy scores are also reported.`;
 }
 function enemyLineupGroups(enemyTeams, library) {
   const groups = new Map();
@@ -1097,7 +1142,13 @@ async function main() {
   console.log(`Scenario universe: ${anchorMatrixCounts.reduce((sum, count) => sum + count, 0).toLocaleString()} anchored cells; selected ${targetScenarios.toLocaleString()} policy-scenario cells across ${activePolicies.length} policy profile(s); ${options.runs} matched runs per comparison.`);
   const progressEvery = Math.max(1, Math.ceil(targetScenarios / 20));
   const sampledScenarioCoverage = new Map();
+  const characterPanelCache = new Map();
+  let characterPanelCacheHits = 0, characterPanelCacheMisses = 0;
+  const simulationPool = new SimulationWorkerPool(options.workers);
+  console.log(`Battle simulation workers: ${options.workers}`);
+  try {
   for (const policyProfile of activePolicies) {
+  characterPanelCache.clear();
   let policyScenarioIndex = 0;
   for (const { party, enemies, difficulty, enemyClassMix: sampledEnemyClassMix, enemyClassBand: sampledEnemyClassBand, focalCharacter } of candidateScenarioSamples(allAllyLists, enemyTeams, options.limitScenarios, library, anchors)) {
       scenarios++; policyScenarioIndex++;
@@ -1135,19 +1186,46 @@ async function main() {
           const shouldCacheControl = spec.type === 'rune' && !controlRuns;
           if (shouldCacheControl) controlRuns = [];
           const actualCharacterGauge = spec.type === 'character-overall';
+          const batchCount = Math.min(options.workers, options.runs);
+          const workerBatches = Array.from({ length: batchCount }, () => []);
+          const cachedControls = [];
+          const cachedTrials = [], characterCacheKeys = [];
           for (let run = 0; run < options.runs; run++) {
             const seed = options.seed + run;
+            let runControlConfig = controlConfig, runTreatmentConfig = treatmentConfig;
             if (effectTargets.length) {
               const targetId = effectTargets[(run + policyScenarioIndex - 1) % effectTargets.length];
-              if (controlConfig) controlConfig.settings.actionOverride.targetId = targetId;
-              treatmentConfig.settings.actionOverride.targetId = targetId;
+              if (controlConfig) { runControlConfig = structuredClone(controlConfig); runControlConfig.settings.actionOverride.targetId = targetId; }
+              runTreatmentConfig = structuredClone(treatmentConfig); runTreatmentConfig.settings.actionOverride.targetId = targetId;
               effectTargetCoverage[targetId]++;
             }
-            const controlResult = actualCharacterGauge ? null : controlRuns?.[run] || simulateBattle(controlConfig, seed, options.maxActions);
-            if (shouldCacheControl) controlRuns.push(controlResult);
-            const treatmentResult = simulateBattle(treatmentConfig, seed, options.maxActions);
-            trials.push(battleMetrics(controlResult, treatmentResult, seed));
+            cachedControls[run] = actualCharacterGauge ? null : controlRuns?.[run] || null;
+            if (actualCharacterGauge && options.cacheCharacterPanels) {
+              const cacheKey = characterPanelCacheKey(runTreatmentConfig, seed, options.maxActions);
+              characterCacheKeys[run] = cacheKey;
+              const cachedTrial = characterPanelCache.get(cacheKey);
+              if (cachedTrial) {
+                cachedTrials[run] = cachedTrial;
+                characterPanelCacheHits++;
+                continue;
+              }
+              characterPanelCacheMisses++;
+            }
+            const needsControl = !actualCharacterGauge && !cachedControls[run];
+            workerBatches[run % batchCount].push({ run, seed, configs: [needsControl ? runControlConfig : null, runTreatmentConfig] });
           }
+          const batchResults = await Promise.all(workerBatches.map(jobs => jobs.length ? simulationPool.runBatch(jobs, options.maxActions) : Promise.resolve([])));
+          for (let batchIndex = 0; batchIndex < workerBatches.length; batchIndex++) {
+            for (let index = 0; index < workerBatches[batchIndex].length; index++) {
+              const job = workerBatches[batchIndex][index], run = job.run;
+              const [controlResult, treatmentResult] = batchResults[batchIndex][index];
+              const resolvedControl = cachedControls[run] || controlResult;
+              if (shouldCacheControl) controlRuns[run] = resolvedControl;
+              trials[run] = battleMetrics(resolvedControl, treatmentResult, job.seed);
+              if (actualCharacterGauge && options.cacheCharacterPanels) characterPanelCache.set(characterCacheKeys[run], trials[run]);
+            }
+          }
+          for (let run = 0; run < options.runs; run++) if (cachedTrials[run]) trials[run] = cachedTrials[run];
           if (shouldCacheControl) neutralControlResults.set(wearer, controlRuns);
           const winsControl = actualCharacterGauge ? null : trials.reduce((sum, trial) => sum + trial.controlWin, 0);
           const winsTreatment = trials.reduce((sum, trial) => sum + trial.treatmentWin, 0);
@@ -1243,6 +1321,11 @@ async function main() {
         console.log(`Progress: ${scenarios.toLocaleString()}/${targetScenarios.toLocaleString()} scenario-policy cells; ${comparisons.toLocaleString()} candidate/wearer simulations.`);
   }
   }
+  } finally {
+    await simulationPool.close();
+  }
+  if (options.cacheCharacterPanels && options.characterBenchmarkReport)
+    console.log(`Character-panel simulation cache: ${characterPanelCacheHits.toLocaleString()} cached trial reuses, ${characterPanelCacheMisses.toLocaleString()} new battle simulations across all policies (cache resets per policy).`);
   await new Promise((resolve, reject) => out.end(error => error ? reject(error) : resolve()));
   const summaryFile = options.output.replace(/\.jsonl$/i, '') + '-summary.csv';
   const expectedBenchmarkStrata = [];
