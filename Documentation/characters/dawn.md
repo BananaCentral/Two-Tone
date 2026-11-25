@@ -12,13 +12,13 @@ When Dawn is in the party, the party's Skill Point cap increases by 2 and battle
 
 ## Basic Attack
 
-Deal single-target Magical damage at a 2.0× multiplier and restore 10 Energy. A Basic Attack restores 1 party Skill Point under the shared default.
+Deal single-target Magical damage at a 2.0× multiplier and restore 20 Energy. A Basic Attack restores 1 party Skill Point under the shared default.
 
 ## Skill: Tune
 
-Costs 1 party Skill Point, restores 20 Energy, and targets one living ally (Dawn may target herself). The target's next Basic Attack deals 40% more damage and restores 1 additional Skill Point when used. Tune lasts through the target's next scheduled turn, then expires. The enhanced-Basic effect is consumed by the first Basic during the duration; if the target does not use a Basic, that enhancement expires with Tune.
+Costs 1 party Skill Point, restores 20 Energy, and targets one living ally (Dawn may target herself). The target's next Basic Attack deals 50% more damage and restores 1 additional Skill Point when used. Tune lasts through the target's next scheduled turn, then expires. The enhanced-Basic effect is consumed by the first Basic during the duration; if the target does not use a Basic, that enhancement expires with Tune.
 
-Character Duplicate 2 gives the Tuned ally +20 percentage points of Critical Rate and +50 percentage points of Critical Damage. Duplicate 3 adds 20% Attack and extends Tune to two target turns. Duplicate 4 adds 40 percentage points to the enhanced Basic damage bonus, raising it from +40% to +80%.
+Character Duplicate 2 gives the Tuned ally +20 percentage points of Critical Rate and +50 percentage points of Critical Damage. Duplicate 3 adds 20% Attack and extends Tune to two target turns. Duplicate 4 doubles Tune's enhanced Basic damage bonus, raising it from +50% to +100%.
 
 While an ally is Tuned, Dawn's equipped signature weapon lets that ally ignore 20% of enemy Physical and Magical Defense. Premium weapon effects are active only while Dawn owns and has equipped the Premium weapon:
 
@@ -38,4 +38,4 @@ Costs 100 Energy, targets one living ally (Dawn may target herself), restores en
 1. Restore 100% of the Ultimate target's maximum Energy.
 2. Tune grants +20 percentage points of Critical Rate and +50 percentage points of Critical Damage.
 3. Tune grants +20% Attack and lasts two target turns.
-4. Tune's enhanced Basic bonus increases from +40% to +80%.
+4. Tune's enhanced Basic bonus increases from +50% to +100%.

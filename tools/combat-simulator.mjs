@@ -225,6 +225,7 @@ function instantiate(config, side) {
       runeShieldRemaining:0,runeShieldTurns:0,runeShieldStartedTurn:0,runeDelayImmunityByOwner:{},
       runeActivations:0,
       runeEnergyRestored:0,
+      lunaTrackedMarks:0,
       disabledPassiveIds,
       disabledUpgradeEffectIds,
       criticalRateBonus:(archetype.criticalRateBonus||0)+(instance.criticalRateBonus||0)+upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'soul.premium-duplicate.2.critical-stats', 'criticalRateBonus')+(!disabledPassiveIds.has('cutthroat')?(archetype.passives?.find(passive=>passive.type==='cutthroat')?.criticalRateBonus||0)*upgradeValue({ archetypeId: instance.archetype, characterDuplicates, premiumWeaponDuplicates, weapon, disabledUpgradeEffectIds }, 'zero.duplicate.1.critical-stats', 'criticalRateMultiplier', 1):0),
@@ -343,8 +344,8 @@ function damageFor(state,attacker, target, type, multiplier, runeEffects = {}) {
     physicalDefense:target.stats.physicalDefense*(1-((target.debuffs||[]).find(effect=>effect.id==='tsunade-physical-defense-down')?.physicalDefenseReduction||0)), magicalDefense:target.stats.magicalDefense,
     multiplier, physicalDefenseIgnore:physicalIgnore,
     magicalDefenseIgnore:Math.min(1,magicalIgnore+(attacker.archetypeId==='luna'?CHARACTER_COMBAT_DATA.luna.passives.find(passive=>passive.type==='moonlight')?.magicalDefenseIgnore||0:0)),
-    magicalDefense: attacker.archetypeId==='luna'&&type==='magical'
-      ? target.stats.magicalDefense*(1-.1*(target.marks||[]).filter(mark=>mark.id==='luna-erosion').length)
+    magicalDefense: type==='magical'
+      ? target.stats.magicalDefense*(1-(CHARACTER_COMBAT_DATA.luna.basic.defenseReductionPerStack??.1)*(target.marks||[]).filter(mark=>mark.id==='luna-erosion').length)
       : target.stats.magicalDefense,
     damageMultiplier:(darkMatter?.damageMultiplier||1)*(1-(attacker.residueStacks||0)*(attacker.residueDamageReductionPerStack??.05))*(1+shieldedDamageBonus)*(type==='magical'&&attacker.archetypeId==='luna'&&attacker.lunaDamageBuff?.turns>0?1+attacker.lunaDamageBuff.amount:1),
     defenseMultiplier:resistance,
@@ -410,6 +411,8 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
   const defenseMechanicSource=target=>target.stealth>0?target.runeSetId==='eternal-sun'?{componentId:'rune:eternal-sun',mechanicTags:RUNE_COMBAT_RULES['eternal-sun'].mechanicTags,trigger:'on_incoming_attack'}:{componentId:`trait:${target.archetypeId}/stealth`,mechanicTags:['defense.stealth'],trigger:'on_incoming_attack'}:null;
   for (const target of targets) {
     const hpBefore = target.hp,shieldBefore=target.shield||0;
+    const lunaErosionStacks=(target.marks||[]).filter(mark=>mark.id==='luna-erosion').length;
+    const lunaMarkApplied=attacker.archetypeId==='luna'&&action==='basic'&&lunaErosionStacks<(attacker.basic.maxStacks??4);
     const baseDamage = damageFor(state,attacker, target, spec.damageType, (options.multiplier ?? spec.multiplier)*(1-(attacker.residueStacks||0)*(attacker.residueDamageReductionPerStack??.05)),runeEffects);
     const exposedStacks=target.marks?.filter(mark=>mark.id==='exposed').length||0,barrierLily=state.allies.find(unit=>unit.archetypeId==='lily');
     const runeEcho=runeEffects.radiantMoon?.echo||0;
@@ -444,7 +447,7 @@ function runAttack(state, attacker, candidates, spec, options = {}) {
     if(outcome.reflect){const hit=outcome.reflect,reflectShield=hit.shieldDamage+hit.breakShieldDamage;attacker.shieldAbsorbed=(attacker.shieldAbsorbed||0)+reflectShield;if(attacker.runeShieldRemaining>0)attacker.runeShieldRemaining=Math.min(attacker.runeShieldRemaining,Math.max(0,attacker.shield||0));attacker.damageTaken+=hit.healthDamage;target.damageDealt+=hit.healthDamage;target.damageBreakdown.reflect+=hit.healthDamage;state.damageBySide[target.side]+=hit.healthDamage;healFromLifesteal(state,target,hit.healthDamage,'reflect_hit');reflect={damage:hit.damage,healthDamage:hit.healthDamage,shieldDamage:reflectShield,damageType:'true',dodged:!!hit.dodged,eventType:hit.eventType,sourceId:hit.sourceId,actionId:hit.actionId}}
     let echo=null;
     if(outcome.echo){const hit=outcome.echo,echoShield=hit.shieldDamage+hit.breakShieldDamage;target.shieldAbsorbed=(target.shieldAbsorbed||0)+echoShield;target.damageTaken+=hit.healthDamage;attacker.damageDealt+=hit.healthDamage;attacker.damageBreakdown.echo+=hit.healthDamage;state.damageBySide[attacker.side]+=hit.healthDamage;healFromLifesteal(state,attacker,hit.healthDamage,'echo_hit');echo={damage:hit.damage,healthDamage:hit.healthDamage,directHealthDamage:hit.directHealthDamage,damageType:spec.damageType,shieldAbsorbed:echoShield,echo:true,eventType:hit.eventType,sourceId:hit.sourceId,actionId:hit.actionId};if(hit.reflect){const echoReflect=hit.reflect,reflectShield=echoReflect.shieldDamage+echoReflect.breakShieldDamage;attacker.shieldAbsorbed=(attacker.shieldAbsorbed||0)+reflectShield;attacker.damageTaken+=echoReflect.healthDamage;target.damageDealt+=echoReflect.healthDamage;target.damageBreakdown.reflect+=echoReflect.healthDamage;state.damageBySide[target.side]+=echoReflect.healthDamage;healFromLifesteal(state,target,echoReflect.healthDamage,'reflect_hit');echo.reflect={damage:echoReflect.damage,healthDamage:echoReflect.healthDamage,shieldDamage:reflectShield,damageType:'true',dodged:!!echoReflect.dodged,eventType:echoReflect.eventType,sourceId:echoReflect.sourceId,actionId:echoReflect.actionId}}}
-    hits.push({ target, damage: finalHpDamage, shieldDamage:shieldAbsorbed, barrierDamage, breakDamage, barrierRemaining: target.barrier, broken,critical:roll.critical,dodged:false,damageType:spec.damageType,reflect,echo,eventType,actionId });
+    hits.push({ target, damage: finalHpDamage, shieldDamage:shieldAbsorbed, barrierDamage, breakDamage, barrierRemaining: target.barrier, broken,critical:roll.critical,dodged:false,damageType:spec.damageType,reflect,echo,eventType,actionId,lunaMarkApplied });
     if(attacker.archetypeId==='zero'&&finalHpDamage>0)attacker.firstStrikeTargets.add(target.id);
     if(target.hp<=0)state.engine.clearUnitEffects(target,{reason:'defeat',taunts:true});
   }
@@ -548,17 +551,19 @@ function ageLunaBuffs(actor){
  for(const key of ['lunaDamageBuff','lunaAttackBuff'])if(actor[key]?.turns>0){actor[key].turns--;if(actor[key].turns===0)actor[key]=null}
 }
 function applyLunaErosion(state,actor,hits){
- const targets=[...new Set(landedTargets(hits).filter(target=>target.hp>0))];
- for(const target of targets)state.engine.applyStackingTimedMark({target,id:'luna-erosion',turns:2,maxStacks:4});
- if(targets.length)state.engine.recordMechanicEvent({componentId:'action:luna/basic',mechanicTags:CHARACTER_COMBAT_DATA.luna.basic.mechanicTags.filter(tag=>['debuff.mark','debuff.defense','limit.duration','limit.stacks'].includes(tag)),trigger:'on_basic',status:'applied',actorId:actor.id,targetIds:targets.map(target=>target.id),values:{stacksApplied:1,defenseReductionPerStack:.1,maxStacks:4,duration:2}});
+ const markHits=hits.filter(hit=>!hit.dodged&&hit.lunaMarkApplied),targets=[...new Map(markHits.map(hit=>[hit.target.id,hit.target])).values()];
+ const basic=CHARACTER_COMBAT_DATA.luna.basic,cap=basic.maxStacks??4,trackerCap=CHARACTER_COMBAT_DATA.luna.skill.trackedStackCap??20,trackedBefore=actor.lunaTrackedMarks||0;
+ for(const target of targets)if(target.hp>0)state.engine.applyStackingTimedMark({target,id:'luna-erosion',turns:2,maxStacks:cap});
+ actor.lunaTrackedMarks=Math.min(trackerCap,trackedBefore+targets.length);
+ if(targets.length)state.engine.recordMechanicEvent({componentId:'action:luna/basic',mechanicTags:basic.mechanicTags.filter(tag=>['debuff.mark','debuff.defense','limit.duration','limit.stacks'].includes(tag)),trigger:'on_basic',status:'applied',actorId:actor.id,targetIds:targets.map(target=>target.id),values:{stacksApplied:targets.length,defenseReductionPerStack:basic.defenseReductionPerStack??.1,maxStacks:cap,duration:2,trackedStacks:actor.lunaTrackedMarks,trackedStackCap:trackerCap}});
 }
 function resolveLunaSkill(state,actor){
  const plan=actionPlan(state,actor,'skill');if(!plan||!settleActionResources(state,actor,plan))return false;
- const enemies=state.enemies.filter(enemy=>enemy.hp>0),stacks=enemies.reduce((sum,enemy)=>sum+(enemy.marks||[]).filter(mark=>mark.id==='luna-erosion').length,0);
- for(const enemy of enemies)enemy.marks=(enemy.marks||[]).filter(mark=>mark.id!=='luna-erosion');
- actor.lunaDamageBuff=stacks?{amount:stacks*.1,turns:2}:null;
+ const skill=CHARACTER_COMBAT_DATA.luna.skill,stacks=actor.lunaTrackedMarks||0;
+ actor.lunaTrackedMarks=0;
+ actor.lunaDamageBuff=stacks?{amount:stacks*(skill.damageBonusPerStack??.05),turns:skill.duration??2}:null;
  actor.skillUses++;state.skillUses++;
- state.engine.recordMechanicEvent({componentId:'action:luna/skill',mechanicTags:CHARACTER_COMBAT_DATA.luna.skill.mechanicTags,trigger:'on_skill',status:'applied',actorId:actor.id,targetIds:enemies.map(enemy=>enemy.id),values:{stacksConsumed:stacks,damageBonusPerStack:.1,damageBonus:stacks*.1,duration:stacks?2:0,energyGained:plan.energyGain||0}});
+ state.engine.recordMechanicEvent({componentId:'action:luna/skill',mechanicTags:skill.mechanicTags.filter(tag=>['buff.damage','resource.energy','limit.duration','limit.stacks'].includes(tag)),trigger:'on_skill',status:'applied',actorId:actor.id,targetIds:[actor.id],values:{stacksConsumed:stacks,trackedStackCap:skill.trackedStackCap,damageBonusPerStack:skill.damageBonusPerStack,damageBonus:stacks*(skill.damageBonusPerStack??.05),duration:stacks?(skill.duration??2):0,energyGained:plan.energyGain||0}});
  useRuneRecycle(state,actor);return true;
 }
 function resolveAllyUltimate(state,actor){

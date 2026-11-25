@@ -312,7 +312,7 @@ export const CHARACTER_ROSTER = Object.freeze([
   ),
   character(
     { id: 'dawn', name: 'DAWN', label: 'Character', hp: 50, baseAttack: 40, basePhysicalDefense: 2, baseMagicalDefense: 4, speed: 20, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'dawn', test: false },
-    { name: 'Dawn', role: 'support', level: 1, basic: { damageType: 'magical', multiplier: 2, target: 'single', energyGain: 10, skillPointGain: 1 }, skill: { type: 'tune', target: 'ally', energyGain: 20, damageBonus: .4, duration: 1, skillPointReturn: 1,
+    { name: 'Dawn', role: 'support', level: 1, basic: { damageType: 'magical', multiplier: 2, target: 'single', energyGain: 20, skillPointGain: 1 }, skill: { type: 'tune', target: 'ally', energyGain: 20, damageBonus: .5, duration: 1, skillPointReturn: 1,
       effects: [{ id: 'dawn.tune.support', mechanicTags: ['status.tune', 'buff.next_basic', 'buff.damage', 'resource.skill_point', 'limit.duration'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', measures: ['damageBonus', 'duration', 'skillPointReturn', 'actionAdvance'] }] }, ultimate: { type: 'dawnSupport', target: 'ally', energyCost: 100, energyRestore: .5, skillPointGain: 1, actionAdvance: 100,
       effects: [
         { id: 'dawn.ultimate.energy-restore', mechanicTags: ['resource.energy'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_ultimate', measures: ['energyGained'] },
@@ -352,13 +352,16 @@ export const CHARACTER_ROSTER = Object.freeze([
   character(
     { id: 'luna', name: 'LUNA', label: 'Character', hp: 50, baseAttack: 25, basePhysicalDefense: 1, baseMagicalDefense: 6, speed: 30, stealth: 0, lifesteal: 0, echoPercent: 0, reflectPercent: 0, art: 'luna', test: false },
     { name: 'Luna', role: 'subDps', level: 1,
-      basic: { damageType: 'magical', multiplier: .3, target: 'aoe', energyGain: 20, skillPointGain: 1,
+      basic: { damageType: 'magical', multiplier: .5, target: 'aoe', energyGain: 20, skillPointGain: 1, maxStacks: 4, defenseReductionPerStack: .1,
         mechanicTags: ['damage.magical', 'damage.direct', 'debuff.mark', 'debuff.defense', 'limit.duration', 'limit.stacks'],
         mechanicTargets: { 'debuff.mark': { side: 'enemy', acquisition: 'all', coverage: 'all' }, 'debuff.defense': { side: 'enemy', acquisition: 'all', coverage: 'all' }, 'limit.duration': { side: 'enemy', acquisition: 'all', coverage: 'all' }, 'limit.stacks': { side: 'enemy', acquisition: 'all', coverage: 'all' } },
-        effects: [{ id: 'luna.basic.erosion', mechanicTags: ['debuff.mark', 'debuff.defense', 'limit.duration', 'limit.stacks'], targeting: { side: 'enemy', acquisition: 'all', coverage: 'all' }, trigger: 'on_basic', measures: ['stacksApplied', 'defenseReductionPerStack', 'maxStacks', 'duration'] }] },
-      skill: { type: 'lunaArcaneBurst', target: 'aoe', energyGain: 20,
-        mechanicTags: ['buff.damage', 'debuff.mark', 'resource.energy', 'limit.duration'],
-        effects: [{ id: 'luna.skill.arcane-burst', mechanicTags: ['buff.damage', 'debuff.mark', 'resource.energy', 'limit.duration'], targeting: { side: 'enemy', acquisition: 'all', coverage: 'all' }, trigger: 'on_skill', measures: ['stacksConsumed', 'damageBonusPerStack', 'damageBonus', 'duration', 'energyGained'] }] },
+        effects: [{ id: 'luna.basic.erosion', mechanicTags: ['debuff.mark', 'debuff.defense', 'limit.duration', 'limit.stacks'], targeting: { side: 'enemy', acquisition: 'all', coverage: 'all' }, trigger: 'on_basic', measures: ['stacksApplied', 'defenseReductionPerStack', 'maxStacks', 'duration', 'trackedStacks', 'trackedStackCap'] }] },
+      skill: { type: 'lunaArcaneBurst', target: 'aoe', energyGain: 20, trackedStackCap: 20, damageBonusPerStack: .05, duration: 2,
+        mechanicTags: ['buff.damage', 'resource.energy', 'limit.duration', 'limit.stacks'],
+        mechanicTargets: { 'buff.damage': { side: 'self', acquisition: 'self', coverage: 'single' }, 'resource.energy': { side: 'self', acquisition: 'self', coverage: 'single' }, 'limit.duration': { side: 'self', acquisition: 'self', coverage: 'single' }, 'limit.stacks': { side: 'self', acquisition: 'self', coverage: 'single' } },
+        effects: [
+          { id: 'luna.skill.arcane-burst', mechanicTags: ['buff.damage', 'resource.energy', 'limit.duration', 'limit.stacks'], targeting: { side: 'self', acquisition: 'self', coverage: 'single' }, trigger: 'on_skill', measures: ['stacksConsumed', 'trackedStackCap', 'damageBonusPerStack', 'damageBonus', 'duration', 'energyGained'] }
+        ] },
       ultimate: { type: 'lunaEclipse', target: 'self', energyCost: 80, attackBonus: 1, duration: 2,
         mechanicTags: ['buff.attack', 'limit.duration'],
         mechanicTargets: { 'buff.attack': { side: 'self', acquisition: 'self', coverage: 'single' }, 'limit.duration': { side: 'self', acquisition: 'self', coverage: 'single' } },
@@ -540,7 +543,7 @@ const upgradeComponents = [
   upgradeComponent({ id: 'dawn.duplicate.1.ultimate-energy', character: 'dawn', source: { kind: 'character_duplicate', rank: 1 }, mechanicTags: ['resource.energy'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_ultimate', values: { ultimateEnergyRestore: 1 } }),
   upgradeComponent({ id: 'dawn.duplicate.2.tune-critical', character: 'dawn', source: { kind: 'character_duplicate', rank: 2 }, mechanicTags: ['buff.critical', 'damage.critical'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', values: { tuneCriticalRateBonus: .2, tuneCriticalDamageBonus: .5 } }),
   upgradeComponent({ id: 'dawn.duplicate.3.tune-duration-and-attack', character: 'dawn', source: { kind: 'character_duplicate', rank: 3 }, mechanicTags: ['status.tune', 'buff.attack', 'limit.duration'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', values: { tuneExtraDuration: 1, tuneAttackBonus: .2 } }),
-  upgradeComponent({ id: 'dawn.duplicate.4.tune-damage', character: 'dawn', source: { kind: 'character_duplicate', rank: 4 }, mechanicTags: ['buff.next_basic', 'buff.damage'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', values: { tuneDamageBonus: .4 } }),
+  upgradeComponent({ id: 'dawn.duplicate.4.tune-damage', character: 'dawn', source: { kind: 'character_duplicate', rank: 4 }, mechanicTags: ['buff.next_basic', 'buff.damage'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', values: { tuneDamageBonus: .5 } }),
   upgradeComponent({ id: 'dawn.signature.tune-defense-ignore', character: 'dawn', source: { kind: 'signature_weapon' }, mechanicTags: ['buff.defense_ignore'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', values: { tuneDefenseIgnore: .2 } }),
   upgradeComponent({ id: 'dawn.premium-duplicate.1.tune-damage-reduction', character: 'dawn', source: { kind: 'premium_weapon_duplicate', rank: 1 }, mechanicTags: ['defense.damage_reduction'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', values: { tuneDamageReduction: .2 } }),
   upgradeComponent({ id: 'dawn.premium-duplicate.2.tune-barrier-damage', character: 'dawn', source: { kind: 'premium_weapon_duplicate', rank: 2 }, mechanicTags: ['buff.barrier_damage'], targeting: { side: 'ally', acquisition: 'selected', coverage: 'single' }, trigger: 'on_skill', values: { tuneBarrierDamageBonus: .2 } }),

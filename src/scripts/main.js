@@ -1,3096 +1,2415 @@
-import { hasClaimedSoulGift, SOUL_GIFT } from './permanent-event.mjs?v=0.1.31';
-import { formatLoginEventCountdown, getLoginEventState, LOGIN_EVENT_REWARDS } from './login-event.mjs';
-import { CAMPAIGN_ARCS, FIRST_CAMPAIGN_ENTRY_ID, PROLOGUE_CAMPSITE_BACKGROUND, PROLOGUE_SUNRISE_BACKGROUND, PROLOGUE_RIVERBANK_BACKGROUND, PROLOGUE_VILLAGE_BACKGROUND, STORY_PORTRAITS, getCampaignEntry, isCampaignEntryUnlocked } from './campaign.mjs?v=0.1.36';
-import { CHARACTER_COMBAT_DATA, CHARACTER_ROSTER, COMBAT_RESOURCE_STANDARD, ENEMY_ARCHETYPES, ENEMY_COMBAT_DATA, RUNE_COMBAT_RULES, enemyStatsAtLevel, getActiveCharacterUpgradeEffect } from './combat-definitions.mjs';
-import { TwoToneBattleEngine, TwoToneTurnTimeline } from './combat-engine-api.mjs';
-'use strict';
-const sources={prologueVillage:PROLOGUE_VILLAGE_BACKGROUND,prologueRiverbank:PROLOGUE_RIVERBANK_BACKGROUND,prologueSunrise:PROLOGUE_SUNRISE_BACKGROUND,prologueCampsite:PROLOGUE_CAMPSITE_BACKGROUND,arena:'/assets/embedded-image-01.png',area1Background:'/assets/area-1-meadow.png',soul:'/assets/soul-ashblade-battle.webp',soulBattleStandard:'/assets/soul-ashblade-battle.webp',soulBattlePremium:'/assets/soulbound-battle.png',lily:'/assets/lily-artwork.png',lilyFront:'/assets/lily-artwork.png',lilyStandardBattle:'/assets/lily-petal-battle.png',lilySignatureBattle:'/assets/lily-everblossom-battle.png',lilyWeaponStandard:'/assets/lily-petal.png',lilyWeaponSignature:'/assets/lily-everblossom.png',dawnBattle:'/assets/dawn-radiant-pearl-battle.png',dawnPremiumBattle:'/assets/dawn-radiant-diamond-battle.png',dawnFront:'/assets/dawn-artwork.png',dawnWeaponStandard:'/assets/dawn-radiant-pearl.png',dawnWeaponPremium:'/assets/dawn-radiant-diamond.png',loganBattle:'/assets/logan.png',loganBattlePremium:'/assets/logan-bloodmoon-battle.png',loganFront:'/assets/logan-front.png',loganPortrait:'/assets/logan-front.png',loganWeaponStandard:'/assets/logan-crimson-edge.png',loganWeaponPremium:'/assets/logan-bloodmoon.png',cloudFront:'/assets/cloud-artwork.png',cloudWindcallBattle:'/assets/cloud-windcall-battle.png',cloudWindcall:'/assets/cloud-windcall.png',cloudNineBattle:'/assets/cloud-nine-battle.png',cloudNine:'/assets/cloud-nine.png',enemy:'/assets/embedded-image-03.png',slimeBattle:'/assets/slime.webp',goblinBattle:'/assets/goblin.png',bearBattle:'/assets/bear.png',hawkBattle:'/assets/hawk.png',geodeBattle:'/assets/geode.png',wolfBattle:'/assets/wolf.png',wolfArtwork:'/assets/wolf-artwork.png',slimeArtwork:'/assets/slime-artwork.jpg',portrait:'/assets/embedded-image-04.png',soulFront:'/assets/soul-artwork.webp',soulWeaponStandard:'/assets/soul-ashblade.png',soulWeaponPremium:'/assets/soulbound.png',zeroFront:'/assets/zero.png',zeroBattle:'/assets/zero-battle.png',zeroBattlePremium:'/assets/zero-nightshade-battle.png',zeroWeaponStandard:'/assets/zero-silent-edge.png',zeroWeaponPremium:'/assets/zero-nightshade.png',architectureLayer:'/assets/embedded-image-06.png',floorLayer:'/assets/embedded-image-07.png',treeLayer:'/assets/embedded-image-08.png',enchantedBottleSmall:'/assets/enchanted-bottle-small.png',enchantedBottleMedium:'/assets/enchanted-bottle-medium.png',enchantedBottleLarge:'/assets/enchanted-bottle-large.png',enchantedBookSmall:'/assets/enchanted-book-small.png',enchantedBookMedium:'/assets/enchanted-book-medium.png',enchantedBookLarge:'/assets/enchanted-book-large.png',core:'/assets/core.png',gem:'/assets/gem.png',coin:'/assets/coins.png',runeRadiantMoon:'/assets/rune-radiant-moon.png',runeEternalSun:'/assets/rune-eternal-sun.png',runeCelestialStar:'/assets/rune-celestial-star.png',runeDarkMatter:'/assets/rune-dark-matter.png',runeClearSkies:'/assets/rune-clear-skies.png',runeInfiniteSpace:'/assets/rune-infinite-space.png',runeRecycle:'/assets/rune-recycle.png',runeAmplify:'/assets/rune-amplify.png',runeUnited:'/assets/rune-united.png'};
-const BATTLE_AREAS=Object.freeze({
- 'area-1':Object.freeze({name:'Area 1',background:'area1Background'}),
- 'prologue-campsite':Object.freeze({name:'Prologue Campsite',background:'prologueCampsite'}),
- 'prologue-campsite-sunrise':Object.freeze({name:'Prologue Campsite at Sunrise',background:'prologueSunrise'}),
- 'prologue-riverbank':Object.freeze({name:'Prologue Riverbank',background:'prologueRiverbank'}),
- 'prologue-village':Object.freeze({name:'Prologue Village',background:'prologueVillage'})
-});
-const DEFAULT_BATTLE_AREA_ID='area-1';
-let campaignEntry = null;
-let storyBeatIndex = 0;
-let storyBeatArt;
-let prefetchedStoryBeatIndex = -1;
-let campaignReward = null;
-const RUNE_SET_DEFINITIONS=Object.freeze({
- 'radiant-moon':Object.freeze({name:'Radiant Moon',image:'runeRadiantMoon',lines:['DAMAGING SKILL','50% Echo','2-turn cooldown']}),
- 'eternal-sun':Object.freeze({name:'Eternal Sun',image:'runeEternalSun',lines:['ULTIMATE COST âˆ’20 ENERGY','NEXT ACTION: +20 ENERGY','1-turn cooldown after next action']}),
- 'celestial-star':Object.freeze({name:'Celestial Star',image:'runeCelestialStar',lines:['GUARANTEED CRITICAL STRIKE','CRITICAL DAMAGE +25%','2-turn cooldown after critical hit']}),
- 'dark-matter':Object.freeze({name:'Dark Matter',image:'runeDarkMatter',lines:['NEXT DAMAGING ATTACK','Ignore both defenses 40%','1-turn cooldown']}),
- 'clear-skies':Object.freeze({name:'Clear Skies',image:'runeClearSkies',lines:['AFTER SKILL','Shield: 20% Max HP / 2 turns','Reflect +10% while shielded','1-turn cooldown']}),
- 'infinite-space':Object.freeze({name:'Infinite Space',image:'runeInfiniteSpace',lines:['ULTIMATE','Delay all enemies 100%','Enemy immunity: 2 turns']}),
- recycle:Object.freeze({name:'Recycle',image:'runeRecycle',lines:['SKILL','Restore 1 Skill Point','Advance self 80%','2-turn cooldown']}),
- amplify:Object.freeze({name:'Amplify',image:'runeAmplify',lines:['BASIC ATTACK','+50% damage','2-turn cooldown']}),
- united:Object.freeze({name:'United',image:'runeUnited',lines:['SINGLE-ALLY SKILL','Next ally action triggers a 50% Basic Attack','Then cooldown for 2 turns']})
-});
-const ANIMATION_STEP_MS=250;
-const CAMERA_TRANSITION_SAME_VIEW_MS=ANIMATION_STEP_MS;
-const CAMERA_TRANSITION_BETWEEN_SIDES_MS=ANIMATION_STEP_MS*2;
-const ENEMY_WINDUP_MS=ANIMATION_STEP_MS*3;
-const COMBAT_ACTION_EFFECT_MS=ANIMATION_STEP_MS*4;
-const ENEMY_ATTACK_EFFECT_MS=ANIMATION_STEP_MS*4;
-const COMBAT_ACTION_PHASE_GAP_MS=ANIMATION_STEP_MS*2;
-const ULTIMATE_PRESENTATION_MS=ANIMATION_STEP_MS*6;
-const ENEMY_DEATH_BEAT_MS=ANIMATION_STEP_MS*2;
-const ENEMY_REINFORCEMENT_ENTRY_MS=ANIMATION_STEP_MS*2;
-const ULTIMATE_CAMERA_INTRO_MS=ANIMATION_STEP_MS*2;
-const ACTION_VISUALS=Object.freeze({
- soul:Object.freeze({basic:'soul-sword',skill:'soul-enhance',ultimate:'soul-storm'}),
- zero:Object.freeze({basic:'zero-cut',skill:'zero-first-strike',ultimate:'zero-execution'}),
- lily:Object.freeze({basic:'lily-petal',skill:'lily-ricochet',ultimate:'lily-haunting'}),
- dawn:Object.freeze({basic:'dawn-star',skill:'dawn-tune',ultimate:'dawn-advance'}),
- cloud:Object.freeze({basic:'cloud-basic',skill:'cloud-restoration',ultimate:'cloud-ultimate'}),
- logan:Object.freeze({basic:'logan-blood-slash',skill:'logan-blood-shield',ultimate:'logan-red-tide'})
-});
-const ENEMY_ACTION_VISUALS=Object.freeze({
- slime:Object.freeze({basic:'enemy-slime-acid'}),wolf:Object.freeze({basic:'enemy-wolf-claw'}),hawk:Object.freeze({basic:'hawk-talon'}),
- goblin:Object.freeze({basic:'goblin-pursuit'}),geode:Object.freeze({basic:'geode-impact'}),bear:Object.freeze({basic:'bear-claws'})
-});
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éí×N5ëtèµ©hºÚn¶X§zÍZ[\ÜÈ\ĞÛZ[YYÛİ[ÚYÓÕSÑÒQ•Hœ›ÛH	Ë‹Ü\›X[™[Y]™[›ZœÏİLŒKŒÌIÎÂš[\ÜÈ›Ü›X]ÙÚ[‘]™[Ûİ[İÛ‹Ù]ÙÚ[‘]™[İ]KÑÒS—ÑU‘S•Ô‘UĞT‘ÈHœ›ÛH	Ë‹ÛÙÚ[‹Y]™[›ZœÉÎÂš[\ÜÈĞSTRQÓ—ĞTÔË’T”ÕĞĞSTRQÓ—ÑS•–WÒQ“ÓÑÕQWĞĞSTÒUWĞPÒÑÔ“ÕS‘“ÓÑÕQWÔÕS”’TÑWĞPÒÑÔ“ÕS‘“ÓÑÕQWÔ’U‘TS’×ĞPÒÑÔ“ÕS‘“ÓÑÕQWÕ’SQÑWĞPÒÑÔ“ÕS‘ÕÔ–WÔÔ•RUËÙ]Ø[\ZYÛ‘[K\ĞØ[\ZYÛ‘[U[›ØÚÙYHœ›ÛH	Ë‹ØØ[\ZYÛ‹›ZœÏİLŒKŒÍ‰ÎÂš[\ÜÈÒTPÕT—ĞÓÓPUÑUKÒTPÕT—Ô“ÔÕT‹ÓÓPUÔ‘TÓÕTÑWÔÕS‘T‘S‘SVWĞTÒUTTËS‘SVWĞÓÓPUÑUK•S‘WĞÓÓPUÔ•STË[™[^Tİ]Ğ]]™[Ù]Xİ]™PÚ\˜Xİ\•\Ü˜YQY™™XİHœ›ÛH	Ë‹ØÛÛX˜]YYš[š][ÛœË›ZœÉÎÂš[\ÜÈÛÕÛ™P˜]Q[™Ú[™KÛÕÛ™U\›•[Y[[™HHœ›ÛH	Ë‹ØÛÛX˜]Y[™Ú[™KX\K›ZœÉÎÂ‰İ\ÙHİšXİ	ÎÂ˜ÛÛœİÛİ\˜Ù\Ï^Ü›ÛÙİYUš[YÙN”“ÓÑÕQWÕ’SQÑWĞPÒÑÔ“ÕS‘›ÛÙİYTš]™\˜˜[šÎ”“ÓÑÕQWÔ’U‘TS’×ĞPÒÑÔ“ÕS‘›ÛÙİYTİ[œš\ÙN”“ÓÑÕQWÔÕS”’TÑWĞPÒÑÔ“ÕS‘›ÛÙİYPØ[\Ú]N”“ÓÑÕQWĞĞSTÒUWĞPÒÑÔ“ÕS‘\™[˜N‰ËØ\ÜÙ]ËÙ[X™YYZ[XYÙKLKœ™ÉË\™XLP˜XÚÙÜ›İ[™‰ËØ\ÜÙ]ËØ\™XKLK[YXYİËœ™ÉËÛİ[‰ËØ\ÜÙ]ËÜÛİ[X\Ú›YKX˜]KÙXœ	ËÛİ[˜]Tİ[™\™‰ËØ\ÜÙ]ËÜÛİ[X\Ú›YKX˜]KÙXœ	ËÛİ[˜]T™[Z][N‰ËØ\ÜÙ]ËÜÛİ[›İ[™X˜]Kœ™ÉË[N‰ËØ\ÜÙ]ËÛ[KX\ÛÜšËœ™ÉË[Qœ›Û‰ËØ\ÜÙ]ËÛ[KX\ÛÜšËœ™ÉË[Tİ[™\™˜]N‰ËØ\ÜÙ]ËÛ[K\][X˜]Kœ™ÉË[TÚYÛ˜]\™P˜]N‰ËØ\ÜÙ]ËÛ[KY]™\˜›ÜÜÛÛKX˜]Kœ™ÉË[UÙX\Û”İ[™\™‰ËØ\ÜÙ]ËÛ[K\][œ™ÉË[UÙX\Û”ÚYÛ˜]\™N‰ËØ\ÜÙ]ËÛ[KY]™\˜›ÜÜÛÛKœ™ÉË]Û˜]N‰ËØ\ÜÙ]ËÙ]Û‹\˜YX[\X\›X˜]Kœ™ÉË]Û”™[Z][P˜]N‰ËØ\ÜÙ]ËÙ]Û‹\˜YX[YX[[Û™X˜]Kœ™ÉË]Û‘œ›Û‰ËØ\ÜÙ]ËÙ]Û‹X\ÛÜšËœ™ÉË]Û•ÙX\Û”İ[™\™‰ËØ\ÜÙ]ËÙ]Û‹\˜YX[\X\›œ™ÉË]Û•ÙX\Û”™[Z][N‰ËØ\ÜÙ]ËÙ]Û‹\˜YX[YX[[Û™œ™ÉËÙØ[˜]N‰ËØ\ÜÙ]ËÛÙØ[‹œ™ÉËÙØ[˜]T™[Z][N‰ËØ\ÜÙ]ËÛÙØ[‹X›ÛÙ[ÛÛ‹X˜]Kœ™ÉËÙØ[‘œ›Û‰ËØ\ÜÙ]ËÛÙØ[‹Yœ›Ûœ™ÉËÙØ[”Ü˜Z]‰ËØ\ÜÙ]ËÛÙØ[‹Yœ›Ûœ™ÉËÙØ[•ÙX\Û”İ[™\™‰ËØ\ÜÙ]ËÛÙØ[‹XÜš[\ÛÛ‹YYÙKœ™ÉËÙØ[•ÙX\Û”™[Z][N‰ËØ\ÜÙ]ËÛÙØ[‹X›ÛÙ[ÛÛ‹œ™ÉËÛİYœ›Û‰ËØ\ÜÙ]ËØÛİYX\ÛÜšËœ™ÉËÛİYÚ[™Ø[˜]N‰ËØ\ÜÙ]ËØÛİY]Ú[™Ø[X˜]Kœ™ÉËÛİYÚ[™Ø[‰ËØ\ÜÙ]ËØÛİY]Ú[™Ø[œ™ÉËÛİYš[™P˜]N‰ËØ\ÜÙ]ËØÛİY[š[™KX˜]Kœ™ÉËÛİYš[™N‰ËØ\ÜÙ]ËØÛİY[š[™Kœ™ÉË[™[^N‰ËØ\ÜÙ]ËÙ[X™YYZ[XYÙKLËœ™ÉËÛ[YP˜]N‰ËØ\ÜÙ]ËÜÛ[YKÙXœ	ËÛØ›[˜]N‰ËØ\ÜÙ]ËÙÛØ›[‹œ™ÉË™X\˜]N‰ËØ\ÜÙ]ËØ™X\‹œ™ÉË]ÚĞ˜]N‰ËØ\ÜÙ]ËÚ]ÚËœ™ÉËÙ[ÙP˜]N‰ËØ\ÜÙ]ËÙÙ[ÙKœ™ÉËÛÛ˜]N‰ËØ\ÜÙ]ËİÛÛ‹œ™ÉËÛÛ\ÛÜšÎ‰ËØ\ÜÙ]ËİÛÛ‹X\ÛÜšËœ™ÉËÛ[YP\ÛÜšÎ‰ËØ\ÜÙ]ËÜÛ[YKX\ÛÜšËšœÉËÜ˜Z]‰ËØ\ÜÙ]ËÙ[X™YYZ[XYÙKLœ™ÉËÛİ[œ›Û‰ËØ\ÜÙ]ËÜÛİ[X\ÛÜšËÙXœ	ËÛİ[ÙX\Û”İ[™\™‰ËØ\ÜÙ]ËÜÛİ[X\Ú›YKœ™ÉËÛİ[ÙX\Û”™[Z][N‰ËØ\ÜÙ]ËÜÛİ[›İ[™œ™ÉË™\›Ñœ›Û‰ËØ\ÜÙ]ËŞ™\›Ëœ™ÉË™\›Ğ˜]N‰ËØ\ÜÙ]ËŞ™\›ËX˜]Kœ™ÉË™\›Ğ˜]T™[Z][N‰ËØ\ÜÙ]ËŞ™\›Ë[šYÚÚYKX˜]Kœ™ÉË™\›ÕÙX\Û”İ[™\™‰ËØ\ÜÙ]ËŞ™\›Ë\Ú[[YYÙKœ™ÉË™\›ÕÙX\Û”™[Z][N‰ËØ\ÜÙ]ËŞ™\›Ë[šYÚÚYKœ™ÉË\˜Ú]Xİ\™S^Y\‰ËØ\ÜÙ]ËÙ[X™YYZ[XYÙKL‹œ™ÉË›ÛÜ“^Y\‰ËØ\ÜÙ]ËÙ[X™YYZ[XYÙKLËœ™ÉË™YS^Y\‰ËØ\ÜÙ]ËÙ[X™YYZ[XYÙKLœ™ÉË[˜Ú[Y›İTÛX[‰ËØ\ÜÙ]ËÙ[˜Ú[YX›İK\ÛX[œ™ÉË[˜Ú[Y›İSYY][N‰ËØ\ÜÙ]ËÙ[˜Ú[YX›İK[YY][Kœ™ÉË[˜Ú[Y›İS\™ÙN‰ËØ\ÜÙ]ËÙ[˜Ú[YX›İK[\™ÙKœ™ÉË[˜Ú[Y›ÛÚÔÛX[‰ËØ\ÜÙ]ËÙ[˜Ú[YX›ÛÚË\ÛX[œ™ÉË[˜Ú[Y›ÛÚÓYY][N‰ËØ\ÜÙ]ËÙ[˜Ú[YX›ÛÚË[YY][Kœ™ÉË[˜Ú[Y›ÛÚÓ\™ÙN‰ËØ\ÜÙ]ËÙ[˜Ú[YX›ÛÚË[\™ÙKœ™ÉËÛÜ™N‰ËØ\ÜÙ]ËØÛÜ™Kœ™ÉËÙ[N‰ËØ\ÜÙ]ËÙÙ[Kœ™ÉËÛÚ[‰ËØ\ÜÙ]ËØÛÚ[œËœ™ÉË[™T˜YX[[ÛÛ‰ËØ\ÜÙ]ËÜ[™K\˜YX[[[ÛÛ‹œ™ÉË[™Q]\›˜[İ[‰ËØ\ÜÙ]ËÜ[™KY]\›˜[\İ[‹œ™ÉË[™PÙ[\İX[İ\‰ËØ\ÜÙ]ËÜ[™KXÙ[\İX[\İ\‹œ™ÉË[™Q\šÓX]\‰ËØ\ÜÙ]ËÜ[™KY\šË[X]\‹œ™ÉË[™PÛX\”ÚÚY\Î‰ËØ\ÜÙ]ËÜ[™KXÛX\‹\ÚÚY\Ëœ™ÉË[™R[™š[š]TÜXÙN‰ËØ\ÜÙ]ËÜ[™KZ[™š[š]K\ÜXÙKœ™ÉË[™T™XŞXÛN‰ËØ\ÜÙ]ËÜ[™K\™XŞXÛKœ™ÉË[™P[\YN‰ËØ\ÜÙ]ËÜ[™KX[\YKœ™ÉË[™U[š]Y‰ËØ\ÜÙ]ËÜ[™K][š]Yœ™ÉßNÂ˜ÛÛœİUWĞT‘PTÏSØš™Xİ™œ™Y^™JÂˆ	Ø\™XKLIÎ“Øš™Xİ™œ™Y^™JÛ˜[YN‰Ğ\™XHIË˜XÚÙÜ›İ[™‰Ø\™XLP˜XÚÙÜ›İ[™	ßJKˆ	Ü›ÛÙİYKXØ[\Ú]IÎ“Øš™Xİ™œ™Y^™JÛ˜[YN‰Ô›ÛÙİYHØ[\Ú]IË˜XÚÙÜ›İ[™‰Ü›ÛÙİYPØ[\Ú]IßJKˆ	Ü›ÛÙİYKXØ[\Ú]K\İ[œš\ÙIÎ“Øš™Xİ™œ™Y^™JÛ˜[YN‰Ô›ÛÙİYHØ[\Ú]H]İ[œš\ÙIË˜XÚÙÜ›İ[™‰Ü›ÛÙİYTİ[œš\ÙIßJKˆ	Ü›ÛÙİYK\š]™\˜˜[šÉÎ“Øš™Xİ™œ™Y^™JÛ˜[YN‰Ô›ÛÙİYHš]™\˜˜[šÉË˜XÚÙÜ›İ[™‰Ü›ÛÙİYTš]™\˜˜[šÉßJKˆ	Ü›ÛÙİYK]š[YÙIÎ“Øš™Xİ™œ™Y^™JÛ˜[YN‰Ô›ÛÙİYHš[YÙIË˜XÚÙÜ›İ[™‰Ü›ÛÙİYUš[YÙIßJBŸJNÂ˜ÛÛœİQUSĞUWĞT‘PWÒQIØ\™XKLIÎÂ›]Ø[\ZYÛ‘[HH[Â›]İÜP™X][™^HÂ›]İÜP™X]\Â›]™Y™]ÚYİÜP™X][™^HLNÂ›]Ø[\ZYÛ”™]Ø\™H[Â˜ÛÛœİ•S‘WÔÑUÑQ’S’USÓ”ÏSØš™Xİ™œ™Y^™JÂˆ	Ü˜YX[[[ÛÛ‰Î“Øš™Xİ™œ™Y^™JÛ˜[YN‰Ô˜YX[[ÛÛ‰Ë[XYÙN‰Ü[™T˜YX[[ÛÛ‰Ë[™\Î–ÉÑSPQÒS‘ÈÒÒS	Ë	ÍL	HXÚÉË	Ì‹]\›ˆÛÛÛİÛ‰×_JKˆ	Ù]\›˜[\İ[‰Î“Øš™Xİ™œ™Y^™JÛ˜[YN‰Ñ]\›˜[İ[‰Ë[XYÙN‰Ü[™Q]\›˜[İ[‰Ë[™\Î–ÉÕSSPUHÓÔÕ8¢$ŒŒS‘T‘ÖIË	Ó‘VPÕSÓˆ
+ÌŒS‘T‘ÖIË	ÌK]\›ˆÛÛÛİÛˆY\ˆ™^Xİ[Û‰×_JKˆ	ØÙ[\İX[\İ\‰Î“Øš™Xİ™œ™Y^™JÛ˜[YN‰ĞÙ[\İX[İ\‰Ë[XYÙN‰Ü[™PÙ[\İX[İ\‰Ë[™\Î–ÉÑÕPTS•QQÔ’UPĞSÕ’RÑIË	ĞÔ’UPĞSSPQÑH
+ÌIIË	Ì‹]\›ˆÛÛÛİÛˆY\ˆÜš]XØ[]	×_JKˆ	Ù\šË[X]\‰Î“Øš™Xİ™œ™Y^™JÛ˜[YN‰Ñ\šÈX]\‰Ë[XYÙN‰Ü[™Q\šÓX]\‰Ë[™\Î–ÉÓ‘VSPQÒS‘ÈUPÒÉË	ÒYÛ›Ü™H›İY™[œÙ\È	IË	ÌK]\›ˆÛÛÛİÛ‰×_JKˆ	ØÛX\‹\ÚÚY\ÉÎ“Øš™Xİ™œ™Y^™JÛ˜[YN‰ĞÛX\ˆÚÚY\ÉË[XYÙN‰Ü[™PÛX\”ÚÚY\ÉË[™\Î–ÉĞQ•TˆÒÒS	Ë	ÔÚY[ˆŒ	HX^Èˆ\›œÉË	Ô™Y›Xİ
+ÌL	HÚ[HÚY[Y	Ë	ÌK]\›ˆÛÛÛİÛ‰×_JKˆ	Ú[™š[š]K\ÜXÙIÎ“Øš™Xİ™œ™Y^™JÛ˜[YN‰Ò[™š[š]HÜXÙIË[XYÙN‰Ü[™R[™š[š]TÜXÙIË[™\Î–ÉÕSSPUIË	Ñ[^H[[™[ZY\ÈL	IË	Ñ[™[^H[[][š]Nˆˆ\›œÉ×_JKˆ™XŞXÛN“Øš™Xİ™œ™Y^™JÛ˜[YN‰Ô™XŞXÛIË[XYÙN‰Ü[™T™XŞXÛIË[™\Î–ÉÔÒÒS	Ë	Ô™\İÜ™HHÚÚ[Ú[	Ë	ĞY˜[˜ÙHÙ[ˆ	IË	Ì‹]\›ˆÛÛÛİÛ‰×_JKˆ[\YN“Øš™Xİ™œ™Y^™JÛ˜[YN‰Ğ[\YIË[XYÙN‰Ü[™P[\YIË[™\Î–ÉĞTÒPÈUPÒÉË	ÊÍL	H[XYÙIË	Ì‹]\›ˆÛÛÛİÛ‰×_JKˆ[š]Y“Øš™Xİ™œ™Y^™JÛ˜[YN‰Õ[š]Y	Ë[XYÙN‰Ü[™U[š]Y	Ë[™\Î–ÉÔÒS‘ÓKPSHÒÒS	Ë	Ó™^[HXİ[ÛˆšYÙÙ\œÈHL	H˜\ÚXÈ]XÚÉË	Õ[ˆÛÛÛİÛˆ›Üˆˆ\›œÉ×_JBŸJNÂ˜ÛÛœİS’SPUSÓ—ÔÕTÓTÏLLÂ˜ÛÛœİĞSQTWÕS”ÒUSÓ—ÔĞSQWÕ’QU×ÓTÏPS’SPUSÓ—ÔÕTÓTÎÂ˜ÛÛœİĞSQTWÕS”ÒUSÓ—Ğ‘UÑQS—ÔÒQT×ÓTÏPS’SPUSÓ—ÔÕTÓTÊŒÂ˜ÛÛœİS‘SVWÕÒS‘TÓTÏPS’SPUSÓ—ÔÕTÓTÊŒÎÂ˜ÛÛœİÓÓPUĞPÕSÓ—ÑQ‘‘PÕÓTÏPS’SPUSÓ—ÔÕTÓTÊÂ˜ÛÛœİS‘SVWĞUPÒ×ÑQ‘‘PÕÓTÏPS’SPUSÓ—ÔÕTÓTÊÂ˜ÛÛœİÓÓPUĞPÕSÓ—ÔTÑWÑĞTÓTÏPS’SPUSÓ—ÔÕTÓTÊŒÂ˜ÛÛœİSSPUWÔ‘TÑS•USÓ—ÓTÏPS’SPUSÓ—ÔÕTÓTÊÂ˜ÛÛœİS‘SVWÑPUĞ‘PUÓTÏPS’SPUSÓ—ÔÕTÓTÊŒÂ˜ÛÛœİS‘SVWÔ‘RS‘“ÔÑSQS•ÑS•–WÓTÏPS’SPUSÓ—ÔÕTÓTÊŒÂ˜ÛÛœİSSPUWĞĞSQTWÒS•“×ÓTÏPS’SPUSÓ—ÔÕTÓTÊŒÂ˜ÛÛœİPÕSÓ—Õ’TÕPSÏSØš™Xİ™œ™Y^™JÂˆÛİ[“Øš™Xİ™œ™Y^™JØ˜\ÚXÎ‰ÜÛİ[\İÛÜ™	ËÚÚ[‰ÜÛİ[Y[š[˜ÙIË[[X]N‰ÜÛİ[\İÜ›IßJKˆ™\›Î“Øš™Xİ™œ™Y^™JØ˜\ÚXÎ‰Ş™\›ËXİ]	ËÚÚ[‰Ş™\›ËYš\œİ\İšZÙIË[[X]N‰Ş™\›ËY^Xİ][Û‰ßJKˆ[N“Øš™Xİ™œ™Y^™JØ˜\ÚXÎ‰Û[K\][	ËÚÚ[‰Û[K\šXÛØÚ]	Ë[[X]N‰Û[KZ][[™ÉßJKˆ]Û“Øš™Xİ™œ™Y^™JØ˜\ÚXÎ‰Ù]Û‹\İ\‰ËÚÚ[‰Ù]Û‹][™IË[[X]N‰Ù]Û‹XY˜[˜ÙIßJKˆÛİY“Øš™Xİ™œ™Y^™JØ˜\ÚXÎ‰ØÛİYX˜\ÚXÉËÚÚ[‰ØÛİY\™\İÜ˜][Û‰Ë[[X]N‰ØÛİY][[X]IßJKˆÙØ[“Øš™Xİ™œ™Y^™JØ˜\ÚXÎ‰ÛÙØ[‹X›ÛÙ\Û\Ú	ËÚÚ[‰ÛÙØ[‹X›ÛÙ\ÚY[	Ë[[X]N‰ÛÙØ[‹\™Y]YIßJBŸJNÂ˜ÛÛœİS‘SVWĞPÕSÓ—Õ’TÕPSÏSØš™Xİ™œ™Y^™JÂˆÛ[YN“Øš™Xİ™œ™Y^™JØ˜\ÚXÎ‰Ù[™[^K\Û[YKXXÚY	ßJKÛÛ“Øš™Xİ™œ™Y^™JØ˜\ÚXÎ‰Ù[™[^K]ÛÛ‹XÛ]ÉßJK]ÚÎ“Øš™Xİ™œ™Y^™JØ˜\ÚXÎ‰Ú]ÚË][Û‰ßJKˆÛØ›[“Øš™Xİ™œ™Y^™JØ˜\ÚXÎ‰ÙÛØ›[‹\\œİZ]	ßJKÙ[ÙN“Øš™Xİ™œ™Y^™JØ˜\ÚXÎ‰ÙÙ[ÙKZ[\Xİ	ßJK™X\“Øš™Xİ™œ™Y^™JØ˜\ÚXÎ‰Ø™X\‹XÛ]ÜÉßJBŸJNÂ‚‹ÊˆÛËUÛ™H[™[Y[[H™]šY]ÈØÚY[[™È[™Ú[™K‚ˆ˜\Ù[[™H]™[[ØØ][Ûˆ›ÛİÜÈ\›İ™Y]\›Z[š\İXÈœ˜Xİ[Û˜[ŞXÛ\È[™ˆ›ÜÜ[Û˜[ZYÚ[ÛİÎÈXİ[ÛˆY˜[˜ÙKÑ[^HÚYÈ^\İ[™È]™[[™XÙ\Ë‚ˆ›ÈÙ[™\šXÈ^˜K]\›ˆ]™[\ÈÜ™X]Yˆ
+‹Â‚‚œÛİ\˜Ù\ËœÛİ[˜\ÚXÕÚ[™\IËØ\ÜÙ]ËÙ[X™YYZ[XYÙKLKœ™ÉÎÂœÛİ\˜Ù\ËœÛİ[˜\ÚXÔÛ\ÚIËØ\ÜÙ]ËÙ[X™YYZ[XYÙKLLœ™ÉÎÂ˜ÛÛœİ[XYÙPØXÚHH™]ÈX\
 
-/* Two-Tone Fundamental 05 preview scheduling engine.
-   Baseline event allocation follows approved deterministic fractional cycles and
-   proportional midpoint slots; Action Advance/Delay shifts existing event indices.
-   No generic extra-turn event is created. */
+NÂ™[˜İ[Ûˆ™\]Y\İ[XYÙJ]š[Üš]OIØ]]ÉÊ^ÂˆYŠ\]
+\™]\›ˆ[™Yš[™YÂˆ][XYÙOZ[XYÙPØXÚK™Ù]
+]
+NÂˆYŠZ[XYÙJ^Âˆ[XYÙO[™]È[XYÙJ
+NÂˆ[XYÙK™™]Úš[Üš]O\š[Üš]NÂˆ[XYÙKœÜ˜Ï\]Âˆ[XYÙPØXÚKœÙ]
+][XYÙJNÂˆY[ÙHYŠš[Üš]OOOIÚYÚ	Ê^Âˆ[XYÙK™™]Úš[Üš]OIÚYÚ	ÎÂˆBˆ™]\›ˆ[XYÙNÂŸB˜ÛÛœİ[XYÙ\ÈHØš™Xİ™Yš[™T›Ü\Y\ÊßKØš™Xİ™œ›ÛQ[šY\ÊˆØš™Xİ™[šY\ÊÛİ\˜Ù\ÊK›X\
+
+ÚÙ^K]JOO–ÚÙ^KÙÙ]Š
+OOœ™\]Y\İ[XYÙJ]
+_WJBŠJNÂ‚™[˜İ[Ûˆ™\]Y\İİÜP™X]
+İÜK™X]š[Üš]J^ÂˆÛÛœİÜ˜Z]X™X]œÜ˜Z]Âˆ™]\›ˆÂˆ˜XÚÙÜ›İ[™œ™\]Y\İ[XYÙJ™X]˜˜XÚÙÜ›İ[™ÏÜİÜK˜˜XÚÙÜ›İ[™š[Üš]JKˆÜ˜Z]œ™\]Y\İ[XYÙJÜ˜Z]	‰”ÕÔ–WÔÔ•RUÖÜÜ˜Z]˜Ú\˜Xİ\’YOË–ÜÜ˜Z]œ™XXİ[Û’YKš[Üš]JKˆNÂŸB‚™[˜İ[Ûˆ™Y™]ÚØ[\ZYÛ˜]JØ\™XRY\KØ]™\ßJ^ÂˆÛÛœİ\™XOPUWĞT‘PTÖØ\™XRYNÂˆÛÛœİÙ^\ÏVØ\™XK˜˜XÚÙÜ›İ[™\™XKœ™]™\œÙP˜XÚÙÜ›İ[™NÂˆ›ÜŠÛÛœİYÙˆ\J^ÂˆÙ^\Ëœ\Ú
+[P˜]P\
+Y	ØÛÛ[X[™	ÊK[P˜]P\
+Y	Ü\IÊJNÂˆYŠYOOIÜÛİ[	ÊZÙ^\Ëœ\Ú
+	ÜÛİ[˜\ÚXÕÚ[™\	Ë	ÜÛİ[˜\ÚXÔÛ\Ú	ÊNÂˆBˆ›ÜŠÛÛœİÙ[™[^RYHÙˆØ]™\ÖÌJ^ÂˆÛÛœİ[™[^OQS‘SVWĞTÒUTTÖÙ[™[^RYNÂˆÙ^\Ëœ\Ú
+[™[^K˜˜]TÜš]K[™[^K˜\ÛÜšÊNÂˆBˆ›ÜŠÛÛœİÙ^HÙˆÙ^\Ê\™\]Y\İ[XYÙJÛİ\˜Ù\ÖÚÙ^WK	ÛİÉÊNÂŸB‚˜ÛÛœİš\ÚX›TÜš]P›İ[™Ï[™]ÈÙXZÓX\
+
+NÂ™[˜İ[ÛˆÜš]P[P›İ[™Ê[YÊ^ÂˆYŠš\ÚX›TÜš]P›İ[™Ëš\Ê[YÊJ\™]\›ˆš\ÚX›TÜš]P›İ[™Ë™Ù]
+[YÊNÂˆÛÛœİØ[˜\ÏYØİ[Y[˜Ü™X]Q[[Y[
+	ØØ[˜\ÉÊNØØ[˜\ËÚYZ[YË›˜]\˜[ÚYØØ[˜\ËšZYÚZ[YË›˜]\˜[ZYÚÂˆÛÛœİÏXØ[˜\Ë™Ù]ÛÛ^
+	Ì™	ËİÚ[™XYœ™\]Y[NY_JNÛ]›İ[™Ï^ŞŒNŒÎš[YË›˜]\˜[ÚYš[YË›˜]\˜[ZYÚNÂˆ^ØË™˜]Ò[XYÙJ[YË
+NØÛÛœİ^[ÏXË™Ù][XYÙQ]JØ[˜\ËÚYØ[˜\ËšZYÚ
+K™]NÛ]YXØ[˜\ËÚYÜXØ[˜\ËšZYÚšYÚKLK›İÛOKLNÂˆ›ÜŠ]OLŞOØ[˜\ËšZYÚŞJÊÊY›ÜŠ]LŞØ[˜\ËÚYŞ
+ÊÊZYŠ^[ÖÊJ˜Ø[˜\ËÚY
+Ş
+J
+Ì×OŒMŠ^ÚYŠY
+[Y^ÚYŠœšYÚ
+\šYÚ^ÚYŠOÜ
+]Ü^NÚYŠO˜›İÛJX›İÛO^_BˆYŠšYÚ[Y	‰˜›İÛO]Ü
+X›İ[™Ï^Ş›YNÜÎœšYÚ[Y
+ÌK˜›İÛK]Ü
+Ì_NÂˆXØ]Ú
+J^ßBˆš\ÚX›TÜš]P›İ[™ËœÙ]
+[YË›İ[™ÊNÜ™]\›ˆ›İ[™ÎÂŸB˜ÛÛœİØ[˜\ÏYØİ[Y[œ]Y\TÙ[XİÜŠ	ÈÙØ[YIÊKİXØ[˜\Ë™Ù]ÛÛ^
+	Ì™	ËØ[N™˜[Ù_JNÂ‹ËÈ]ˆ[ÙH\È\ØX›Y[ˆHX›XÈÛY[ˆ]]\İ™H[˜X›YH[‚‹ËÈ]][XØ]YÙ\™\‹\ÚYH]™[Ü\ˆ›ÛK™]™\ˆHHT“\˜[Y]\‹‚˜ÛÛœİU—ÓSÑOY˜[ÙNÂ˜ÛÛœİÏLMŒNLÂ˜ÛÛœİPSWÒÑVOQU—ÓSÑOÉİÛË]Û™KY]‹]X[KY[™[Y[[LK]ŒIÎ‰İÛË]Û™KY[[Ë]X[KY[™[Y[[LK]ŒIÎÂ˜ÛÛœİ“ÑÔ‘TÔÒSÓ—ÒÑVOQU—ÓSÑOÉİÛË]Û™KY]‹XÚ\˜Xİ\‹\›ÙÜ™\ÜË]ŒIÎ‰İÛË]Û™KXÚ\˜Xİ\‹\›ÙÜ™\ÜË]ŒIË’US×ÒÑVOQU—ÓSÑOÉİÛË]Û™KY]‹XÚ\˜Xİ\‹]š][Ë]ŒIÎ‰İÛË]Û™KXÚ\˜Xİ\‹]š][Ë]ŒIËĞQÕUÒÑVOQU—ÓSÑOÉİÛË]Û™KY]‹XÚ\˜Xİ\‹[ØYİ]Ë]ŒIÎ‰İÛË]Û™KXÚ\˜Xİ\‹[ØYİ]Ë]ŒIËUSWÒS•‘S•Ô–WÒÑVOQU—ÓSÑOÉİÛË]Û™KY]‹Z][KZ[™[ÜK]ŒIÎ‰İÛË]Û™KZ][KZ[™[ÜK]ŒIËÕÔ‘WĞÓÒS”×ÒÑVOQU—ÓSÑOÉİÛË]Û™KY]‹\İÜ™KXÛÚ[œË]ŒIÎ‰İÛË]Û™K\İÜ™KXÛÚ[œË]ŒIËRSWÔ‘UĞT‘ÒÑVOQU—ÓSÑOÉİÛË]Û™KY]‹YZ[K\™]Ø\™\\š[Ù]ŒIÎ‰İÛË]Û™KYZ[K\™]Ø\™\\š[Ù]ŒIËVQT—ÔS’×ÒÑVOQU—ÓSÑOÉİÛË]Û™KY]‹\^Y\‹\˜[šË]ŒIÎ‰İÛË]Û™K\^Y\‹\˜[šË]ŒIËÕÓ‘QĞÒTPÕT”×ÒÑVOQU—ÓSÑOÉİÛË]Û™KY]‹[İÛ™YXÚ\˜Xİ\œË]ŒIÎ‰İÛË]Û™K[İÛ™YXÚ\˜Xİ\œË]ŒIÎÂ˜ÛÛœİÒTPÕT—ÓPVÓU‘SMLTĞÑS”ÒSÓ—ÑĞUTÏVÌLŒÌKPVÔT•WÔÒV‘OMÂ‹ËÈ˜[šÈ›ÙÜ™\ÜÚ[Ûˆ\È›İ[\[Y[YY]È\È˜[YH\ÈHXØÛİ[˜[šÈÛÚË‚™[˜İ[ÛˆØY^Y\”˜[šÊ
+^İ^ØÛÛœİS[X™\ŠØØ[İÜ˜YÙK™Ù]][JVQT—ÔS’×ÒÑVJJNÜ™]\›ˆ[X™\‹š\Ò[YÙ\ŠŠI‰›LI‰›MLÛŒ_XØ]Ú
+J^Ü™]\›ˆ__B™[˜İ[ÛˆØ]™T^Y\”˜[šÊ
+^İ^ÛØØ[İÜ˜YÙKœÙ]][JVQT—ÔS’×ÒÑVKİš[™Ê^Y\”˜[šÊJ_XØ]Ú
+J^ß_B›]^Y\”˜[šÏ[ØY^Y\”˜[šÊ
+NÂ‹ËÈ[Y\šXØ[˜\ÙH˜[Y\È\™H[š\š]YÙ]™[ÜY[[Û›HÛÛX˜]š^\™\Ë“Õ‹ËÈ\›İ™Y\‹XÚ\˜Xİ\ˆİ]ËˆH[›˜[YY[š]È™[XZ[ˆ]™[Ü\ˆ\İÛİË‚˜ÛÛœİ“ÔÕTPÒTPÕT—Ô“ÔÕTÂ™[˜İ[ÛˆÛÛX˜]Ú]
+Y
+^Ü™]\›ˆ“ÔÕT‹™š[™
+[š]O[š]šYOOZY
+OË˜ÛÛX˜][B˜ÛÛœİ“ÔÕT—ÒQÏ[™]ÈÙ]
+“ÔÕT‹›X\
+OOKšY
+JNÂ™[˜İ[ÛˆÚ\˜Xİ\”Ü˜Z]\
+Y
+^Ü™]\›ˆ
+ÜÛİ[‰ÜÛİ[œ›Û	Ë™\›Î‰Ş™\›Ñœ›Û	Ë[N‰Û[Qœ›Û	Ë]Û‰Ù]Û‘œ›Û	ËÙØ[‰ÛÙØ[‘œ›Û	ËÛİY‰ØÛİYœ›Û	ßJVÚY_	ÜÜ˜Z]	ßB™[˜İ[Ûˆ›Ü›X[^™SİÛ™YÚ\˜Xİ\’YÊ˜[YJ^ÚYŠP\œ˜^Kš\Ğ\œ˜^J˜[YJ_˜[YKœÛÛYJYOˆT“ÔÕT—ÒQËš\ÊY
+J_™]ÈÙ]
+˜[YJKœÚ^™HOO]˜[YK›[™İ
+\™]\›ˆ[ØÛÛœİYÏ[™]ÈÙ]
+˜[YJNÚYË˜Y
+	ÜÛİ[	ÊNÜ™]\›ˆË‹‹”“ÔÕT—ÒQ×K™š[\ŠYOšYËš\ÊY
+J_B™[˜İ[Ûˆ[š]X[^™SİÛ™YÚ\˜Xİ\œÊ
+^ÚYŠU—ÓSÑJ\™]\›ˆ™]ÈÙ]
+“ÔÕT‹›X\
+[Ù[O›[Ù[šY
+JNİ^ØÛÛœİ˜]Ï[ØØ[İÜ˜YÙK™Ù]][JÕÓ‘QĞÒTPÕT”×ÒÑVJNÚYŠ˜]ÈOO[[
+^ØÛÛœİ\œÙY[›Ü›X[^™SİÛ™YÚ\˜Xİ\’YÊ”ÓÓ‹œ\œÙJ˜]ÊJNÚYŠ\œÙY
+\™]\›ˆ™]ÈÙ]
+\œÙY
+__XØ]Ú
+J^ß\™]\›ˆ™]ÈÙ]
+ÉÜÛİ[	×J_B›]İÛ™YÚ\˜Xİ\’YÏZ[š]X[^™SİÛ™YÚ\˜Xİ\œÊ
+NÂ™[˜İ[Ûˆ\ĞÚ\˜Xİ\“İÛ™Y
+Y
+^Ü™]\›ˆU—ÓSÑ_İÛ™YÚ\˜Xİ\’YËš\ÊY
+_B™[˜İ[ÛˆØ]™SİÛ™YÚ\˜Xİ\œÊ
+^ÚYŠQU—ÓSÑJ]^ÛØØ[İÜ˜YÙKœÙ]][JÕÓ‘QĞÒTPÕT”×ÒÑVK”ÓÓ‹œİš[™ÚYJË‹‹›İÛ™YÚ\˜Xİ\’Y×JJ_XØ]Ú
+J^ß_B™[˜İ[Ûˆ]˜Z[X›PÚ\˜Xİ\œÊ
+^Ü™]\›ˆ“ÔÕT‹™š[\Š[Ù[Oš\ĞÚ\˜Xİ\“İÛ™Y
+[Ù[šY
+J_B˜ÛÛœİÛÛX˜][™Ú[™O[™]ÈÛÕÛ™P˜]Q[™Ú[™J
+NÂ™[˜İ[Ûˆ›İ[™
+˜[YJ^Ü™]\›ˆÛÛX˜][™Ú[™Kœ›İ[™
+˜[YJ_B™[˜İ[Ûˆ›İ[™İ]]X\\Š˜[YJ^Ü™]\›ˆÛÛX˜][™Ú[™Kœ›İ[™İ]]X\\Š˜[YJ_B™[˜İ[ÛˆØ[İ[]S]™[ØØ[Yİ]
+˜\ÙK]™[›]^ßK\˜Ù[^ßK\]Z\Y[›]^ßJ^ÂˆYŠS[X™\‹š\Ñš[š]J˜\ÙJ_˜\ÙOS[X™\‹š\Ò[YÙ\Š]™[
+_]™[_]™[ÒTPÕT—ÓPVÓU‘S
+\™]\›ˆ[ÂˆÛÛœİ›]ÏSØš™Xİ˜[Y\Ê›]
+K\˜Ù[ÏSØš™Xİ˜[Y\Ê\˜Ù[
+K\]Z\Y[SØš™Xİ˜[Y\Ê\]Z\Y[›]
+NÂˆYŠË‹‹™›]Ë‹‹œ\˜Ù[Ë‹‹™\]Z\Y[KœÛÛYJOˆS[X™\‹š\Ñš[š]JŠJJ\™]\›ˆ[ÂˆÛÛœİ˜]ÏJ
+˜\ÙJÙ›]Ëœ™YXÙJ
+KŠOO˜JØ‹
+JJ›]™[
+Ù\]Z\Y[œ™YXÙJ
+KŠOO˜JØ‹
+JJŠJÜ\˜Ù[Ëœ™YXÙJ
+KŠOO˜JØ‹
+JNÂˆ™]\›ˆ˜]ÏL	‰“[X™\‹š\Ñš[š]J˜]ÊOÜ›İ[™İ]]X\\Š˜]ÊN›[ÂŸB™[˜İ[ÛˆØ[İ[]P]XÚÊ[š]
+^ÂˆYŠ][š]S[X™\‹š\Ñš[š]J[š]˜˜\ÙP]XÚÊJ\™]\›ˆ[ÂˆÛÛœİ[˜U[[X]P›Û\Ï][š]šYOOIÛ[˜IÉ‰[š]›[˜P]XÚĞY™Ë\›œÏŒİ[š]›[˜P]XÚĞY™‹˜[[İ[ŒÂˆ™]\›ˆØ[İ[]S]™[ØØ[Yİ]
+[š]˜˜\ÙP]XÚË[X™\‹š\Ò[YÙ\Š[š]›]™[
+Oİ[š]›]™[ŒK[š]˜]XÚÑ›][ÙYšY\œßßKË‹‹Š[š]˜]XÚÔ\˜Ù[[ÙYšY\œßßJK]Û•[™N[š][™OË˜]XÚĞ›Û\ß[˜QXÛ\ÙN›[˜U[[X]P›Û\ßK[š]˜]XÚÑ\]Z\Y[›][ÙYšY\œßßJNÂŸB˜ÛÛœİ‘TÒQQWÔ•STÏSØš™Xİ™œ™Y^™JÛX^İXÚÜÎK[XYÙT™YXİ[Û”\”İXÚÎ‹ŒK™\Ú\İ[˜ÙT™YXİ[Û”\”İXÚÎ‹ŒK\˜][Û•\›œÎŒŸJNÂ™[˜İ[Ûˆ™\ÚYYTİXÚÜÓÙŠ[š]
+^Ü™]\›ˆX]›X^
+X]›Z[Š[š]Ëœ™\ÚYYSX^İXÚÜß‘TÒQQWÔ•STË›X^İXÚÜË[X™\‹š\Ò[YÙ\Š[š]Ëœ™\ÚYYTİXÚÜÊOİ[š]œ™\ÚYYTİXÚÜÎŒ
+J_B™[˜İ[Ûˆ™\ÚYYT™YXİ[ÛŠ[š]
+^Ü™]\›ˆ™\ÚYYTİXÚÜÓÙŠ[š]
+JŠ[š]Ëœ™\ÚYYT™\Ú\İ[˜ÙT™YXİ[Û”\”İXÚÏÏÔ‘TÒQQWÔ•STËœ™\Ú\İ[˜ÙT™YXİ[Û”\”İXÚÊ_B™[˜İ[ÛˆXİ]™T[™QY™™Xİ
+YÙ]YšYÙÙ\‹Ü[ÛœÏ^ßJ^Ü™]\›ˆY	‰š\Ô[™TÙ]
+YÙ]Y
+OØÛÛX˜][™Ú[™Kœ™\ÛÛ™T[™QY™™Xİ
+ÜÙ]YšYÙÙ\‹‹‹›Ü[ÛœßJN›[B™[˜İ[Ûˆ[XYÙQX[][\Y\Š[š][XYÙU\O[[
+^ØÛÛœİ[™OXXİ]™T[™Q[XYÙQY™™XİÖİ[š]ËšYOË™\šÓX]\‹ÙØ[\\K™š[™
+Y[X™\O›Y[X™\‹šYOOIÛÙØ[‰ÊKÚY[Y›Û\Ï][š]ËœÚY[Œ	‰œ\Kš[˜ÛY\Ê[š]
+I‰›ÙØ[İ\Ü˜YU˜[YQ›ÜŠ	ÛÙØ[‹œ™[Z][KY\XØ]KœÚY[YY[XYÙIË	ÜÚY[Y[XYÙP›Û\ÉË	ÛÙØ[‰ÊNŒ[˜P›Û\Ï][š]ËšYOOIÛ[˜IÉ‰™[XYÙU\OOOIÛXYÚXØ[	É‰[š]›[˜Q[XYÙPY™Ë\›œÏŒİ[š]›[˜Q[XYÙPY™‹˜[[İ[ŒÜ™]\›ˆ
+K\™\ÚYYTİXÚÜÓÙŠ[š]
+JŠ[š]Ëœ™\ÚYYQ[XYÙT™YXİ[Û”\”İXÚÏÏÔ‘TÒQQWÔ•STË™[XYÙT™YXİ[Û”\”İXÚÊJJŠ[™OË™[XYÙS][\Y\ÏÌJJŠJÜÚY[Y›Û\ÊJŠJÛ[˜P›Û\Ê_B™[˜İ[ÛˆØ[İ[]T\ÚXØ[Y™[œÙJ[š]
+^ÂˆYŠ][š]S[X™\‹š\Ñš[š]J[š]˜˜\ÙT\ÚXØ[Y™[œÙJJ\™]\›ˆ[Âˆ™]\›ˆØ[İ[]S]™[ØØ[Yİ]
+[š]˜˜\ÙT\ÚXØ[Y™[œÙK[š]›]™[[š]œ\ÚXØ[Y™[œÙQ›][ÙYšY\œßßK[š]œ\ÚXØ[Y™[œÙT\˜Ù[[ÙYšY\œßßK[š]œ\ÚXØ[Y™[œÙQ\]Z\Y[›][ÙYšY\œßßJNÂŸB™[˜İ[ÛˆØ[İ[]SXYÚXØ[Y™[œÙJ[š]
+^ÂˆYŠ][š]S[X™\‹š\Ñš[š]J[š]˜˜\ÙSXYÚXØ[Y™[œÙJJ\™]\›ˆ[Âˆ™]\›ˆØ[İ[]S]™[ØØ[Yİ]
+[š]˜˜\ÙSXYÚXØ[Y™[œÙK[š]›]™[[š]›XYÚXØ[Y™[œÙQ›][ÙYšY\œßßK[š]›XYÚXØ[Y™[œÙT\˜Ù[[ÙYšY\œßßK[š]›XYÚXØ[Y™[œÙQ\]Z\Y[›][ÙYšY\œßßJNÂŸB™[˜İ[ÛˆØ[İ[]UYQY™[œÙJ[š]
+^ÂˆÛÛœİ\ÚXØ[XØ[İ[]T\ÚXØ[Y™[œÙJ[š]
+KXYÚXØ[XØ[İ[]SXYÚXØ[Y™[œÙJ[š]
+NÂˆ™]\›ˆ\ÚXØ[OO[[XYÚXØ[OO[[Û[Š\ÚXØ[
+ÛXYÚXØ[
+J‹NÂŸB™[˜İ[Ûˆ˜\ÙQY™[œÙRYÛ›Ü™SÙŠ]XÚÙ\Š^ØÛÛœİ\ÜÚ]™RYÛ›Ü™OS[X™\‹š\Ñš[š]J]XÚÙ\Ëœ\ÜÚ]™OË™Y™[œÙRYÛ›Ü™JOØ]XÚÙ\‹œ\ÜÚ]™K™Y™[œÙRYÛ›Ü™N˜]XÚÙ\Ëœ\ÜÚ]™OËšYOOIÜÚ\œXÛ]ÜÉÈÈŒHˆÜ™]\›ˆX]›Z[ŠKX]›X^
+
+[X™\‹š\Ñš[š]J]XÚÙ\Ë[™OË™Y™[œÙRYÛ›Ü™JOØ]XÚÙ\‹[™K™Y™[œÙRYÛ›Ü™NŒ
+JÜ\ÜÚ]™RYÛ›Ü™JJ_B™[˜İ[ÛˆY™[œÙRYÛ›Ü™SÙŠ]XÚÙ\‹\O[[
+^ØÛÛœİ[™OXXİ]™T[™Q[XYÙQY™™XİÖØ]XÚÙ\ËšYOË™\šÓX]\‹[™P›Û\Ï\[™I‰–ÉÜ\ÚXØ[	Ë	ÛXYÚXØ[	×Kš[˜ÛY\Ê\JOÜ[™K™Y™[œÙRYÛ›Ü™NŒ[˜P›Û\ÏX]XÚÙ\ËšYOOIÛ[˜IÉ‰\OOOIÛXYÚXØ[	ÏÊÒTPÕT—ĞÓÓPUÑUK›[˜Kœ\ÜÚ]™\Ë™š[™
+\ÜÚ]™OOœ\ÜÚ]™K\OOOIÛ[ÛÛ›YÚ	ÊOË›XYÚXØ[Y™[œÙRYÛ›Ü™_
+NŒÜ™]\›ˆX]›Z[ŠK˜\ÙQY™[œÙRYÛ›Ü™SÙŠ]XÚÙ\ŠJÜ[™P›Û\ÊÛ[˜P›Û\Ê_B™[˜İ[ÛˆØ[İ[]UYQ[XYÙT™YXİ[ÛŠ]XÚÙ\‹\™Ù]
+^ÂˆÛÛœİ]XÚÏXØ[İ[]P]XÚÊ]XÚÙ\ŠK^ÜÙY˜XİÜSX]œİÊK\™Ù]Ë›X\šÜÏË™š[\ŠOO›KšYOOIÙ^ÜÙY	ÊK›[™İ
+K™\ÚYYQ˜XİÜLK\™\ÚYYT™YXİ[ÛŠ\™Ù]
+K\ÚXØ[Y™[œÙOXØ[İ[]T\ÚXØ[Y™[œÙJ\™Ù]
+Jœ™\ÚYYQ˜XİÜŠŠKYY™[œÙRYÛ›Ü™SÙŠ]XÚÙ\‹	Ü\ÚXØ[	ÊJJ™^ÜÙY˜XİÜ‹XYÚXØ[Y™[œÙOXØ[İ[]SXYÚXØ[Y™[œÙJ\™Ù]
+Jœ™\ÚYYQ˜XİÜŠŠKYY™[œÙRYÛ›Ü™SÙŠ]XÚÙ\‹	ÛXYÚXØ[	ÊJJ™^ÜÙY˜XİÜÂˆYŠS[X™\‹š\Ñš[š]J]XÚÊ_]XÚÏLS[X™\‹š\Ñš[š]J\ÚXØ[Y™[œÙJ_\ÚXØ[Y™[œÙOS[X™\‹š\Ñš[š]JXYÚXØ[Y™[œÙJ_XYÚXØ[Y™[œÙO
+\™]\›ˆ[Âˆ™]\›ˆJ“X]›Z[Š\ÚXØ[Y™[œÙKØ]XÚËJJËJ“X]›Z[ŠXYÚXØ[Y™[œÙKØ]XÚËJNÂŸB™[˜İ[ÛˆØ[İ[]Q[XYÙPY\‘Y™[œÙJ[XYÙP™Y›Ü™QY™[œÙK]XÚËY™[œÙJ^ÂˆYŠS[X™\‹š\Ñš[š]J[XYÙP™Y›Ü™QY™[œÙJ_[XYÙP™Y›Ü™QY™[œÙOS[X™\‹š\Ñš[š]J]XÚÊ_]XÚÏLS[X™\‹š\Ñš[š]JY™[œÙJ_Y™[œÙO
+\™]\›ˆ[ÂˆÛÛœİ™YXİ[ÛSX]›Z[ŠY™[œÙKØ]XÚËJNÂˆ™]\›ˆ›İ[™
+[XYÙP™Y›Ü™QY™[œÙJŠK\™YXİ[ÛŠJNÂŸB™[˜İ[ÛˆØ[İ[]T\ÚXØ[[XYÙPY\‘Y™[œÙJ[XYÙP™Y›Ü™QY™[œÙK]XÚÙ\‹\™Ù]
+^Âˆ™]\›ˆØ[İ[]Q[XYÙPY\‘Y™[œÙJ[XYÙP™Y›Ü™QY™[œÙKØ[İ[]P]XÚÊ]XÚÙ\ŠKØ[İ[]T\ÚXØ[Y™[œÙJ\™Ù]
+JNÂŸB™[˜İ[ÛˆØ[İ[]SXYÚXØ[[XYÙPY\‘Y™[œÙJ[XYÙP™Y›Ü™QY™[œÙK]XÚÙ\‹\™Ù]
+^Âˆ™]\›ˆØ[İ[]Q[XYÙPY\‘Y™[œÙJ[XYÙP™Y›Ü™QY™[œÙKØ[İ[]P]XÚÊ]XÚÙ\ŠKØ[İ[]SXYÚXØ[Y™[œÙJ\™Ù]
+JNÂŸB™[˜İ[ÛˆØ[İ[]UYQ[XYÙPY\‘Y™[œÙJ[XYÙP™Y›Ü™QY™[œÙK]XÚÙ\‹\™Ù]
+^ÂˆÛÛœİ]XÚÏXØ[İ[]P]XÚÊ]XÚÙ\ŠK™YXİ[ÛXØ[İ[]UYQ[XYÙT™YXİ[ÛŠ]XÚÙ\‹\™Ù]
+NÂˆYŠS[X™\‹š\Ñš[š]J[XYÙP™Y›Ü™QY™[œÙJ_[XYÙP™Y›Ü™QY™[œÙOS[X™\‹š\Ñš[š]J]XÚÊ_]XÚÏLS[X™\‹š\Ñš[š]J™YXİ[ÛŠJ\™]\›ˆ[Âˆ™]\›ˆ›İ[™
+[XYÙP™Y›Ü™QY™[œÙJŠK\™YXİ[ÛŠJNÂŸB™[˜İ[ÛˆØ[İ[]U\YXİ[Û‘[XYÙJ\K]XÚÔ˜]K]XÚÙ\‹\™Ù]
+^ÂˆYŠVÉÜ\ÚXØ[	Ë	ÛXYÚXØ[	Ë	İYI×Kš[˜ÛY\Ê\J_S[X™\‹š\Ñš[š]J]XÚÔ˜]J_]XÚÔ˜]O
+\™]\›ˆ[ÂˆÛÛœİ]XÚÏXØ[İ[]P]XÚÊ]XÚÙ\ŠNÂˆÛÛœİ[˜P˜\ÚXÏPÒTPÕT—ĞÓÓPUÑUK›[˜K˜˜\ÚXË[˜Q\›ÜÚ[Û”İXÚÜÏSX]›Z[Š[˜P˜\ÚXË›X^İXÚÜÏÏÍ\™Ù]Ë›X\šÜÏË™š[\ŠX\šÏO›X\šËšYOOIÛ[˜KY\›ÜÚ[Û‰ÊK›[™İ
+KY™[œÙS][\Y\LK\™\ÚYYT™YXİ[ÛŠ\™Ù]
+K\ÚXØ[Y™[œÙT™YXİ[Û]\™Ù]Ë™XY™œÏË™š[™
+Y™™XİO™Y™™XİšYOOIİİ[˜YK\\ÚXØ[YY™[œÙKYİÛ‰ÊOËœ\ÚXØ[Y™[œÙT™YXİ[ÛŸ\ÚXØ[Y™[œÙOXØ[İ[]T\ÚXØ[Y™[œÙJ\™Ù]
+JŠK\\ÚXØ[Y™[œÙT™YXİ[ÛŠKXYÚXØ[Y™[œÙOXØ[İ[]SXYÚXØ[Y™[œÙJ\™Ù]
+JŠKJ[˜P˜\ÚXË™Y™[œÙT™YXİ[Û”\”İXÚÏÏËŒJJ›[˜Q\›ÜÚ[Û”İXÚÜÊKY™[œÙO]\OOOIÜ\ÚXØ[	ÏÜ\ÚXØ[Y™[œÙN\OOOIÛXYÚXØ[	ÏÛXYÚXØ[Y™[œÙNŠ\ÚXØ[Y™[œÙJÛXYÚXØ[Y™[œÙJKÌ‹\ÚXØ[YÛ›Ü™OYY™[œÙRYÛ›Ü™SÙŠ]XÚÙ\‹	Ü\ÚXØ[	ÊKXYÚXØ[YÛ›Ü™OYY™[œÙRYÛ›Ü™SÙŠ]XÚÙ\‹	ÛXYÚXØ[	ÊNÂˆÛÛœİYQY™[œÙP˜\Ú\ÏJ\ÚXØ[Y™[œÙJ™Y™[œÙS][\Y\ŠŠK\\ÚXØ[YÛ›Ü™JJÛXYÚXØ[Y™[œÙJ™Y™[œÙS][\Y\ŠŠK[XYÚXØ[YÛ›Ü™JJKÌÂˆÛÛœİ^ÜÙYİXÚÜÏ]\™Ù]Ë›X\šÜÏË™š[\ŠOO›KšYOOIÙ^ÜÙY	ÊK›[™İ^ÜÙYY™[œÙT™YXİ[ÛPÒTPÕT—ĞÓÓPUÑUK›[Kœ\ÜÚ]™\Ë™š[™
+\ÜÚ]™OOœ\ÜÚ]™K\OOOIÙ^ÜÙY	ÊOË™Y™[œÙT™YXİ[ÛÏËŒÂˆÛÛœİ™\İ[XÛÛX˜][™Ú[™Kœ™\ÛÛ™U\Y]
+İ\K]XÚË\ÚXØ[Y™[œÙKXYÚXØ[Y™[œÙK][\Y\˜]XÚÔ˜]K\ÚXØ[Y™[œÙRYÛ›Ü™Nœ\ÚXØ[YÛ›Ü™KXYÚXØ[Y™[œÙRYÛ›Ü™N›XYÚXØ[YÛ›Ü™K[XYÙS][\Y\™[XYÙQX[][\Y\Š]XÚÙ\‹\JKY™[œÙS][\Y\‹^ÜÙYİXÚÜË^ÜÙYY™[œÙT™YXİ[ÛŸJNÂˆYŠ\™\İ[S[X™\‹š\Ñš[š]JY™[œÙJ_Y™[œÙO
+\™]\›ˆ[Âˆ™]\›ˆİ\K]XÚĞ˜\Ú\Î˜]XÚËY™[œÙP˜\Ú\Î\OOOIİYIÏİYQY™[œÙP˜\Ú\Î™Y™[œÙJ™Y™[œÙS][\Y\ŠŠKJ\OOOIÜ\ÚXØ[	ÏÜ\ÚXØ[YÛ›Ü™N›XYÚXØ[YÛ›Ü™JJK]XÚÔ˜]K[XYÙP™Y›Ü™QY™[œÙNœ™\İ[™[XYÙP™Y›Ü™QY™[œÙK™YXİ[Ûœ™\İ[œ™YXİ[Û‹[XYÙUZÙ[œ™\İ[™[XYÙ_NÂŸB™[˜İ[ÛˆÜš]XØ[˜]SÙŠ[š]
+^Ü™]\›ˆX]›Z[ŠKX]›X^
+
+[X™\‹š\Ñš[š]J[š]Ë˜Üš]XØ[˜]JOİ[š]˜Üš]XØ[˜]N‹ŒJJÊ[X™\‹š\Ñš[š]J[š]Ë˜Üš]XØ[˜]P›Û\ÊOİ[š]˜Üš]XØ[˜]P›Û\ÎŒ
+JÊ[š]Ëœ\ÜÚ]™OË˜Üš]XØ[˜]P›Û\ß
+JÊ[š]Ë[™OË˜Üš]XØ[˜]P›Û\ß
+JÓØš™Xİ˜[Y\Ê[š]Ë˜Üš]XØ[˜]S[ÙYšY\œßßJKœ™YXÙJ
+İ[K˜[YJOOœİ[JÊ[X™\‹š\Ñš[š]J˜[YJOİ˜[YNŒ
+K
+JJ_B™[˜İ[ÛˆÜš]XØ[[XYÙSÙŠ[š]
+^Ü™]\›ˆX]›X^
+
+[X™\‹š\Ñš[š]J[š]Ë˜Üš]XØ[[XYÙJOİ[š]˜Üš]XØ[[XYÙN‹JJÊ[X™\‹š\Ñš[š]J[š]Ë˜Üš]XØ[[XYÙP›Û\ÊOİ[š]˜Üš]XØ[[XYÙP›Û\ÎŒ
+JÊ[š]Ëœ\ÜÚ]™OË˜Üš]XØ[[XYÙP›Û\ß
+JÊ[š]Ë[™OË˜Üš]XØ[[XYÙP›Û\ß
+JÓØš™Xİ˜[Y\Ê[š]Ë˜Üš]XØ[[XYÙS[ÙYšY\œßßJKœ™YXÙJ
+İ[K˜[YJOOœİ[JÊ[X™\‹š\Ñš[š]J˜[YJOİ˜[YNŒ
+K
+J_B™[˜İ[ÛˆY™\İX[˜]SÙŠ[š]
+^ØÛÛœİ˜\ÙOJ[X™\‹š\Ñš[š]J[š]Ë›Y™\İX[
+Oİ[š]›Y™\İX[Œ
+JÊ[X™\‹š\Ñš[š]J[š]Ë›Y™\İX[›Û\ÊOİ[š]›Y™\İX[›Û\ÎŒ
+JÓØš™Xİ˜[Y\Ê[š]Ë›Y™\İX[[ÙYšY\œßßJKœ™YXÙJ
+İ[K˜[YJOOœİ[JÊ[X™\‹š\Ñš[š]J˜[YJOİ˜[YNŒ
+K
+KÙØ[\\K™š[™
+Y[X™\O›Y[X™\‹šYOOIÛÙØ[‰É‰›Y[X™\‹šŒ
+K\İQ›Ü›ÛÙ\\Kš[˜ÛY\Ê[š]
+I‰›ÙØ[İ\Ü˜YU˜[YQ›ÜŠ	ÛÙØ[‹™\XØ]KŒ‹›Y™\İX[	Ë	ÛY™\İX[˜]IË	ÛÙØ[‰ËŒJNŒÜ™]\›ˆX]›X^
+˜\ÙJİ\İQ›Ü›ÛÙ
+_B™[˜İ[ÛˆÚY[ÙŠ[š]
+^Ü™]\›ˆX]›X^
+[X™\‹š\Ñš[š]J[š]ËœÚY[
+Oİ[š]œÚY[Œ
+_B™[˜İ[ÛˆYÚY[
+[š][[İ[
+^Ü™]\›ˆÛÛX˜][™Ú[™K˜\TÚY[
+İ\™Ù][š][[İ[JOËİ[B™[˜İ[Ûˆ\SY™\İX[
+]XÚÙ\‹X[[XYÙK]™[\OIÙ\™XİÚ]	Ê^ÂˆÛÛœİ˜]O[Y™\İX[˜]SÙŠ]XÚÙ\ŠKÙØ[\\K™š[™
+[š]O[š]šYOOIÛÙØ[‰É‰[š]šŒ
+NÚYŠX[[XYÙOL˜]OLX]XÚÙ\Ÿ]XÚÙ\‹šLS[X™\‹š\Ñš[š]J]XÚÙ\‹›X^
+J\™]\›ˆÂˆÛÛœİ\ÜÚ]™T˜]O\\Kš[˜ÛY\Ê]XÚÙ\ŠI‰›ÙØ[İ\Ü˜YU˜[YQ›ÜŠ	ÛÙØ[‹™\XØ]KŒ‹›Y™\İX[	Ë	ÛY™\İX[˜]IË	ÛÙØ[‰ËŒJNŒÂˆÛÛœİYXÚ[šXÔÛİ\˜ÙO\\ÜÚ]™T˜]OŒŞØÛÛ\Û™[Y‰Ü\ÜÚ]™N›ÙØ[‹İ\İQ›Ü›ÛÙ	ËYXÚ[šXÕYÜÎ–ÉÜ™XÛİ™\K›Y™\İX[	×KšYÙÙ\‰ÛÛ—Ø[WÙ[XYÙIßN˜]XÚÙ\‹šYOOIØ[™Ù[	ÏŞØÛÛ\Û™[Y‰Ü\ÜÚ]™N˜[™Ù[ÚY˜][Û‰ËYXÚ[šXÕYÜÎ–ÉÜ™XÛİ™\K›Y™\İX[	×KšYÙÙ\‰ÛÛ—Ø[WÙ[XYÙWÙX[	ßN›[ÂˆÛÛœİX[YXÛÛX˜][™Ú[™Kœ™\ÛÛ™SY™\İX[
+Ø]XÚÙ\‹[XYÙNšX[[XYÙK˜]K]™[\KYXÚ[šXÔÛİ\˜ÙKÛİ\˜ÙPXİÜ’Y›ÙØ[ËšYJKX[[™ÏZX[YË˜\YYÚYŠX[[™ÏŒ
+^ÚYŠ\ÜÚ]™T˜]O‹ŒJXÛÛX˜][™Ú[™Kœ™XÛÜ™\Ü˜YQY™™Xİ
+	ÛÙØ[‹™\XØ]KŒ‹›Y™\İX[	ËØXİÜ’Y›ÙØ[‹šY\™Ù]YÎ–Ø]XÚÙ\‹šYKšYÙÙ\‰ÛÛ—Ø[WÙ[XYÙWÙX[	Ë˜[Y\ÎÚX[[™ËY™\İX[˜]Nœ\ÜÚ]™T˜]__JNÜØ]™Uš][Ê
+_BˆYŠX[[™ÏŒ
+^Ù[Z]ÛÛX˜]š\İX[
+	ÛY™\İX[ZX[	ËØ]XÚÙ\‹šYKÓÓPUĞPÕSÓ—ÑQ‘‘PÕÓTËÚX[[™ßJNØÛÛœİÙX\Û[ÙØ[‰‰›ØYİ]›ÜŠ	ÛÙØ[‰ÊKÙX\Û‹ÚYÛ˜]\™Q\]Z\Y]ÙX\ÛËœÙ[XİYOOIÜ™[Z][IÉ‰ÙX\ÛËœ™[Z][SİÛ™YÚYŠ]XÚÙ\‹šYOOIÛÙØ[‰É‰›ÙØ[‰‰œ\Kš[˜ÛY\Ê]XÚÙ\ŠI‰œÚYÛ˜]\™Q\]Z\Y
+^ØÛÛœİ™Y›Ü™O[ÙØ[‹šÚX[Ú\˜Xİ\’
+ÙØ[‹X[[™ÊNØÛÛœİÛÜYYSX]›X^
+ÙØ[‹šX™Y›Ü™JNÚYŠÛÜYYŒ
+^ØÛÛX˜][™Ú[™Kœ™XÛÜ™\Ü˜YQY™™Xİ
+	ÛÙØ[‹œÚYÛ˜]\™K›Y™\İX[\Ú\™IËØXİÜ’Y›ÙØ[‹šY\™Ù]YÎ–ÛÙØ[‹šYKšYÙÙ\‰ÛÛ—Ø[WÛY™\İX[	Ë˜[Y\ÎÚX[[™Î˜ÛÜYY_JNÙ[Z]ÛÛX˜]š\İX[
+	ÛÙØ[‹\ÚYÛ˜]\™KZX[	ËÛÙØ[‹šYKÓÓPUĞPÕSÓ—ÑQ‘‘PÕÓTËÚX[[™Î˜ÛÜYYJ___Bˆ™]\›ˆX[[™ÎÂŸB™[˜İ[Ûˆ][˜]SÙŠ]XÚÙ\‹\™Ù][[
+^Ü™]\›ˆX]›Z[ŠKX]›X^
+‹‹Š]XÚÙ\Ë][Y™™Xİß×JK™š[\ŠY™™XİO“[X™\‹š\Ò[YÙ\ŠY™™Xİ\›œÊI‰™Y™™Xİ\›œÏŒ	‰Š]\™Ù]Y™™Xİ\™Ù]YOO]\™Ù]šY
+JK›X\
+Y™™XİO™Y™™Xİœ˜]JJJ_B™[˜İ[Ûˆ\U][
+]XÚÙ\‹][\‹˜]K\›œÊ^ÂˆYŠX]XÚÙ\Ÿ]][\ŸS[X™\‹š\Ñš[š]J˜]J_˜]O˜]OŒ_S[X™\‹š\Ò[YÙ\Š\›œÊ_\›œÏJ\™]\›ˆ˜[ÙNÂˆYŠXÛÛX˜][™Ú[™K˜\U][
+İ\™Ù]˜]XÚÙ\‹Ûİ\˜ÙRY][\‹šY\™Ù]Y][\‹šY˜]K\›œßJJ\™]\›ˆ˜[ÙNÂˆ[Z]ÛÛX˜]š\İX[
+	İ][X\YY	ËØ]XÚÙ\‹šYKÓÓPUĞPÕSÓ—ÑQ‘‘PÕÓTËÜ˜]K\›œË][\’Y][\‹šYJNÜ™]\›ˆYNÂŸB™[˜İ[Ûˆ™\ÛÛ™U][\™Ù]
+]XÚÙ\‹Ø[™Y]\ËÜšYÚ[˜[\™Ù]˜[™ÛOSX]œ˜[™ÛJ^ÂˆÛÛœİÛÛ[™\œÏVË‹‹›™]ÈÙ]
+Ø[™Y]\ÊWK›X\
+[š]OŠİ[š]˜]N][˜]SÙŠ]XÚÙ\‹[š]
+_JJK™š[\Š[OO™[Kœ˜]OŒ
+KœÛÜ
+
+KŠOO˜‹œ˜]KXKœ˜]_İš[™ÊK[š]šY
+K›ØØ[PÛÛ\\™Jİš[™Ê‹[š]šY
+JJNÂˆ›ÜŠÛÛœİİ[š]˜]_HÙˆÛÛ[™\œÊZYŠ˜[™ÛJ
+O˜]J\™]\›ˆİ\™Ù][š]][YY_NÂˆ™]\›ˆİ\™Ù]›ÜšYÚ[˜[\™Ù]][Y™˜[Ù_NÂŸB™[˜İ[ÛˆÚ\˜Xİ\“]™[Ø\
+˜[šÏ\^Y\”˜[šÊ^Ü™]\›ˆ[X™\‹š\Ò[YÙ\Š˜[šÊI‰œ˜[šÏLI‰œ˜[šÏMLÓX]˜ÙZ[
+˜[šËÌL
+JŒLŒB™[˜İ[Ûˆ™\]Z\™Y^
+]™[
+^Ü™]\›ˆ[X™\‹š\Ò[YÙ\Š]™[
+I‰›]™[LI‰›]™[ÒTPÕT—ÓPVÓU‘SÛ]™[
+ŠL
+ŠJÓX]™›ÛÜŠ]™[ÍJJJNŒB™[˜İ[ÛˆY˜][›ÙÜ™\ÜÊ
+^Ü™]\›ˆÛ]™[ŒK^Œ\ØÙ[™Y–×__B™[˜İ[Ûˆ˜[Y]T›ÙÜ™\ÜÊ˜[YKØ\XÚ\˜Xİ\“]™[Ø\
+
+J^ÂˆYŠ]˜[Y_S[X™\‹š\Ò[YÙ\Š˜[YK›]™[
+_˜[YK›]™[_˜[YK›]™[˜Ø\ˆS[X™\‹š\Ò[YÙ\Š˜[YK™^
+_˜[YK™^P\œ˜^Kš\Ğ\œ˜^J˜[YK˜\ØÙ[™Y
+J\™]\›ˆ˜[ÙNÂˆÛÛœİÛÛ\]Y]˜[YK˜\ØÙ[™YÂˆYŠÛÛ\]YœÛÛYJÏOˆPTĞÑS”ÒSÓ—ÑĞUTËš[˜ÛY\ÊÊJ_™]ÈÙ]
+ÛÛ\]Y
+KœÚ^™HOOXÛÛ\]Y›[™İ
+\™]\›ˆ˜[ÙNÂˆ›ÜŠÛÛœİÈÙˆTĞÑS”ÒSÓ—ÑĞUTÊZYŠ˜[YK›]™[™É‰ˆXÛÛ\]Yš[˜ÛY\ÊÊJ\™]\›ˆ˜[ÙNÂˆYŠ˜[YK›]™[OOXØ\TĞÑS”ÒSÓ—ÑĞUTËš[˜ÛY\Ê˜[YK›]™[
+I‰ˆXÛÛ\]Yš[˜ÛY\Ê˜[YK›]™[
+J\™]\›ˆYNÂˆ™]\›ˆ˜[YK™^™\]Z\™Y^
+˜[YK›]™[
+NÂŸB™[˜İ[ÛˆYØXŞT™\]Z\™Y^
+]™[
+^Ü™]\›ˆ[X™\‹š\Ò[YÙ\Š]™[
+I‰›]™[LI‰›]™[ÒTPÕT—ÓPVÓU‘SÌL
+ŠJÓX]™›ÛÜŠ
+]™[LJKÍJJNŒB™[˜İ[Ûˆ˜[Y]SYØXŞT›ÙÜ™\ÜÊ˜[YJ^ÂˆYŠ]˜[Y_S[X™\‹š\Ò[YÙ\Š˜[YK›]™[
+_˜[YK›]™[_˜[YK›]™[ÒTPÕT—ÓPVÓU‘SˆS[X™\‹š\Ò[YÙ\Š˜[YK™^
+_˜[YK™^P\œ˜^Kš\Ğ\œ˜^J˜[YK˜\ØÙ[™Y
+J\™]\›ˆ˜[ÙNÂˆÛÛœİÛÛ\]Y]˜[YK˜\ØÙ[™YÂˆYŠÛÛ\]YœÛÛYJÏOˆPTĞÑS”ÒSÓ—ÑĞUTËš[˜ÛY\ÊÊ_Ï˜[YK›]™[
+_™]ÈÙ]
+ÛÛ\]Y
+KœÚ^™HOOXÛÛ\]Y›[™İ
+\™]\›ˆ˜[ÙNÂˆ›ÜŠÛÛœİÈÙˆTĞÑS”ÒSÓ—ÑĞUTÊZYŠ˜[YK›]™[™É‰ˆXÛÛ\]Yš[˜ÛY\ÊÊJ\™]\›ˆ˜[ÙNÂˆYŠ˜[YK›]™[OOPÒTPÕT—ÓPVÓU‘S
+\™]\›ˆ˜[YK™^OOLÂˆYŠTĞÑS”ÒSÓ—ÑĞUTËš[˜ÛY\Ê˜[YK›]™[
+I‰ˆXÛÛ\]Yš[˜ÛY\Ê˜[YK›]™[
+J\™]\›ˆ˜[YK™^OOLÂˆ™]\›ˆ˜[YK™^YØXŞT™\]Z\™Y^
+˜[YK›]™[
+NÂŸB™[˜İ[ÛˆÙ]PÚ\˜Xİ\”›ÙÜ™\ÜÊ›ÙÜ™\ÜËØ\XÚ\˜Xİ\“]™[Ø\
+
+J^Âˆ]]™[ÑØZ[™YLÂˆÚ[J›ÙÜ™\ÜË›]™[Ø\
+^ÂˆYŠTĞÑS”ÒSÓ—ÑĞUTËš[˜ÛY\Ê›ÙÜ™\ÜË›]™[
+I‰ˆ\›ÙÜ™\ÜË˜\ØÙ[™Yš[˜ÛY\Ê›ÙÜ™\ÜË›]™[
+JXœ™XZÎÂˆÛÛœİ™YYY\™\]Z\™Y^
+›ÙÜ™\ÜË›]™[
+NÚYŠ›ÙÜ™\ÜË™^™YYY
+Xœ™XZÎÂˆ›ÙÜ™\ÜË™^O[™YYYÜ›ÙÜ™\ÜË›]™[
+ÊÎÛ]™[ÑØZ[™Y
+ÊÎÂˆBˆ™]\›ˆ]™[ÑØZ[™YÂŸB™[˜İ[ÛˆØY›ÙÜ™\ÜÊ
+^Âˆ]İÜ™Y^ßNİ^ÜİÜ™YR”ÓÓ‹œ\œÙJØØ[İÜ˜YÙK™Ù]][J“ÑÔ‘TÔÒSÓ—ÒÑVJ_	ŞßIÊ_ß_XØ]Ú
+J^ßBˆÛÛœİ]O^ßKØ\XÚ\˜Xİ\“]™[Ø\
+
+NÙ›ÜŠÛÛœİˆÙˆ“ÔÕTŠ^ØÛÛœİ\İÜ™YÜ‹šYNÂˆYŠ˜[Y]T›ÙÜ™\ÜÊØ\
+JY]VÜ‹šYO^Û]™[œ›]™[^œ™^\ØÙ[™Y–Ë‹‹œ˜\ØÙ[™Y_NÂˆ[ÙHYŠ˜[Y]SYØXŞT›ÙÜ™\ÜÊ
+J^ÂˆÛÛœİ]™[SX]›Z[Š›]™[Ø\
+K\ØÙ[™YVË‹‹œ˜\ØÙ[™YNÛ]^LÂˆYŠ›]™[XØ\
+^ØÛÛœİÛ™YY[YØXŞT™\]Z\™Y^
+›]™[
+K™]Ó™YY\™\]Z\™Y^
+›]™[
+NÙ^[Û™YYÓX]™›ÛÜŠ™^
+›™]Ó™YYÛÛ™YY
+NŒßBˆ[Ù^Âˆ›ÜŠ]XØ\Û›]™[Û
+ÊÊY^
+Ï\™\]Z\™Y^
+
+NÂˆÛÛœİÛ™YY[YØXŞT™\]Z\™Y^
+›]™[
+K™]Ó™YY\™\]Z\™Y^
+›]™[
+NÚYŠÛ™YY
+Y^
+ÏSX]™›ÛÜŠ™^
+›™]Ó™YYÛÛ™YY
+NÂˆBˆ]VÜ‹šYO^Û]™[^\ØÙ[™YNÂˆY[ÙH]VÜ‹šYOYY˜][›ÙÜ™\ÜÊ
+NÂˆÙ]PÚ\˜Xİ\”›ÙÜ™\ÜÊ]VÜ‹šYKØ\
+NÂˆ\™]\›ˆ]NÂŸB›]Ú\˜Xİ\”›ÙÜ™\ÜÏ[ØY›ÙÜ™\ÜÊ
+NÂ™[˜İ[Ûˆ›ÙÜ™\ÜÑ›ÜŠY
+^Ü™]\›ˆÚ\˜Xİ\”›ÙÜ™\ÜÖÚY_[B™[˜İ[ÛˆØ]™T›ÙÜ™\ÜÊ
+^İ^ÛØØ[İÜ˜YÙKœÙ]][J“ÑÔ‘TÔÒSÓ—ÒÑVK”ÓÓ‹œİš[™ÚYJÚ\˜Xİ\”›ÙÜ™\ÜÊJ_XØ]Ú
+J^ß_B‹ËÈ™\Ûİ\˜ÙH][\ËÜ]X[]Y\È\™H›İ\›İ™YY]ˆ\ÈXYÈ[š™Xİ[Ûˆ™]™\‚‹ËÈ[Ù[È[™[ÜHÛÛœİ[\[Û‹ˆ›ÙXİ[ÛˆÚ\˜Xİ\ˆÛİ\˜Ù\È\™H›İYš[™Y‚™[˜İ[ÛˆÜ˜[Ú\˜Xİ\–
+Y[[İ[
+^ÂˆÛÛœİİ\œ™[\›ÙÜ™\ÜÑ›ÜŠY
+KØ\XÚ\˜Xİ\“]™[Ø\
+
+NÚYŠXİ\œ™[S[X™\‹š\ÔØY™R[YÙ\Š[[İ[
+_[[İ[Lİ\œ™[›]™[XØ\
+\™]\›ˆ˜[ÙNÂˆÛÛœİ[\^Û]™[˜İ\œ™[›]™[^˜İ\œ™[™^\ØÙ[™Y–Ë‹‹˜İ\œ™[˜\ØÙ[™Y_NÂˆYŠS[X™\‹š\ÔØY™R[YÙ\Š[\™^
+Ø[[İ[
+J\™]\›ˆ˜[ÙNİ[\™^
+ÏX[[İ[ÜÙ]PÚ\˜Xİ\”›ÙÜ™\ÜÊ[\Ø\
+NÂˆYŠ]˜[Y]T›ÙÜ™\ÜÊ[\Ø\
+J\™]\›ˆ˜[ÙNÂˆÛÛœİ™Y›Ü™OXİ\œ™[›]™[ØÚ\˜Xİ\”›ÙÜ™\ÜÖÚYO][\ÜØ]™T›ÙÜ™\ÜÊ
+NÂˆÛÛœİXİÜ\\K™š[™
+OœšYOOZY
+NÂˆYŠXİÜŠ^ØXİÜ‹›]™[][\›]™[ÚYŠ™Y›Ü™HOO][\›]™[
+\™XÛÛ\]U[š]X^
+XİÜŠNßBˆ™]\›ˆÛ]™[[\›]™[^[\™^]™[ÑØZ[™Y[\›]™[X™Y›Ü™K™^^œ™\]Z\™Y^
+[\›]™[
+_NÂŸB™[˜İ[Ûˆ\İÜ˜[^
+Y[[İ[
+^Ü™]\›ˆÜ˜[Ú\˜Xİ\–
+Y[[İ[
+_B™[˜İ[Ûˆ\İ\ØÙ[™
+Y
+^ÂˆÛÛœİ\›ÙÜ™\ÜÑ›ÜŠY
+NÚYŠ\PTĞÑS”ÒSÓ—ÑĞUTËš[˜ÛY\Ê›]™[
+_˜\ØÙ[™Yš[˜ÛY\Ê›]™[
+J\™]\›ˆ˜[ÙNÂˆ˜\ØÙ[™Yœ\Ú
+›]™[
+NÜÙ]PÚ\˜Xİ\”›ÙÜ™\ÜÊ
+NÜØ]™T›ÙÜ™\ÜÊ
+NÂˆÛÛœİXİÜ\\K™š[™
+OšYOOZY
+NÚYŠXİÜŠ^ØXİÜ‹›]™[\›]™[Ü™XÛÛ\]U[š]X^
+XİÜŠ_Bˆ™]\›ˆYNÂŸB™[˜İ[ÛˆÙ]^Y\”˜[šÑ›Ü•\İ
+˜[šÊ^ÂˆYŠS[X™\‹š\Ò[YÙ\Š˜[šÊ_˜[šÏ^Y\”˜[šß˜[šÏL
+\™]\›ˆ˜[ÙNÂˆ^Y\”˜[šÏ\˜[šÎØÛÛœİØ\XÚ\˜Xİ\“]™[Ø\
+
+NÂˆ›ÜŠÛÛœİÚYHÙˆØš™Xİ™[šY\ÊÚ\˜Xİ\”›ÙÜ™\ÜÊJ^ÂˆÛÛœİ™Y›Ü™O\›]™[ÜÙ]PÚ\˜Xİ\”›ÙÜ™\ÜÊØ\
+NÂˆÛÛœİXİÜ\\K™š[™
+OšYOOZY
+NÚYŠXİÜŠ^ØXİÜ‹›]™[\›]™[ÚYŠ™Y›Ü™HOO\›]™[
+\™XÛÛ\]U[š]X^
+XİÜŠ_BˆBˆØ]™T›ÙÜ™\ÜÊ
+NÜØ]™T^Y\”˜[šÊ
+NÜ™]\›ˆYNÂŸB™[˜İ[ÛˆØ[İ[]SX^
+˜\ÙR]™[›]^ßK\˜Ù[^ßK\]Z\Y[›]^ßJ^ÂˆYŠS[X™\‹š\Ñš[š]J˜\ÙR
+_˜\ÙRL
+\™]\›ˆ[ÂˆÛÛœİX^XØ[İ[]S]™[ØØ[Yİ]
+˜\ÙR]™[›]\˜Ù[\]Z\Y[›]
+NÂˆ™]\›ˆX^OO[[	‰›X^LOÛX^›[ÂŸB™[˜İ[Ûˆ™XÛÛ\]U[š]X^
+[š]
+^ÂˆÛÛœİX^XØ[İ[]SX^
+[š]˜˜\ÙR[š]›]™[[š]š›][ÙYšY\œË[š]š\˜Ù[[ÙYšY\œË[š]š\]Z\Y[›][ÙYšY\œÊNÂˆYŠX^OO[[
+\™]\›ˆ˜[ÙNÂˆÛÛœİÛX^][š]›X^X^Û][š]šÂˆËÈ™\Ù\™HHİ\œ™[˜][Ë[˜ÛY[™È˜[Y\ÈX›İ™HHÛX^‚ˆ[š]›X^[X^İ[š]š[ÛLÌ“X]›X^
+›İ[™
+X^
+ŠÛÛÛX^
+JJNÂˆØ]™Uš][Ê
+NÜ™]\›ˆYNÂŸB™[˜İ[ÛˆX[Ú\˜Xİ\’
+[š][[İ[Ø[İÓİ™\“X^Y˜[Ù_O^ßJ^ÂˆYŠ][š][š]šLS[X™\‹š\Ñš[š]J[[İ[
+_[[İ[L
+\™]\›ˆ˜[ÙNÂˆYŠX[İÓİ™\“X^	‰[š]š[š]›X^
+\™]\›ˆ˜[ÙNÂˆ[š]šX[İÓİ™\“X^İ[š]š
+Ø[[İ[“X]›Z[Š[š]›X^[š]š
+Ø[[İ[
+NÂˆØ]™Uš][Ê
+NÜ™]\›ˆYNÂŸB™[˜İ[ÛˆÙ]›Û\Ñ›Ü•\İ
+YÛİ\˜ÙKÚ[™˜[YJ^ÂˆÛÛœİ\\K™š[™
+OOKšYOOZY
+NÚYŠ\\Ûİ\˜Ù_S[X™\‹š\Ñš[š]J˜[YJ_VÉÙ›]	Ë	Ü\˜Ù[	×Kš[˜ÛY\ÊÚ[™
+J\™]\›ˆ˜[ÙNÂˆÛÛœİÙ^OZÚ[™OOIÙ›]	ÏÉÚ›][ÙYšY\œÉÎ‰Ú\˜Ù[[ÙYšY\œÉË™^^Ë‹‹œÚÙ^WKÜÛİ\˜ÙWN˜[Y_NÂˆÛÛœİX^XØ[İ[]SX^
+˜˜\ÙR›]™[Ú[™OOIÙ›]	ÏÛ™^œš›][ÙYšY\œËÚ[™OOIÜ\˜Ù[	ÏÛ™^œš\˜Ù[[ÙYšY\œËš\]Z\Y[›][ÙYšY\œÊNÂˆYŠX^OO[[
+\™]\›ˆ˜[ÙNÜÚÙ^WO[™^Ü™XÛÛ\]U[š]X^
+
+NÜ™]\›ˆYNÂŸB™[˜İ[ÛˆÙ]XÚÔ\˜Ù[›Ü•\İ
+Y\˜Ù[
+^ÂˆYŠQU—ÓSÑ_\ÙHOOIÜ^Y\‰ß]XÚÒ[”›ÙÜ™\ÜßS[X™\‹š\Ñš[š]J\˜Ù[
+_\˜Ù[\˜Ù[ŒJ\™]\›ˆ˜[ÙNÂˆÛÛœİ[š]\\K™š[™
+Ø[™Y]OO˜Ø[™Y]KšYOOZY
+_]™Q[™[ZY\Ê
+K™š[™
+Ø[™Y]OO˜Ø[™Y]KšYOOZY
+NÚYŠ][š]
+\™]\›ˆ˜[ÙNÂˆ[š]™XÚÔ\˜Ù[\\˜Ù[ÜØ^JTÕÓ“Nˆ	İ[š]›˜[Y_HXÚÈ	Ü›İ[™
+\˜Ù[
+ŒL
+_IK˜
+NÜ™]\›ˆYNÂŸB™[˜İ[ÛˆÙ]™Y›Xİ\˜Ù[›Ü•\İ
+Y\˜Ù[
+^ÂˆYŠQU—ÓSÑ_\ÙHOOIÜ^Y\‰ß]XÚÒ[”›ÙÜ™\ÜßS[X™\‹š\Ñš[š]J\˜Ù[
+_\˜Ù[\˜Ù[ŒJ\™]\›ˆ˜[ÙNÂˆÛÛœİ[š]\\K™š[™
+Ø[™Y]OO˜Ø[™Y]KšYOOZY
+_]™Q[™[ZY\Ê
+K™š[™
+Ø[™Y]OO˜Ø[™Y]KšYOOZY
+NÚYŠ][š]
+\™]\›ˆ˜[ÙNÂˆ[š]œ™Y›Xİ\˜Ù[\\˜Ù[ÜØ^JTÕÓ“Nˆ	İ[š]›˜[Y_H™Y›Xİ	Ü›İ[™
+\˜Ù[
+ŒL
+_IK˜
+NÜ™]\›ˆYNÂŸB™[˜İ[ÛˆØYš][Ê
+^İ^ØÛÛœİR”ÓÓ‹œ\œÙJØØ[İÜ˜YÙK™Ù]][J’US×ÒÑVJ_	ŞßIÊNÜ™]\›ˆ	‰\[ÙˆOOIÛØš™Xİ	ÏŞß_XØ]Ú
+J^Ü™]\›ˆß__B›]Ø]™Yš][Ï[ØYš][Ê
+NÂ›]š][ÔŞ[˜Õ[Y\[[Â™[˜İ[ÛˆØ]™Uš][Ê
+^ÂˆYŠØ[\ZYÛ‘[J\™]\›Âˆ›ÜŠÛÛœİÙˆ\J^ÚYŠ\T“ÔÕT—ÒQËš\ÊšY
+JXÛÛ[YNÜØ]™Yš][ÖÜšYO^ÚœšX^œ›X^_Bˆ^ÛØØ[İÜ˜YÙKœÙ]][J’US×ÒÑVK”ÓÓ‹œİš[™ÚYJØ]™Yš][ÊJ_XØ]Ú
+J^ßBˆÛX\•[Y[İ]
+š][ÔŞ[˜Õ[Y\ŠNİš][ÔŞ[˜Õ[Y\\Ù][Y[İ]
 
 
-sources.soulBasicWindup='/assets/embedded-image-09.png';
-sources.soulBasicSlash='/assets/embedded-image-10.png';
-const imageCache = new Map();
-function requestImage(path, priority='auto'){
- if(!path)return undefined;
- let image=imageCache.get(path);
- if(!image){
-  image=new Image();
-  image.fetchPriority=priority;
-  image.src=path;
-  imageCache.set(path,image);
- }else if(priority==='high'){
-  image.fetchPriority='high';
- }
- return image;
-}
-const images = Object.defineProperties({},Object.fromEntries(
- Object.entries(sources).map(([key,path])=>[key,{get:()=>requestImage(path)}])
-));
+OOÚ[™İË•ÛÕÛ™PXØÛİ[Ë˜Xİ[ÛŠ	ÜÙ]]š][ÉËİš][ÎœØ]™Yš][ßJK˜Ø]Ú
 
-function requestStoryBeat(story,beat,priority){
- const portrait=beat.portrait;
- return {
-  background:requestImage(beat.background??story.background,priority),
-  portrait:requestImage(portrait&&STORY_PORTRAITS[portrait.characterId]?.[portrait.reactionId],priority),
- };
-}
 
-function prefetchCampaignBattle({areaId,party,waves}){
- const area=BATTLE_AREAS[areaId];
- const keys=[area.background,area.reverseBackground];
- for(const id of party){
-  keys.push(allyBattleArt(id,'command'),allyBattleArt(id,'party'));
-  if(id==='soul')keys.push('soulBasicWindup','soulBasicSlash');
- }
- for(const {enemyId} of waves[0]){
-  const enemy=ENEMY_ARCHETYPES[enemyId];
-  keys.push(enemy.battleSprite,enemy.artwork);
- }
- for(const key of keys)requestImage(sources[key],'low');
-}
+OOßJKL
+NÂŸB‹ËÈ˜Z[š[™È[ÙH\ÜÚYÛ›Y[È^\˜Ú\ÙH›İ\›İ™YØ[YK[[ÙH™XÛİ™\HÛXÚY\ÎÂ‹ËÈXİX[˜[YYØ[YH[Ù\È]™H›İ™Y[ˆ\ÚYÛ™YÜˆ\ÜÚYÛ™YHÛXŞK‚›]˜Z[š[™Ô™XÛİ™\S[ÙOIÜ™\İÜ™IÎÂ™[˜İ[ÛˆÙ]˜Z[š[™Ô™XÛİ™\S[ÙJ[ÙJ^ÚYŠ\ÙHOOIÜÙ]\	ßVÉÜ™\İÜ™IË	Ü™\Ù\™I×Kš[˜ÛY\Ê[ÙJJ\™]\›ˆ˜[ÙNİ˜Z[š[™Ô™XÛİ™\S[ÙO[[ÙNÜ™]\›ˆY_B™[˜İ[ÛˆÜ]Û”›ÙÜ™\ÜÙY[š]
+Y[X[Y˜[ÙJ^ÂˆÛÛœİ[Ù[T“ÔÕT‹™š[™
+OšYOOZY
+K›ÙÜ™\ÜÏ\›ÙÜ™\ÜÑ›ÜŠY
+NÚYŠ[[Ù[\›ÙÜ™\ÜÊ\™]\›ˆ[ÂˆÛÛœİ[ÙYšY\œÏ[ØYİ]İ][ÙYšY\œÊY›ÙÜ™\ÜË›]™[
+NÂˆÛÛœİX^XØ[İ[]SX^
+[Ù[š›ÙÜ™\ÜË›]™[[ÙYšY\œËš›][ÙYšY\œË[ÙYšY\œËš\˜Ù[[ÙYšY\œË[ÙYšY\œËš\]Z\Y[›][ÙYšY\œÊNÚYŠX^OO[[
+\™]\›ˆ[ÂˆÛÛœİØ]™Y\Ø]™Yš][ÖÚYNØÛÛœİ™\İÜ™OY[X[˜Z[š[™Ô™XÛİ™\S[ÙOOOIÜ™\İÜ™Iß\Ø]™YÂˆÛÛœİØ]™YX^S[X™\‹š\Ñš[š]JØ]™YË›X^
+I‰œØ]™Y›X^ŒÜØ]™Y›X^›X^ÂˆÛÛœİØ]™YS[X™\‹š\Ñš[š]JØ]™YËš
+OÜØ]™Yš›X^ÂˆÛÛœİ\™\İÜ™OÛX^œØ]™YLÌ“X]›X^
+›İ[™
+X^
+ŠØ]™YÜØ]™YX^
+JJNÂˆÛÛœİ\ÜÚ]™O^Ë‹‹Š[Ù[œ\ÜÚ]™_ßJ_NÂˆYŠYOOIŞ™\›ÉÊ^Âˆ\ÜÚ]™K˜Üš]XØ[˜]P›Û\ÏKŒŠ\Ü˜YU˜[YQ›ÜŠ	Ş™\›Ë™\XØ]KŒK˜Üš]XØ[\İ]ÉË	ØÜš]XØ[˜]S][\Y\‰Ë	Ş™\›ÉËJNÂˆ\ÜÚ]™K˜Üš]XØ[[XYÙP›Û\ÏKJ\Ü˜YU˜[YQ›ÜŠ	Ş™\›Ë™\XØ]KŒK˜Üš]XØ[\İ]ÉË	ØÜš]XØ[[XYÙS][\Y\‰Ë	Ş™\›ÉËJNÂˆ\ÜÚ]™K™Y™[œÙRYÛ›Ü™O]\Ü˜YU˜[YQ›ÜŠ	Ş™\›Ëœ™[Z][KY\XØ]K™Y™[œÙKZYÛ›Ü™IË	ÙY™[œÙRYÛ›Ü™IË	Ş™\›ÉÊNÂˆBˆ™]\›ˆË‹‹›[Ù[\ÜÚ]™K˜\ÙR›[Ù[š]™[œ›ÙÜ™\ÜË›]™[X^‹‹›[ÙYšY\œËÚY[Œ][Y™™XİÎ–×K[™\™ŞNÓÓPUÔ‘TÓÕTÑWÔÕS‘T‘œİ\[™Ñ[™\™ŞK[™\™ŞT™\Ù\™YŒ‹‹ŠYOOIØ[™Ù[	ÏŞØİ\œ™[ŞXÛNŒNßJK‹‹ŠYOOIÛ[˜IÏŞÛ[˜U˜XÚÙYX\šÜÎŒ[˜Q[XYÙPY™›[[˜P]XÚĞY™›[NßJ_NÂŸB‚˜ÛÛœİ\›•[Y[[™OXÛÛX˜][™Ú[™K[Y[[™NÂ›]ÜYY[ÙYšY\œÏSØš™Xİ˜Ü™X]J[
+Kİ[[[ÛœÏV×Kİ[[[Û”Ù\šX[Lİ[[[Û’\İÜOV×K[™PÛÛX˜]İ]OSØš™Xİ˜Ü™X]J[
+KXİ]™T[™Q[XYÙQY™™XİÏSØš™Xİ˜Ü™X]J[
+NÂ˜ÛÛœİ[š]Y›ÛİÕ\\™[Ï[™]ÈX\
 
-const visibleSpriteBounds=new WeakMap();
-function spriteAlphaBounds(img){
- if(visibleSpriteBounds.has(img))return visibleSpriteBounds.get(img);
- const canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
- const c=canvas.getContext('2d',{willReadFrequently:true});let bounds={x:0,y:0,w:img.naturalWidth,h:img.naturalHeight};
- try{c.drawImage(img,0,0);const pixels=c.getImageData(0,0,canvas.width,canvas.height).data;let left=canvas.width,top=canvas.height,right=-1,bottom=-1;
-  for(let y=0;y<canvas.height;y++)for(let x=0;x<canvas.width;x++)if(pixels[(y*canvas.width+x)*4+3]>16){if(x<left)left=x;if(x>right)right=x;if(y<top)top=y;if(y>bottom)bottom=y}
-  if(right>=left&&bottom>=top)bounds={x:left,y:top,w:right-left+1,h:bottom-top+1};
- }catch(e){}
- visibleSpriteBounds.set(img,bounds);return bounds;
-}
-const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:false});
-// Dev Mode is disabled in the public client. It must be enabled by an
-// authenticated server-side developer role, never by a URL parameter.
-const DEV_MODE=false;
-const W=1600,H=900;
-const TEAM_KEY=DEV_MODE?'two-tone-dev-team-fundamental-1-v1':'two-tone-demo-team-fundamental-1-v1';
-const PROGRESSION_KEY=DEV_MODE?'two-tone-dev-character-progress-v1':'two-tone-character-progress-v1',VITALS_KEY=DEV_MODE?'two-tone-dev-character-vitals-v1':'two-tone-character-vitals-v1',LOADOUT_KEY=DEV_MODE?'two-tone-dev-character-loadouts-v1':'two-tone-character-loadouts-v1',ITEM_INVENTORY_KEY=DEV_MODE?'two-tone-dev-item-inventory-v1':'two-tone-item-inventory-v1',STORE_COINS_KEY=DEV_MODE?'two-tone-dev-store-coins-v1':'two-tone-store-coins-v1',DAILY_REWARD_KEY=DEV_MODE?'two-tone-dev-daily-reward-period-v1':'two-tone-daily-reward-period-v1',PLAYER_RANK_KEY=DEV_MODE?'two-tone-dev-player-rank-v1':'two-tone-player-rank-v1',OWNED_CHARACTERS_KEY=DEV_MODE?'two-tone-dev-owned-characters-v1':'two-tone-owned-characters-v1';
-const CHARACTER_MAX_LEVEL=50,ASCENSION_GATES=[10,20,30,40],MAX_PARTY_SIZE=4;
-// Rank progression is not implemented yet; this value is the account Rank hook.
-function loadPlayerRank(){try{const n=Number(localStorage.getItem(PLAYER_RANK_KEY));return Number.isInteger(n)&&n>=1&&n<=50?n:1}catch(e){return 1}}
-function savePlayerRank(){try{localStorage.setItem(PLAYER_RANK_KEY,String(playerRank))}catch(e){}}
-let playerRank=loadPlayerRank();
-// Numerical Base HP values are inherited/development-only combat fixtures, NOT
-// approved per-character stats. The unnamed units remain developer test slots.
-const ROSTER=CHARACTER_ROSTER;
-function combatKit(id){return ROSTER.find(unit=>unit.id===id)?.combat||null}
-const ROSTER_IDS=new Set(ROSTER.map(u=>u.id));
-function characterPortraitArt(id){return ({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront',cloud:'cloudFront'})[id]||'portrait'}
-function normalizeOwnedCharacterIds(value){if(!Array.isArray(value)||value.some(id=>!ROSTER_IDS.has(id))||new Set(value).size!==value.length)return null;const ids=new Set(value);ids.add('soul');return [...ROSTER_IDS].filter(id=>ids.has(id))}
-function initializeOwnedCharacters(){if(DEV_MODE)return new Set(ROSTER.map(model=>model.id));try{const raw=localStorage.getItem(OWNED_CHARACTERS_KEY);if(raw!==null){const parsed=normalizeOwnedCharacterIds(JSON.parse(raw));if(parsed)return new Set(parsed)}}catch(e){}return new Set(['soul'])}
-let ownedCharacterIds=initializeOwnedCharacters();
-function isCharacterOwned(id){return DEV_MODE||ownedCharacterIds.has(id)}
-function saveOwnedCharacters(){if(!DEV_MODE)try{localStorage.setItem(OWNED_CHARACTERS_KEY,JSON.stringify([...ownedCharacterIds]))}catch(e){}}
-function availableCharacters(){return ROSTER.filter(model=>isCharacterOwned(model.id))}
-const combatEngine=new TwoToneBattleEngine();
-function roundHp(value){return combatEngine.roundHp(value)}
-function roundStatQuarter(value){return combatEngine.roundStatQuarter(value)}
-function calculateLevelScaledStat(base,level,flat={},percent={},equipmentFlat={}){
- if(!Number.isFinite(base)||base<0||!Number.isInteger(level)||level<1||level>CHARACTER_MAX_LEVEL)return null;
- const flats=Object.values(flat),percents=Object.values(percent),equipment=Object.values(equipmentFlat);
- if([...flats,...percents,...equipment].some(v=>!Number.isFinite(v)))return null;
- const raw=((base+flats.reduce((a,b)=>a+b,0))*level+equipment.reduce((a,b)=>a+b,0))*(1+percents.reduce((a,b)=>a+b,0));
- return raw>=0&&Number.isFinite(raw)?roundStatQuarter(raw):null;
-}
-function calculateAttack(unit){
- if(!unit||!Number.isFinite(unit.baseAttack))return null;
- return calculateLevelScaledStat(unit.baseAttack,Number.isInteger(unit.level)?unit.level:1,unit.attackFlatModifiers||{},{...(unit.attackPercentModifiers||{}),dawnTune:unit.tune?.attackBonus||0},unit.attackEquipmentFlatModifiers||{});
-}
-const RESIDUE_RULES=Object.freeze({maxStacks:5,damageReductionPerStack:.05,resistanceReductionPerStack:.05,durationTurns:2});
-function residueStacksOf(unit){return Math.max(0,Math.min(unit?.residueMaxStacks||RESIDUE_RULES.maxStacks,Number.isInteger(unit?.residueStacks)?unit.residueStacks:0))}
-function residueReduction(unit){return residueStacksOf(unit)*(unit?.residueResistanceReductionPerStack??RESIDUE_RULES.resistanceReductionPerStack)}
-function activeRuneEffect(id,setId,trigger,options={}){return id&&hasRuneSet(id,setId)?combatEngine.resolveRuneEffect({setId,trigger,...options}):null}
-function damageDealtMultiplier(unit){const rune=activeRuneDamageEffects[unit?.id]?.darkMatter,logan=party.find(member=>member.id==='logan'),shieldedBonus=unit?.shield>0&&party.includes(unit)&&logan?upgradeValueFor('logan.premium-duplicate.4.shielded-damage','shieldedDamageBonus','logan'):0;return (1-residueStacksOf(unit)*(unit?.residueDamageReductionPerStack??RESIDUE_RULES.damageReductionPerStack))*(rune?.damageMultiplier??1)*(1+shieldedBonus)}
-function calculatePhysicalDefense(unit){
- if(!unit||!Number.isFinite(unit.basePhysicalDefense))return null;
- return calculateLevelScaledStat(unit.basePhysicalDefense,unit.level,unit.physicalDefenseFlatModifiers||{},unit.physicalDefensePercentModifiers||{},unit.physicalDefenseEquipmentFlatModifiers||{});
-}
-function calculateMagicalDefense(unit){
- if(!unit||!Number.isFinite(unit.baseMagicalDefense))return null;
- return calculateLevelScaledStat(unit.baseMagicalDefense,unit.level,unit.magicalDefenseFlatModifiers||{},unit.magicalDefensePercentModifiers||{},unit.magicalDefenseEquipmentFlatModifiers||{});
-}
-function calculateTrueDefense(unit){
- const physical=calculatePhysicalDefense(unit),magical=calculateMagicalDefense(unit);
- return physical===null||magical===null?null:(physical+magical)*.5;
-}
-function baseDefenseIgnoreOf(attacker){const passiveIgnore=Number.isFinite(attacker?.passive?.defenseIgnore)?attacker.passive.defenseIgnore:attacker?.passive?.id==='sharp-claws' ? .25 : 0;return Math.min(1,Math.max(0,(Number.isFinite(attacker?.tune?.defenseIgnore)?attacker.tune.defenseIgnore:0)+passiveIgnore))}
-function defenseIgnoreOf(attacker,type=null){const rune=activeRuneDamageEffects[attacker?.id]?.darkMatter,runeBonus=rune&&['physical','magical'].includes(type)?rune.defenseIgnore:0;return Math.min(1,baseDefenseIgnoreOf(attacker)+runeBonus)}
-function calculateTrueDamageReduction(attacker,target){
- const attack=calculateAttack(attacker),exposedFactor=Math.pow(.9,target?.marks?.filter(m=>m.id==='exposed').length||0),residueFactor=1-residueReduction(target),physicalDefense=calculatePhysicalDefense(target)*residueFactor*(1-defenseIgnoreOf(attacker,'physical'))*exposedFactor,magicalDefense=calculateMagicalDefense(target)*residueFactor*(1-defenseIgnoreOf(attacker,'magical'))*exposedFactor;
- if(!Number.isFinite(attack)||attack<=0||!Number.isFinite(physicalDefense)||physicalDefense<0||!Number.isFinite(magicalDefense)||magicalDefense<0)return null;
- return .5*Math.min(physicalDefense/attack,1)+.5*Math.min(magicalDefense/attack,1);
-}
-function calculateDamageAfterDefense(damageBeforeDefense,attack,defense){
- if(!Number.isFinite(damageBeforeDefense)||damageBeforeDefense<0||!Number.isFinite(attack)||attack<=0||!Number.isFinite(defense)||defense<0)return null;
- const reduction=Math.min(defense/attack,1);
- return roundHp(damageBeforeDefense*(1-reduction));
-}
-function calculatePhysicalDamageAfterDefense(damageBeforeDefense,attacker,target){
- return calculateDamageAfterDefense(damageBeforeDefense,calculateAttack(attacker),calculatePhysicalDefense(target));
-}
-function calculateMagicalDamageAfterDefense(damageBeforeDefense,attacker,target){
- return calculateDamageAfterDefense(damageBeforeDefense,calculateAttack(attacker),calculateMagicalDefense(target));
-}
-function calculateTrueDamageAfterDefense(damageBeforeDefense,attacker,target){
- const attack=calculateAttack(attacker),reduction=calculateTrueDamageReduction(attacker,target);
- if(!Number.isFinite(damageBeforeDefense)||damageBeforeDefense<0||!Number.isFinite(attack)||attack<=0||!Number.isFinite(reduction))return null;
- return roundHp(damageBeforeDefense*(1-reduction));
-}
-function calculateTypedActionDamage(type,attackRate,attacker,target){
- if(!['physical','magical','true'].includes(type)||!Number.isFinite(attackRate)||attackRate<0)return null;
- const attack=calculateAttack(attacker);
- const defenseMultiplier=1-residueReduction(target),physicalDefenseReduction=target?.debuffs?.find(effect=>effect.id==='tsunade-physical-defense-down')?.physicalDefenseReduction||0,physicalDefense=calculatePhysicalDefense(target)*(1-physicalDefenseReduction),magicalDefense=calculateMagicalDefense(target),defense=type==='physical'?physicalDefense:type==='magical'?magicalDefense:(physicalDefense+magicalDefense)/2,physicalIgnore=defenseIgnoreOf(attacker,'physical'),magicalIgnore=defenseIgnoreOf(attacker,'magical');
- const trueDefenseBasis=(physicalDefense*defenseMultiplier*(1-physicalIgnore)+magicalDefense*defenseMultiplier*(1-magicalIgnore))/2;
- const exposedStacks=target?.marks?.filter(m=>m.id==='exposed').length||0,exposedDefenseReduction=CHARACTER_COMBAT_DATA.lily.passives.find(passive=>passive.type==='exposed')?.defenseReduction??.2;
- const result=combatEngine.resolveTypedHit({type,attack,physicalDefense,magicalDefense,multiplier:attackRate,physicalDefenseIgnore:physicalIgnore,magicalDefenseIgnore:magicalIgnore,damageMultiplier:damageDealtMultiplier(attacker),defenseMultiplier,exposedStacks,exposedDefenseReduction});
- if(!result||!Number.isFinite(defense)||defense<0)return null;
- return {type,attackBasis:attack,defenseBasis:type==='true'?trueDefenseBasis:defense*defenseMultiplier*(1-(type==='physical'?physicalIgnore:magicalIgnore)),attackRate,damageBeforeDefense:result.damageBeforeDefense,reduction:result.reduction,damageTaken:result.damage};
-}
-function criticalRateOf(unit){return Math.min(1,Math.max(0,(Number.isFinite(unit?.criticalRate)?unit.criticalRate:.1)+(Number.isFinite(unit?.criticalRateBonus)?unit.criticalRateBonus:0)+(unit?.passive?.criticalRateBonus||0)+(unit?.tune?.criticalRateBonus||0)+Object.values(unit?.criticalRateModifiers||{}).reduce((sum,value)=>sum+(Number.isFinite(value)?value:0),0)))}
-function criticalDamageOf(unit){return Math.max(0,(Number.isFinite(unit?.criticalDamage)?unit.criticalDamage:.5)+(Number.isFinite(unit?.criticalDamageBonus)?unit.criticalDamageBonus:0)+(unit?.passive?.criticalDamageBonus||0)+(unit?.tune?.criticalDamageBonus||0)+Object.values(unit?.criticalDamageModifiers||{}).reduce((sum,value)=>sum+(Number.isFinite(value)?value:0),0))}
-function lifestealRateOf(unit){const base=(Number.isFinite(unit?.lifesteal)?unit.lifesteal:0)+(Number.isFinite(unit?.lifestealBonus)?unit.lifestealBonus:0)+Object.values(unit?.lifestealModifiers||{}).reduce((sum,value)=>sum+(Number.isFinite(value)?value:0),0),logan=party.find(member=>member.id==='logan'&&member.hp>0),tasteForBlood=party.includes(unit)&&logan?upgradeValueFor('logan.duplicate.2.lifesteal','lifestealRate','logan',.1):0;return Math.max(0,base+tasteForBlood)}
-function shieldOf(unit){return Math.max(0,Number.isFinite(unit?.shield)?unit.shield:0)}
-function addShield(unit,amount){return combatEngine.applyShield({target:unit,amount})?.total||0}
-function applyLifesteal(attacker,healthDamage,eventType='direct_hit'){
- const rate=lifestealRateOf(attacker),logan=party.find(unit=>unit.id==='logan'&&unit.hp>0);if(healthDamage<=0||rate<=0||!attacker||attacker.hp<=0||!Number.isFinite(attacker.maxHp))return 0;
- const passiveRate=party.includes(attacker)&&logan?upgradeValueFor('logan.duplicate.2.lifesteal','lifestealRate','logan',.1):0;
- const mechanicSource=passiveRate>0?{componentId:'passive:logan/tasteForBlood',mechanicTags:['recovery.lifesteal'],trigger:'on_ally_damage'}:attacker.id==='angel'?{componentId:'passive:angel/hydration',mechanicTags:['recovery.lifesteal'],trigger:'on_ally_damage_dealt'}:null;
- const healed=combatEngine.resolveLifesteal({attacker,damage:healthDamage,rate,eventType,mechanicSource,sourceActorId:logan?.id}),healing=healed?.applied||0;if(healing>0){if(passiveRate>.1)combatEngine.recordUpgradeEffect('logan.duplicate.2.lifesteal',{actorId:logan.id,targetIds:[attacker.id],trigger:'on_ally_damage_dealt',values:{healing,lifestealRate:passiveRate}});saveVitals()}
- if(healing>0){emitCombatVisual('lifesteal-heal',[attacker.id],COMBAT_ACTION_EFFECT_MS,{healing});const weapon=logan&&loadoutFor('logan').weapon,signatureEquipped=weapon?.selected==='premium'&&weapon?.premiumOwned;if(attacker.id!=='logan'&&logan&&party.includes(attacker)&&signatureEquipped){const before=logan.hp;healCharacterHp(logan,healing);const copied=Math.max(0,logan.hp-before);if(copied>0){combatEngine.recordUpgradeEffect('logan.signature.lifesteal-share',{actorId:logan.id,targetIds:[logan.id],trigger:'on_ally_lifesteal',values:{healing:copied}});emitCombatVisual('logan-signature-heal',[logan.id],COMBAT_ACTION_EFFECT_MS,{healing:copied})}}}
- return healing;
-}
-function tauntRateOf(attacker,target=null){return Math.min(1,Math.max(0,...(attacker?.tauntEffects||[]).filter(effect=>Number.isInteger(effect.turns)&&effect.turns>0&&(!target||effect.targetId===target.id)).map(effect=>effect.rate)))}
-function applyTaunt(attacker,taunter,rate,turns){
- if(!attacker||!taunter||!Number.isFinite(rate)||rate<0||rate>1||!Number.isInteger(turns)||turns<1)return false;
- if(!combatEngine.applyTaunt({target:attacker,sourceId:taunter.id,targetId:taunter.id,rate,turns}))return false;
- emitCombatVisual('taunt-applied',[attacker.id],COMBAT_ACTION_EFFECT_MS,{rate,turns,taunterId:taunter.id});return true;
-}
-function resolveTauntTarget(attacker,candidates,originalTarget,random=Math.random){
- const contenders=[...new Set(candidates)].map(unit=>({unit,rate:tauntRateOf(attacker,unit)})).filter(entry=>entry.rate>0).sort((a,b)=>b.rate-a.rate||String(a.unit.id).localeCompare(String(b.unit.id)));
- for(const {unit,rate} of contenders)if(random()<rate)return {target:unit,taunted:true};
- return {target:originalTarget,taunted:false};
-}
-function characterLevelCap(rank=playerRank){return Number.isInteger(rank)&&rank>=1&&rank<=50?Math.ceil(rank/10)*10:0}
-function requiredExp(level){return Number.isInteger(level)&&level>=1&&level<CHARACTER_MAX_LEVEL?level*(10*(1+Math.floor(level/5))):0}
-function defaultProgress(){return {level:1,exp:0,ascended:[]}}
-function validateProgress(value,cap=characterLevelCap()){
- if(!value||!Number.isInteger(value.level)||value.level<1||value.level>cap||
-    !Number.isInteger(value.exp)||value.exp<0||!Array.isArray(value.ascended))return false;
- const completed=value.ascended;
- if(completed.some(g=>!ASCENSION_GATES.includes(g))||new Set(completed).size!==completed.length)return false;
- for(const g of ASCENSION_GATES)if(value.level>g&&!completed.includes(g))return false;
- if(value.level===cap||ASCENSION_GATES.includes(value.level)&&!completed.includes(value.level))return true;
- return value.exp<requiredExp(value.level);
-}
-function legacyRequiredExp(level){return Number.isInteger(level)&&level>=1&&level<CHARACTER_MAX_LEVEL?100*(1+Math.floor((level-1)/5)):0}
-function validateLegacyProgress(value){
- if(!value||!Number.isInteger(value.level)||value.level<1||value.level>CHARACTER_MAX_LEVEL||
-    !Number.isInteger(value.exp)||value.exp<0||!Array.isArray(value.ascended))return false;
- const completed=value.ascended;
- if(completed.some(g=>!ASCENSION_GATES.includes(g)||g>value.level)||new Set(completed).size!==completed.length)return false;
- for(const g of ASCENSION_GATES)if(value.level>g&&!completed.includes(g))return false;
- if(value.level===CHARACTER_MAX_LEVEL)return value.exp===0;
- if(ASCENSION_GATES.includes(value.level)&&!completed.includes(value.level))return value.exp===0;
- return value.exp<legacyRequiredExp(value.level);
-}
-function settleCharacterProgress(progress,cap=characterLevelCap()){
- let levelsGained=0;
- while(progress.level<cap){
-  if(ASCENSION_GATES.includes(progress.level)&&!progress.ascended.includes(progress.level))break;
-  const needed=requiredExp(progress.level);if(progress.exp<needed)break;
-  progress.exp-=needed;progress.level++;levelsGained++;
- }
- return levelsGained;
-}
-function loadProgress(){
- let stored={};try{stored=JSON.parse(localStorage.getItem(PROGRESSION_KEY)||'{}')||{}}catch(e){}
- const data={},cap=characterLevelCap();for(const r of ROSTER){const p=stored[r.id];
-  if(validateProgress(p,cap))data[r.id]={level:p.level,exp:p.exp,ascended:[...p.ascended]};
-  else if(validateLegacyProgress(p)){
-   const level=Math.min(p.level,cap),ascended=[...p.ascended];let exp=0;
-   if(p.level<=cap){const oldNeed=legacyRequiredExp(p.level),newNeed=requiredExp(p.level);exp=oldNeed?Math.floor(p.exp*newNeed/oldNeed):0;}
-   else{
-    for(let l=cap;l<p.level;l++)exp+=requiredExp(l);
-    const oldNeed=legacyRequiredExp(p.level),newNeed=requiredExp(p.level);if(oldNeed)exp+=Math.floor(p.exp*newNeed/oldNeed);
-   }
-   data[r.id]={level,exp,ascended};
-  }else data[r.id]=defaultProgress();
-  settleCharacterProgress(data[r.id],cap);
- }return data;
-}
-let characterProgress=loadProgress();
-function progressFor(id){return characterProgress[id]||null}
-function saveProgress(){try{localStorage.setItem(PROGRESSION_KEY,JSON.stringify(characterProgress))}catch(e){}}
-// Resource items/quantities are not approved yet. This debug injection never
-// models inventory consumption. Production Character XP sources are not defined.
-function grantCharacterXp(id,amount){
- const current=progressFor(id),cap=characterLevelCap();if(!current||!Number.isSafeInteger(amount)||amount<=0||current.level>=cap)return false;
- const temp={level:current.level,exp:current.exp,ascended:[...current.ascended]};
- if(!Number.isSafeInteger(temp.exp+amount))return false;temp.exp+=amount;settleCharacterProgress(temp,cap);
- if(!validateProgress(temp,cap))return false;
- const before=current.level;characterProgress[id]=temp;saveProgress();
- const actor=party.find(p=>p.id===id);
- if(actor){actor.level=temp.level;if(before!==temp.level)recomputeUnitMaxHp(actor);}
- return {level:temp.level,exp:temp.exp,levelsGained:temp.level-before,nextExp:requiredExp(temp.level)};
-}
-function testGrantExp(id,amount){return grantCharacterXp(id,amount)}
-function testAscend(id){
- const p=progressFor(id);if(!p||!ASCENSION_GATES.includes(p.level)||p.ascended.includes(p.level))return false;
- p.ascended.push(p.level);settleCharacterProgress(p);saveProgress();
- const actor=party.find(x=>x.id===id);if(actor){actor.level=p.level;recomputeUnitMaxHp(actor)}
- return true;
-}
-function setPlayerRankForTest(rank){
- if(!Number.isInteger(rank)||rank<playerRank||rank>50)return false;
- playerRank=rank;const cap=characterLevelCap();
- for(const [id,p] of Object.entries(characterProgress)){
-  const before=p.level;settleCharacterProgress(p,cap);
-  const actor=party.find(x=>x.id===id);if(actor){actor.level=p.level;if(before!==p.level)recomputeUnitMaxHp(actor)}
- }
- saveProgress();savePlayerRank();return true;
-}
-function calculateMaxHp(baseHp,level,flat={},percent={},equipmentFlat={}){
- if(!Number.isFinite(baseHp)||baseHp<=0)return null;
- const max=calculateLevelScaledStat(baseHp,level,flat,percent,equipmentFlat);
- return max!==null&&max>=1?max:null;
-}
-function recomputeUnitMaxHp(unit){
- const max=calculateMaxHp(unit.baseHp,unit.level,unit.hpFlatModifiers,unit.hpPercentModifiers,unit.hpEquipmentFlatModifiers);
- if(max===null)return false;
- const oldMax=unit.maxHp||max, oldHp=unit.hp;
- // Preserve the current HP ratio, including values above the old Max HP.
- unit.maxHp=max;unit.hp=oldHp<=0?0:Math.max(0,roundHp(max*(oldHp/oldMax)));
- saveVitals();return true;
-}
-function healCharacterHp(unit,amount,{allowOverMax=false}={}){
- if(!unit||unit.hp<=0||!Number.isFinite(amount)||amount<=0)return false;
- if(!allowOverMax&&unit.hp>unit.maxHp)return false;
- unit.hp=allowOverMax?unit.hp+amount:Math.min(unit.maxHp,unit.hp+amount);
- saveVitals();return true;
-}
-function setHpBonusForTest(id,source,kind,value){
- const p=party.find(u=>u.id===id);if(!p||!source||!Number.isFinite(value)||!['flat','percent'].includes(kind))return false;
- const key=kind==='flat'?'hpFlatModifiers':'hpPercentModifiers',next={...p[key],[source]:value};
- const max=calculateMaxHp(p.baseHp,p.level,kind==='flat'?next:p.hpFlatModifiers,kind==='percent'?next:p.hpPercentModifiers,p.hpEquipmentFlatModifiers);
- if(max===null)return false;p[key]=next;recomputeUnitMaxHp(p);return true;
-}
-function setEchoPercentForTest(id,percent){
- if(!DEV_MODE||phase!=='player'||attackInProgress||!Number.isFinite(percent)||percent<0||percent>1)return false;
- const unit=party.find(candidate=>candidate.id===id)||liveEnemies().find(candidate=>candidate.id===id);if(!unit)return false;
- unit.echoPercent=percent;say(`TEST ONLY: ${unit.name} Echo ${roundHp(percent*100)}%.`);return true;
-}
-function setReflectPercentForTest(id,percent){
- if(!DEV_MODE||phase!=='player'||attackInProgress||!Number.isFinite(percent)||percent<0||percent>1)return false;
- const unit=party.find(candidate=>candidate.id===id)||liveEnemies().find(candidate=>candidate.id===id);if(!unit)return false;
- unit.reflectPercent=percent;say(`TEST ONLY: ${unit.name} Reflect ${roundHp(percent*100)}%.`);return true;
-}
-function loadVitals(){try{const x=JSON.parse(localStorage.getItem(VITALS_KEY)||'{}');return x&&typeof x==='object'?x:{}}catch(e){return {}}}
-let savedVitals=loadVitals();
-let vitalsSyncTimer=null;
-function saveVitals(){
- if(campaignEntry)return;
- for(const p of party){if(!p||!ROSTER_IDS.has(p.id))continue;savedVitals[p.id]={hp:p.hp,maxHp:p.maxHp}}
- try{localStorage.setItem(VITALS_KEY,JSON.stringify(savedVitals))}catch(e){}
- clearTimeout(vitalsSyncTimer);vitalsSyncTimer=setTimeout(()=>window.TwoToneAccount?.action('set-vitals',{vitals:savedVitals}).catch(()=>{}),500);
-}
-// Training mode assignments exercise both approved game-mode recovery policies;
-// actual named game modes have not been designed or assigned a policy.
-let trainingRecoveryMode='restore';
-function setTrainingRecoveryMode(mode){if(phase!=='setup'||!['restore','preserve'].includes(mode))return false;trainingRecoveryMode=mode;return true}
-function spawnProgressedUnit(id,fullHealth=false){
- const model=ROSTER.find(x=>x.id===id),progress=progressFor(id);if(!model||!progress)return null;
- const modifiers=loadoutStatModifiers(id,progress.level);
- const maxHp=calculateMaxHp(model.hp,progress.level,modifiers.hpFlatModifiers,modifiers.hpPercentModifiers,modifiers.hpEquipmentFlatModifiers);if(maxHp===null)return null;
- const saved=savedVitals[id];const restore=fullHealth||trainingRecoveryMode==='restore'||!saved;
- const savedMax=Number.isFinite(saved?.maxHp)&&saved.maxHp>0?saved.maxHp:maxHp;
- const savedHp=Number.isFinite(saved?.hp)?saved.hp:maxHp;
- const hp=restore?maxHp:savedHp<=0?0:Math.max(0,roundHp(maxHp*(savedHp/savedMax)));
- const passive={...(model.passive||{})};
- if(id==='zero'){
-  passive.criticalRateBonus=.2*upgradeValueFor('zero.duplicate.1.critical-stats','criticalRateMultiplier','zero',1);
-  passive.criticalDamageBonus=.5*upgradeValueFor('zero.duplicate.1.critical-stats','criticalDamageMultiplier','zero',1);
-  passive.defenseIgnore=upgradeValueFor('zero.premium-duplicate.4.defense-ignore','defenseIgnore','zero');
- }
- return {...model,passive,baseHp:model.hp,level:progress.level,hp,maxHp,...modifiers,shield:0,tauntEffects:[],energy:COMBAT_RESOURCE_STANDARD.startingEnergy,energyReserved:0,...(id==='angel'?{currentCycle:0}:{})};
-}
+NÂ™[˜İ[Ûˆ[™TÙ]İ]JY
+^Ü™]\›ˆ[™PÛÛX˜]İ]VÚY_
+[™PÛÛX˜]İ]VÚYO^ØÛÛÛİÛœÎÉÜ˜YX[[[ÛÛ‰ÎŒ	Ù]\›˜[\İ[‰ÎŒ	Ù\šË[X]\‰ÎŒ	ØÛX\‹\ÚÚY\ÉÎŒ™XŞXÛNŒ[\YNŒ	ØÙ[\İX[\İ\‰ÎŒ[š]YŒKÛÛÛİÛ”İ\Y\›ßK]\›˜[İ[“™^Xİ[Û”[™[™Î™˜[ÙKÚY[™[XZ[š[™ÎŒÚY[\›œÎŒÚY[İ\Y\›Œ[š]Y[šÎ›[J_B™[˜İ[Ûˆ[™TÙ]YXÙPÛİ[
+YÙ^J^Ü™]\›ˆ\[ÙˆYOOIÜİš[™ÉÉ‰”“ÔÕT—ÒQËš\ÊY
+I‰šÙ^OÛØYİ]›ÜŠY
+Kœ[™\Ë™š[\Š[™OOœ[™OËœÙ]YOOZÙ^JK›[™İŒB™[˜İ[ÛˆİÛ™Y[™PÛİ[
+Ù]Y
+^Ü™]\›ˆ
+][R[™[ÜOËœ[™\ÏË–ÜÙ]YOË›[™İ
+JÓØš™Xİ˜[Y\ÊÚ\˜Xİ\“ØYİ]ßßJKœ™YXÙJ
+Ûİ[™XÛÜ™
+OO˜Ûİ[
+Ü™XÛÜ™œ[™\Ë™š[\Š[™OOœ[™OËœÙ]YOO\Ù]Y
+K›[™İ
+_B™[˜İ[Ûˆ\Ô[™TÙ]
+YÙ^J^Ü™]\›ˆ[™TÙ]YXÙPÛİ[
+YÙ^JOOOMB™[˜İ[Ûˆ[™QY™™Xİ™XYJYY™™Xİ
+^Ü™]\›ˆÛÛX˜][™Ú[™Kš\Ô[™T™XYJ[™TÙ]İ]JY
+KY™™Xİ
+_B™[˜İ[Ûˆ™\İÜ™T[™Q[™\™ŞJXİÜ‹[[İ[
+^ÚYŠXXİÜŸS[X™\‹š\Ñš[š]J[[İ[
+_[[İ[L
+\™]\›ˆØÛÛœİ™Y›Ü™OXXİÜ‹™[™\™ŞNØXİÜ‹™[™\™ŞOSX]›Z[ŠLŒXİÜ‹™[™\™ŞJØ[[İ[
+NÜ™]\›ˆXİÜ‹™[™\™ŞKX™Y›Ü™_B™[˜İ[Ûˆ™\ÛÛ™Q]\›˜[İ[Xİ[ÛŠ]XÚÊ^ÚYŠX]XÚßZ\Ô[™TÙ]
+]XÚË˜XİÜ‹	Ù]\›˜[\İ[‰ÊJ\™]\›ˆ˜[ÙNØÛÛœİXİÜ\\K™š[™
+Y[X™\O›Y[X™\‹šYOOX]XÚË˜XİÜŠKİ]O\[™TÙ]İ]J]XÚË˜XİÜŠNÚYŠXXİÜŠ\™]\›ˆ˜[ÙNÚYŠİ]K™]\›˜[İ[“™^Xİ[Û”[™[™Ê^ØÛÛœİY™™XİXÛÛX˜][™Ú[™Kœ™\ÛÛ™T[™UšYÙÙ\ŠÜÙ]Y‰Ù]\›˜[\İ[‰ËšYÙÙ\‰Û™^Xİ[Û‰Ëİ]KY™™XİY‰Ù]\›˜[\İ[‰Ë\›‹XİÜ’Y˜XİÜ‹šY\™Ù]YÎ–ØXİÜ‹šY_JNÜİ]K™]\›˜[İ[“™^Xİ[Û”[™[™ÏY˜[ÙNÚYŠYY™™Xİ
+\™]\›ˆ˜[ÙNØÛÛœİ[™\™ŞQØZ[™Y\™\İÜ™T[™Q[™\™ŞJXİÜ‹Y™™Xİ™[™\™ŞT™\İÜ™JNØXİÜ‹œ[™PXİ]˜][ÛœÏJXİÜ‹œ[™PXİ]˜][Ûœß
+JÌNØÛÛX˜][™Ú[™Kœ™XÛÜ™YXÚ[šXÑ]™[
+ØÛÛ\Û™[Y‰Ü[™N™]\›˜[\İ[‰ËYXÚ[šXÕYÜÎ”•S‘WĞÓÓPUÔ•STÖÉÙ]\›˜[\İ[‰×K›YXÚ[šXÕYÜËšYÙÙ\‰ØY\—Û™^ØXİ[Û‰Ëİ]\Î‰Ø\YY	ËXİÜ’Y˜XİÜ‹šY\™Ù]YÎ–ØXİÜ‹šYK˜[Y\ÎÙ[™\™ŞQØZ[™YÛÛÛİÛ•\›œÎ™Y™™Xİ˜ÛÛÛİÛ•\›œß_JNÙ[Z]ÛÛX˜]š\İX[
+	Ü[™KY]\›˜[\İ[‰ËØXİÜ‹šYKÓÓPUĞPÕSÓ—ÑQ‘‘PÕÓTËÙ[™\™ŞQØZ[™YJNÜ™]\›ˆY_ZYŠ]XÚË˜Xİ[ÛOOIİ[[X]IÉ‰œ[™QY™™Xİ™XYJXİÜ‹šY	Ù]\›˜[\İ[‰ÊJ^ØÛÛœİY™™XİXÛÛX˜][™Ú[™Kœ™\ÛÛ™T[™UšYÙÙ\ŠÜÙ]Y‰Ù]\›˜[\İ[‰ËšYÙÙ\‰İ[[X]IËİ]KXİÜ’Y˜XİÜ‹šY\™Ù]YÎ–ØXİÜ‹šY_JNÚYŠY™™Xİ
+^Üİ]K™]\›˜[İ[“™^Xİ[Û”[™[™Ï]YNØXİÜ‹œ[™PXİ]˜][ÛœÏJXİÜ‹œ[™PXİ]˜][Ûœß
+JÌNÜ™]\›ˆY__\™]\›ˆ˜[Ù_B™[˜İ[Ûˆ™\\™T[™Q[XYÙQY™™XİÊXİÜ‹Xİ[Û‹[‹\™Ù]Ê^ÂˆÛÛœİY™™XİÏ^ßNØXİ]™T[™Q[XYÙQY™™XİÖØXİÜ‹šYOYY™™XİÎÚYŠ\[Ÿ]\™Ù]ÏË›[™İ
+\™]\›ˆY™™XİÎÂˆÛÛœİ\™Ù]YÏ]\™Ù]Ë›X\
+\™Ù]O\™Ù]šY
+Kİ]O\[™TÙ]İ]JXİÜ‹šY
+NÂˆYŠ[‹™[XYÙU\I‰š\Ô[™TÙ]
+XİÜ‹šY	Ù\šË[X]\‰ÊJYY™™XİË™\šÓX]\XÛÛX˜][™Ú[™Kœ™\ÛÛ™T[™UšYÙÙ\ŠÜÙ]Y‰Ù\šË[X]\‰ËšYÙÙ\‰ØXš[]Q[XYÙIËİ]KY™™XİY‰Ù\šË[X]\‰Ë\›‹XİÜ’Y˜XİÜ‹šY\™Ù]YÎ–ØXİÜ‹šY_JNÂˆYŠ[‹™[XYÙU\I‰˜Xİ[ÛOOIÜÚÚ[	É‰š\Ô[™TÙ]
+XİÜ‹šY	Ü˜YX[[[ÛÛ‰ÊJYY™™XİËœ˜YX[[ÛÛXÛÛX˜][™Ú[™Kœ™\ÛÛ™T[™UšYÙÙ\ŠÜÙ]Y‰Ü˜YX[[[ÛÛ‰ËšYÙÙ\‰Ù[XYÚ[™ÔÚÚ[	Ëİ]KY™™XİY‰Ü˜YX[[[ÛÛ‰Ë\›‹XİÜ’Y˜XİÜ‹šY\™Ù]YßJNÂˆ™]\›ˆY™™XİÎÂŸB™[˜İ[Ûˆ\T[™TÚÚ[Y™™XİÊXİÜŠ^ÂˆYŠXXİÜŠ\™]\›ˆ˜[ÙNÛ]\YYY˜[ÙNØÛÛœİİ]O\[™TÙ]İ]JXİÜ‹šY
+NÂˆÛÛœİÚY[XÛÛX˜][™Ú[™Kœ™\ÛÛ™T[™UšYÙÙ\ŠÜÙ]Yš\Ô[™TÙ]
+XİÜ‹šY	ØÛX\‹\ÚÚY\ÉÊOÉØÛX\‹\ÚÚY\ÉÎ›[šYÙÙ\‰ÜÚÚ[	Ëİ]KY™™XİY‰ØÛX\‹\ÚÚY\ÉË\›‹XİÜ’Y˜XİÜ‹šY\™Ù]YÎ–ØXİÜ‹šY_JNÂˆYŠÚY[
+^ØÛÛœİ[[İ[\›İ[™
+XİÜ‹›X^
+œÚY[œÚY[X^
+K™Y›Ü™O\ÚY[ÙŠXİÜŠNØYÚY[
+XİÜ‹[[İ[
+NÜİ]KœÚY[™[XZ[š[™ÊÏSX]›X^
+ÚY[ÙŠXİÜŠKX™Y›Ü™JNÜİ]KœÚY[\›œÏ\ÚY[œÚY[\˜][Û•\›œÎÜİ]KœÚY[İ\Y\›]\›ØÛÛX˜][™Ú[™Kœ™XÛÜ™YXÚ[šXÑ]™[
+ØÛÛ\Û™[Y‰Ü[™N˜ÛX\‹\ÚÚY\ÉËYXÚ[šXÕYÜÎ”•S‘WĞÓÓPUÔ•STÖÉØÛX\‹\ÚÚY\É×K›YXÚ[šXÕYÜËšYÙÙ\‰ÛÛ—ÜÚÚ[	Ëİ]\Î‰Ø\YY	ËXİÜ’Y˜XİÜ‹šY\™Ù]YÎ–ØXİÜ‹šYK˜[Y\ÎÜÚY[Ü˜[Y“X]›X^
+ÚY[ÙŠXİÜŠKX™Y›Ü™JKÚY[X^œÚY[œÚY[X^\˜][Û•\›œÎœÚY[œÚY[\˜][Û•\›œË™Y›XİÚ[TÚY[Y”•S‘WĞÓÓPUÔ•STÖÉØÛX\‹\ÚÚY\É×Kœ™Y›Xİ_JNÙ[Z]ÛÛX˜]š\İX[
+	Ü[™KXÛX\‹\ÚÚY\ÉËØXİÜ‹šYKÓÓPUĞPÕSÓ—ÑQ‘‘PÕÓTËÜÚY[“X]›X^
+ÚY[ÙŠXİÜŠKX™Y›Ü™J_JNØ\YY]Y_BˆÛÛœİ™XŞXÛOXÛÛX˜][™Ú[™Kœ™\ÛÛ™T[™UšYÙÙ\ŠÜÙ]Yš\Ô[™TÙ]
+XİÜ‹šY	Ü™XŞXÛIÊOÉÜ™XŞXÛIÎ›[šYÙÙ\‰ÜÚÚ[	Ëİ]KY™™XİY‰Ü™XŞXÛIË\›‹XİÜ’Y˜XİÜ‹šY\™Ù]YÎ–ØXİÜ‹šY_JNÂˆYŠ™XŞXÛJ^ØÛÛœİ™Y›Ü™O\ÜÙØZ[”Ü
+™XŞXÛKœÚÚ[Ú[ÊNØYXİ[ÛY˜[˜ÙJXİÜ‹šY™XŞXÛK˜Xİ[ÛY˜[˜ÙJNØÛÛX˜][™Ú[™Kœ™XÛÜ™YXÚ[šXÑ]™[
+ØÛÛ\Û™[Y‰Ü[™Nœ™XŞXÛIËYXÚ[šXÕYÜÎ”•S‘WĞÓÓPUÔ•STËœ™XŞXÛK›YXÚ[šXÕYÜËšYÙÙ\‰ÛÛ—ÜÚÚ[	Ëİ]\Î‰Ø\YY	ËXİÜ’Y˜XİÜ‹šY\™Ù]YÎ–ØXİÜ‹šYK˜[Y\ÎÜÚÚ[Ú[ÑØZ[™YœÜX™Y›Ü™KÚÚ[Ú[Ğ™Y›Ü™N˜™Y›Ü™KÚÚ[Ú[ĞY\œÜXİ[ÛY˜[˜ÙNœ™XŞXÛK˜Xİ[ÛY˜[˜Ù__JNÙ[Z]ÛÛX˜]š\İX[
+	Ü[™K\™XŞXÛIËØXİÜ‹šYKÓÓPUĞPÕSÓ—ÑQ‘‘PÕÓTËÜÚÚ[Ú[Îœ™XŞXÛKœÚÚ[Ú[ËY˜[˜ÙT\˜Ù[œ™XŞXÛK˜Xİ[ÛY˜[˜Ù_JNØ\YY]Y_Bˆ™]\›ˆ\YYÂŸB™[˜İ[Ûˆ\U[š]Y[™JY\™Ù]Y
+^ØÛÛœİXİÜ\\K™š[™
+Y[X™\O›Y[X™\‹šYOOZY
+K\™Ù]\\K™š[™
+Y[X™\O›Y[X™\‹šYOO]\™Ù]Y
+Kİ]O\[™TÙ]İ]JY
+NÚYŠXXİÜŸ]\™Ù]\™Ù]šL\™Ù]šYOOZYİ]K[š]Y[šÊ\™]\›ˆ˜[ÙNØÛÛœİY™™XİXÛÛX˜][™Ú[™Kœ™\ÛÛ™T[™UšYÙÙ\ŠÜÙ]Yš\Ô[™TÙ]
+Y	İ[š]Y	ÊOÉİ[š]Y	Î›[šYÙÙ\‰Ø[TÚÚ[	Ëİ]KY™™XİY‰İ[š]Y	Ë\›‹XİÜ’YšY\™Ù]YÎ–İ\™Ù]Y_JNÚYŠYY™™Xİ
+\™]\›ˆ˜[ÙNÜİ]K[š]Y[šÏ^İ\™Ù]YXİ[ÛœÔ™[XZ[š[™Î™Y™™Xİ›[šĞXİ[ÛœËÛÛÛİÛY\“[šÕ\›œÎ™Y™™Xİ˜ÛÛÛİÛY\“[šÕ\›œßNØÛÛX˜][™Ú[™Kœ™XÛÜ™YXÚ[šXÑ]™[
+ØÛÛ\Û™[Y‰Ü[™N[š]Y	ËYXÚ[šXÕYÜÎ”•S‘WĞÓÓPUÔ•STË[š]Y›YXÚ[šXÕYÜËšYÙÙ\‰ÛÛ—Ø[WÜÚÚ[	Ëİ]\Î‰Û[šÙY	ËXİÜ’YšY\™Ù]YÎ–ÚY\™Ù]YK˜[Y\ÎÛ[šÙYXİ[ÛœÎ™Y™™Xİ›[šĞXİ[ÛœËÛÛÛİÛY\“[šÕ\›œÎ™Y™™Xİ˜ÛÛÛİÛY\“[šÕ\›œß_JNÙ[Z]ÛÛX˜]š\İX[
+	Ü[™K][š]Y	ËÚY\™Ù]YKÓÓPUĞPÕSÓ—ÑQ‘‘PÕÓTËÛ[šÙYXİ[ÛœÎ™Y™™Xİ›[šĞXİ[ÛœßJNÜ™]\›ˆY_B™[˜İ[Ûˆ^\™U[š]Y[šÊİÛ™\’Y\™Ù]Y
+^ØÛÛœİİ]O\[™TÙ]İ]JİÛ™\’Y
+K[šÏ\İ]K[š]Y[šÎÚYŠ[[šß[šË\™Ù]YOO]\™Ù]Y
+\™]\›ˆ˜[ÙNÜİ]K[š]Y[šÏ[[ØÛÛX˜][™Ú[™Kœİ\[™PÛÛÛİÛŠİ]K	İ[š]Y	Ë\›‹[šË˜ÛÛÛİÛY\“[šÕ\›œÊNØÛÛX˜][™Ú[™Kœ™XÛÜ™YXÚ[šXÑ]™[
+ØÛÛ\Û™[Y‰Ü[™N[š]Y	ËYXÚ[šXÕYÜÎ”•S‘WĞÓÓPUÔ•STË[š]Y›YXÚ[šXÕYÜËšYÙÙ\‰ØY\—Û[š×Ù^\™Y	Ëİ]\Î‰Ù^\™Y	ËXİÜ’Y›İÛ™\’Y\™Ù]YÎ–ÛİÛ™\’Y\™Ù]YK˜[Y\ÎØÛÛÛİÛ•\›œÎ›[šË˜ÛÛÛİÛY\“[šÕ\›œË[šÙYXİ[ÛœÎ›[šË˜Xİ[ÛœÔ™[XZ[š[™ß_JNÜ™]\›ˆY_B™[˜İ[ÛˆYÙU[š]Y[šÕ\›Š\™Ù]Y
+^Ù›ÜŠÛÛœİİÛ™\ˆÙˆ\JY^\™U[š]Y[šÊİÛ™\‹šY\™Ù]Y
+_B™[˜İ[ÛˆYÙT[™U\›ŠY
+^ØÛÛœİİ]O\[™TÙ]İ]JY
+NØÛÛX˜][™Ú[™K˜YÙT[™PÛÛÛİÛœÊİ]K\›‹ÉÜ˜YX[[[ÛÛ‰Ë	Ù]\›˜[\İ[‰Ë	Ù\šË[X]\‰Ë	ØÛX\‹\ÚÚY\ÉË	Ü™XŞXÛIË	Ø[\YIË	ØÙ[\İX[\İ\‰Ë	İ[š]Y	×JNÚYŠİ]KœÚY[\›œÏŒ	‰œİ]KœÚY[İ\Y\›\›Š^Üİ]KœÚY[\›œËKNÚYŠ\İ]KœÚY[\›œÉ‰œİ]KœÚY[™[XZ[š[™ÏŒ
+^ØÛÛœİ[š]\\K™š[™
+Y[X™\O›Y[X™\‹šYOOZY
+NÚYŠ[š]
+][š]œÚY[SX]›X^
+ÚY[ÙŠ[š]
+K\İ]KœÚY[™[XZ[š[™ÊNÜİ]KœÚY[™[XZ[š[™ÏL__B™[˜İ[ÛˆYÙT[™Q[^R[[][š]J[š]
+^Ù›ÜŠÛÛœİİÛ™\ˆÙˆØš™XİšÙ^\Ê[š]Ëœ[™Q[^R[[][š]PSİÛ™\ŸßJJ^İ[š]œ[™Q[^R[[][š]PSİÛ™\–ÛİÛ™\—OSX]›X^
+[š]œ[™Q[^R[[][š]PSİÛ™\–ÛİÛ™\—KLJNÚYŠ][š]œ[™Q[^R[[][š]PSİÛ™\–ÛİÛ™\—JY[]H[š]œ[™Q[^R[[][š]PSİÛ™\–ÛİÛ™\—__B™[˜İ[ÛˆØ[İ[]TÜYY
+[š]
+^ÂˆYŠ][š]
+\™]\›ˆ[ÂˆÛÛœİ˜\ÙOS[X™\‹š\Ñš[š]J[š]˜˜\ÙTÜYY
+Oİ[š]˜˜\ÙTÜYY[š]œÜYYÂˆYŠS[X™\‹š\Ñš[š]J˜\ÙJJ\™]\›ˆ[ÂˆÛÛœİY™™Xİ][\Y\\ÜYY[ÙYšY\œÖİ[š]šY_NÂˆÛÛœİ[\ÔİXÚÜÏ][š]›X\šÜÏË™š[\ŠX\šÏO–ÉØÛİY][\ÉË	İİ[˜YK\ÛİË\İ\	×Kš[˜ÛY\ÊX\šËšY
+JKœ™YXÙJ
+İ[KX\šÊOOœİ[JÊX\šËœÜYY›Û\ß
+X\šËšYOOIİİ[˜YK\ÛİË\İ\	ÏÌNŒŒŠJK
+_ÂˆÛÛœİÛİÔİXÚÜÏ][š]›X\šÜÏË™š[\ŠX\šÏO›X\šËšYOOIØÛİY\ÛİÉÊ_×KÛİÏ\ÛİÔİXÚÜËœ™YXÙJ
+˜[YKX\šÊOO˜[YJÊX\šËœÛİÔ\˜Ù[ŒŠK
+NÂˆ™]\›ˆØ[İ[]S]™[ØØ[Yİ]
+˜\ÙK[X™\‹š\Ò[YÙ\Š[š]›]™[
+Oİ[š]›]™[ŒKˆË‹‹Š[š]œÜYY›][ÙYšY\œßßJ_KˆË‹‹Š[š]œÜYY\˜Ù[[ÙYšY\œßßJK[\Ü˜\TÜYYY™™Xİ™Y™™Xİ][\Y\‹LJİ[\ÔİXÚÜË\ÛİßK[š]œÜYY\]Z\Y[›][ÙYšY\œßßJNÂŸB™[˜İ[ÛˆÜYYÙŠ[š]
+^Ü™]\›ˆX]›X^
+KØ[İ[]TÜYY
+[š]
+_J_B™[˜İ[Ûˆ[Y[[™Q[™[^SY[X™\œÊ
+^ÂˆËÈ[ˆ\È˜Z[š[™È[˜Ûİ[\‹HØ]™IÜÈ™YYš[™Y[™[^H›Üİ\ˆ\È]ÈÜYYX]™\˜YÚ[™ÈX[K‚ˆËÈY™X]Y[™ØZ][™È[™[^H[œİ[˜Ù\È™[XZ[ˆ[ˆHÛÚÜÈH[H›Üˆ›Û‹]Ø]™H›ÜÜÂˆËÈ™Z[™›Ü˜Ù[Y[È]\İ™HÜXÚYšYYÙ\\˜][H™Y›Ü™HY[™È[H\È›ÙXİ[ÛˆXš[]Y\Ë‚ˆ™]\›ˆØ]™T[–İØ]™R[™^OİØ]™T[–İØ]™R[™^K›X\
+OOŠÚY™KšYÜYYœÜYYÙŠJ_JJN›]™Q[™[ZY\Ê
+K›X\
+OOŠÚY™KšYÜYYœÜYYÙŠJ_JJNÂŸB™[˜İ[Ûˆ\›•[Y[[™R[œ]Ê
+^ÂˆÛÛœİ[š]ÏVË‹‹˜[]™J
+K›X\
+OŠÚYœšYÜYYœÜYYÙŠ
+K˜Xİ[Û‰Ø[IßJJKˆ‹‹›]™Q[™[ZY\Ê
+K›X\
+OOŠÚY™KšYÜYYœÜYYÙŠJK˜Xİ[Û‰Ù[™[^IßJJKˆ‹‹œİ[[[ÛœË™š[\ŠO›[ÙOOOIÚ[™\[™[	É‰œ™[XZ[š[™ÏŒ
+K›X\
+OŠÚYšYÜYYœÜYYÙŠ
+K˜Xİ[Û‰Ø[IËİ[[[ÛY_JJWNÂˆÛÛœİ[SY[X™\œÏ\\K›X\
+OŠÚYœšYÜYYœÜYYÙŠ
+_JJNÂˆÛÛœİ[™[^SY[X™\œÏ][Y[[™Q[™[^SY[X™\œÊ
+NÂˆ™]\›ˆİ[š]Ë[YYY[X™\œÎ˜[SY[X™\œË[™[^SY[X™\œßNÂŸB™[˜İ[ÛˆŞ[˜Õ\›•[Y[[™J
+^ÂˆÛÛœİ[œ]Ï]\›•[Y[[™R[œ]Ê
+NÂˆYŠ[œ]Ë˜[YYY[X™\œË›[™İ	‰š[œ]Ë™[™[^SY[X™\œË›[™İ
+XÛÛX˜][™Ú[™KœŞ[˜Õ\›“Ü™\Š[œ]Ë[š]Ë[œ]Ë˜[YYY[X™\œË[œ]Ë™[™[^SY[X™\œÊNÂˆŞ[˜ÓYØXŞQØ]YÙ\Ê
+NÂŸB™[˜İ[ÛˆŞ[˜ÓYØXŞQØ]YÙ\Ê
+^ÂˆÛÛœİÛ˜\]\›•[Y[[™KœÛ˜\Úİ
 
-const turnTimeline=combatEngine.timeline;
-let speedModifiers=Object.create(null),summons=[],summonSerial=0,summonHistory=[],runeCombatState=Object.create(null),activeRuneDamageEffects=Object.create(null);
-const unitedFollowUpParents=new Map();
-function runeSetState(id){return runeCombatState[id]||(runeCombatState[id]={cooldowns:{'radiant-moon':0,'eternal-sun':0,'dark-matter':0,'clear-skies':0,recycle:0,amplify:0,'celestial-star':0,united:0},cooldownStartedTurn:{},eternalSunNextActionPending:false,shieldRemaining:0,shieldTurns:0,shieldStartedTurn:0,unitedLink:null})}
-function runeSetPieceCount(id,key){return typeof id==='string'&&ROSTER_IDS.has(id)&&key?loadoutFor(id).runes.filter(rune=>rune?.setId===key).length:0}
-function ownedRuneCount(setId){return (itemInventory?.runes?.[setId]?.length||0)+Object.values(characterLoadouts||{}).reduce((count,record)=>count+record.runes.filter(rune=>rune?.setId===setId).length,0)}
-function hasRuneSet(id,key){return runeSetPieceCount(id,key)===4}
-function runeEffectReady(id,effect){return combatEngine.isRuneReady(runeSetState(id),effect)}
-function restoreRuneEnergy(actor,amount){if(!actor||!Number.isFinite(amount)||amount<=0)return 0;const before=actor.energy;actor.energy=Math.min(120,actor.energy+amount);return actor.energy-before}
-function resolveEternalSunAction(attack){if(!attack||!hasRuneSet(attack.actor,'eternal-sun'))return false;const actor=party.find(member=>member.id===attack.actor),state=runeSetState(attack.actor);if(!actor)return false;if(state.eternalSunNextActionPending){const effect=combatEngine.resolveRuneTrigger({setId:'eternal-sun',trigger:'nextAction',state,effectId:'eternal-sun',turn,actorId:actor.id,targetIds:[actor.id]});state.eternalSunNextActionPending=false;if(!effect)return false;const energyGained=restoreRuneEnergy(actor,effect.energyRestore);actor.runeActivations=(actor.runeActivations||0)+1;combatEngine.recordMechanicEvent({componentId:'rune:eternal-sun',mechanicTags:RUNE_COMBAT_RULES['eternal-sun'].mechanicTags,trigger:'after_next_action',status:'applied',actorId:actor.id,targetIds:[actor.id],values:{energyGained,cooldownTurns:effect.cooldownTurns}});emitCombatVisual('rune-eternal-sun',[actor.id],COMBAT_ACTION_EFFECT_MS,{energyGained});return true}if(attack.action==='ultimate'&&runeEffectReady(actor.id,'eternal-sun')){const effect=combatEngine.resolveRuneTrigger({setId:'eternal-sun',trigger:'ultimate',state,actorId:actor.id,targetIds:[actor.id]});if(effect){state.eternalSunNextActionPending=true;actor.runeActivations=(actor.runeActivations||0)+1;return true}}return false}
-function prepareRuneDamageEffects(actor,action,plan,targets){
- const effects={};activeRuneDamageEffects[actor.id]=effects;if(!plan||!targets?.length)return effects;
- const targetIds=targets.map(target=>target.id),state=runeSetState(actor.id);
- if(plan.damageType&&hasRuneSet(actor.id,'dark-matter'))effects.darkMatter=combatEngine.resolveRuneTrigger({setId:'dark-matter',trigger:'abilityDamage',state,effectId:'dark-matter',turn,actorId:actor.id,targetIds:[actor.id]});
- if(plan.damageType&&action==='skill'&&hasRuneSet(actor.id,'radiant-moon'))effects.radiantMoon=combatEngine.resolveRuneTrigger({setId:'radiant-moon',trigger:'damagingSkill',state,effectId:'radiant-moon',turn,actorId:actor.id,targetIds});
- return effects;
-}
-function applyRuneSkillEffects(actor){
- if(!actor)return false;let applied=false;const state=runeSetState(actor.id);
- const shield=combatEngine.resolveRuneTrigger({setId:hasRuneSet(actor.id,'clear-skies')?'clear-skies':null,trigger:'skill',state,effectId:'clear-skies',turn,actorId:actor.id,targetIds:[actor.id]});
- if(shield){const amount=roundHp(actor.maxHp*shield.shieldMaxHp),before=shieldOf(actor);addShield(actor,amount);state.shieldRemaining+=Math.max(0,shieldOf(actor)-before);state.shieldTurns=shield.shieldDurationTurns;state.shieldStartedTurn=turn;combatEngine.recordMechanicEvent({componentId:'rune:clear-skies',mechanicTags:RUNE_COMBAT_RULES['clear-skies'].mechanicTags,trigger:'on_skill',status:'applied',actorId:actor.id,targetIds:[actor.id],values:{shieldGranted:Math.max(0,shieldOf(actor)-before),shieldMaxHp:shield.shieldMaxHp,durationTurns:shield.shieldDurationTurns,reflectWhileShielded:RUNE_COMBAT_RULES['clear-skies'].reflect}});emitCombatVisual('rune-clear-skies',[actor.id],COMBAT_ACTION_EFFECT_MS,{shield:Math.max(0,shieldOf(actor)-before)});applied=true}
- const recycle=combatEngine.resolveRuneTrigger({setId:hasRuneSet(actor.id,'recycle')?'recycle':null,trigger:'skill',state,effectId:'recycle',turn,actorId:actor.id,targetIds:[actor.id]});
- if(recycle){const before=sp;gainSp(recycle.skillPoints);addActionAdvance(actor.id,recycle.actionAdvance);combatEngine.recordMechanicEvent({componentId:'rune:recycle',mechanicTags:RUNE_COMBAT_RULES.recycle.mechanicTags,trigger:'on_skill',status:'applied',actorId:actor.id,targetIds:[actor.id],values:{skillPointsGained:sp-before,skillPointsBefore:before,skillPointsAfter:sp,actionAdvance:recycle.actionAdvance}});emitCombatVisual('rune-recycle',[actor.id],COMBAT_ACTION_EFFECT_MS,{skillPoints:recycle.skillPoints,advancePercent:recycle.actionAdvance});applied=true}
- return applied;
-}
-function applyUnitedRune(id,targetId){const actor=party.find(member=>member.id===id),target=party.find(member=>member.id===targetId),state=runeSetState(id);if(!actor||!target||target.hp<=0||target.id===id||state.unitedLink)return false;const effect=combatEngine.resolveRuneTrigger({setId:hasRuneSet(id,'united')?'united':null,trigger:'allySkill',state,effectId:'united',turn,actorId:id,targetIds:[targetId]});if(!effect)return false;state.unitedLink={targetId,actionsRemaining:effect.linkActions,cooldownAfterLinkTurns:effect.cooldownAfterLinkTurns};combatEngine.recordMechanicEvent({componentId:'rune:united',mechanicTags:RUNE_COMBAT_RULES.united.mechanicTags,trigger:'on_ally_skill',status:'linked',actorId:id,targetIds:[id,targetId],values:{linkedActions:effect.linkActions,cooldownAfterLinkTurns:effect.cooldownAfterLinkTurns}});emitCombatVisual('rune-united',[id,targetId],COMBAT_ACTION_EFFECT_MS,{linkedActions:effect.linkActions});return true}
-function expireUnitedLink(ownerId,targetId){const state=runeSetState(ownerId),link=state.unitedLink;if(!link||link.targetId!==targetId)return false;state.unitedLink=null;combatEngine.startRuneCooldown(state,'united',turn,link.cooldownAfterLinkTurns);combatEngine.recordMechanicEvent({componentId:'rune:united',mechanicTags:RUNE_COMBAT_RULES.united.mechanicTags,trigger:'after_link_expired',status:'expired',actorId:ownerId,targetIds:[ownerId,targetId],values:{cooldownTurns:link.cooldownAfterLinkTurns,linkedActions:link.actionsRemaining}});return true}
-function ageUnitedLinkTurn(targetId){for(const owner of party)expireUnitedLink(owner.id,targetId)}
-function ageRuneTurn(id){const state=runeSetState(id);combatEngine.ageRuneCooldowns(state,turn,['radiant-moon','eternal-sun','dark-matter','clear-skies','recycle','amplify','celestial-star','united']);if(state.shieldTurns>0&&state.shieldStartedTurn<turn){state.shieldTurns--;if(!state.shieldTurns&&state.shieldRemaining>0){const unit=party.find(member=>member.id===id);if(unit)unit.shield=Math.max(0,shieldOf(unit)-state.shieldRemaining);state.shieldRemaining=0}}}
-function ageRuneDelayImmunity(unit){for(const owner of Object.keys(unit?.runeDelayImmunityByOwner||{})){unit.runeDelayImmunityByOwner[owner]=Math.max(0,unit.runeDelayImmunityByOwner[owner]-1);if(!unit.runeDelayImmunityByOwner[owner])delete unit.runeDelayImmunityByOwner[owner]}}
-function calculateSpeed(unit){
- if(!unit)return null;
- const base=Number.isFinite(unit.baseSpeed)?unit.baseSpeed:unit.speed;
- if(!Number.isFinite(base))return null;
- const effectMultiplier=speedModifiers[unit.id]||1;
- const tempoStacks=unit.marks?.filter(mark=>['cloud-tempo','tsunade-slow-start'].includes(mark.id)).reduce((sum,mark)=>sum+(mark.speedBonus||(mark.id==='tsunade-slow-start'?0.5:0.2)),0)||0;
- const slowStacks=unit.marks?.filter(mark=>mark.id==='cloud-slow')||[],slow=slowStacks.reduce((value,mark)=>value+(mark.slowPercent||.2),0);
- return calculateLevelScaledStat(base,Number.isInteger(unit.level)?unit.level:1,
-  {...(unit.speedFlatModifiers||{})},
-  {...(unit.speedPercentModifiers||{}),temporarySpeedEffect:effectMultiplier-1+tempoStacks-slow},unit.speedEquipmentFlatModifiers||{});
-}
-function speedOf(unit){return Math.max(1,calculateSpeed(unit)||1)}
-function timelineEnemyMembers(){
- // In this training encounter, a wave's predefined enemy roster is its speed-averaging team.
- // Defeated and waiting enemy instances remain in the cohort; the rule for non-wave boss
- // reinforcements must be specified separately before adding them as production abilities.
- return wavePlan[waveIndex]?wavePlan[waveIndex].map(e=>({id:e.id,speed:speedOf(e)})):liveEnemies().map(e=>({id:e.id,speed:speedOf(e)}));
-}
-function turnTimelineInputs(){
- const units=[...alive().map(p=>({id:p.id,speed:speedOf(p),faction:'ally'})),
-  ...liveEnemies().map(e=>({id:e.id,speed:speedOf(e),faction:'enemy'})),
-  ...summons.filter(x=>x.mode==='independent'&&x.remaining>0).map(x=>({id:x.id,speed:speedOf(x),faction:'ally',summon:true}))];
- const allyMembers=party.map(p=>({id:p.id,speed:speedOf(p)}));
- const enemyMembers=timelineEnemyMembers();
- return {units,alliedMembers:allyMembers,enemyMembers};
-}
-function syncTurnTimeline(){
- const inputs=turnTimelineInputs();
- if(inputs.alliedMembers.length&&inputs.enemyMembers.length)combatEngine.syncTurnOrder(inputs.units,inputs.alliedMembers,inputs.enemyMembers);
- syncLegacyGauges();
-}
-function syncLegacyGauges(){
- const snap=turnTimeline.snapshot();
- for(const state of snap.states){
-  const approx=100*(1-Math.max(0,state.nextAt-snap.clock)*state.rate);
-  gauges[state.id]=Math.max(0,Math.min(100,approx));
- }
-}
-function prepareBattleIntro(){
- syncTurnTimeline();const first=turnTimeline.preview(1)[0]?.id;
- activeId=party.some(p=>p.id===first)?first:null;
- actingEnemyId=liveEnemies().some(e=>e.id===first)?first:null;
-}
-function addActionAdvance(id,percent){
- if(!Number.isFinite(percent)||percent<0)return false;
- const enemy=enemies.find(e=>e.id===id);if(enemy&&enemy.brokenTurns>0)return false;
- syncTurnTimeline();const ok=turnTimeline.modify(id,percent);syncLegacyGauges();return ok;
-}
-function addActionDelay(id,percent){
- if(!Number.isFinite(percent)||percent<0)return false;
- syncTurnTimeline();const ok=turnTimeline.modify(id,-percent);syncLegacyGauges();return ok;
-}
-function setSpeedMultiplierForTest(id,multiplier){
- const u=party.find(p=>p.id===id)||enemies.find(e=>e.id===id)||summons.find(x=>x.id===id);
- if(!u||!Number.isFinite(multiplier)||multiplier<=0||multiplier>5)return false;
- speedModifiers[id]=multiplier;syncTurnTimeline();return true;
-}
-function queueSummonForTest(mode='independent',creatorId=activeId){
- if(phase!=='player'||paused||!['independent','controlled'].includes(mode))return false;
- const owner=party.find(p=>p.id===creatorId&&p.hp>0);if(!owner||owner.id!==activeId)return false;
- // TEST ONLY: No published character currently has a summon creation ability.
- // Simulate a completed creation action at the next normal action boundary, without
- // inventing a creator follow-up ordering when both immediate entitlements collide.
- const current=summons.find(x=>x.ownerId===owner.id);
- if(current){turnTimeline.states.delete(current.id);summons=summons.filter(x=>x.id!==current.id)}
- const s={id:'test-summon-'+(++summonSerial),name:'TEST SUMMON',ownerId:owner.id,speed:95,mode,remaining:3,pendingCreation:true,test:true};
- summons.push(s);summonHistory.push({event:'creation-queued',id:s.id,ownerId:owner.id,mode});
- log=`TEST ONLY: ${mode} summon will appear after ${owner.name}'s next action.`;
- return s.id;
-}
-function finishSummonCreationForTest(ownerId){
- const ready=summons.filter(s=>s.ownerId===ownerId&&s.pendingCreation);
- if(!ready.length)return;
- for(const s of ready){s.pendingCreation=false;summonHistory.push({event:'created',id:s.id,mode:s.mode,clock:turnTimeline.clock});}
- syncTurnTimeline();
- for(const s of ready){
-  if(s.mode==='independent')turnTimeline.immediateFirst(s.id);
-  // Creator-controlled creation explicitly returns the creator to their own
-  // next ordinary turn by Action Advance, not a separate cloned 'extra turn'.
-  else if(s.mode==='controlled')addActionAdvance(s.ownerId,100);
- }
- syncLegacyGauges();
-}
-function executeIndependentSummonTurn(s){
- if(!s||s.mode!=='independent')return nextTurn();
- const summonTurn=combatEngine.advanceSummonTurn(s);if(!summonTurn)return nextTurn();attackInProgress=true;summonHistory.push({event:'acted',id:s.id,clock:turnTimeline.clock,remaining:summonTurn.remainingTurns});
- activeId=null;actingEnemyId=null;phase='resolve';
- const owner=party.find(p=>p.id===s.ownerId);
- const foe=chosenEnemy();
- fx={kind:'basic',visual:'lily-hauntling',at:performance.now(),actor:owner?.id||s.ownerId,targetEnemyId:foe?.id,targetEnemyIds:liveEnemies().map(e=>e.id),targetGeometry:foe?{x:foe.x,y:foe.y,w:foe.w,h:foe.h}:null};
- const source={serial:++attackSerial,actor:'lily',action:'summon',hits:[],ricochetEligibleEnemyIds:liveEnemies().filter(enemy=>enemy.marks?.some(mark=>mark.id==='ricochet')).map(enemy=>enemy.id)};
- for(const enemy of liveEnemies().slice()){
-  const lily=party.find(p=>p.id==='lily'),raw=calculateTypedActionDamage('true',s.multiplier??.75,lily,enemy),dealt=applyEnemyDamage(enemy,raw?.damageTaken||0,lily,{damageType:'true',eventType:'summon_hit',actionId:source.serial});
-  source.hits.push({target:enemy.id,damage:dealt.damage,summon:true,eventType:dealt.eventType,sourceId:dealt.sourceId,actionId:dealt.actionId,reflect:dealt.reflect||null,echo:dealt.echo||null});if(dealt.reflect)source.hits.push({index:source.hits.length+1,target:lily?.id||null,damage:dealt.reflect.damage,healthDamage:dealt.reflect.healthDamage,damageType:'true',reflect:true,eventType:dealt.reflect.eventType,sourceId:dealt.reflect.sourceId,actionId:dealt.reflect.actionId,phase:'reflect'});if(dealt.echoReflect)source.hits.push({index:source.hits.length+1,target:lily?.id||null,damage:dealt.echoReflect.damage,healthDamage:dealt.echoReflect.healthDamage,damageType:'true',reflect:true,eventType:dealt.echoReflect.eventType,sourceId:dealt.echoReflect.sourceId,actionId:dealt.echoReflect.actionId,phase:'echo-reflect'});if(enemy.hp<=0)resolveEnemyDefeat(enemy);
-  else{
-   const effects=combatEngine.resolveHitEffects({actor:lily,target:enemy,hit:{dodged:!!dealt.dodged,damage:dealt.damage},action:'summon',eventType:dealt.eventType,passives:combatKit('lily')?.passives||[],characterDuplicates:characterDuplicateRank('lily'),premiumWeaponDuplicates:premiumWeaponDuplicateRank('lily'),hasPremiumWeapon:loadoutFor('lily').weapon.selected==='premium'&&loadoutFor('lily').weapon.premiumOwned,allies:party,isEnemyTarget:true});
-   if(effects.some(effect=>effect.type==='exposed'))emitCombatVisual('lily-exposed',[enemy.id],COMBAT_ACTION_EFFECT_MS);
-   if(effects.some(effect=>effect.type==='ricochet-mark'))emitCombatVisual('lily-ricochet-mark',[enemy.id],COMBAT_ACTION_EFFECT_MS);
-   if(!source.pendingRicochet&&dealt.damage>0)source.pendingRicochet={enemyId:enemy.id,damage:dealt.damage};
-  }
- }
- log=`${s.name} â€¢ INITIAL AOE â€¢ TRUE DAMAGE`;
- const finishTurn=()=>{attackInProgress=false;settleAfterAttack();if(s.expired){summons=summons.filter(x=>x.id!==s.id);turnTimeline.states.delete(s.id);summonHistory.push({event:'expired',id:s.id})}drainUltimateQueueBefore(()=>nextTurn())};
- const finishSummonTriggers=()=>{const pending=source.pendingRicochet,ricochetCount=pending?triggerRicochet(source,enemies.find(e=>e.id===pending.enemyId),pending.damage):0;if(ricochetCount){log=`Hauntling triggers Lily's Ricochet â€¢ ${ricochetCount} marked ${ricochetCount===1?'enemy':'enemies'}.`;schedule(finishSummonTriggers,COMBAT_ACTION_PHASE_GAP_MS);return}if(resolveSoulFollowUp(source)){const followUp=source.followUp;log=`Soul Follow-up â€¢ ${followUp.targets.length} ${followUp.targets.length===1?'enemy':'enemies'} take ${followUp.damage} True damage.`;schedule(finishTurn,COMBAT_ACTION_PHASE_GAP_MS);return}finishTurn()};
- schedule(finishSummonTriggers,COMBAT_ACTION_EFFECT_MS+(source.hits.some(hit=>hit.echo)?COMBAT_ACTION_PHASE_GAP_MS:0));
-}
+NÂˆ›ÜŠÛÛœİİ]HÙˆÛ˜\œİ]\Ê^ÂˆÛÛœİ\›ŞLL
+ŠKSX]›X^
+İ]K›™^]\Û˜\˜ÛØÚÊJœİ]Kœ˜]JNÂˆØ]YÙ\ÖÜİ]KšYOSX]›X^
+X]›Z[ŠL\›Ş
+JNÂˆBŸB™[˜İ[Ûˆ™\\™P˜]R[›Ê
+^ÂˆŞ[˜Õ\›•[Y[[™J
+NØÛÛœİš\œİ]\›•[Y[[™Kœ™]šY]ÊJVÌOËšYÂˆXİ]™RY\\KœÛÛYJOœšYOOYš\œİ
+OÙš\œİ›[ÂˆXİ[™Ñ[™[^RY[]™Q[™[ZY\Ê
+KœÛÛYJOO™KšYOOYš\œİ
+OÙš\œİ›[ÂŸB™[˜İ[ÛˆYXİ[ÛY˜[˜ÙJY\˜Ù[
+^ÂˆYŠS[X™\‹š\Ñš[š]J\˜Ù[
+_\˜Ù[
+\™]\›ˆ˜[ÙNÂˆÛÛœİ[™[^OY[™[ZY\Ë™š[™
+OO™KšYOOZY
+NÚYŠ[™[^I‰™[™[^K˜œ›ÚÙ[•\›œÏŒ
+\™]\›ˆ˜[ÙNÂˆŞ[˜Õ\›•[Y[[™J
+NØÛÛœİÚÏ]\›•[Y[[™K›[ÙYJY\˜Ù[
+NÜŞ[˜ÓYØXŞQØ]YÙ\Ê
+NÜ™]\›ˆÚÎÂŸB™[˜İ[ÛˆYXİ[Û‘[^JY\˜Ù[
+^ÂˆYŠS[X™\‹š\Ñš[š]J\˜Ù[
+_\˜Ù[
+\™]\›ˆ˜[ÙNÂˆŞ[˜Õ\›•[Y[[™J
+NØÛÛœİÚÏ]\›•[Y[[™K›[ÙYJY\\˜Ù[
+NÜŞ[˜ÓYØXŞQØ]YÙ\Ê
+NÜ™]\›ˆÚÎÂŸB™[˜İ[ÛˆÙ]ÜYY][\Y\‘›Ü•\İ
+Y][\Y\Š^ÂˆÛÛœİO\\K™š[™
+OœšYOOZY
+_[™[ZY\Ë™š[™
+OO™KšYOOZY
+_İ[[[ÛœË™š[™
+OšYOOZY
+NÂˆYŠ]_S[X™\‹š\Ñš[š]J][\Y\Š_][\Y\L][\Y\J\™]\›ˆ˜[ÙNÂˆÜYY[ÙYšY\œÖÚYO[][\Y\ÜŞ[˜Õ\›•[Y[[™J
+NÜ™]\›ˆYNÂŸB™[˜İ[Ûˆ]Y]YTİ[[[Û‘›Ü•\İ
+[ÙOIÚ[™\[™[	ËÜ™X]Ü’YXXİ]™RY
+^ÂˆYŠ\ÙHOOIÜ^Y\‰ß]\ÙYVÉÚ[™\[™[	Ë	ØÛÛ›ÛY	×Kš[˜ÛY\Ê[ÙJJ\™]\›ˆ˜[ÙNÂˆÛÛœİİÛ™\\\K™š[™
+OœšYOOXÜ™X]Ü’Y	‰œšŒ
+NÚYŠ[İÛ™\ŸİÛ™\‹šYOOXXİ]™RY
+\™]\›ˆ˜[ÙNÂˆËÈTÕÓ“Nˆ›ÈX›\ÚYÚ\˜Xİ\ˆİ\œ™[H\ÈHİ[[[ÛˆÜ™X][ÛˆXš[]K‚ˆËÈÚ[][]HHÛÛ\]YÜ™X][ÛˆXİ[Ûˆ]H™^›Ü›X[Xİ[Ûˆ›İ[™\KÚ]İ]ˆËÈ[™[[™ÈHÜ™X]Üˆ›ÛİË]\Ü™\š[™ÈÚ[ˆ›İ[[YYX]H[][Y[ÈÛÛYK‚ˆÛÛœİİ\œ™[\İ[[[ÛœË™š[™
+O›İÛ™\’YOO[İÛ™\‹šY
+NÂˆYŠİ\œ™[
+^İ\›•[Y[[™Kœİ]\Ë™[]Jİ\œ™[šY
+NÜİ[[[ÛœÏ\İ[[[ÛœË™š[\ŠOšYOOXİ\œ™[šY
+_BˆÛÛœİÏ^ÚY‰İ\İ\İ[[[Û‹IÊÊ
+ÊÜİ[[[Û”Ù\šX[
+K˜[YN‰ÕTÕÕSSSÓ‰ËİÛ™\’Y›İÛ™\‹šYÜYYMK[ÙK™[XZ[š[™ÎŒË[™[™ĞÜ™X][ÛYK\İY_NÂˆİ[[[ÛœËœ\Ú
+ÊNÜİ[[[Û’\İÜKœ\Ú
+Ù]™[‰ØÜ™X][Û‹\]Y]YY	ËYœËšYİÛ™\’Y›İÛ™\‹šY[Ù_JNÂˆÙÏXTÕÓ“Nˆ	Û[Ù_Hİ[[[ÛˆÚ[\X\ˆY\ˆ	ÛİÛ™\‹›˜[Y_IÜÈ™^Xİ[Û‹˜Âˆ™]\›ˆËšYÂŸB™[˜İ[Ûˆš[š\Úİ[[[ÛÜ™X][Û‘›Ü•\İ
+İÛ™\’Y
+^ÂˆÛÛœİ™XYO\İ[[[ÛœË™š[\ŠÏOœË›İÛ™\’YOO[İÛ™\’Y	‰œËœ[™[™ĞÜ™X][ÛŠNÂˆYŠ\™XYK›[™İ
+\™]\›Âˆ›ÜŠÛÛœİÈÙˆ™XYJ^ÜËœ[™[™ĞÜ™X][ÛY˜[ÙNÜİ[[[Û’\İÜKœ\Ú
+Ù]™[‰ØÜ™X]Y	ËYœËšY[ÙNœË›[ÙKÛØÚÎ\›•[Y[[™K˜ÛØÚßJNßBˆŞ[˜Õ\›•[Y[[™J
+NÂˆ›ÜŠÛÛœİÈÙˆ™XYJ^ÂˆYŠË›[ÙOOOIÚ[™\[™[	Ê]\›•[Y[[™Kš[[YYX]Qš\œİ
+ËšY
+NÂˆËÈÜ™X]Ü‹XÛÛ›ÛYÜ™X][Ûˆ^XÚ]H™]\›œÈHÜ™X]ÜˆÈZ\ˆİÛ‚ˆËÈ™^Ü™[˜\H\›ˆHXİ[ÛˆY˜[˜ÙK›İHÙ\\˜]HÛÛ™Y	Ù^˜H\›‰Ë‚ˆ[ÙHYŠË›[ÙOOOIØÛÛ›ÛY	ÊXYXİ[ÛY˜[˜ÙJË›İÛ™\’YL
+NÂˆBˆŞ[˜ÓYØXŞQØ]YÙ\Ê
+NÂŸB™[˜İ[Ûˆ^Xİ]R[™\[™[İ[[[Û•\›ŠÊ^ÂˆYŠ\ßË›[ÙHOOIÚ[™\[™[	Ê\™]\›ˆ™^\›Š
+NÂˆÛÛœİİ[[[Û•\›XÛÛX˜][™Ú[™K˜Y˜[˜ÙTİ[[[Û•\›ŠÊNÚYŠ\İ[[[Û•\›Š\™]\›ˆ™^\›Š
+NØ]XÚÒ[”›ÙÜ™\ÜÏ]YNÜİ[[[Û’\İÜKœ\Ú
+Ù]™[‰ØXİY	ËYœËšYÛØÚÎ\›•[Y[[™K˜ÛØÚË™[XZ[š[™Îœİ[[[Û•\›‹œ™[XZ[š[™Õ\›œßJNÂˆXİ]™RY[[ØXİ[™Ñ[™[^RY[[Ü\ÙOIÜ™\ÛÛ™IÎÂˆÛÛœİİÛ™\\\K™š[™
+OœšYOO\Ë›İÛ™\’Y
+NÂˆÛÛœİ›ÙOXÚÜÙ[‘[™[^J
+NÂˆ^ÚÚ[™‰Ø˜\ÚXÉËš\İX[‰Û[KZ][[™ÉË]œ\™›Ü›X[˜ÙK››İÊ
+KXİÜ›İÛ™\ËšYË›İÛ™\’Y\™Ù][™[^RY™›ÙOËšY\™Ù][™[^RYÎ›]™Q[™[ZY\Ê
+K›X\
+OO™KšY
+K\™Ù]Ù[ÛY]N™›ÙOŞŞ™›ÙKN™›ÙKKÎ™›ÙKË™›ÙKšN›[NÂˆÛÛœİÛİ\˜ÙO^ÜÙ\šX[ŠÊØ]XÚÔÙ\šX[XİÜ‰Û[IËXİ[Û‰Üİ[[[Û‰Ë]Î–×KšXÛØÚ][YÚX›Q[™[^RYÎ›]™Q[™[ZY\Ê
+K™š[\Š[™[^OO™[™[^K›X\šÜÏËœÛÛYJX\šÏO›X\šËšYOOIÜšXÛØÚ]	ÊJK›X\
+[™[^OO™[™[^KšY
+_NÂˆ›ÜŠÛÛœİ[™[^HÙˆ]™Q[™[ZY\Ê
+KœÛXÙJ
+J^ÂˆÛÛœİ[O\\K™š[™
+OœšYOOIÛ[IÊK˜]ÏXØ[İ[]U\YXİ[Û‘[XYÙJ	İYIËË›][\Y\ÏËÍK[K[™[^JKX[X\Q[™[^Q[XYÙJ[™[^K˜]ÏË™[XYÙUZÙ[Ÿ[KÙ[XYÙU\N‰İYIË]™[\N‰Üİ[[[Û—Ú]	ËXİ[Û’YœÛİ\˜ÙKœÙ\šX[JNÂˆÛİ\˜ÙKš]Ëœ\Ú
+İ\™Ù]™[™[^KšY[XYÙN™X[™[XYÙKİ[[[ÛYK]™[\N™X[™]™[\KÛİ\˜ÙRY™X[œÛİ\˜ÙRYXİ[Û’Y™X[˜Xİ[Û’Y™Y›Xİ™X[œ™Y›Xİ[XÚÎ™X[™XÚß[JNÚYŠX[œ™Y›Xİ
+\Ûİ\˜ÙKš]Ëœ\Ú
+Ú[™^œÛİ\˜ÙKš]Ë›[™İ
+ÌK\™Ù]›[OËšY[[XYÙN™X[œ™Y›Xİ™[XYÙKX[[XYÙN™X[œ™Y›XİšX[[XYÙK[XYÙU\N‰İYIË™Y›XİYK]™[\N™X[œ™Y›Xİ™]™[\KÛİ\˜ÙRY™X[œ™Y›XİœÛİ\˜ÙRYXİ[Û’Y™X[œ™Y›Xİ˜Xİ[Û’Y\ÙN‰Ü™Y›Xİ	ßJNÚYŠX[™XÚÔ™Y›Xİ
+\Ûİ\˜ÙKš]Ëœ\Ú
+Ú[™^œÛİ\˜ÙKš]Ë›[™İ
+ÌK\™Ù]›[OËšY[[XYÙN™X[™XÚÔ™Y›Xİ™[XYÙKX[[XYÙN™X[™XÚÔ™Y›XİšX[[XYÙK[XYÙU\N‰İYIË™Y›XİYK]™[\N™X[™XÚÔ™Y›Xİ™]™[\KÛİ\˜ÙRY™X[™XÚÔ™Y›XİœÛİ\˜ÙRYXİ[Û’Y™X[™XÚÔ™Y›Xİ˜Xİ[Û’Y\ÙN‰ÙXÚË\™Y›Xİ	ßJNÚYŠ[™[^KšL
+\™\ÛÛ™Q[™[^QY™X]
+[™[^JNÂˆ[Ù^ÂˆÛÛœİY™™XİÏXÛÛX˜][™Ú[™Kœ™\ÛÛ™R]Y™™XİÊØXİÜ›[K\™Ù]™[™[^K]ÙÙÙYˆHYX[™ÙÙY[XYÙN™X[™[XYÙ_KXİ[Û‰Üİ[[[Û‰Ë]™[\N™X[™]™[\K\ÜÚ]™\Î˜ÛÛX˜]Ú]
+	Û[IÊOËœ\ÜÚ]™\ß×KÚ\˜Xİ\‘\XØ]\Î˜Ú\˜Xİ\‘\XØ]T˜[šÊ	Û[IÊK™[Z][UÙX\Û‘\XØ]\Îœ™[Z][UÙX\Û‘\XØ]T˜[šÊ	Û[IÊK\Ô™[Z][UÙX\Û›ØYİ]›ÜŠ	Û[IÊKÙX\Û‹œÙ[XİYOOIÜ™[Z][IÉ‰›ØYİ]›ÜŠ	Û[IÊKÙX\Û‹œ™[Z][SİÛ™Y[Y\Îœ\K\Ñ[™[^U\™Ù]Y_JNÂˆYŠY™™XİËœÛÛYJY™™XİO™Y™™Xİ\OOOIÙ^ÜÙY	ÊJY[Z]ÛÛX˜]š\İX[
+	Û[KY^ÜÙY	ËÙ[™[^KšYKÓÓPUĞPÕSÓ—ÑQ‘‘PÕÓTÊNÂˆYŠY™™XİËœÛÛYJY™™XİO™Y™™Xİ\OOOIÜšXÛØÚ][X\šÉÊJY[Z]ÛÛX˜]š\İX[
+	Û[K\šXÛØÚ][X\šÉËÙ[™[^KšYKÓÓPUĞPÕSÓ—ÑQ‘‘PÕÓTÊNÂˆYŠ\Ûİ\˜ÙKœ[™[™ÔšXÛØÚ]	‰™X[™[XYÙOŒ
+\Ûİ\˜ÙKœ[™[™ÔšXÛØÚ]^Ù[™[^RY™[™[^KšY[XYÙN™X[™[XYÙ_NÂˆBˆBˆÙÏX	ÜË›˜[Y_H8 (ˆS’UPSSÑH8 (ˆ•QHSPQÑXÂˆÛÛœİš[š\Ú\›J
+OOØ]XÚÒ[”›ÙÜ™\ÜÏY˜[ÙNÜÙ]PY\]XÚÊ
+NÚYŠË™^\™Y
+^Üİ[[[ÛœÏ\İ[[[ÛœË™š[\ŠOšYOO\ËšY
+Nİ\›•[Y[[™Kœİ]\Ë™[]JËšY
+NÜİ[[[Û’\İÜKœ\Ú
+Ù]™[‰Ù^\™Y	ËYœËšYJ_Y˜Z[•[[X]T]Y]YP™Y›Ü™J
 
-const color={ink:'#0a101f',panel:'rgba(13,17,35,.94)',gold:'#eacb87',white:'#f7f3f8',sub:'#bfc8d9',blue:'#85d9ff',red:'#f47679',green:'#5bebac'};
-let phase='startup',paused=false,turn=0,enemyHp=0,maxEnemyHp=0,sp=3,
-    gauges={},party=[],activeId=null,fx=null,combatVisualEvents=[],log='',hint='',hintAt=0,
-    choiceRects=[],battleToken=0,enemyCount=0,forceSelect=false;
-// Four authored party formation positions. Enemy identities and wave queues are independent of these slots.
-// Encounter presets and enemy stats below are DEMO DATA; Approved Fundamental 2 defines the rules.
-const ENEMY_CATEGORIES=Object.freeze(['common','elite','boss']);
-const ENEMY_TRAIT_TAGS=Object.freeze(['Magical Attacker','Magical Resistant','Defensive','Physically Fragile','Slow','Fast','Physical Attacker','Strong','Magically Fragile','Fragile','Weak','Physically Resistant','Physically Defensive']);
-const ENCOUNTER_LIMITS=Object.freeze({enemiesOnField:5,bossesPerWave:1,elitesPerWave:5,elitesOnField:3,elitesOnFieldInBossWave:2});
-function validateEnemyCategory(category){
- if(!ENEMY_CATEGORIES.includes(category))throw Error(`Enemy category must be one of: ${ENEMY_CATEGORIES.join(', ')}`);
- return category;
-}
-function validateEnemyHealthBars(category,bars=1){
- if(!Number.isInteger(bars)||bars<1||bars>3)throw Error('Enemy health bars must be an integer from 1 to 3.');
- if(category!=='boss'&&bars!==1)throw Error('Only Boss enemies can have multiple health bars.');
- return bars;
-}
-function validateEnemyTags(tags,category){
- if(!tags||typeof tags.area!=='string'||!tags.area.trim()||tags.type!==category||!Array.isArray(tags.strengths)||!Array.isArray(tags.weaknesses))throw Error(`Enemy ${category} needs area, matching type, strengths, and weaknesses tags.`);
- for(const trait of [...tags.strengths,...tags.weaknesses])if(!ENEMY_TRAIT_TAGS.includes(trait))throw Error(`Unknown enemy trait tag: ${trait}`);
- if(new Set(tags.strengths).size!==tags.strengths.length||new Set(tags.weaknesses).size!==tags.weaknesses.length)throw Error('Enemy trait tags cannot be duplicated within strengths or weaknesses.');
- return {area:tags.area,type:tags.type,strengths:[...tags.strengths],weaknesses:[...tags.weaknesses]};
-}
-const ENEMY_FORMATIONS=[
- {id:'slot1',x:646,y:359,w:151,h:198},
- {id:'slot2',x:822,y:314,w:156,h:205},
- {id:'slot3',x:1010,y:274,w:167,h:220},
- {id:'slot4',x:1201,y:312,w:156,h:205},
- {id:'slot5',x:1389,y:355,w:151,h:198},
-];
-// Any encounter may supply its own finite number of waves, each with 1â€“15 enemies.
-// Presets are only review scenarios; they are NOT a global wave-count limit.
-const WAVE_PRESETS={stress:[15,12,6],quick:[1,5,6],sizes:[1,5,6,12,15]};
-let currentBattleAreaId=DEFAULT_BATTLE_AREA_ID,wavePreset=DEV_MODE?'stress':'quick',waveOverride=null,enemyRosterMode=DEV_MODE?'mixed':'slime',wavePlan=[],waveIndex=-1,waveQueue=[],waveKills=0,
-    totalEnemyDefeats=0,encounterCleared=false,spawnHistory=[],enemies=[],selectedEnemyId=null,actingEnemyId=null;
-// Fundamental 3 target rules and Fundamental 2 v1.1 post-attack reinforcement boundary.
-// Soul Enhanced Basic uses Blast unless Premium Weapon Duplicate 3 changes it to AoE; Ultimate is AoE. The pattern toolbar,
-// 5-hit and support actions remain development-only controls. Damage/cost values are provisional.
-let targetingMode='single',pendingTargetAction=null,supportDemo=null,zeroSkillArmed=false,attackInProgress=false,attackSerial=0,
-     pendingVacancies=[],lastAttack=null,supportTestHistory=[],soulEnhanceStacks=0,soulFollowUpState={type:'followUp',charges:5,remaining:5,seenSources:new Set(),activations:0},soulEnhanceSpendingRemainder=0,zeroHitEnemyIds=new Set();
-// Fundamental 4. Numerical energy costs and debug bonuses are inherited/provisional,
-// not character-balancing approvals. No gameplay source grants an SP-cap bonus by default.
-const ULTIMATE_ENERGY_COST=100,BASE_SP_MAX=5;
-const SP_CAP_SOURCES=new Set(['passive','skill','ultimate','character-potential','signature-premium-weapon-effect','premium-weapon-potential','other-combat-effect']);
-let spCapModifiers=Object.create(null),ultimateQueue=[],ultimateSequence=0,ultimateHistory=[],
-    ultimateResume=null,ultimateExecuting=false;
-function effectiveSpMax(){return Math.max(0,BASE_SP_MAX+Object.values(spCapModifiers).reduce((a,b)=>a+b,0))}
-// Modifier IDs are unique per effect so separate increases stack, even when
-// they share a category. Updating or removing a modifier never clamps current SP.
-function setSpCapModifier(sourceId,amount){
- if(typeof sourceId!=='string'||!sourceId.trim()||sourceId.length>128||!Number.isSafeInteger(amount))return false;
- if(amount)spCapModifiers[sourceId]=amount;else delete spCapModifiers[sourceId];
- return true;
-}
-function gainSp(amount,{allowOvercap=false}={}){
- if(!Number.isSafeInteger(amount)||amount<0)return false;
- if(allowOvercap){sp+=amount;return true}
- const cap=effectiveSpMax();
- // Ordinary gains cannot add above cap, but preserve SP already above a lowered cap.
- if(sp>=cap)return true;
- sp=Math.min(cap,sp+amount);return true;
-}
-function availableEnergy(p){return p?Math.max(0,p.energy-(p.energyReserved||0)):0}
-function isUltPending(id){return ultimateQueue.some(q=>q.actorId===id)||(ultimateExecuting&&lastAttack?.action==='ultimate'&&lastAttack.actor===id)}
-function ultimateEnergyCost(p){const kit=combatKit(p?.id),base=p?.id==='zero'?upgradeValueFor('zero.premium-duplicate.3.ultimate-energy-cost','ultimateEnergyCost','zero',kit?.ultimate?.energyCost??ULTIMATE_ENERGY_COST):p?.id==='cloud'?upgradeValueFor('cloud.duplicate.4.ultimate-control','ultimateEnergyCost','cloud',kit?.ultimate?.energyCost??ULTIMATE_ENERGY_COST):(kit?.ultimate?.energyCost??ULTIMATE_ENERGY_COST);return Math.max(0,base-(p&&hasRuneSet(p.id,'eternal-sun')&&runeEffectReady(p.id,'eternal-sun')?RUNE_COMBAT_RULES['eternal-sun'].ultimateEnergyReduction:0))}
-function canQueueUltimate(p){return !!p&&p.hp>0&&!p.debuffs?.some(effect=>effect.id==='stun')&&!paused&&['player','enemy','resolve'].includes(phase)
-  &&availableEnergy(p)>=ultimateEnergyCost(p)&&!isUltPending(p.id)}
-function emitCombatVisual(type,targetIds=[],duration=COMBAT_ACTION_EFFECT_MS,details={}){const {delayMs=0,...payload}=details;combatVisualEvents.push({type,targetIds:[...targetIds],at:performance.now()+delayMs,duration,...payload})}
-function resetActionResources(){const resourceful=party.some(p=>p.id==='dawn');combatVisualEvents=[];runeCombatState=Object.create(null);activeRuneDamageEffects=Object.create(null);unitedFollowUpParents.clear();sp=resourceful?5:3;soulEnhanceStacks=0;resetSoulFollowUp();soulEnhanceSpendingRemainder=0;zeroHitEnemyIds=new Set();spCapModifiers=Object.create(null);if(resourceful){setSpCapModifier('dawn-resourceful',2);combatEngine.recordAuthoredEffect({ownerId:'dawn',slot:'passive',effectId:'resourceful',trigger:'battle_start',actorId:'dawn',targetIds:party.map(p=>p.id),values:{skillPointCapacityBonus:2,startingSkillPointsBonus:2,skillPointCap:effectiveSpMax(),startingSkillPoints:sp}});emitCombatVisual('dawn-resourceful',party.map(p=>p.id),1250)}combatEngine.recordBattleStartEffects([...party,...enemies],unit=>Object.keys(RUNE_SET_DEFINITIONS).find(setId=>hasRuneSet(unit.id,setId)));ultimateQueue=[];ultimateSequence=0;ultimateHistory=[];ultimateResume=null;ultimateExecuting=false;
-  for(const p of party)p.energyReserved=0;}
-function setSpCapTestSource(source,bonus){
- if(!SP_CAP_SOURCES.has(source)||!Number.isInteger(bonus)||bonus<0||bonus>20)return false;
- if(!setSpCapModifier(source,bonus))return false;
- // This preview exposes only nonnegative TEST boosts. General gameplay effects
- // use setSpCapModifier with a unique source ID and may raise or lower the cap.
- log=`TEST ONLY: ${source} SP limit modifier ${bonus>=0?'+':''}${bonus}. Maximum ${effectiveSpMax()}.`;
- return true;
-}
-function cycleSpCapTest(){const n=spCapModifiers.passive||0;return setSpCapTestSource('passive',n>=3?0:n+1)}
-function chargeUltimateForTest(id){const p=party.find(p=>p.id===id);if(!p||p.hp<=0||paused||['setup','intro','victory','defeat'].includes(phase))return false;
- p.energy=120;ultimateHistory.push({event:'debug-charge',actor:id,energy:p.energy});say('TEST ONLY: '+p.name+' energy charged to 120.');return true}
-function cancelQueuedUltimatesOfDefeated(){
- for(let i=ultimateQueue.length-1;i>=0;i--){const q=ultimateQueue[i],p=party.find(x=>x.id===q.actorId);
-  if(!p||p.hp<=0){if(p)p.energyReserved=Math.max(0,(p.energyReserved||0)-q.cost);
-   ultimateQueue.splice(i,1);ultimateHistory.push({event:'canceled-ko',actor:q.actorId,seq:q.seq,energy:p?.energy??null});
-   log=`${p?.name||q.actorId}'s queued Ultimate canceled on K.O.; energy released.`;}}
-}
-function cancelAllQueuedUltimates(reason){for(const q of ultimateQueue){const p=party.find(x=>x.id===q.actorId);
- if(p)p.energyReserved=Math.max(0,(p.energyReserved||0)-q.cost);
- ultimateHistory.push({event:'canceled-'+reason,actor:q.actorId,seq:q.seq});}
- ultimateQueue=[];ultimateResume=null;ultimateExecuting=false;}
-// An Ultimate can be requested at any moment in an allied or enemy turn. Active
-// actions and enemy windups are never interrupted; the queue drains at boundaries.
-function queueUltimate(id,allyTargetId=null){
- const p=party.find(p=>p.id===id);
- if(!canQueueUltimate(p)){say(!p?'Unknown ally.':p.hp<=0?'Defeated ally cannot Ult.':isUltPending(id)?'Ultimate already queued.':'Ultimate needs '+ultimateEnergyCost(p)+' available energy.');return false}
- const q={actorId:id,cost:ultimateEnergyCost(p),seq:++ultimateSequence,requestedTurn:turn,allyTargetId};
- p.energyReserved=(p.energyReserved||0)+q.cost;ultimateQueue.push(q);
- ultimateHistory.push({event:'queued',actor:id,seq:q.seq,energy:p.energy,reserved:p.energyReserved,phase});
- log=`${p.name} Ultimate queued (${ultimateQueue.length} waiting). Energy reserved, not spent.`;
- if(phase==='player'&&!attackInProgress&&!ultimateExecuting&&!ultimateResume){
-  // The player retains the same normal turn after the Ultimate finishes.
-  ultimateResume=()=>{phase='player';cameraPreview=null;log=`${p.name}'s Ultimate finished. Normal turn retained.`};
-  runNextUltimate();
- }
- return true;
-}
-function drainUltimateQueueBefore(continuation){
- cancelQueuedUltimatesOfDefeated();
- if(!alive().length){cancelAllQueuedUltimates('defeat');continuation();return}
- if(encounterCleared){cancelAllQueuedUltimates('victory');continuation();return}
- if(!ultimateQueue.length){continuation();return}
- ultimateResume=continuation;runNextUltimate();
-}
-function runNextUltimate(){
- cancelQueuedUltimatesOfDefeated();
- if(!alive().length||encounterCleared){cancelAllQueuedUltimates(!alive().length?'defeat':'victory')}
- if(ultimateQueue.length){
-  const q=ultimateQueue.shift(),p=party.find(x=>x.id===q.actorId);
-  if(!p||p.hp<=0){if(p)p.energyReserved=Math.max(0,(p.energyReserved||0)-q.cost);ultimateHistory.push({event:'canceled-ko',actor:q.actorId,seq:q.seq});return runNextUltimate()}
-  if(p.debuffs?.some(effect=>effect.id==='stun')){p.energyReserved=Math.max(0,(p.energyReserved||0)-q.cost);ultimateHistory.push({event:'canceled-stun',actor:q.actorId,seq:q.seq});log=`${p.name}'s queued Ultimate was canceled by Stun; energy released.`;return runNextUltimate()}
-  if(p.id==='dawn'&&!party.some(ally=>ally.id===q.allyTargetId&&ally.hp>0)){p.energyReserved=Math.max(0,(p.energyReserved||0)-q.cost);ultimateHistory.push({event:'canceled-ally-target-ko',actor:q.actorId,target:q.allyTargetId,seq:q.seq});log='Dawnâ€™s Ultimate canceled because its target was defeated; Energy released.';return runNextUltimate()}
-  p.energyReserved=Math.max(0,(p.energyReserved||0)-q.cost);
-  ultimateHistory.push({event:'started',actor:q.actorId,seq:q.seq,energy:p.energy,turn});
-  ultimateExecuting=true;
-  // Same provisional Ultimate attack effect from v0.8. This is a testing
-  // placeholder, not a canonical Ultimate definition or approved balance.
-  if(!executeCombatAction(p,'ultimate',q.seq,q.allyTargetId,{kind:'eternal-sun-cost',energyCost:q.cost})){
-   ultimateExecuting=false;ultimateHistory.push({event:'canceled-no-target',actor:q.actorId,seq:q.seq});return runNextUltimate();
-  }
-  return;
- }
- ultimateExecuting=false;
- const resume=ultimateResume;ultimateResume=null;
- if(resume)resume();
-}
+OO›™^\›Š
+J_NÂˆÛÛœİš[š\Úİ[[[Û•šYÙÙ\œÏJ
+OOØÛÛœİ[™[™Ï\Ûİ\˜ÙKœ[™[™ÔšXÛØÚ]šXÛØÚ]Ûİ[\[™[™ÏİšYÙÙ\”šXÛØÚ]
+Ûİ\˜ÙK[™[ZY\Ë™š[™
+OO™KšYOO\[™[™Ë™[™[^RY
+K[™[™Ë™[XYÙJNŒÚYŠšXÛØÚ]Ûİ[
+^ÛÙÏX][[™ÈšYÙÙ\œÈ[IÜÈšXÛØÚ]8 (ˆ	ÜšXÛØÚ]Ûİ[HX\šÙY	ÜšXÛØÚ]Ûİ[OOLOÉÙ[™[^IÎ‰Ù[™[ZY\ÉßK˜ÜØÚY[Jš[š\Úİ[[[Û•šYÙÙ\œËÓÓPUĞPÕSÓ—ÔTÑWÑĞTÓTÊNÜ™]\›ŸZYŠ™\ÛÛ™TÛİ[›ÛİÕ\
+Ûİ\˜ÙJJ^ØÛÛœİ›ÛİÕ\\Ûİ\˜ÙK™›ÛİÕ\ÛÙÏXÛİ[›ÛİË]\8 (ˆ	Ù›ÛİÕ\\™Ù]Ë›[™İH	Ù›ÛİÕ\\™Ù]Ë›[™İOOLOÉÙ[™[^IÎ‰Ù[™[ZY\ÉßHZÙH	Ù›ÛİÕ\™[XYÙ_HYH[XYÙK˜ÜØÚY[Jš[š\Ú\›‹ÓÓPUĞPÕSÓ—ÔTÑWÑĞTÓTÊNÜ™]\›ŸYš[š\Ú\›Š
+_NÂˆØÚY[Jš[š\Úİ[[[Û•šYÙÙ\œËÓÓPUĞPÕSÓ—ÑQ‘‘PÕÓTÊÊÛİ\˜ÙKš]ËœÛÛYJ]Oš]™XÚÊOĞÓÓPUĞPÕSÓ—ÔTÑWÑĞTÓTÎŒ
+JNÂŸB‚˜ÛÛœİÛÛÜ^Ú[šÎ‰ÈÌLLY‰Ë[™[‰Ü™Ø˜JLËMËÍKM
+IËÛÛ‰ÈÙXXØÉËÚ]N‰ÈÙÙŒÙ	ËİX‰ÈØ™˜ÎIË›YN‰ÈÎYY™‰Ë™Y‰ÈÙÍÎIËÜ™Y[‰ÈÍX™X˜XÉßNÂ›]\ÙOIÜİ\\	Ë]\ÙYY˜[ÙK\›L[™[^RLX^[™[^RLÜLËˆØ]YÙ\Ï^ßK\OV×KXİ]™RY[[[[ÛÛX˜]š\İX[]™[ÏV×KÙÏIÉË[IÉË[]LˆÚÚXÙT™XİÏV×K˜]UÚÙ[L[™[^PÛİ[L›Ü˜ÙTÙ[XİY˜[ÙNÂ‹ËÈ›İ\ˆ]]Ü™Y\H›Ü›X][ÛˆÜÚ][ÛœËˆ[™[^HY[]Y\È[™Ø]™H]Y]Y\È\™H[™\[™[Ùˆ\ÙHÛİË‚‹ËÈ[˜Ûİ[\ˆ™\Ù]È[™[™[^Hİ]È™[İÈ\™HSSÈUNÈ\›İ™Y[™[Y[[ˆYš[™\ÈH[\Ë‚˜ÛÛœİS‘SVWĞĞUQÓÔ’QTÏSØš™Xİ™œ™Y^™JÉØÛÛ[[Û‰Ë	Ù[]IË	Ø›ÜÜÉ×JNÂ˜ÛÛœİS‘SVWÕRUÕQÔÏSØš™Xİ™œ™Y^™JÉÓXYÚXØ[]XÚÙ\‰Ë	ÓXYÚXØ[™\Ú\İ[	Ë	ÑY™[œÚ]™IË	Ô\ÚXØ[Hœ˜YÚ[IË	ÔÛİÉË	Ñ˜\İ	Ë	Ô\ÚXØ[]XÚÙ\‰Ë	Ôİ›Û™ÉË	ÓXYÚXØ[Hœ˜YÚ[IË	Ñœ˜YÚ[IË	ÕÙXZÉË	Ô\ÚXØ[H™\Ú\İ[	Ë	Ô\ÚXØ[HY™[œÚ]™I×JNÂ˜ÛÛœİSÓÕS•T—ÓSRUÏSØš™Xİ™œ™Y^™JÙ[™[ZY\ÓÛ‘šY[K›ÜÜÙ\Ô\•Ø]™NŒK[]\Ô\•Ø]™NK[]\ÓÛ‘šY[ŒË[]\ÓÛ‘šY[[›ÜÜÕØ]™NŒŸJNÂ™[˜İ[Ûˆ˜[Y]Q[™[^PØ]YÛÜJØ]YÛÜJ^ÂˆYŠQS‘SVWĞĞUQÓÔ’QTËš[˜ÛY\ÊØ]YÛÜJJ]›İÈ\œ›ÜŠ[™[^HØ]YÛÜH]\İ™HÛ™HÙˆ	ÑS‘SVWĞĞUQÓÔ’QTËš›Ú[Š	Ë	Ê_X
+NÂˆ™]\›ˆØ]YÛÜNÂŸB™[˜İ[Ûˆ˜[Y]Q[™[^RX[˜\œÊØ]YÛÜK˜\œÏLJ^ÂˆYŠS[X™\‹š\Ò[YÙ\Š˜\œÊ_˜\œÏ_˜\œÏŒÊ]›İÈ\œ›ÜŠ	Ñ[™[^HX[˜\œÈ]\İ™H[ˆ[YÙ\ˆœ›ÛHHÈË‰ÊNÂˆYŠØ]YÛÜHOOIØ›ÜÜÉÉ‰˜˜\œÈOOLJ]›İÈ\œ›ÜŠ	ÓÛ›H›ÜÜÈ[™[ZY\ÈØ[ˆ]™H][\HX[˜\œË‰ÊNÂˆ™]\›ˆ˜\œÎÂŸB™[˜İ[Ûˆ˜[Y]Q[™[^UYÜÊYÜËØ]YÛÜJ^ÂˆYŠ]YÜß\[ÙˆYÜË˜\™XHOOIÜİš[™Éß]YÜË˜\™XKš[J
+_YÜË\HOOXØ]YÛÜ_P\œ˜^Kš\Ğ\œ˜^JYÜËœİ™[™İÊ_P\œ˜^Kš\Ğ\œ˜^JYÜËÙXZÛ™\ÜÙ\ÊJ]›İÈ\œ›ÜŠ[™[^H	ØØ]YÛÜ_H™YYÈ\™XKX]Ú[™È\Kİ™[™İË[™ÙXZÛ™\ÜÙ\ÈYÜË˜
+NÂˆ›ÜŠÛÛœİ˜Z]ÙˆË‹‹YÜËœİ™[™İË‹‹YÜËÙXZÛ™\ÜÙ\×JZYŠQS‘SVWÕRUÕQÔËš[˜ÛY\Ê˜Z]
+J]›İÈ\œ›ÜŠ[šÛ›İÛˆ[™[^H˜Z]YÎˆ	İ˜Z]X
+NÂˆYŠ™]ÈÙ]
+YÜËœİ™[™İÊKœÚ^™HOO]YÜËœİ™[™İË›[™İ™]ÈÙ]
+YÜËÙXZÛ™\ÜÙ\ÊKœÚ^™HOO]YÜËÙXZÛ™\ÜÙ\Ë›[™İ
+]›İÈ\œ›ÜŠ	Ñ[™[^H˜Z]YÜÈØ[››İ™H\XØ]YÚ][ˆİ™[™İÈÜˆÙXZÛ™\ÜÙ\Ë‰ÊNÂˆ™]\›ˆØ\™XNYÜË˜\™XK\NYÜË\Kİ™[™İÎ–Ë‹‹YÜËœİ™[™İ×KÙXZÛ™\ÜÙ\Î–Ë‹‹YÜËÙXZÛ™\ÜÙ\×_NÂŸB˜ÛÛœİS‘SVWÑ“Ô“PUSÓ”ÏVÂˆÚY‰ÜÛİIË‹NŒÍNKÎŒMLKŒNNKˆÚY‰ÜÛİ‰ËŒ‹NŒÌMÎŒMM‹ŒŒ_KˆÚY‰ÜÛİÉËŒLLNŒÍÎŒMËŒŒŒKˆÚY‰ÜÛİ	ËŒLŒKNŒÌL‹ÎŒMM‹ŒŒ_KˆÚY‰ÜÛİIËŒLÎKNŒÍMKÎŒMLKŒNNK—NÂ‹ËÈ[H[˜Ûİ[\ˆX^Hİ\H]ÈİÛˆš[š]H[X™\ˆÙˆØ]™\ËXXÚÚ]x $ÌMH[™[ZY\Ë‚‹ËÈ™\Ù]È\™HÛ›H™]šY]ÈØÙ[˜\š[ÜÎÈ^H\™H“ÕHÛØ˜[Ø]™KXÛİ[[Z]‚˜ÛÛœİĞU‘WÔ‘TÑUÏ^Üİ™\ÜÎ–ÌMKL‹—K]ZXÚÎ–ÌKK—KÚ^™\Î–ÌKK‹L‹MW_NÂ›]İ\œ™[˜]P\™XRYQQUSĞUWĞT‘PWÒQØ]™T™\Ù]QU—ÓSÑOÉÜİ™\ÜÉÎ‰Ü]ZXÚÉËØ]™Sİ™\œšYO[[[™[^T›Üİ\“[ÙOQU—ÓSÑOÉÛZ^Y	Î‰ÜÛ[YIËØ]™T[V×KØ]™R[™^KLKØ]™T]Y]YOV×KØ]™RÚ[ÏLˆİ[[™[^QY™X]ÏL[˜Ûİ[\ÛX\™YY˜[ÙKÜ]Û’\İÜOV×K[™[ZY\ÏV×KÙ[XİY[™[^RY[[Xİ[™Ñ[™[^RY[[Â‹ËÈ[™[Y[[È\™Ù][\È[™[™[Y[[ˆŒKŒHÜİX]XÚÈ™Z[™›Ü˜Ù[Y[›İ[™\K‚‹ËÈÛİ[[š[˜ÙY˜\ÚXÈ\Ù\È›\İ[›\ÜÈ™[Z][HÙX\Ûˆ\XØ]HÈÚ[™Ù\È]È[ÑNÈ[[X]H\È[ÑKˆH]\›ˆÛÛ˜\‹‹ËÈKZ][™İ\ÜXİ[ÛœÈ™[XZ[ˆ]™[ÜY[[Û›HÛÛ›ÛËˆ[XYÙKØÛÜİ˜[Y\È\™H›İš\Ú[Û˜[‚›]\™Ù][™Ó[ÙOIÜÚ[™ÛIË[™[™Õ\™Ù]Xİ[Û[[İ\Ü[[Ï[[™\›ÔÚÚ[\›YYY˜[ÙK]XÚÒ[”›ÙÜ™\ÜÏY˜[ÙK]XÚÔÙ\šX[Lˆ[™[™Õ˜XØ[˜ÚY\ÏV×K\İ]XÚÏ[[İ\Ü\İ\İÜOV×KÛİ[[š[˜ÙTİXÚÜÏLÛİ[›ÛİÕ\İ]O^İ\N‰Ù›ÛİÕ\	ËÚ\™Ù\ÎK™[XZ[š[™ÎKÙY[”Ûİ\˜Ù\Î›™]ÈÙ]
 
-function eligibleAllyTarget(p,kind){return !!p&&(kind==='revive'?p.hp<=0:kind==='heal'?p.hp>0&&p.hp<=p.maxHp:p.hp>0)}
-function chooseAttackTargets(mode=targetingMode,primary=chosenEnemy()){
- return combatEngine.resolveTargets({candidates:liveEnemies(),mode,primary});
-}
-function closestSurvivingEnemy(slot){return liveEnemies().slice().sort((a,b)=>Math.abs(a.slot-slot)-Math.abs(b.slot-slot)||a.slot-b.slot)[0]||null}
-// Soul's Basic becomes Blast at three Enhance stacks; the Ultimate is AoE.
-function actionTargetMode(actor,action){if(actor?.id==='soul'&&action==='basic')return soulEnhancedBasicTargetMode(soulEnhanceStacks);if(actor?.id==='angel'&&action==='skill')return combatKit('angel')?.skill?.cycles?.[actor.currentCycle||0]?.target||'single';return combatKit(actor?.id)?.[action]?.target||targetingMode}
-function previewTargetMode(){if(pendingTargetAction){const actor=party.find(p=>p.id===pendingTargetAction.actorId);return actionTargetMode(actor,pendingTargetAction.action)}return targetingMode}
-function beginDawnAllyTargetSelection(action,actorId){
- const actor=party.find(p=>p.id===actorId);if(!actor||!['dawn','cloud'].includes(actor.id))return false;
- if(action==='ultimate'&&!canQueueUltimate(actor)){say(actor.hp<=0?'Defeated ally cannot use an Ultimate.':'Ultimate needs '+ultimateEnergyCost(actor)+' available Energy.');return false}
- if(action==='skill'&&sp<1){say('This skill needs 1 Skill Point.');return false}
- if(pendingTargetAction?.targetSide==='ally'&&pendingTargetAction.action===action&&pendingTargetAction.actorId===actorId){
-  const target=party.find(p=>p.id===selectedAllyId&&p.hp>0);
-  if(!target){say('Select a living ally before confirming this action.');return false}
-  pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;
-  return action==='ultimate'?queueUltimate(actorId,target.id):executeCombatAction(actor,action,null,target.id);
- }
- pendingTargetAction={action,actorId,targetSide:'ally'};cameraPreview='party';supportDemo=null;selectedAllyId=party.find(p=>p.hp>0&&p.id!==actorId)?.id||actorId;
- const actionName=actor.id==='cloud'?'Restoration':action==='skill'?'Tune':'Ultimate';say(`Select a living ally for ${actor.name}'s ${actionName} on the field or in their portrait card.`);return true;
-}
-function beginTargetSelection(action,actorId=activeId){
- const actor=party.find(p=>p.id===actorId);if(!actor||actor.hp<=0)return false;
- if((actor.id==='dawn'&&(action==='skill'||action==='ultimate'))||(actor.id==='cloud'&&action==='skill'))return beginDawnAllyTargetSelection(action,actorId);
- if(action==='skill'&&actor.id!=='soul'&&sp<1){say('Not enough shared SP. Basic restores 1 SP.');return false}
- if(action==='ultimate'&&!canQueueUltimate(actor)){say(actor.hp<=0?'Defeated ally cannot use an Ultimate.':'Ultimate needs '+ultimateEnergyCost(actor)+' available Energy.');return false}
- if(actionTargetMode(actor,action)==='allAllies'){
-  if(pendingTargetAction?.actorId===actorId&&pendingTargetAction.action===action&&pendingTargetAction.targetScope==='all'){
-   pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;return executeCombatAction(actor,action)
-  }
-  pendingTargetAction={action,actorId,targetSide:'ally',targetScope:'all'};cameraPreview='party';supportDemo=null;selectedAllyId=null;
-  say(`All living allies are selected for ${actor.name}'s ${action.toUpperCase()}. Tap a party member or press ${action.toUpperCase()} again to confirm.`);return true;
- }
- if(pendingTargetAction?.action===action&&pendingTargetAction.actorId===actorId){pendingTargetAction=null;cameraPreview=null;if(action==='ultimate')return queueUltimate(actorId);return executeCombatAction(actor,action)}
- if(action==='ultimate'&&actionTargetMode(actor,action)==='aoe'){pendingTargetAction=null;cameraPreview=null;return queueUltimate(actorId)}
- pendingTargetAction={action,actorId};cameraPreview='target';supportDemo=null;selectedAllyId=null;
- say(`Select an enemy for ${actor.name}'s ${action.toUpperCase()}. Press the ability again to use the selected target, or choose another action to switch.`);return true;
-}
-function cancelTargetSelection(){if(!pendingTargetAction)return false;pendingTargetAction=null;cameraPreview=null;say('Target selection canceled.');return true}
-function setTargetingMode(mode){if(!['single','blast','aoe','five-hit'].includes(mode)||phase!=='player'||paused)return false;targetingMode=mode;zeroSkillArmed=false;supportDemo=null;cameraPreview='target';return true}
-function zeroSkillControl(){return activateSoulEnhance();}
-function activateSoulEnhance(){
- const a=active();if(phase!=='player'||paused||!a||a.id!=='soul'){say('Enhance is available on Soulâ€™s turn.');return false}
- if(sp<1){say('Soul Enhance needs 1 Skill Point.');return false}
- const resources={skillPoints:sp,skillPointCap:effectiveSpMax()},plan=combatEngine.resolveActionPlan({kit:combatKit('soul'),action:'skill',characterId:'soul'}),weapon=loadoutFor('soul').weapon,result=combatEngine.resolveEnhanceAction({actor:a,battle:resources,plan,currentStacks:soulEnhanceStacks,maxStacks:Infinity,premiumWeapon:weapon.selected==='premium'&&weapon.premiumOwned,spendingRemainder:soulEnhanceSpendingRemainder});if(!result){say('Enhance needs 1 Skill Point.');return false}sp=resources.skillPoints;soulEnhanceStacks=result.enhanceStacks;soulEnhanceSpendingRemainder=result.spendingRemainder;let refunded=result.refundedSkillPoints>0,recycled=false;
- const beforeSkillRuneSp=sp;applyRuneSkillEffects(a);recycled=sp>beforeSkillRuneSp;
- zeroSkillArmed=false;pendingTargetAction=null;cameraPreview=null;fx={kind:'self',visual:'soul-enhance',at:performance.now(),actor:a.id};
- log='SOUL ENHANCE: '+soulEnhanceStacks+' Skill Point(s) banked for the next Basic Attack.'+(recycled?' Recycle restored 1 Skill Point.':'')+(refunded?' Standard signature weapon restored 1 Skill Point.':'');return true;
-}
-function startSupportDemo(kind){
- if(phase!=='player'||paused||!['heal','revive'].includes(kind))return false;
- const eligible=party.filter(p=>eligibleAllyTarget(p,kind));
- if(!eligible.length){say(kind==='revive'?'No defeated ally to revive.':'No eligible ally to heal.');return false}
- supportDemo=kind;zeroSkillArmed=false;selectedAllyId=eligible.find(p=>p.id===activeId)?.id||eligible[0].id;cameraPreview='party';
- log=`TEST ONLY: choose ${kind==='revive'?'a defeated':'a living'} ally, then confirm.`;return true;
-}
-function cancelSupportDemo(){supportDemo=null;selectedAllyId=null;cameraPreview=null}
-function confirmSupportDemo(){
- if(phase!=='player'||paused||!supportDemo)return false;
- const p=party.find(p=>p.id===selectedAllyId);
- if(!eligibleAllyTarget(p,supportDemo)){say('This ally is not eligible for that action.');return false}
- const kind=supportDemo,before=p.hp;
- // Sandbox test only: no real skill, turn, energy, or SP are consumed; costs remain undecided.
- if(kind==='heal')healCharacterHp(p,160);
- else{p.hp=Math.max(1,roundHp(p.maxHp*.35));gauges[p.id]=0}saveVitals();
- supportTestHistory.push({kind,target:p.id,before,after:p.hp,actor:activeId});
- log=`TEST ONLY: ${kind==='heal'?'healing':'revival'} targeted ${p.name} (${before} â†’ ${p.hp} HP).`;
- cancelSupportDemo();return true;
-}
+KXİ]˜][ÛœÎŒKÛİ[[š[˜ÙTÜ[™[™Ô™[XZ[™\L™\›Ò][™[^RYÏ[™]ÈÙ]
 
-function liveEnemies(){return enemies.filter(e=>e.hp>0)}
-function liveBattleOutcome(){return combatEngine.resolveBattleOutcome({allies:party,enemies:enemies.filter(e=>e.hp>0),encounterComplete:encounterCleared,noEnemyMeansVictory:false})}
-function totalEnemyHp(){return liveEnemies().reduce((n,e)=>n+e.hp,0)}
-function syncEnemyHp(){enemyHp=totalEnemyHp();maxEnemyHp=liveEnemies().reduce((n,e)=>n+e.maxHp,0)}
-function chosenEnemy(){return liveEnemies().find(e=>e.id===selectedEnemyId)||liveEnemies()[0]||null}
-function enemyBattleSprite(enemy){return enemy?.battleSprite}
-function buildWavePlan(sizes,authoredWaves=null){
- if(!Array.isArray(sizes)||!sizes.length||!sizes.every(n=>Number.isInteger(n)&&n>=1&&n<=15))throw Error('Wave sizes must each be 1â€“15');
- return sizes.map((size,wi)=>validateWaveComposition(Array.from({length:size},(_,i)=>{
-  const mixedCommon=['slime','wolf','hawk'][(wi+i)%3],commonId=enemyRosterMode==='mixed'?mixedCommon:enemyRosterMode==='wolf'?'wolf':enemyRosterMode==='hawk'?'hawk':'slime';
-  const finalMixedWave=enemyRosterMode==='mixed'&&wi===sizes.length-1,firstMixedWave=enemyRosterMode==='mixed'&&sizes.length>1&&wi===0;
-  const mixedBoss=finalMixedWave&&i===0,mixedBossElite=finalMixedWave&&(i===1||i===2),mixedLeader=firstMixedWave&&i===0;
-  const authoredEnemy=authoredWaves?.[wi][i];
-  const model=authoredEnemy?ENEMY_ARCHETYPES[authoredEnemy.enemyId]:enemyRosterMode==='goblin'?(i<ENCOUNTER_LIMITS.elitesPerWave?ENEMY_ARCHETYPES.goblin:ENEMY_ARCHETYPES.slime):enemyRosterMode==='geode'?(i<ENCOUNTER_LIMITS.elitesPerWave?ENEMY_ARCHETYPES.geode:ENEMY_ARCHETYPES.slime):enemyRosterMode==='bear'?(i===0?ENEMY_ARCHETYPES.bear:ENEMY_ARCHETYPES.slime):enemyRosterMode==='hawk'?ENEMY_ARCHETYPES.hawk:mixedBoss?ENEMY_ARCHETYPES.bear:finalMixedWave&&i===2?ENEMY_ARCHETYPES.geode:(mixedBossElite||mixedLeader)?ENEMY_ARCHETYPES.goblin:ENEMY_ARCHETYPES[commonId];
-  const category=validateEnemyCategory(model.category),tags=validateEnemyTags(model.tags,category),level=authoredEnemy?.level??model.level??1;
-  const stats=enemyStatsAtLevel({hp:model.hp,attack:model.baseAttack,physicalDefense:model.basePhysicalDefense,magicalDefense:model.baseMagicalDefense,speed:model.speed},level);
-  return {id:`wave${wi+1}-enemy${i+1}`,archetypeId:model.id,name:model.name,tags,
-   wave:wi+1,order:i+1,category,healthBars:validateEnemyHealthBars(category,model.healthBars??1),level,maxHp:stats.hp,speed:model.speed,baseSpeed:model.speed,
-   baseAttack:model.baseAttack,
-   basePhysicalDefense:model.basePhysicalDefense,baseMagicalDefense:model.baseMagicalDefense,lifesteal:model.lifesteal??0,lifestealModifiers:{...(model.lifestealModifiers||{})},bleedStacks:[],bleedMaxStacks:model.bleedMaxStacks??5,
-   battleSprite:model.battleSprite,battleAspectRatio:model.battleAspectRatio,art:model.artwork,artwork:model.artwork,barrierPercent:model.barrierPercent??.2,passive:{...model.passive},basicAttack:{...model.basicAttack},basicAttackCount:0,rampageStacks:0,momentumStacks:0};
- })));
-}
-function validateWaveComposition(wave){
- const bosses=wave.filter(e=>validateEnemyCategory(e.category)==='boss').length,elites=wave.filter(e=>e.category==='elite').length;
- if(bosses>ENCOUNTER_LIMITS.bossesPerWave)throw Error(`A wave can contain at most ${ENCOUNTER_LIMITS.bossesPerWave} Boss.`);
- if(elites>ENCOUNTER_LIMITS.elitesPerWave)throw Error(`A wave can contain at most ${ENCOUNTER_LIMITS.elitesPerWave} Elite enemies.`);
- return wave;
-}
-function initialSlots(count,bossWave=false,queuedEnemies=[]){
- if(!bossWave&&!queuedEnemies.some(enemy=>enemy.category==='elite'))return ({1:[2],2:[1,3],3:[1,2,3],4:[0,1,3,4],5:[0,1,2,3,4]})[count].slice();
- const middle=[2],sides=[1,3],eliteCenter=[2,1,3],outer=[0,4],fallback=[0,4,1,3],used=new Set();
- return queuedEnemies.slice(0,count).map(enemy=>{
-  const preferred=enemy.category==='boss'?middle:enemy.category==='elite'?(bossWave?sides:eliteCenter):outer;
-  const slot=preferred.shift()??fallback.find(candidate=>!used.has(candidate));used.add(slot);
-  return slot;
- });
-}
-function canDeployEnemy(enemy){
- if(!enemy||enemies.length>=ENCOUNTER_LIMITS.enemiesOnField)return false;
- const eliteCount=enemies.filter(e=>e.category==='elite'&&e.hp>0).length,bossOnField=enemies.some(e=>e.category==='boss'&&e.hp>0);
- if(enemy.category==='boss'&&eliteCount>ENCOUNTER_LIMITS.elitesOnFieldInBossWave)return false;
- if(enemy.category==='elite'&&eliteCount>=(bossOnField?ENCOUNTER_LIMITS.elitesOnFieldInBossWave:ENCOUNTER_LIMITS.elitesOnField))return false;
- return true;
-}
-function enterEnemy(slot){
- if(!waveQueue.length||enemies.some(e=>e.slot===slot))return null;
- const queueIndex=waveQueue.findIndex(canDeployEnemy);if(queueIndex<0)return null;
- const [incoming]=waveQueue.splice(queueIndex,1),formation=ENEMY_FORMATIONS[slot];
- const barrier=roundHp(incoming.maxHp*incoming.barrierPercent);
- const e={...incoming,echoPercent:incoming.echoPercent??0,slot,x:formation.x,y:formation.y,w:formation.w,h:formation.h,hp:incoming.maxHp,shield:incoming.shield||0,maxBarrier:barrier,barrier,brokenTurns:0,debuffs:[],marks:[],tauntEffects:[],reinforcement:waveKills>0,entryPending:waveKills>0,enteredAt:waveKills>0?performance.now():null};
- const lily=party.find(p=>p.id==='lily'),soulMarkTurns=lily?upgradeValueFor('lily.premium-duplicate.2.entry-marks','entrySoulMarkTurns','lily'):0,ricochetTurns=lily?upgradeValueFor('lily.premium-duplicate.2.entry-marks','entryRicochetTurns','lily'):0;
- if(soulMarkTurns>0||ricochetTurns>0){if(soulMarkTurns>0)combatEngine.setTimedMark({target:e,mark:{id:'soul-mark',turns:soulMarkTurns}});if(ricochetTurns>0)combatEngine.setTimedMark({target:e,mark:{id:'ricochet',turns:ricochetTurns,sources:[]}});combatEngine.recordUpgradeEffect('lily.premium-duplicate.2.entry-marks',{actorId:lily.id,targetIds:[e.id],trigger:'on_enemy_enter',values:{soulMarkTurns,ricochetTurns}})}
- enemies.push(e);enemies.sort((a,b)=>a.slot-b.slot);gauges[e.id]=0;
- spawnHistory.push({wave:e.wave,id:e.id,slot,initial:waveKills===0,duringAttack:attackInProgress});
- syncEnemyHp();return e;
-}
-function beginWave(index){saveVitals();
- if(index>=wavePlan.length){encounterCleared=true;enemies=[];selectedEnemyId=null;syncEnemyHp();return;}
- const categoryOrder={boss:0,elite:1,common:2};waveIndex=index;waveQueue=[...wavePlan[index]].sort((a,b)=>categoryOrder[a.category]-categoryOrder[b.category]||a.order-b.order);waveKills=0;enemies=[];actingEnemyId=null;pendingVacancies=[];
- const initialCount=Math.min(ENCOUNTER_LIMITS.enemiesOnField,waveQueue.length);
- const bossWave=wavePlan[index].some(enemy=>enemy.category==='boss');for(const slot of initialSlots(initialCount,bossWave,waveQueue))enterEnemy(slot);
- const count=enemies.length;
- selectedEnemyId=enemies[Math.floor(enemies.length/2)]?.id||null;
- syncEnemyHp();
- log=`Wave ${index+1}/${wavePlan.length}: ${wavePlan[index].length} enemies â€¢ ${count} deployed.`;
-}
-function resetEnemies(){
- const authoredWaves=campaignEntry?.encounter.waves.map(wave=>wave.flatMap(group=>Array(group.quantity).fill(group)));
- wavePlan=authoredWaves?buildWavePlan(authoredWaves.map(wave=>wave.length),authoredWaves):buildWavePlan(waveOverride||WAVE_PRESETS[wavePreset]);waveIndex=-1;waveQueue=[];waveKills=0;
- for(const ally of party){ally.residueStacks=0;ally.residueTurns=0;ally.residueMaxStacks=null;ally.residueDamageReductionPerStack=null;ally.residueResistanceReductionPerStack=null}
- totalEnemyDefeats=0;encounterCleared=false;spawnHistory=[];enemies=[];selectedEnemyId=null;actingEnemyId=null;pendingVacancies=[];attackInProgress=false;lastAttack=null;supportDemo=null;supportTestHistory=[];
- beginWave(0);
-}
-function resolveEnemyDefeat(victim,{deferSettlement=false}={}){
- if(!victim||victim.hp>0||victim.deathAt||!enemies.some(e=>e.id===victim.id))return null;
- combatEngine.clearUnitEffects(victim,{reason:'defeat',taunts:true});
- // Keep the defeated unit on stage for a visible fade-out. Its zero HP keeps it
- // out of targeting and turn order while its slot remains unavailable.
- victim.deathAt=performance.now();delete gauges[victim.id];
- pendingVacancies.push(victim.slot);waveKills++;totalEnemyDefeats++;
- if(lastAttack&&attackInProgress&&!lastAttack.finished)lastAttack.defeats.push({id:victim.id,slot:victim.slot});
- syncEnemyHp();
- if(!attackInProgress&&!deferSettlement)schedule(()=>{if(!attackInProgress)settleAfterAttack()},ENEMY_DEATH_BEAT_MS);
- return victim;
-}
-function settleAfterAttack(){
- if(attackInProgress)return false;
- // Remove stage corpses only when their presentation beat is complete.
- enemies=enemies.filter(e=>e.hp>0);
- // Temporary implementation detail, not a finalized multi-KO gameplay rule:
- // vacated slots are filled in ascending slot order for deterministic test reproducibility.
- const vacancies=pendingVacancies.splice(0).sort((a,b)=>a-b);
- for(const slot of vacancies){if(waveQueue.length)enterEnemy(slot)}
- if(enemies.length===0&&waveQueue.length===0){
-  if(waveIndex+1<wavePlan.length)beginWave(waveIndex+1);
-  else {encounterCleared=true;selectedEnemyId=null;}
- }
- if(!enemies.some(e=>e.id===selectedEnemyId))selectedEnemyId=chosenEnemy()?.id||null;
- syncEnemyHp();return true;
-}
-function applyTrainingHit(enemy,damage,hitNumber,deferRicochet=false){
- if(!enemy||enemy.hp<=0||!attackInProgress)return false;
- const source=party.find(p=>p.id===lastAttack.actor)||summons.find(s=>s.id===lastAttack.actor)||null;
- const amplifyEffect=lastAttack.runeAmplifyActive?activeRuneEffect(lastAttack.actor,'amplify','basic'):null,actionDamage=amplifyEffect?roundHp(damage*(1+amplifyEffect.damageBonus)):damage;
- const dealt=applyEnemyDamage(enemy,actionDamage,source,{damageType:lastAttack.damageType,eventType:'direct_hit',actionId:lastAttack.serial});
- if(source?.id==='zero'&&dealt.damage>0)zeroHitEnemyIds.add(enemy.id);
- lastAttack.hits.push({index:hitNumber,target:enemy.id,slot:enemy.slot,damage:dealt.damage+dealt.breakDamage,healthDamage:dealt.healthDamage,shieldDamage:dealt.shieldDamage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,breakDamage:dealt.breakDamage,barrierAfter:enemy.barrier,broken:dealt.broken,critical:dealt.critical,criticalMultiplier:dealt.criticalMultiplier,dodged:!!dealt.dodged,eventType:dealt.eventType,sourceId:dealt.sourceId,actionId:dealt.actionId,phase:'initial'});
- if(dealt.reflect)lastAttack.hits.push({index:lastAttack.hits.length+1,target:source?.id||null,damage:dealt.reflect.damage,healthDamage:dealt.reflect.healthDamage,shieldDamage:dealt.reflect.shieldDamage,damageType:'true',reflect:true,eventType:dealt.reflect.eventType,sourceId:dealt.reflect.sourceId,actionId:dealt.reflect.actionId,phase:'reflect'});
- if(dealt.echo)lastAttack.hits.push({index:lastAttack.hits.length+1,target:enemy.id,slot:enemy.slot,damage:dealt.echo.damage,healthDamage:dealt.echo.healthDamage,damageType:dealt.echo.damageType,echo:true,eventType:dealt.echo.eventType,sourceId:dealt.echo.sourceId,actionId:dealt.echo.actionId,phase:'echo'});
- if(dealt.echoReflect)lastAttack.hits.push({index:lastAttack.hits.length+1,target:source?.id||null,damage:dealt.echoReflect.damage,healthDamage:dealt.echoReflect.healthDamage,shieldDamage:dealt.echoReflect.shieldDamage,damageType:'true',reflect:true,eventType:dealt.echoReflect.eventType,sourceId:dealt.echoReflect.sourceId,actionId:dealt.echoReflect.actionId,phase:'echo-reflect'});
- const slowStartBefore=source?.id==='tsunade'?(source.marks||[]).filter(mark=>mark.id==='tsunade-slow-start').length:0;
- const hitEffects=source?combatEngine.resolveHitEffects({actor:source,target:enemy,hit:{dodged:!!dealt.dodged,damage:dealt.damage,actionId:dealt.actionId},action:lastAttack.action,eventType:dealt.eventType,passives:combatKit(source.id)?.passives||[],ability:combatKit(source.id)?.[lastAttack.action],characterDuplicates:characterDuplicateRank(source.id),premiumWeaponDuplicates:premiumWeaponDuplicateRank(source.id),hasPremiumWeapon:loadoutFor(source.id).weapon.selected==='premium'&&loadoutFor(source.id).weapon.premiumOwned,allies:party,isEnemyTarget:true}):[];
- if(source)combatEngine.resolveTsunadeAbilityEffect({actor:source,target:enemy,ability:combatKit(source.id)?.[lastAttack.action],action:lastAttack.action,hit:{dodged:!!dealt.dodged,damage:dealt.damage,actionId:dealt.actionId,eventType:dealt.eventType}});
- if(slowStartBefore!==(source?.marks||[]).filter(mark=>mark.id==='tsunade-slow-start').length)syncTurnTimeline();
- if(hitEffects.some(effect=>effect.type==='exposed'))emitCombatVisual('lily-exposed',[enemy.id],COMBAT_ACTION_EFFECT_MS);
- if(deferRicochet){if(!lastAttack.pendingRicochet)lastAttack.pendingRicochet={enemyId:enemy.id,damage:dealt.damage}}
- else triggerRicochet(lastAttack,enemy,dealt.damage);
- if(hitEffects.some(effect=>effect.type==='ricochet-mark'))emitCombatVisual('lily-ricochet-mark',[enemy.id],1000);
- if(enemy.hp<=0)resolveEnemyDefeat(enemy);else syncEnemyHp();
- return true;
-}
-function triggerRicochet(sourceAttack,hitEnemy,sourceDamage){
- if(!sourceAttack||sourceAttack.ricochetFollowUp||sourceDamage<=0)return;
- const eligibleIds=sourceAttack.ricochetEligibleEnemyIds;
- const marked=liveEnemies().filter(e=>(!eligibleIds||eligibleIds.includes(e.id))&&e.marks?.some(m=>m.id==='ricochet'));
- const lily=party.find(p=>p.id==='lily');if(!lily)return;
- const allocations=combatEngine.resolveRicochetPlan({targets:marked,sourceId:sourceAttack.serial,sourceDamage,eventType:sourceAttack.action==='summon'?'summon_hit':'direct_hit',repeats:upgradeValueFor('lily.duplicate.4.ricochet-repeat','ricochetRepeats','lily',1),secondHitMultiplier:upgradeValueFor('lily.duplicate.4.ricochet-repeat','ricochetSecondHitMultiplier','lily',.5)}),triggered=[...new Set(allocations.map(entry=>entry.target))];
- if(!triggered.length)return;
- sourceAttack.ricochetFollowUp=true;const damageByTarget={};
- const dodgedTargets=[];for(const entry of allocations){const enemy=entry.target;if(enemy.hp<=0)continue;const reduction=calculateTrueDamageReduction(lily,enemy),amount=roundHp(entry.damage*(1-(Number.isFinite(reduction)?reduction:0))),dealt=applyEnemyDamage(enemy,amount,lily,{damageType:'true',eventType:'ricochet_hit',actionId:sourceAttack.serial});damageByTarget[enemy.id]=(damageByTarget[enemy.id]||0)+dealt.damage;if(dealt.dodged)dodgedTargets.push(enemy.id);sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,damage:dealt.damage,barrierDamage:dealt.barrierDamage,ricochet:true,ricochetSource:sourceAttack.serial,critical:dealt.critical,dodged:!!dealt.dodged,eventType:dealt.eventType,sourceId:dealt.sourceId,actionId:dealt.actionId,phase:'ricochet'});if(dealt.reflect)sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:lily.id,damage:dealt.reflect.damage,healthDamage:dealt.reflect.healthDamage,damageType:'true',reflect:true,eventType:dealt.reflect.eventType,sourceId:dealt.reflect.sourceId,actionId:dealt.reflect.actionId,phase:'reflect'});if(dealt.echo)sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,damage:dealt.echo.damage,damageType:dealt.echo.damageType,echo:true,eventType:dealt.echo.eventType,sourceId:dealt.echo.sourceId,actionId:dealt.echo.actionId,phase:'echo'});if(dealt.echoReflect)sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:lily.id,damage:dealt.echoReflect.damage,healthDamage:dealt.echoReflect.healthDamage,damageType:'true',reflect:true,eventType:dealt.echoReflect.eventType,sourceId:dealt.echoReflect.sourceId,actionId:dealt.echoReflect.actionId,phase:'echo-reflect'});const hitEffects=combatEngine.resolveHitEffects({actor:lily,target:enemy,hit:{dodged:!!dealt.dodged,damage:dealt.damage},action:'ricochet',eventType:dealt.eventType,passives:combatKit('lily')?.passives||[],characterDuplicates:characterDuplicateRank('lily'),premiumWeaponDuplicates:premiumWeaponDuplicateRank('lily'),hasPremiumWeapon:loadoutFor('lily').weapon.selected==='premium'&&loadoutFor('lily').weapon.premiumOwned,allies:party,isEnemyTarget:true});if(hitEffects.some(effect=>effect.type==='exposed'))emitCombatVisual('lily-exposed',[enemy.id],COMBAT_ACTION_EFFECT_MS);if(enemy.hp<=0)resolveEnemyDefeat(enemy)
- }
- emitCombatVisual('lily-ricochet-trigger',triggered.map(e=>e.id),COMBAT_ACTION_EFFECT_MS,{damageByTarget,dodgedTargets});sourceAttack.ricochetFollowUp=false;syncEnemyHp();return triggered.length;
-}
-function cleanseEnemy(enemy,full=true){return combatEngine.clearUnitEffects(enemy,{full,taunts:full,bleed:full})}
-function teamBaseTurns(faction){
- const allyAverage=TwoToneTurnTimeline.mean(party.map(p=>speedOf(p)));
- const enemyMembers=timelineEnemyMembers(),enemyAverage=TwoToneTurnTimeline.mean(enemyMembers.map(e=>speedOf(e)));
- const slower=Math.min(allyAverage,enemyAverage),teamAverage=faction==='enemy'?enemyAverage:allyAverage;
- return Math.max(1,teamAverage/slower);
-}
-function brokenDuration(speed,baseTurns){
- return Math.max(1,roundHp(baseTurns*Math.max(.5,Math.min(1.5,2-speed/100))));
-}
-function stealthChanceOf(unit){const base=Number.isFinite(unit?.stealth)?unit.stealth:0;return Math.min(1,Math.max(0,base))}
-function echoPercentOf(source){const base=Number.isFinite(source?.echoPercent)?source.echoPercent:0,rune=lastAttack?.actor===source?.id?activeRuneDamageEffects[source.id]?.radiantMoon:null;return Math.max(0,Math.min(1,base+(rune?.echo??0)))}
-function reflectPercentOf(source){const base=Number.isFinite(source?.reflectPercent)?source.reflectPercent:0,rune=activeRuneEffect(source?.id,'clear-skies','reflect',{shielded:shieldOf(source)>0});return Math.max(0,Math.min(1,base+(rune?.reflect??0)))}
-function mechanicSourceForHit(attacker,eventType){
- if(!attacker)return null;const ownerId=attacker.archetypeId||attacker.id,kit=CHARACTER_COMBAT_DATA[ownerId]||ENEMY_COMBAT_DATA[ownerId];let slot=lastAttack?.actor===attacker.id?lastAttack.action:'basic',effect;
- if(eventType==='follow_up_hit'){slot='passive';effect=CHARACTER_COMBAT_DATA.soul?.passives.find(value=>value.type==='followUp')}
- else if(eventType==='ricochet_hit'){slot='skill';effect=CHARACTER_COMBAT_DATA.lily?.skill}
- else if(eventType==='summon_hit'){slot='ultimate';effect=CHARACTER_COMBAT_DATA.lily?.ultimate}
- else effect=kit?.[slot];
- const tags=(effect?.mechanicTags||[]).filter(tag=>['damage.direct','damage.physical','damage.magical','damage.true','damage.critical','damage.conditional_multiplier'].includes(tag)||tag.startsWith('trigger.')||tag.startsWith('limit.'));if(!tags.length)return null;
- return{componentId:slot==='passive'?`passive:${ownerId}/${effect.id||effect.type}`:`action:${ownerId}/${slot}`,mechanicTags:tags,trigger:effect.mechanicTriggers?.['damage.direct']||`on_${slot}`};
-}
-function applyEnemyDamage(enemy,rawDamage,attacker=null,{damageType=null,eventType='direct_hit',actionId=lastAttack?.serial??null}={}){
- const runeEffects=attacker?.id&&lastAttack?.actor===attacker.id?lastAttack.runeDamageEffects||{}:{},celestialRune=attacker&&party.includes(attacker)?combatEngine.resolveRuneEffect({setId:hasRuneSet(attacker.id,'celestial-star')?'celestial-star':null,trigger:'criticalStrike',ready:runeEffectReady(attacker.id,'celestial-star')}):null,exposed=enemy.marks?.filter(mark=>mark.id==='exposed').length||0,barrierDamageMultiplier=1+exposed*upgradeValueFor('lily.premium-duplicate.3.exposed-barrier-damage','exposedBarrierDamagePerStack','lily')+(attacker?.tune?.barrierDamageBonus||0),breakDamagePercent=.1+exposed*upgradeValueFor('lily.premium-duplicate.4.exposed-break-damage','exposedBreakDamagePerStack','lily'),primary={stealthChance:stealthChanceOf(enemy),criticalRate:attacker?(celestialRune?.forceCritical?1:criticalRateOf(attacker)):0,criticalDamage:attacker?criticalDamageOf(attacker)+(celestialRune?.criticalDamageBonus||0):0,damageReduction:Math.min(1,Math.max(0,enemy.tune?.damageReduction||0)),vulnerabilityMultiplier:enemy.brokenTurns>0?1.5:1,random:Math.random,barrierDamageMultiplier,breakDamagePercent,brokenDuration:brokenDuration(speedOf(enemy),teamBaseTurns('enemy')),reflectPercent:attacker?.hp>0?reflectPercentOf(enemy):0,echoPercent:attacker&&['physical','magical','true'].includes(damageType)?echoPercentOf(attacker):0};
- const reflectedTarget=attacker,reflectExposed=reflectedTarget?.marks?.filter(mark=>mark.id==='exposed').length||0;
- const mechanicSource=mechanicSourceForHit(attacker,eventType),additionalMechanicSources=[];
- if(runeEffects.darkMatter)additionalMechanicSources.push({componentId:'rune:dark-matter',mechanicTags:RUNE_COMBAT_RULES['dark-matter'].mechanicTags,trigger:'on_ability_damage'});
- if(attacker?.id&&hasRuneSet(attacker.id,'amplify')&&lastAttack?.actor===attacker.id&&lastAttack.runeAmplifyActive)additionalMechanicSources.push({componentId:'rune:amplify',mechanicTags:RUNE_COMBAT_RULES.amplify.mechanicTags,trigger:'on_basic'});
- if(attacker?.id&&lastAttack?.actor===attacker.id&&lastAttack.runeFollowUp)additionalMechanicSources.push({componentId:'rune:united',mechanicTags:RUNE_COMBAT_RULES.united.mechanicTags,trigger:'on_linked_ally_action'});
- const reflectMechanicSource=enemy?.id&&hasRuneSet(enemy.id,'clear-skies')&&shieldOf(enemy)>0?{componentId:'rune:clear-skies',mechanicTags:RUNE_COMBAT_RULES['clear-skies'].mechanicTags,trigger:'while_shielded'}:null,echoMechanicSource=runeEffects.radiantMoon?{componentId:'rune:radiant-moon',mechanicTags:RUNE_COMBAT_RULES['radiant-moon'].mechanicTags,trigger:'on_damaging_skill'}:null,defenseMechanicSource=stealthChanceOf(enemy)>0?{componentId:`trait:${enemy.archetypeId||enemy.id}/stealth`,mechanicTags:['defense.stealth'],trigger:'on_incoming_attack'}:null;
- const outcome=combatEngine.resolveDamageSequence({target:enemy,attacker,rawDamage,damageType,eventType,sourceId:attacker?.id||null,actionId,primary,mechanicSource,additionalMechanicSources,reflectMechanicSource,echoMechanicSource,defenseMechanicSource,
-  calculateReflectDamage:(amount,reflector,target)=>{const attack=calculateAttack(reflector);if(!Number.isFinite(attack)||attack<=0)return null;return calculateTypedActionDamage('true',amount/attack,reflector,target)?.damageTaken??0},
-  reflect:{stealthChance:stealthChanceOf(reflectedTarget),criticalRate:enemy?criticalRateOf(enemy):0,criticalDamage:enemy?criticalDamageOf(enemy):0,damageReduction:Math.min(1,Math.max(0,reflectedTarget?.tune?.damageReduction||0)),vulnerabilityMultiplier:reflectedTarget&&enemies.includes(reflectedTarget)&&reflectedTarget.brokenTurns>0?1.5:1,random:Math.random,barrierDamageMultiplier:1+reflectExposed*upgradeValueFor('lily.premium-duplicate.3.exposed-barrier-damage','exposedBarrierDamagePerStack','lily')+(enemy?.tune?.barrierDamageBonus||0),breakDamagePercent:.1+reflectExposed*upgradeValueFor('lily.premium-duplicate.4.exposed-break-damage','exposedBreakDamagePerStack','lily'),brokenDuration:reflectedTarget?brokenDuration(speedOf(reflectedTarget),teamBaseTurns('enemy')):0},
-  echo:{random:Math.random,reflectPercent:reflectPercentOf(enemy),barrierDamageMultiplier:1,breakDamagePercent:.1+exposed*upgradeValueFor('lily.premium-duplicate.4.exposed-break-damage','exposedBreakDamagePerStack','lily'),brokenDuration:brokenDuration(speedOf(enemy),teamBaseTurns('enemy'))}});
- if(!outcome)return {damage:0,healthDamage:0,directHealthDamage:0,shieldDamage:0,breakShieldDamage:0,barrierDamage:0,breakDamage:0,broken:false,critical:false,criticalMultiplier:1,lifestealHealing:0,dodged:true,eventType,sourceId:attacker?.id||null,actionId};
- const {damage,critical,criticalMultiplier,directHealthDamage,healthDamage,barrierDamage,breakDamage,breakShieldDamage,broken}=outcome,shieldDamage=outcome.shieldDamage+breakShieldDamage;
- if(critical&&celestialRune&&combatEngine.startRuneCooldown(runeSetState(attacker.id),'celestial-star',turn,celestialRune.cooldownTurns)){attacker.runeActivations=(attacker.runeActivations||0)+1;combatEngine.recordMechanicEvent({componentId:'rune:celestial-star',mechanicTags:RUNE_COMBAT_RULES['celestial-star'].mechanicTags,trigger:'on_critical_strike',status:'applied',actorId:attacker.id,targetIds:[enemy.id],values:{forceCritical:celestialRune.forceCritical,criticalDamageBonus:celestialRune.criticalDamageBonus,cooldownTurns:celestialRune.cooldownTurns}})}
- if(shieldDamage>0&&runeCombatState[enemy.id]?.shieldRemaining>0)runeCombatState[enemy.id].shieldRemaining=Math.min(runeCombatState[enemy.id].shieldRemaining,shieldOf(enemy));
- if(shieldDamage>0)emitCombatVisual('shield-absorbed',[enemy.id],COMBAT_ACTION_EFFECT_MS,{damage:shieldDamage,remaining:shieldOf(enemy)});
- const lifestealHealing=applyLifesteal(attacker,healthDamage,eventType);
- const reflect=outcome.reflect?{damage:outcome.reflect.damage,healthDamage:outcome.reflect.healthDamage,shieldDamage:outcome.reflect.shieldDamage+outcome.reflect.breakShieldDamage,damageType:'true',dodged:!!outcome.reflect.dodged,eventType:outcome.reflect.eventType,sourceId:outcome.reflect.sourceId,actionId:outcome.reflect.actionId}:null;
- if(reflect){applyLifesteal(enemy,outcome.reflect.healthDamage,'reflect_hit');emitCombatVisual('reflect-damage',[attacker.id],COMBAT_ACTION_EFFECT_MS,{damage:reflect.healthDamage,shieldDamage:reflect.shieldDamage,dodged:reflect.dodged,sourceId:enemy.id,delayMs:COMBAT_ACTION_PHASE_GAP_MS});if(enemies.includes(attacker)&&attacker.hp<=0)resolveEnemyDefeat(attacker,{deferSettlement:phase==='enemy'})}
- let echo=null;
- if(outcome.echo&&attacker&&enemy.hp>0){
-  const echoed=outcome.echo;if(echoed.shieldDamage+echoed.breakShieldDamage>0&&runeCombatState[enemy.id]?.shieldRemaining>0)runeCombatState[enemy.id].shieldRemaining=Math.min(runeCombatState[enemy.id].shieldRemaining,shieldOf(enemy));applyLifesteal(attacker,echoed.healthDamage,'echo_hit');echo={damage:echoed.damage,damageType,healthDamage:echoed.healthDamage,directHealthDamage:echoed.directHealthDamage,eventType:echoed.eventType,sourceId:echoed.sourceId,actionId:echoed.actionId};
-  const now=performance.now(),stackIndex=combatVisualEvents.filter(event=>event.type==='echo-damage'&&event.targetIds.includes(enemy.id)&&event.at<=now+COMBAT_ACTION_EFFECT_MS&&event.at>=now-COMBAT_ACTION_EFFECT_MS).length;
-  emitCombatVisual('echo-damage',[enemy.id],COMBAT_ACTION_EFFECT_MS,{damage:echoed.damage,healthDamage:echoed.healthDamage,shieldDamage:echoed.shieldDamage+echoed.breakShieldDamage,damageType,sourceId:attacker.id,stackIndex,delayMs:COMBAT_ACTION_PHASE_GAP_MS*(reflect?2:1)});
-  if(echoed.reflect){const reflectedEcho={damage:echoed.reflect.damage,healthDamage:echoed.reflect.healthDamage,shieldDamage:echoed.reflect.shieldDamage+echoed.reflect.breakShieldDamage,damageType:'true',dodged:!!echoed.reflect.dodged,eventType:echoed.reflect.eventType,sourceId:echoed.reflect.sourceId,actionId:echoed.reflect.actionId};echo.reflect=reflectedEcho;applyLifesteal(enemy,echoed.reflect.healthDamage,'reflect_hit');emitCombatVisual('reflect-damage',[attacker.id],COMBAT_ACTION_EFFECT_MS,{damage:reflectedEcho.healthDamage,shieldDamage:reflectedEcho.shieldDamage,dodged:reflectedEcho.dodged,sourceId:enemy.id,delayMs:COMBAT_ACTION_PHASE_GAP_MS*2});if(enemies.includes(attacker)&&attacker.hp<=0)resolveEnemyDefeat(attacker,{deferSettlement:phase==='enemy'})}
-  }
- syncEnemyHp();return {damage,healthDamage,directHealthDamage,shieldDamage,breakShieldDamage,barrierDamage,breakDamage,broken,critical,criticalMultiplier,lifestealHealing,reflect,echo,echoReflect:echo?.reflect||null,eventType,sourceId:attacker?.id||null,actionId};
-}
-function applyBleed(target,source,stacks=1,maxStacks=target?.bleedMaxStacks??5){
- if(!target||target.hp<=0||!source||!Number.isInteger(stacks)||stacks<1||!Number.isInteger(maxStacks)||maxStacks<1)return false;
- const ownerId=source.archetypeId||source.id,action=lastAttack?.actor===source.id?lastAttack.action:null,kit=CHARACTER_COMBAT_DATA[ownerId]||ENEMY_COMBAT_DATA[ownerId];
- const passive=kit?.passives?.find(effect=>effect.type==='bleed'||effect.id==='bleed');
- const actionEffect=['basic','skill','ultimate'].includes(action)?kit?.[action]:null;
- const effect=actionEffect?.mechanicTags?.includes('status.bleed')?actionEffect:passive;
- const componentId=effect?`${effect===passive?'passive':'action'}:${ownerId}/${effect.id||effect.type||action}`:null;
- const added=combatEngine.applyBleed({target,sourceId:source.id,stacks,maxStacks,sourceComponentId:componentId,
-  mechanicTags:effect?.mechanicTags||['status.bleed','damage.over_time','trigger.per_hit','limit.stacks']});if(!added)return false;emitCombatVisual('bleed-applied',[target.id],COMBAT_ACTION_EFFECT_MS,{stacks:target.bleedStacks.length});return added;
-}
-function resolveBleedTick(target){
- if(!target||target.hp<=0||!target.bleedStacks?.length)return 0;
- const events=combatEngine.resolveBleedTick({target,units:[...party,...enemies]}),total=events.reduce((sum,event)=>sum+event.healthDamage,0);
- for(const event of events)applyLifesteal(event.source,event.healthDamage,'damage_over_time');
- emitCombatVisual('bleed-tick',[target.id],1000,{damage:total,stacks:target.bleedStacks.length});syncEnemyHp();return total;
-}
-function resolveSoulFollowUp(sourceAttack){
- const soul=party.find(p=>p.id==='soul'&&p.hp>0);if(!soul)return false;
- const attack=calculateAttack(soul),dupeBonus=upgradeValueFor('soul.duplicate.1.follow-up-damage','followUpDamageMultiplier','soul',1),rawTotal=Number.isFinite(attack)?roundHp(attack*.5*dupeBonus*celestialMultiplier(soul.id,'passive')):0;let total=0;
- const allocation=combatEngine.resolveFollowUpEvent({passive:soulFollowUpState,ownerId:soul.id,sourceActorId:sourceAttack.actor,sourceId:sourceAttack.serial,hits:sourceAttack.hits,enemies,action:sourceAttack.action,enhancedStacks:sourceAttack.enhanceSpent||0,totalDamage:rawTotal,maxCharges:soulFollowUpLimit(),refundEvery:upgradeValueFor('soul.premium-duplicate.4.follow-up-refund','followUpRefundEvery','soul'),characterDuplicates:characterDuplicateRank('soul'),premiumWeaponDuplicates:premiumWeaponDuplicateRank('soul'),weaponType:loadoutFor('soul').weapon.selected,disabledUpgradeEffectIds:null});if(!allocation)return false;
- const affected=allocation.affectedTargets;
- for(const entry of allocation.targets){const enemy=entry.target,rate=attack>0?entry.damage/attack:0,amount=soulDamageForTarget(soul,enemy,rate);if(amount<=0)continue;const dealt=applyEnemyDamage(enemy,amount,soul,{damageType:'true',eventType:'follow_up_hit',actionId:sourceAttack.serial});total+=dealt.damage;sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,slot:enemy.slot,damage:dealt.damage,hpAfter:enemy.hp,barrierDamage:dealt.barrierDamage,barrierAfter:enemy.barrier,broken:dealt.broken,followUp:true,critical:dealt.critical,dodged:!!dealt.dodged,eventType:dealt.eventType,sourceId:dealt.sourceId,actionId:dealt.actionId,phase:'follow-up'});if(dealt.reflect)sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:soul.id,damage:dealt.reflect.damage,healthDamage:dealt.reflect.healthDamage,damageType:'true',reflect:true,eventType:dealt.reflect.eventType,sourceId:dealt.reflect.sourceId,actionId:dealt.reflect.actionId,phase:'reflect'});if(dealt.echo)sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:enemy.id,damage:dealt.echo.damage,damageType:dealt.echo.damageType,echo:true,eventType:dealt.echo.eventType,sourceId:dealt.echo.sourceId,actionId:dealt.echo.actionId,phase:'echo'});if(dealt.echoReflect)sourceAttack.hits.push({index:sourceAttack.hits.length+1,target:soul.id,damage:dealt.echoReflect.damage,healthDamage:dealt.echoReflect.healthDamage,damageType:'true',reflect:true,eventType:dealt.echoReflect.eventType,sourceId:dealt.echoReflect.sourceId,actionId:dealt.echoReflect.actionId,phase:'echo-reflect'});const hitEffects=combatEngine.resolveHitEffects({actor:soul,target:enemy,hit:{dodged:!!dealt.dodged,damage:dealt.damage},action:'follow-up',eventType:dealt.eventType,passives:combatKit('soul')?.passives||[],characterDuplicates:characterDuplicateRank('soul'),premiumWeaponDuplicates:premiumWeaponDuplicateRank('soul'),hasPremiumWeapon:loadoutFor('soul').weapon.selected==='premium'&&loadoutFor('soul').weapon.premiumOwned,allies:party,isEnemyTarget:true});if(hitEffects.some(effect=>effect.type==='exposed'))emitCombatVisual('lily-exposed',[enemy.id],COMBAT_ACTION_EFFECT_MS);if(enemy.hp<=0)resolveEnemyDefeat(enemy)}
- const dodgedTargets=sourceAttack.hits.filter(hit=>hit.followUp&&hit.dodged).map(hit=>hit.target);sourceAttack.followUp={sourceSerial:sourceAttack.serial,damage:total,targets:affected.map(e=>e.id),procsRemaining:soulFollowUpState.remaining};emitCombatVisual('soul-follow-up',affected.map(e=>e.id),ANIMATION_STEP_MS*5,{damageByTarget:Object.fromEntries(sourceAttack.hits.filter(hit=>hit.followUp).map(hit=>[hit.target,hit.damage])),dodgedTargets,targetGeometry:Object.fromEntries(affected.map(e=>[e.id,{x:e.x,y:e.y,w:e.w,h:e.h}]))});syncEnemyHp();return total>0;
-}
-function resolveRuneUltimateEffects(attack){
- if(!attack||attack.action!=='ultimate'||attack.runeSetEffectsApplied)return false;
- attack.runeSetEffectsApplied=true;
- const infiniteEffect=activeRuneEffect(attack.actor,'infinite-space','ultimate');if(infiniteEffect){
- const enemyIds=[...new Set(enemies.filter(enemy=>enemy.hp>0&&(enemy.runeDelayImmunityByOwner?.[attack.actor]||0)<=0).map(enemy=>enemy.id))];
-  const delayPercent=infiniteEffect.actionDelay;for(const id of enemyIds){const enemy=enemies.find(entry=>entry.id===id);addActionDelay(id,delayPercent);enemy.runeDelayImmunityByOwner=enemy.runeDelayImmunityByOwner||{};enemy.runeDelayImmunityByOwner[attack.actor]=RUNE_COMBAT_RULES['infinite-space'].immunityTurns}
-  if(enemyIds.length)combatEngine.recordMechanicEvent({componentId:'rune:infinite-space',mechanicTags:RUNE_COMBAT_RULES['infinite-space'].mechanicTags,trigger:'on_ultimate',status:'applied',actorId:attack.actor,targetIds:enemyIds,values:{actionDelay:delayPercent,targetsAffected:enemyIds.length,immunityTurns:RUNE_COMBAT_RULES['infinite-space'].immunityTurns}});
-  if(enemyIds.length)emitCombatVisual('rune-infinite-space',enemyIds,COMBAT_ACTION_EFFECT_MS,{delayPercent});
- }
- return true;
-}
-function finishTrainingAttack(serial){
- if(!attackInProgress||!lastAttack||lastAttack.serial!==serial)return;
- if(!lastAttack.resolutionPhase){
-  lastAttack.resolutionPhase='follow-up';const pending=lastAttack.pendingRicochet;
-  const ricochetCount=pending?triggerRicochet(lastAttack,enemies.find(e=>e.id===pending.enemyId),pending.damage):0;
-  if(ricochetCount){const source=party.find(p=>p.id===lastAttack.actor);log=`${source?.name||'Ally'} triggers Lily's Ricochet â€¢ ${ricochetCount} marked ${ricochetCount===1?'enemy':'enemies'}.`;schedule(()=>finishTrainingAttack(serial),COMBAT_ACTION_PHASE_GAP_MS);return}
- }
- if(lastAttack.resolutionPhase==='follow-up'){
-  lastAttack.resolutionPhase='complete';
-  const soulSelfFollowUp=lastAttack.actor==='soul'&&lastAttack.action==='basic'&&(lastAttack.enhanceSpent||0)>=3;
-  const soulFollowUpTriggered=lastAttack.actor&&party.some(p=>p.id===lastAttack.actor)&&(lastAttack.actor!=='soul'||soulSelfFollowUp)?resolveSoulFollowUp(lastAttack):false;
-  if(soulFollowUpTriggered||lastAttack.followUp){
-   const followUp=lastAttack.followUp;log=`Soul Follow-up â€¢ ${followUp.targets.length} ${followUp.targets.length===1?'enemy':'enemies'} take ${followUp.damage} True damage.`;
-   schedule(()=>finishTrainingAttack(serial),COMBAT_ACTION_PHASE_GAP_MS);return;
-  }
- }
- resolveRuneUltimateEffects(lastAttack);
- attackInProgress=false;lastAttack.finished=true;lastAttack.finishedAt=performance.now();
- if(lastAttack.actor==='lily'&&lastAttack.action==='ultimate'){
-  const battleResources={skillPoints:sp,skillPointCap:effectiveSpMax()},weapon=loadoutFor('lily').weapon,result=combatEngine.resolveLilyPremiumUltimateEffects({actor:party.find(member=>member.id==='lily'),allies:party,battle:battleResources,characterDuplicates:characterDuplicateRank('lily'),premiumWeaponDuplicates:premiumWeaponDuplicateRank('lily'),hasPremiumWeapon:weapon.selected==='premium'&&weapon.premiumOwned});sp=battleResources.skillPoints;
-  if(!encounterCleared){const existing=summons.find(s=>s.ownerId==='lily');if(existing){summons=summons.filter(s=>s.id!==existing.id);turnTimeline.states.delete(existing.id)}
-   const summonPlan=combatEngine.resolveSummonPlan({owner:party.find(member=>member.id==='lily'),characterDuplicates:characterDuplicateRank('lily'),sourceId:++summonSerial}),s={id:'lily-'+summonPlan.id,name:summonPlan.name.toUpperCase(),ownerId:summonPlan.ownerId,speed:summonPlan.speed,multiplier:summonPlan.multiplier,mode:'independent',remaining:summonPlan.durationTurns,pendingCreation:false,test:false};summons.push(s);syncTurnTimeline();turnTimeline.immediateFirst(s.id)}
- }
- if(lastAttack.actor==='soul'&&lastAttack.action==='ultimate'){combatEngine.refillFollowUps({passive:soulFollowUpState,maxCharges:soulFollowUpLimit()});lastAttack.followUpRefill=soulFollowUpState.remaining}
- if(lastAttack.actor==='zero'&&lastAttack.action==='ultimate'){
-  const battleResources={skillPoints:sp,skillPointCap:effectiveSpMax()},result=combatEngine.resolveZeroUltimateEffects({actor:party.find(member=>member.id==='zero'),enemies:liveEnemies(),battle:battleResources,characterDuplicates:characterDuplicateRank('zero'),premiumWeaponDuplicates:premiumWeaponDuplicateRank('zero'),hasPremiumWeapon:loadoutFor('zero').weapon.selected==='premium'&&loadoutFor('zero').weapon.premiumOwned});sp=battleResources.skillPoints;if(result?.delayed.length)emitCombatVisual('zero-delay',result.delayed,COMBAT_ACTION_EFFECT_MS);
- }
- if(lastAttack.actor==='logan'&&lastAttack.action==='ultimate'){const battleResources={skillPoints:sp,skillPointCap:effectiveSpMax()},weapon=loadoutFor('logan').weapon;combatEngine.resolveLoganUltimateEffects({actor:party.find(member=>member.id==='logan'),battle:battleResources,premiumWeaponDuplicates:premiumWeaponDuplicateRank('logan'),hasPremiumWeapon:weapon.selected==='premium'&&weapon.premiumOwned});sp=battleResources.skillPoints}
- const actingAlly=party.find(p=>p.id===lastAttack.actor);if(actingAlly&&lastAttack.action!=='ultimate'&&!lastAttack.runeFollowUp){const expired=combatEngine.ageUnitEffects(actingAlly,{event:'affected_turn_end'});if(expired.tuneExpired)syncTurnTimeline();ageRuneTurn(actingAlly.id)}
- if(pendingVacancies.length){schedule(()=>completeTrainingAttack(serial),ENEMY_DEATH_BEAT_MS);return}
- completeTrainingAttack(serial);
-}
-function nextUnitedLinkOwner(targetId,alreadyTriggered=[]){return party.find(owner=>owner.id!==targetId&&owner.hp>0&&hasRuneSet(owner.id,'united')&&!alreadyTriggered.includes(owner.id)&&runeSetState(owner.id).unitedLink?.targetId===targetId&&runeSetState(owner.id).unitedLink.actionsRemaining>0)||null}
-function queueUnitedFollowUp(parent,linkedAllyId=parent.actor){
- const triggered=parent.unitedOwnersTriggered||(parent.unitedOwnersTriggered=[]),owner=nextUnitedLinkOwner(linkedAllyId,triggered);if(!owner)return false;const link=runeSetState(owner.id).unitedLink;
- triggered.push(owner.id);const targets=liveEnemies();if(!targets.length)return false;const target=targets[Math.floor(Math.random()*targets.length)];
- if(!executeCombatAction(owner,'basic',null,null,{kind:'united',targetId:target.id,linkedAllyId,damageMultiplier:RUNE_COMBAT_RULES.united.basicDamageMultiplier})){return queueUnitedFollowUp(parent,linkedAllyId)}
- lastAttack.unitedLinkActions=link?.actionsRemaining||1;expireUnitedLink(owner.id,linkedAllyId);
- unitedFollowUpParents.set(lastAttack.serial,parent);return true;
-}
-function completeTrainingAttack(serial,entryFinished=false){
- if(!lastAttack||lastAttack.serial!==serial||phase!=='resolve')return;
- const completed=lastAttack;if(!entryFinished)settleAfterAttack();
- if(!entryFinished&&enemies.some(e=>e.entryPending)){schedule(()=>{for(const enemy of enemies)if(enemy.entryPending)enemy.entryPending=false;completeTrainingAttack(serial,true)},ENEMY_REINFORCEMENT_ENTRY_MS);return}
- if(completed.runeFollowUp){
-  const parent=unitedFollowUpParents.get(serial);unitedFollowUpParents.delete(serial);
-  const owner=party.find(member=>member.id===completed.actor);
-  if(owner&&completed.unitedLinkedAllyId)combatEngine.recordMechanicEvent({componentId:'rune:united',mechanicTags:RUNE_COMBAT_RULES.united.mechanicTags,trigger:'on_linked_ally_action',status:'applied',actorId:owner.id,targetIds:[completed.unitedLinkedAllyId,completed.initialTarget].filter(Boolean),actionId:serial,values:{basicAttack:true,damage:completed.hits.reduce((sum,hit)=>sum+(hit.damage||0)+(hit.shieldDamage||0)+(hit.barrierDamage||0),0),damageMultiplier:RUNE_COMBAT_RULES.united.basicDamageMultiplier,linkedAlly:completed.unitedLinkedAllyId,linkedActions:completed.unitedLinkActions||1}});
-  if(parent&&queueUnitedFollowUp(parent,completed.actor))return;
-  if(parent){lastAttack=parent;return completeTrainingAttack(parent.serial,true)}
- }
- if(!encounterCleared&&completed.action!=='ultimate'&&!completed.runeFollowUp)finishSummonCreationForTest(completed.actor);
- if(phase!=='resolve')return;
- resolveEternalSunAction(completed);
- if(liveBattleOutcome()==='victory'){cancelAllQueuedUltimates('victory');finishVictory();log='All enemies in every wave defeated.';return}
- if(!completed.runeFollowUp&&queueUnitedFollowUp(completed))return;
- if(!completed.runeFollowUp&&!completed.unitedLinkTurnAged&&completed.action!=='ultimate'){
-  ageUnitedLinkTurn(completed.actor);completed.unitedLinkTurnAged=true;
- }
- if(completed.action==='ultimate'){ultimateHistory.push({event:'finished',actor:completed.actor,seq:completed.ultimateSeq,turn});ultimateExecuting=false;runNextUltimate()}
- else if(!completed.runeFollowUp)drainUltimateQueueBefore(()=>nextTurn());
-}
-function setEnemyTarget(id){if(phase!=='player'||paused)return false;const e=enemies.find(e=>e.id===id&&e.hp>0);if(!e)return false;selectedEnemyId=id;selectedAllyId=null;if(pendingTargetAction){const pending=pendingTargetAction;pendingTargetAction=null;cameraPreview=null;const actor=party.find(p=>p.id===pending.actorId);if(pending.action==='ultimate')return queueUltimate(pending.actorId);return executeCombatAction(actor,pending.action)}cameraPreview='target';log=`Target selected: ${e.name} (wave ${e.wave}, slot ${e.slot+1}).`;return true;}
-function setWavePlanForTest(sizes){if(phase!=='setup')return false;try{buildWavePlan(sizes)}catch(e){return false}waveOverride=[...sizes];return true;}
-function toggleWavePreset(){if(phase!=='setup')return;waveOverride=null;const choices=['stress','quick','sizes'];wavePreset=choices[(choices.indexOf(wavePreset)+1)%choices.length]}
-function setEnemyRoster(mode){if(phase!=='setup'||!['slime','wolf','hawk','mixed','goblin','geode','bear'].includes(mode))return false;enemyRosterMode=mode;return true;}
+NÂ‹ËÈ[™[Y[[ˆ[Y\šXØ[[™\™ŞHÛÜİÈ[™XYÈ›Û\Ù\È\™H[š\š]YÜ›İš\Ú[Û˜[‹ËÈ›İÚ\˜Xİ\‹X˜[[˜Ú[™È\›İ˜[Ëˆ›ÈØ[Y\^HÛİ\˜ÙHÜ˜[È[ˆÔXØ\›Û\ÈHY˜][‚˜ÛÛœİSSPUWÑS‘T‘ÖWĞÓÔÕLLTÑWÔÔÓPVMNÂ˜ÛÛœİÔĞĞTÔÓÕTÑTÏ[™]ÈÙ]
+ÉÜ\ÜÚ]™IË	ÜÚÚ[	Ë	İ[[X]IË	ØÚ\˜Xİ\‹\İ[X[	Ë	ÜÚYÛ˜]\™K\™[Z][K]ÙX\Û‹YY™™Xİ	Ë	Ü™[Z][K]ÙX\Û‹\İ[X[	Ë	Ûİ\‹XÛÛX˜]YY™™Xİ	×JNÂ›]ÜØ\[ÙYšY\œÏSØš™Xİ˜Ü™X]J[
+K[[X]T]Y]YOV×K[[X]TÙ\]Y[˜ÙOL[[X]R\İÜOV×Kˆ[[X]T™\İ[YO[[[[X]Q^Xİ][™ÏY˜[ÙNÂ™[˜İ[ÛˆY™™Xİ]™TÜX^
 
-const savedTeam=loadTeam();
-let draft=[...savedTeam];
-function validTeam(ids,ownedIds=ownedCharacterIds){return Array.isArray(ids)&&ids.length>=1&&ids.length<=MAX_PARTY_SIZE&&ids.every(id=>ROSTER_IDS.has(id)&&ownedIds.has(id))&&new Set(ids).size===ids.length}
-function loadTeam(){try{const a=JSON.parse(localStorage.getItem(TEAM_KEY)||'null');if(validTeam(a))return a.slice(0,MAX_PARTY_SIZE)}catch(e){}return ['soul']}
-function roster(id){return ROSTER.find(x=>x.id===id)}
-function alive(){return party.filter(x=>x.hp>0)}
-function active(){return party.find(x=>x.id===activeId)}
-function say(message){hint=message;hintAt=performance.now()}
-function schedule(fn,ms){const token=battleToken;setTimeout(()=>{if(token===battleToken)fn()},ms)}
-function enterSelection(mandatory=false){saveVitals();campaignEntry=null;cameraPreview=null;selectedAllyId=null;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;pendingVacancies=[];cancelAllQueuedUltimates('reset');battleToken++;summons=[];combatEngine.resetBattle();phase='setup';paused=false;forceSelect=mandatory;draft=[...loadTeam()];activeId=null;log='';say(mandatory?'This encounter requires team confirmation.':DEV_MODE?'Review the party and battle test options.':'Review your party before battle.');}
-function enterPartySetup(){
- saveVitals();battleToken++;cancelAllQueuedUltimates('party-setup');combatEngine.resetBattle();
- phase='partySetup';paused=false;forceSelect=false;draft=[...loadTeam()];activeId=null;actingEnemyId=null;
- cameraPreview=null;selectedAllyId=null;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;fx=null;hint='';
-}
-async function saveParty(){
- if(phase!=='partySetup'||!validTeam(draft))return false;
- try{await window.TwoToneAccount.action('set-team',{team:[...draft]});phase='menu';hint='';return true}
- catch(error){say('Party changes could not be saved.');return false}
-}
-function canAccessMainMenu(){
- return window.TwoToneAccount?.profile?.clearedCampaignEntries?.includes(FIRST_CAMPAIGN_ENTRY_ID)===true;
-}
-function startFromTitle(){
- if(phase!=='startup')return;
- if(canAccessMainMenu())enterMainMenu();
- else openCampaignEntry();
-}
-function enterMainMenu(){
- if(!canAccessMainMenu())return;
- saveVitals();
- if(campaignEntry)party=[];
- battleToken++;cancelAllQueuedUltimates('main-menu');combatEngine.resetBattle();
- campaignEntry=null;campaignReward=null;phase='menu';paused=false;activeId=null;actingEnemyId=null;cameraPreview=null;
- selectedAllyId=null;supportDemo=null;zeroSkillArmed=false;attackInProgress=false;fx=null;hint='';
-}
-function addUnit(id){if(phase!=='partySetup')return;if(!isCharacterOwned(id)){say('This character is not owned.');return}if(draft.includes(id)){say('Already in the party.');return}if(draft.length>=MAX_PARTY_SIZE){say('A party can contain no more than four characters.');return}draft.push(id);}
-function removeUnit(index){if(phase!=='partySetup')return;if(draft.length<=1){say('A party must contain at least one character.');return}draft.splice(index,1);}
-const CAMPAIGN_CHOICES_PER_PAGE=8;
-let expandedCampaignArc=null,expandedCampaignChapter=null,previewedCampaignEntry=null,campaignPage=0;
+^Ü™]\›ˆX]›X^
+TÑWÔÔÓPV
+ÓØš™Xİ˜[Y\ÊÜØ\[ÙYšY\œÊKœ™YXÙJ
+KŠOO˜JØ‹
+J_B‹ËÈ[ÙYšY\ˆQÈ\™H[š\]YH\ˆY™™XİÛÈÙ\\˜]H[˜Ü™X\Ù\ÈİXÚË]™[ˆÚ[‚‹ËÈ^HÚ\™HHØ]YÛÜKˆ\][™ÈÜˆ™[[İš[™ÈH[ÙYšY\ˆ™]™\ˆÛ[\Èİ\œ™[Ô‚™[˜İ[ÛˆÙ]ÜØ\[ÙYšY\ŠÛİ\˜ÙRY[[İ[
+^ÂˆYŠ\[ÙˆÛİ\˜ÙRYOOIÜİš[™Éß\Ûİ\˜ÙRYš[J
+_Ûİ\˜ÙRY›[™İŒLS[X™\‹š\ÔØY™R[YÙ\Š[[İ[
+J\™]\›ˆ˜[ÙNÂˆYŠ[[İ[
+\ÜØ\[ÙYšY\œÖÜÛİ\˜ÙRYOX[[İ[Ù[ÙH[]HÜØ\[ÙYšY\œÖÜÛİ\˜ÙRYNÂˆ™]\›ˆYNÂŸB™[˜İ[ÛˆØZ[”Ü
+[[İ[Ø[İÓİ™\˜Ø\Y˜[Ù_O^ßJ^ÂˆYŠS[X™\‹š\ÔØY™R[YÙ\Š[[İ[
+_[[İ[
+\™]\›ˆ˜[ÙNÂˆYŠ[İÓİ™\˜Ø\
+^ÜÜ
+ÏX[[İ[Ü™]\›ˆY_BˆÛÛœİØ\YY™™Xİ]™TÜX^
 
-function campaignSelectorRows(){
- const rows=[];
- for(const arc of CAMPAIGN_ARCS){
-  rows.push({title:arc.title,depth:0,arc,expanded:arc===expandedCampaignArc});
-  if(arc!==expandedCampaignArc)continue;
-  for(const chapter of arc.chapters){
-   rows.push({title:chapter.title,depth:1,chapter,expanded:chapter===expandedCampaignChapter});
-   if(chapter!==expandedCampaignChapter)continue;
-   for(const part of chapter.parts){
-    rows.push({title:'Part '+part.label,depth:2,entry:getCampaignEntry(part.entryId)});
-   }
-  }
- }
- return rows;
-}
+NÂˆËÈÜ™[˜\HØZ[œÈØ[››İYX›İ™HØ\]™\Ù\™HÔ[™XYHX›İ™HHİÙ\™YØ\‚ˆYŠÜXØ\
+\™]\›ˆYNÂˆÜSX]›Z[ŠØ\Ü
+Ø[[İ[
+NÜ™]\›ˆYNÂŸB™[˜İ[Ûˆ]˜Z[X›Q[™\™ŞJ
+^Ü™]\›ˆÓX]›X^
+™[™\™ŞKJ™[™\™ŞT™\Ù\™Y
+JNŒB™[˜İ[Ûˆ\Õ[[™[™ÊY
+^Ü™]\›ˆ[[X]T]Y]YKœÛÛYJOOœK˜XİÜ’YOOZY
+_
+[[X]Q^Xİ][™É‰›\İ]XÚÏË˜Xİ[ÛOOIİ[[X]IÉ‰›\İ]XÚË˜XİÜOOZY
+_B™[˜İ[Ûˆ[[X]Q[™\™ŞPÛÜİ
+
+^ØÛÛœİÚ]XÛÛX˜]Ú]
+ËšY
+K˜\ÙO\ËšYOOIŞ™\›ÉÏİ\Ü˜YU˜[YQ›ÜŠ	Ş™\›Ëœ™[Z][KY\XØ]KŒË[[X]KY[™\™ŞKXÛÜİ	Ë	İ[[X]Q[™\™ŞPÛÜİ	Ë	Ş™\›ÉËÚ]Ë[[X]OË™[™\™ŞPÛÜİÏÕSSPUWÑS‘T‘ÖWĞÓÔÕ
+NœËšYOOIØÛİY	Ïİ\Ü˜YU˜[YQ›ÜŠ	ØÛİY™\XØ]K[[X]KXÛÛ›Û	Ë	İ[[X]Q[™\™ŞPÛÜİ	Ë	ØÛİY	ËÚ]Ë[[X]OË™[™\™ŞPÛÜİÏÕSSPUWÑS‘T‘ÖWĞÓÔÕ
+NŠÚ]Ë[[X]OË™[™\™ŞPÛÜİÏÕSSPUWÑS‘T‘ÖWĞÓÔÕ
+NÜ™]\›ˆX]›X^
+˜\ÙKJ	‰š\Ô[™TÙ]
+šY	Ù]\›˜[\İ[‰ÊI‰œ[™QY™™Xİ™XYJšY	Ù]\›˜[\İ[‰ÊOÔ•S‘WĞÓÓPUÔ•STÖÉÙ]\›˜[\İ[‰×K[[X]Q[™\™ŞT™YXİ[ÛŒ
+J_B™[˜İ[ÛˆØ[”]Y]YU[[X]J
+^Ü™]\›ˆH\	‰œšŒ	‰ˆ\™XY™œÏËœÛÛYJY™™XİO™Y™™XİšYOOIÜİ[‰ÊI‰ˆ\]\ÙY	‰–ÉÜ^Y\‰Ë	Ù[™[^IË	Ü™\ÛÛ™I×Kš[˜ÛY\Ê\ÙJBˆ	‰˜]˜Z[X›Q[™\™ŞJ
+O][[X]Q[™\™ŞPÛÜİ
+
+I‰ˆZ\Õ[[™[™ÊšY
+_B™[˜İ[Ûˆ[Z]ÛÛX˜]š\İX[
+\K\™Ù]YÏV×K\˜][ÛPÓÓPUĞPÕSÓ—ÑQ‘‘PÕÓTË]Z[Ï^ßJ^ØÛÛœİÙ[^S\ÏL‹‹œ^[ØYOY]Z[ÎØÛÛX˜]š\İX[]™[Ëœ\Ú
+İ\K\™Ù]YÎ–Ë‹‹\™Ù]Y×K]œ\™›Ü›X[˜ÙK››İÊ
+JÙ[^S\Ë\˜][Û‹‹‹œ^[ØYJ_B™[˜İ[Ûˆ™\Ù]Xİ[Û”™\Ûİ\˜Ù\Ê
+^ØÛÛœİ™\Ûİ\˜ÙY[\\KœÛÛYJOœšYOOIÙ]Û‰ÊNØÛÛX˜]š\İX[]™[ÏV×NÜ[™PÛÛX˜]İ]OSØš™Xİ˜Ü™X]J[
+NØXİ]™T[™Q[XYÙQY™™XİÏSØš™Xİ˜Ü™X]J[
+Nİ[š]Y›ÛİÕ\\™[Ë˜ÛX\Š
+NÜÜ\™\Ûİ\˜ÙY[ÍNŒÎÜÛİ[[š[˜ÙTİXÚÜÏLÜ™\Ù]Ûİ[›ÛİÕ\
 
-function openCampaignSelector(){
- if(phase!=='menu'||!canAccessMainMenu())return;
- expandedCampaignArc=CAMPAIGN_ARCS[0]??null;
- expandedCampaignChapter=expandedCampaignArc?.chapters[0]??null;
- const entries=(expandedCampaignChapter?.parts??[]).map(part=>getCampaignEntry(part.entryId)).filter(Boolean);
- const cleared=window.TwoToneAccount.profile.clearedCampaignEntries??[];
- previewedCampaignEntry=entries.find(entry=>!cleared.includes(entry.id)&&isCampaignEntryUnlocked(entry,cleared))??entries[0]??null;
- campaignPage=0;
- choiceRects=[];
- phase='campaign';
- hint='';
-}
+NÜÛİ[[š[˜ÙTÜ[™[™Ô™[XZ[™\LŞ™\›Ò][™[^RYÏ[™]ÈÙ]
 
-function chooseCampaignOption(index){
- if(phase!=='campaign')return;
- const row=campaignSelectorRows()[index];
- if(!row)return;
- choiceRects=[];
- if(row.entry){
-  previewedCampaignEntry=row.entry;
-  return;
- }
- if(row.arc){
-  expandedCampaignArc=row.expanded?null:row.arc;
-  expandedCampaignChapter=null;
- }else if(row.chapter){
-  expandedCampaignChapter=row.expanded?null:row.chapter;
- }
- const lastPage=Math.max(0,Math.ceil(campaignSelectorRows().length/CAMPAIGN_CHOICES_PER_PAGE)-1);
- campaignPage=Math.min(campaignPage,lastPage);
-}
+NÜÜØ\[ÙYšY\œÏSØš™Xİ˜Ü™X]J[
+NÚYŠ™\Ûİ\˜ÙY[
+^ÜÙ]ÜØ\[ÙYšY\Š	Ù]Û‹\™\Ûİ\˜ÙY[	ËŠNØÛÛX˜][™Ú[™Kœ™XÛÜ™]]Ü™YY™™Xİ
+ÛİÛ™\’Y‰Ù]Û‰ËÛİ‰Ü\ÜÚ]™IËY™™XİY‰Ü™\Ûİ\˜ÙY[	ËšYÙÙ\‰Ø˜]WÜİ\	ËXİÜ’Y‰Ù]Û‰Ë\™Ù]YÎœ\K›X\
+OœšY
+K˜[Y\ÎÜÚÚ[Ú[Ø\XÚ]P›Û\ÎŒ‹İ\[™ÔÚÚ[Ú[Ğ›Û\ÎŒ‹ÚÚ[Ú[Ø\™Y™™Xİ]™TÜX^
 
-function startPreviewedCampaignPart(){
- if(phase!=='campaign'||!previewedCampaignEntry)return;
- choiceRects=[];
- openCampaignEntry(previewedCampaignEntry.id);
-}
+Kİ\[™ÔÚÚ[Ú[ÎœÜ_JNÙ[Z]ÛÛX˜]š\İX[
+	Ù]Û‹\™\Ûİ\˜ÙY[	Ë\K›X\
+OœšY
+KLL
+_XÛÛX˜][™Ú[™Kœ™XÛÜ™˜]Tİ\Y™™XİÊË‹‹œ\K‹‹™[™[ZY\×K[š]O“Øš™XİšÙ^\Ê•S‘WÔÑUÑQ’S’USÓ”ÊK™š[™
+Ù]YOš\Ô[™TÙ]
+[š]šYÙ]Y
+JJNİ[[X]T]Y]YOV×Nİ[[X]TÙ\]Y[˜ÙOLİ[[X]R\İÜOV×Nİ[[X]T™\İ[YO[[İ[[X]Q^Xİ][™ÏY˜[ÙNÂˆ›ÜŠÛÛœİÙˆ\J\™[™\™ŞT™\Ù\™YLßB™[˜İ[ÛˆÙ]ÜØ\\İÛİ\˜ÙJÛİ\˜ÙK›Û\Ê^ÂˆYŠTÔĞĞTÔÓÕTÑTËš\ÊÛİ\˜ÙJ_S[X™\‹š\Ò[YÙ\Š›Û\Ê_›Û\Ï›Û\ÏŒŒ
+\™]\›ˆ˜[ÙNÂˆYŠ\Ù]ÜØ\[ÙYšY\ŠÛİ\˜ÙK›Û\ÊJ\™]\›ˆ˜[ÙNÂˆËÈ\È™]šY]È^ÜÙ\ÈÛ›H›Û›™YØ]]™HTÕ›ÛÜİËˆÙ[™\˜[Ø[Y\^HY™™XİÂˆËÈ\ÙHÙ]ÜØ\[ÙYšY\ˆÚ]H[š\]YHÛİ\˜ÙHQ[™X^H˜Z\ÙHÜˆİÙ\ˆHØ\‚ˆÙÏXTÕÓ“Nˆ	ÜÛİ\˜Ù_HÔ[Z][ÙYšY\ˆ	Ø›Û\ÏLÉÊÉÎ‰ÉßIØ›Û\ßKˆX^[][H	ÙY™™Xİ]™TÜX^
 
-function openCampaignEntry(entryId=FIRST_CAMPAIGN_ENTRY_ID){
- const entry=getCampaignEntry(entryId);
- if(!entry||!isCampaignEntryUnlocked(entry,window.TwoToneAccount?.profile?.clearedCampaignEntries))return;
- campaignEntry=entry;
- campaignReward=null;
- storyBeatIndex=0;
- prefetchedStoryBeatIndex=-1;
- storyBeatArt=requestStoryBeat(entry.story,entry.story.beats[0],'high');
- phase='story';
- hint='';
-}
-function advanceCampaignStory(){
- if(phase!=='story'||!campaignEntry)return;
- if(storyBeatIndex<campaignEntry.story.beats.length-1){
-  storyBeatIndex++;
-  storyBeatArt=requestStoryBeat(campaignEntry.story,campaignEntry.story.beats[storyBeatIndex],'high');
-  return;
- }
- startCampaignBattle();
-}
-function startCampaignBattle(){
- draft=[...campaignEntry.encounter.party];
- campaignReward={status:'ready',coins:0,requestId:window.TwoToneAccount.createRequestId()};
- startBattle(campaignEntry.encounter.areaId);
-}
-function finishVictory(){
- phase='victory';
- if(campaignEntry&&!DEV_MODE)saveCampaignVictory();
-}
-async function saveCampaignVictory(){
- if(phase!=='victory'||!campaignEntry||!['ready','error'].includes(campaignReward?.status))return;
- const reward=campaignReward;
- reward.status='pending';
- try{
-  const result=await window.TwoToneAccount.action('complete-campaign-entry',{entryId:campaignEntry.id},reward.requestId);
-  reward.coins=result.rewards[0]?.coins??0;
-  reward.rankXp=result.rewards[0]?.rankXp??0;
-  reward.status='saved';
- }catch{
-  reward.status='error';
- }
-}
-function startBattle(areaId=DEFAULT_BATTLE_AREA_ID){
- if(!BATTLE_AREAS[areaId]){say('Unknown battle area.');return false}
- if((!campaignEntry&&phase!=='setup')||!validTeam(draft)){say('Set a party of 1â€“4 unique characters in Party first.');return}
- currentBattleAreaId=areaId;
- cameraPreview=null;selectedAllyId=null;supportDemo=null;zeroSkillArmed=false;targetingMode='single';battleToken++;
- party=draft.map(id=>spawnProgressedUnit(id,Boolean(campaignEntry)));
- combatEngine.resetBattle();pendingTargetAction=null;speedModifiers=Object.create(null);summons=[];summonSerial=0;summonHistory=[];gauges={};for(const p of party)gauges[p.id]=0;
- resetEnemies();resetActionResources();enemyCount=0;turn=0;activeId=null;actingEnemyId=null;prepareBattleIntro();zeroSkillArmed=false;fx=null;paused=false;phase='intro';forceSelect=false;saveVitals();
- log=`Wave 1/${wavePlan.length}: ${wavePlan[0].length} enemies (${enemies.length} on field).`;
- schedule(()=>{if(phase==='intro')nextTurn()},CAMERA_TRANSITION_BETWEEN_SIDES_MS);
-}
-function replay(){if(phase==='setup'||phase==='story')return;if(campaignEntry){if(!['pending','error'].includes(campaignReward?.status))startCampaignBattle();return}draft=party.map(p=>p.id);startFromBattle();}
-function startFromBattle(){
- cameraPreview=null;selectedAllyId=null;supportDemo=null;zeroSkillArmed=false;targetingMode='single';battleToken++;
- saveVitals();party=party.map(p=>spawnProgressedUnit(p.id));
- combatEngine.resetBattle();pendingTargetAction=null;speedModifiers=Object.create(null);summons=[];summonSerial=0;summonHistory=[];gauges={};for(const p of party)gauges[p.id]=0;
- resetEnemies();resetActionResources();enemyCount=0;turn=0;activeId=null;actingEnemyId=null;prepareBattleIntro();zeroSkillArmed=false;fx=null;paused=false;phase='intro';saveVitals();
- log=`Wave test restarted: ${wavePlan.length} waves, ${wavePlan.reduce((n,w)=>n+w.length,0)} total enemies.`;
- schedule(()=>{if(phase==='intro')nextTurn()},CAMERA_TRANSITION_BETWEEN_SIDES_MS);
-}
-function applyResidue(target,passive={}){if(!combatEngine.applyResidue({target,maxStacks:passive.maxStacks??RESIDUE_RULES.maxStacks,damageReductionPerStack:passive.damageReductionPerStack??RESIDUE_RULES.damageReductionPerStack,resistanceReductionPerStack:passive.resistanceReductionPerStack??RESIDUE_RULES.resistanceReductionPerStack,durationTurns:RESIDUE_RULES.durationTurns}))return false;emitCombatVisual('slime-residue',[target.id],1000);return true}
-function resolveEnemyBasicAttack(attacker,candidates){
- const basic=attacker.basicAttack||{},passive=attacker.passive||null,rampage=passive?.id==='rampage',momentum=passive?.id==='momentum';
- const passivePlan=combatEngine.resolveEnemyBasicPlan({ownerId:attacker.archetypeId||attacker.id,actorId:attacker.id,basic,passive,attackCount:attacker.basicAttackCount||0,rampageStacks:attacker.rampageStacks||0,momentumStacks:attacker.momentumStacks||0,debuffMultiplier:(attacker.debuffs||[]).reduce((value,debuff)=>value*(debuff.damageMultiplier??1),1)});
- if(!passivePlan)return {hits:[],enhanced:false,mode:'single',pursuitAdvance:0};
- attacker.basicAttackCount=passivePlan.nextAttackCount;
- const enhanced=passivePlan.enhanced,mode=passivePlan.target;
- const originalPrimary=candidates[Math.floor(Math.random()*candidates.length)],tauntSelection=mode==='aoe'?{target:originalPrimary,taunted:false}:resolveTauntTarget(attacker,candidates,originalPrimary),primary=tauntSelection.target||originalPrimary;
- if(tauntSelection.taunted)emitCombatVisual('taunt-redirect',[attacker.id],COMBAT_ACTION_EFFECT_MS,{rate:tauntRateOf(attacker,primary),taunterId:primary.id});
- const candidateSlots=candidates.map(target=>({...target,slot:party.indexOf(target)})),primarySlot=candidateSlots.find(target=>target.id===primary.id),targets=combatEngine.resolveTargets({candidates:candidateSlots,mode,primary:primarySlot}).map(target=>candidates.find(candidate=>candidate.id===target.id)).filter(Boolean);
- const multiplier=passivePlan.multiplier,actionId=++attackSerial;
- const hits=targets.map(target=>{
-  const calculated=basic.damageType?calculateTypedActionDamage(basic.damageType,multiplier,attacker,target):null;
-  const damage=calculated?.damageTaken??(basic.damageType?0:92+((turn*37)%51));
-  const dealt=applyEnemyDamage(target,damage,attacker,{damageType:basic.damageType,eventType:'direct_hit',actionId});if(!dealt.dodged)target.energy=Math.min(120,target.energy+10);if(passivePlan.bleedPerHit&&!dealt.dodged)applyBleed(target,attacker,passivePlan.bleedPerHit,passivePlan.bleedCap);if(attacker.passive?.id==='residue'&&dealt.damage>0)applyResidue(target,attacker.passive);
-  combatEngine.resolveHitEffects({actor:attacker,target,hit:{dodged:!!dealt.dodged,damage:dealt.damage,actionId},action:'basic',eventType:dealt.eventType,passives:[],ability:combatKit(attacker.archetypeId)?.basic,isEnemyTarget:false});
-  return {target:target.id,damage:dealt.damage+dealt.breakDamage,healthDamage:dealt.healthDamage,shieldDamage:dealt.shieldDamage,barrierDamage:dealt.barrierDamage,breakDamage:dealt.breakDamage,barrierAfter:target.barrier,broken:dealt.broken,critical:dealt.critical,dodged:!!dealt.dodged,reflect:dealt.reflect||null,echo:dealt.echo||null,echoReflect:dealt.echoReflect||null};
- });
- if(rampage&&hits.some(hit=>hit.damage>0))attacker.rampageStacks=passivePlan.nextRampageStacks;
- if(momentum)attacker.momentumStacks=passivePlan.nextMomentumStacks;
- return {hits,enhanced,mode,pursuitAdvance:passivePlan.pursuitAdvance};
-}
-function nextTurn(){
- if(paused||['setup','victory','defeat'].includes(phase))return;
- const outcome=liveBattleOutcome();if(outcome==='victory'){finishVictory();return}if(outcome==='defeat'){phase='defeat';return}
- if(liveEnemies().length===0){say('Wave state has no active enemies.');return}
- const inputs=turnTimelineInputs(),nextEvent=combatEngine.scheduleTurn(inputs);if(!nextEvent)return;
- syncLegacyGauges();const next=nextEvent.id;
- turn++;
- const actingSummon=summons.find(s=>s.id===next&&s.mode==='independent');
- if(actingSummon){executeIndependentSummonTurn(actingSummon);return;}
- const bleedTarget=[...party,...enemies].find(unit=>unit.id===next&&unit.hp>0),attacking=enemies.find(e=>e.id===next&&e.hp>0);
- if(bleedTarget?.bleedStacks?.length){resolveBleedTick(bleedTarget);if(!enemies.includes(bleedTarget))saveVitals();if(bleedTarget.hp<=0){if(enemies.includes(bleedTarget))resolveEnemyDefeat(bleedTarget);schedule(()=>nextTurn(),ENEMY_DEATH_BEAT_MS);return}}
- if(attacking&&attacking.brokenTurns>0){attacking.brokenTurns--;if(attacking.brokenTurns===0){attacking.barrier=attacking.maxBarrier;cleanseEnemy(attacking);addActionAdvance(attacking.id,100);}combatEngine.ageUnitEffects(attacking,{event:'affected_turn_end'});schedule(()=>nextTurn(),0);return;}
- if(attacking&&(attacking.debuffs||[]).some(effect=>effect.id==='stun')){combatEngine.ageUnitEffects(attacking,{event:'affected_turn_end'});log=`${attacking.name} is stunned and loses this turn.`;schedule(()=>nextTurn(),0);return;}
- const scheduledAlly=party.find(p=>p.id===next&&p.hp>0);
- if(scheduledAlly?.debuffs?.some(effect=>effect.id==='stun')){activeId=null;combatEngine.ageUnitEffects(scheduledAlly,{event:'affected_turn_end'});log=`${scheduledAlly.name} is stunned and loses this turn.`;schedule(()=>nextTurn(),0);return;}
- if(attacking){activeId=null;zeroSkillArmed=false;pendingTargetAction=null;actingEnemyId=next;cameraPreview=null;phase='enemy';log=`${attacking.name} prepares an attack.`;
-  schedule(()=>{if(phase!=='enemy'||paused)return;if(attacking.hp<=0){nextTurn();return}const candidates=alive();if(liveBattleOutcome()==='defeat'||!candidates.length){cancelAllQueuedUltimates('defeat');phase='defeat';return}enemyCount++;const attack=resolveEnemyBasicAttack(attacking,candidates),firstHit=attack.hits[0];if(attack.pursuitAdvance)addActionAdvance(attacking.id,attack.pursuitAdvance);combatEngine.ageUnitEffects(attacking,{event:'affected_turn_end'});ageRuneDelayImmunity(attacking);saveVitals();cancelQueuedUltimatesOfDefeated();const visual=ENEMY_ACTION_VISUALS[attacking.archetypeId]?.basic||ENEMY_ACTION_VISUALS.slime.basic;fx={kind:'enemy',visual,at:performance.now(),damage:firstHit.damage,target:firstHit.target,hits:attack.hits,actorEnemyId:attacking.id};log=attack.hits.length&&attack.hits.every(hit=>hit.dodged)?`${attacking.name}'s attack was dodged.`:attack.enhanced?`${attacking.name} uses Slimy against all allied characters.`:attack.mode==='aoe'?`${attacking.name} attacks all allied characters.`:attack.mode==='blast'?`${attacking.name} blasts ${attack.hits.length} allied characters.`:firstHit.dodged?`${party.find(p=>p.id===firstHit.target)?.name||'An ally'} dodges ${attacking.name}'s attack.`:`${attacking.name} hits ${party.find(p=>p.id===firstHit.target)?.name||'an ally'} for ${firstHit.damage}.`;const reflectDamage=attack.hits.reduce((sum,hit)=>sum+((hit.reflect?.healthDamage||0)+(hit.reflect?.shieldDamage||0)+(hit.echoReflect?.healthDamage||0)+(hit.echoReflect?.shieldDamage||0)),0),echoDamage=attack.hits.reduce((sum,hit)=>sum+(hit.echo?.damage||0),0),echoHit=attack.hits.find(hit=>hit.echo)?.echo,hasReflect=attack.hits.some(hit=>hit.reflect||hit.echoReflect),hasEcho=attack.hits.some(hit=>hit.echo);if(reflectDamage)log+=` Reflect deals ${reflectDamage} True damage.`;if(echoDamage)log+=` Echo deals ${echoDamage} ${echoHit?.damageType?.toUpperCase()||'typed'} damage.`;if(attacking.passive?.id==='momentum')log+=` Momentum ${attacking.momentumStacks}/${attacking.passive.maxStacks??10}.`;phase='resolve';schedule(()=>{settleAfterAttack();drainUltimateQueueBefore(()=>{if(liveBattleOutcome()==='defeat'){phase='defeat';log='All allied characters were defeated.'}else nextTurn()})},ENEMY_ATTACK_EFFECT_MS+COMBAT_ACTION_PHASE_GAP_MS*((hasReflect?1:0)+(hasEcho?(hasReflect?2:1):0)))},ENEMY_WINDUP_MS);
- }else{actingEnemyId=null;activeId=next;zeroSkillArmed=false;pendingTargetAction=null;cameraPreview=null;phase='player';log=`${active().name}'s turn â€” select an ability, then choose an enemy.`;}
-}
-// Normal turns can use Basic or Skill. Ultimate is off-turn and never spends a turn.
-function play(action){
- if(phase!=='player'||paused||!['basic','skill','ultimate'].includes(action))return false;
- const a=active();if(!a||a.hp<=0)return false;
- if(action==='skill'&&a.id==='soul'){pendingTargetAction=null;cameraPreview=null;return activateSoulEnhance()}
- if(action==='skill'&&(a.id==='dawn'||a.id==='cloud'))return beginDawnAllyTargetSelection('skill',a.id);
- return beginTargetSelection(action,a.id);
-}
-function soulDamageForTarget(actor,target,rate){return calculateTypedActionDamage('true',rate,actor,target)?.damageTaken??0}
-function applyDawnTune(ally,plan=combatEngine.resolveActionPlan({kit:combatKit('dawn'),action:'skill',characterId:'dawn',characterDuplicates:characterDuplicateRank('dawn')})){
- if(!ally||ally.hp<=0)return false;
- const duplicates=characterDuplicateRank('dawn'),weapon=loadoutFor('dawn').weapon,premium=weapon.selected==='premium'&&weapon.premiumOwned,weaponDuplicates=premium?premiumWeaponDuplicateRank('dawn'):0;
- const result=combatEngine.resolveDawnTune({actor:party.find(member=>member.id==='dawn'),target:ally,plan,characterDuplicates:duplicates,premiumWeaponDuplicates:weaponDuplicates,weaponType:weapon.selected});
- if(!result)return false;syncTurnTimeline();return true;
-}
-function applyLoganBloodShield(logan,plan=combatEngine.resolveActionPlan({kit:combatKit('logan'),action:'skill',characterId:'logan',characterDuplicates:characterDuplicateRank('logan')})){
- if(!logan||logan.hp<=0)return false;
- const weapon=loadoutFor('logan').weapon,recipients=party.filter(ally=>ally.hp>0),result=combatEngine.resolveLoganBloodShield({actor:logan,allies:recipients,enemies:liveEnemies(),plan,characterDuplicates:characterDuplicateRank('logan'),premiumWeaponDuplicates:premiumWeaponDuplicateRank('logan'),weaponType:weapon.selected});
- if(!result)return false;saveVitals();for(const entry of result.shields)if(entry.amount>0)emitCombatVisual('shield-applied',[entry.target.id],1000,{shield:entry.amount,totalShield:entry.target.shield});
- if(result.tauntsApplied)for(const enemy of liveEnemies())emitCombatVisual('taunt-applied',[enemy.id],COMBAT_ACTION_EFFECT_MS,{rate:result.tauntRate,turns:result.tauntTurns,taunterId:logan.id});
- emitCombatVisual('logan-blood-shield',recipients.map(ally=>ally.id),COMBAT_ACTION_EFFECT_MS,{healthCost:result.healthCost,shieldPerAlly:result.shieldPerAlly});return result;
-}
-function executeCombatAction(a,action,ultimateSeq=null,allyTargetId=null,runeAction=null){
- if(!a||a.hp<=0||!['basic','skill','ultimate'].includes(action))return false;
- const authoredType=combatKit(a.id)?.[action]?.type,allySingleSupport=['tune','dawnSupport','cloudRestoration'].includes(authoredType),dawnSupport=authoredType==='tune'||authoredType==='dawnSupport',teamWideSupport=actionTargetMode(a,action)==='allAllies',supportAction=allySingleSupport||teamWideSupport,allyTarget=allySingleSupport?party.find(p=>p.id===allyTargetId&&p.hp>0):null;
- if(allySingleSupport&&!allyTarget){say(`${a.name}'s ability needs a living ally target.`);return false}
- const victim=supportAction?null:(runeAction?.targetId?enemies.find(enemy=>enemy.id===runeAction.targetId&&enemy.hp>0):chosenEnemy());if(!supportAction&&!victim){say('No available enemy target.');return false;}
- const targetGeometry=victim?{x:victim.x,y:victim.y,w:victim.w,h:victim.h,slot:victim.slot}:null;
- const angelCycle=a.id==='angel'&&action==='skill'?combatKit('angel')?.skill?.cycles?.[a.currentCycle||0]:null;
- const mode=supportAction?'ally':runeAction?combatKit(a.id)?.[action]?.target||'single':angelCycle?.target||actionTargetMode(a,action),targets=supportAction?[]:chooseAttackTargets(mode,victim);
- const controlledSummon=action==='skill'&&a.test?summons.find(s=>s.mode==='controlled'&&!s.pendingCreation&&s.ownerId===a.id):null;
- let runeAmplifyActive=false;const runeAmplifyReady=action==='basic'&&hasRuneSet(a.id,'amplify')&&runeEffectReady(a.id,'amplify'),runeRecycleActive=action==='skill'&&hasRuneSet(a.id,'recycle')&&runeEffectReady(a.id,'recycle'),runeUnitedActive=action==='skill'&&allySingleSupport&&!!allyTarget&&hasRuneSet(a.id,'united')&&!runeSetState(a.id).unitedLink&&runeEffectReady(a.id,'united');
- const energyBefore=a.energy,spBefore=sp,spMaxBefore=effectiveSpMax();
- let damage=0,enhanceSpent=0,soulRate=null,zeroRate=null,loganUltimateRate=null,tuneBasicUsed=action==='basic'&&!!a.tune?.basicEnhanced;
- const actionResources={skillPoints:sp,skillPointCap:effectiveSpMax()},planOptions={kit:combatKit(a.id),action,characterId:a.id,characterDuplicates:characterDuplicateRank(a.id),premiumWeaponDuplicates:premiumWeaponDuplicateRank(a.id),weaponType:loadoutFor(a.id).weapon.selected,enhanceStacks:a.id==='soul'&&!runeAction?soulEnhanceStacks:0,targetAlreadyHit:zeroHitEnemyIds.has(targets[0]?.id),tuneMultiplier:tuneBasicUsed?1+a.tune.damageBonus:1,celestialMultipliers:Object.fromEntries(['basic','skill','ultimate'].map(kind=>[kind,celestialMultiplier(a.id,kind)])),enhancedStacks:a.id==='soul'&&action==='basic'&&!runeAction?soulEnhanceStacks:0};let actionPlanOverride=runeAction?.kind==='eternal-sun-cost'?combatEngine.resolveActionPlan(planOptions):null;if(a.id==='angel'&&action==='skill'&&angelCycle)actionPlanOverride={...combatEngine.resolveActionPlan(planOptions),multiplier:angelCycle.multiplier,target:angelCycle.target,energyGain:angelCycle.energyGain};if(actionPlanOverride)actionPlanOverride={...actionPlanOverride,energyCost:runeAction?.kind==='eternal-sun-cost'?runeAction.energyCost:actionPlanOverride.energyCost};const actionIntent=combatEngine.resolveActionIntent({actor:a,battle:actionResources,...planOptions,plan:actionPlanOverride,payEnergyCost:action==='ultimate'});let actionPlan=actionIntent?.plan;const resourceResult=actionIntent?.resources||null;
- if(!actionIntent){say(action==='skill'?'Not enough Skill Points.':'Action resources could not be resolved.');return false}
- if(resourceResult)sp=actionResources.skillPoints;
- if(angelCycle){a.currentCycle=((a.currentCycle||0)+1)%combatKit('angel').skill.cycles.length;combatEngine.recordMechanicEvent({componentId:'action:angel/skill',mechanicTags:['trigger.per_action','resource.energy'],trigger:'on_skill',status:'resolved',actorId:a.id,targetIds:targets.map(target=>target.id),actionId:attackSerial+1,values:{cycle:(a.currentCycle+2)%combatKit('angel').skill.cycles.length+1,multiplier:angelCycle.multiplier,energyGained:resourceResult?.energyGained||0}})}
- if(a.id==='tsunade'){combatEngine.applyTsunadeSlowStart({actor:a});syncTurnTimeline()}
- if(runeAmplifyReady)runeAmplifyActive=!!combatEngine.resolveRuneTrigger({setId:'amplify',trigger:'basic',state:runeSetState(a.id),effectId:'amplify',turn,actorId:a.id,targetIds:targets.map(target=>target.id)});
- if(a.id==='angel'&&action==='ultimate'&&actionPlan?.damageType){const choices=combatKit('angel').ultimate.multiplierChoices,multiplier=choices[Math.floor(Math.random()*choices.length)];actionPlan={...actionPlan,multiplier};combatEngine.recordMechanicEvent({componentId:'action:angel/ultimate',mechanicTags:['damage.conditional_multiplier'],trigger:'on_ultimate',status:'resolved',actorId:a.id,targetIds:targets.map(target=>target.id),actionId:attackSerial+1,values:{multiplier}})}
- if(runeAction?.damageMultiplier&&actionPlan?.damageType)actionPlan={...actionPlan,multiplier:actionPlan.multiplier*runeAction.damageMultiplier};const runeDamageEffects=prepareRuneDamageEffects(a,action,actionPlan,targets);
- if(a.id==='soul'&&action==='basic'&&!runeAction){enhanceSpent=soulEnhanceStacks;soulEnhanceStacks=0;soulRate=actionPlan.multiplier}
- if(a.id==='soul'&&action==='ultimate')soulRate=actionPlan.multiplier;
- if(actionPlan.type==='tune'){applyDawnTune(allyTarget,actionPlan)}
- else if(actionPlan.type==='dawnSupport'){const battleResources={skillPoints:sp,skillPointCap:effectiveSpMax()},weapon=loadoutFor(a.id).weapon,supportResult=combatEngine.resolveDawnUltimate({actor:a,target:allyTarget,battle:battleResources,plan:actionPlan,characterDuplicates:characterDuplicateRank(a.id),premiumWeaponDuplicates:premiumWeaponDuplicateRank(a.id),weaponType:weapon.selected==='premium'&&weapon.premiumOwned?'premium':'standard'});if(!supportResult)return false;sp=battleResources.skillPoints}
- else if(actionPlan.type==='cloudRestoration'){const weapon=loadoutFor(a.id).weapon,result=combatEngine.resolveCloudRestoration({actor:a,target:allyTarget,allies:party,plan:actionPlan,speed:speedOf(a),characterDuplicates:characterDuplicateRank(a.id),premiumWeaponDuplicates:premiumWeaponDuplicateRank(a.id),weaponType:weapon.selected==='premium'&&weapon.premiumOwned?'premium':'standard'});if(!result)return false;saveVitals();syncTurnTimeline()}
- else if(actionPlan.type==='bloodShield'){applyLoganBloodShield(a,actionPlan)}
- else if(actionPlan.damageType){damage=calculateTypedActionDamage(actionPlan.damageType,actionPlan.multiplier,a,targets[0])?.damageTaken??0;if(a.id==='zero')zeroRate=actionPlan.multiplier;if(a.id==='logan'&&action==='ultimate')loganUltimateRate=actionPlan.multiplier}
- else if(action==='basic'){damage=280;a.energy=Math.min(120,a.energy+25)}
- else if(action==='skill'){damage=460;a.energy=Math.min(120,a.energy+35);sp--;addActionAdvance(a.id,25)}
- else damage=980;
- if(!actionPlan&&action==='basic')gainSp(1);
- if(tuneBasicUsed){const before=sp;gainSp(1);const gained=sp-before,source=party.find(member=>member.id===a.tune?.sourceId);if(gained>0&&source)combatEngine.recordMechanicEvent({componentId:'action:dawn/skill',mechanicTags:['resource.skill_point'],trigger:'on_tuned_basic_used',status:'applied',actorId:source.id,targetIds:[a.id],actionId:attackSerial+1,values:{skillPointsGained:gained,skillPointsBefore:before,skillPointsAfter:sp}})}
- if(action==='skill')applyRuneSkillEffects(a);
- const cloudWeapon=loadoutFor(a.id).weapon,cloudWeaponType=cloudWeapon.selected==='premium'&&cloudWeapon.premiumOwned?'premium':'standard';
- if(a.id==='cloud'){
-  if(action==='basic'){combatEngine.applyCloudBasicTempo({actor:a,allies:party,plan:actionPlan,characterDuplicates:characterDuplicateRank(a.id),premiumWeaponDuplicates:premiumWeaponDuplicateRank(a.id),weaponType:cloudWeaponType});syncTurnTimeline()}
-  if(action==='ultimate'&&victim){combatEngine.resolveCloudUltimateEffects({actor:a,target:victim,enemies:liveEnemies(),plan:actionPlan,characterDuplicates:characterDuplicateRank(a.id),premiumWeaponDuplicates:premiumWeaponDuplicateRank(a.id),weaponType:cloudWeaponType});syncTurnTimeline()}
-  combatEngine.resolveCloudActionPassive({actor:a,characterDuplicates:characterDuplicateRank(a.id),premiumWeaponDuplicates:premiumWeaponDuplicateRank(a.id),weaponType:cloudWeaponType});syncLegacyGauges();
- }
- if(runeUnitedActive)applyUnitedRune(a.id,allyTarget.id);
- const serial=++attackSerial,ricochetEligibleEnemyIds=liveEnemies().filter(enemy=>enemy.marks?.some(mark=>mark.id==='ricochet')).map(enemy=>enemy.id);
- attackInProgress=true;pendingTargetAction=null;supportDemo=null;zeroSkillArmed=false;cameraPreview=null;selectedAllyId=null;
- const damageType=actionPlan.damageType||null;
- lastAttack={serial,actor:a.id,action,mode,damageType,ultimateSeq,allyTargetId:allyTarget?.id||null,tuneBasicUsed,runeAmplifyActive,runeDamageEffects,controlledSummonId:controlledSummon?.id||null,initialTarget:victim?.id||allyTarget?.id||null,initialTargets:targets.map(e=>e.id),runeFollowUp:runeAction?.kind==='united',unitedLinkedAllyId:runeAction?.linkedAllyId||null,
-  ricochetEligibleEnemyIds,hits:[],defeats:[],finished:false,startedAt:performance.now(),finishedAt:null,energyBefore,energyAfter:a.energy,spBefore,spAfter:sp,spMaxBefore,spMaxAfter:effectiveSpMax(),enhanceSpent,soulRate,zeroRate,loganUltimateRate};
- if(runeAmplifyActive)emitCombatVisual('rune-amplify',targets.map(enemy=>enemy.id),COMBAT_ACTION_EFFECT_MS,{damageBonus:.5});
- phase='resolve';if(allySingleSupport)selectedAllyId=allyTarget.id;const actionVisual=ACTION_VISUALS[a.id]?.[action]||`${a.id}-${action}`;fx=supportAction?{kind:'support',visual:actionVisual,at:performance.now(),damage:0,actor:a.id,targetAllyId:allyTarget?.id||null,targetAllyIds:teamWideSupport?party.filter(ally=>ally.hp>0).map(ally=>ally.id):null,action}:{kind:action,visual:actionVisual,at:performance.now(),damage,actor:a.id,targetEnemyId:victim?.id||null,targetEnemyIds:targets.map(e=>e.id),targetGeometry};
- log=a.id==='soul'?(action==='ultimate'?'SOUL ULTIMATE â€¢ INITIAL TRUE AOE':action==='basic'?'SOUL BASIC â€¢ INITIAL TRUE HIT':'SOUL '+action.toUpperCase()):a.id==='zero'?'ZERO '+(action==='skill'?'FIRST STRIKE':action==='ultimate'?'EXECUTION':'BASIC ATTACK')+' â€¢ PHYSICAL HIT':a.id==='dawn'?(action==='skill'?'DAWN TUNE â€¢ '+allyTarget.name:action==='ultimate'?'DAWN ULTIMATE â€¢ '+allyTarget.name:'DAWN BASIC â€¢ INITIAL MAGICAL HIT'):a.id==='cloud'?(action==='skill'?'CLOUD RESTORATION â€¢ '+allyTarget.name:'CLOUD '+action.toUpperCase()):a.id==='lily'?'LILY '+action.toUpperCase()+' â€¢ INITIAL HIT':a.id==='logan'?(action==='skill'?'LOGAN BLOOD SHIELD â€¢ TEAM GUARD':action==='ultimate'?'LOGAN ULTIMATE â€¢ RED TIDE AOE':'LOGAN BASIC â€¢ BLEEDING STRIKE'):a.id==='tsunade'?'TSUNADE â€¢ '+(combatKit(a.id)?.[action]?.name||action.toUpperCase()).toUpperCase():'TEST '+mode.toUpperCase()+': '+a.name+' uses '+action+' â€¢ '+targets.length+' initial target(s).';
- if(controlledSummon)summonHistory.push({event:'controlled-activation',id:controlledSummon.id,ownerId:a.id,clock:turnTimeline.clock});
- if(mode==='five-hit'){
-  let focused=victim,lastSlot=victim.slot;
-  for(let n=0;n<5;n++)schedule(()=>{if(phase!=='resolve'||!attackInProgress||lastAttack?.serial!==serial)return;if(!focused||focused.hp<=0)focused=closestSurvivingEnemy(lastSlot);if(!focused)return;lastSlot=focused.slot;const part=Math.floor(damage/5)+(n<damage%5?1:0);applyTrainingHit(focused,part,n+1,true)},ANIMATION_STEP_MS*(n+1));
- }else schedule(()=>{
-  if(phase!=='resolve'||!attackInProgress||lastAttack?.serial!==serial)return;
-  for(let n=0;n<targets.length;n++)if(targets[n].hp>0){let hitDamage=damage;if(actionPlan.damageType)hitDamage=calculateTypedActionDamage(actionPlan.damageType,actionPlan.multiplier,a,targets[n])?.damageTaken??0;applyTrainingHit(targets[n],hitDamage,n+1,true)}
- },a.id==='soul'&&action==='basic'?ANIMATION_STEP_MS*3:ANIMATION_STEP_MS);
- const hitResolveAt=mode==='five-hit'?ANIMATION_STEP_MS*5:a.id==='soul'&&action==='basic'?ANIMATION_STEP_MS*3:ANIMATION_STEP_MS,normalFinishAt=mode==='five-hit'?ULTIMATE_PRESENTATION_MS:a.id==='soul'&&action==='basic'?SOUL_BASIC_MS:action==='ultimate'?ULTIMATE_PRESENTATION_MS:COMBAT_ACTION_EFFECT_MS,hasReflect=targets.some(target=>reflectPercentOf(target)>0),hasEcho=echoPercentOf(a)>0,reactionDelay=hasEcho?COMBAT_ACTION_PHASE_GAP_MS*(hasReflect?2:1):hasReflect?COMBAT_ACTION_PHASE_GAP_MS:0,reactionFinishPadding=(hasReflect||hasEcho)?Math.max(0,hitResolveAt+reactionDelay+COMBAT_ACTION_EFFECT_MS-normalFinishAt):0;
- schedule(()=>finishTrainingAttack(serial),normalFinishAt+reactionFinishPadding);
- return true;
-}
-// Developer-only test helpers. They do not define the game's revival resource, cost, or eligibility rules.
-function testKO(){if(!paused||phase!=='player')return;const others=alive().filter(p=>p.id!==activeId);if(!others.length){say('Debug KO requires another living ally; no final-ally KO.');return}const p=others[0];p.hp=0;gauges[p.id]=0;saveVitals();cancelQueuedUltimatesOfDefeated();log=`DEBUG ONLY: ${p.name} knocked out; party slot retained.`}
-function testRevive(){if(!paused||phase!=='player')return;const p=party.find(p=>p.hp<=0);if(!p){say('No knocked-out member to test revival.');return}p.hp=Math.max(1,roundHp(p.maxHp*.35));gauges[p.id]=0;saveVitals();log=`DEBUG ONLY: ${p.name} restored in the same party slot.`}
-function rect(x,y,w,h,fill,stroke=null,r=0){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke()}}
-function text(s,x,y,size=24,fill=color.white,weight='600',align='left'){ctx.textAlign=align;ctx.textBaseline='middle';ctx.fillStyle=fill;ctx.font=`${weight} ${size}px system-ui,-apple-system,Segoe UI,sans-serif`;ctx.fillText(String(s),x,y)}
-function line(x,y,w,f=1,c='#72e3ae',bg='#303649',h=13){rect(x,y,w,h,bg,null,6);rect(x,y,Math.max(0,w*Math.min(1,Math.max(0,f))),h,c,null,6)}
-function shieldedHealthBar(x,y,w,h,hp,maxHp,shield,fill='#72e3ae',background='#303649'){
- line(x,y,w,maxHp?hp/maxHp:0,fill,background,h);
- if(!(shield>0)||!(maxHp>0))return;
- const extra=Math.min(w*.12,Math.max(3,w*shield/maxHp)),covered=Math.min(w*1.12,w*Math.max(0,hp/maxHp)+extra);
- ctx.save();ctx.fillStyle='rgba(178,187,196,.48)';ctx.beginPath();ctx.roundRect(x,y-4,covered,h+8,Math.min(7,(h+8)/2));ctx.fill();ctx.restore();
-}
-function addButton(x,y,w,h,action,label,sub='',enabled=true,labelSize=19){choiceRects.push({x,y,w,h,action,enabled});rect(x,y,w,h,enabled?'#263754':'#1d2538',enabled?'#a5c9dc':'#526176',11);text(label,x+w/2,y+h/2-(sub?10:0),labelSize,enabled?'#fff4e6':'#9eafc1','750','center');if(sub)text(sub,x+w/2,y+h/2+16,13,'#bacadb','500','center')}
-function drawBackground(){ctx.imageSmoothingEnabled=false;if(images.arena.complete&&images.arena.naturalWidth)ctx.drawImage(images.arena,0,0,W,H);else{rect(0,0,W,H,'#596f83');rect(0,480,W,420,'#a38f9e')}rect(0,0,W,165,'rgba(8,10,22,.24)');const shade=ctx.createLinearGradient(0,580,0,900);shade.addColorStop(0,'#17122500');shade.addColorStop(1,'#090d23dc');rect(0,560,W,340,shade)}
+_K˜Âˆ™]\›ˆYNÂŸB™[˜İ[ÛˆŞXÛTÜØ\\İ
 
-const RUNE_STATS=['hp','attack','physicalDefense','magicalDefense','speed'];
-const RUNE_STAT_INFO={
- hp:{label:'HP',main:100},attack:{label:'Attack',main:20},
- physicalDefense:{label:'Physical Defense',main:4},
- magicalDefense:{label:'Magical Defense',main:4},speed:{label:'Speed',main:20}
-};
-const CELESTIALS=[['passive','PASSIVE'],['basic','BASIC'],['skill','SKILL'],['ultimate','ULTIMATE']];
-function defaultLoadout(){return {characterDuplicates:0,weapon:{selected:'standard',standardPotential:1,premiumPotential:1,premiumOwned:false,standardLevel:1,standardExp:0,standardAscended:[],premiumLevel:1,premiumExp:0,premiumAscended:[]},runes:[null,null,null,null],celestials:{passive:1,basic:1,skill:1,ultimate:1}}}
-function normalizeRune(value){
- if(!value||typeof value!=='object'||!Array.isArray(value.subs))return null;
- // Map historical typed Attack Rune names to the unified Attack stat during save migration.
- const convert=x=>x==='physicalAttack'||x==='magicalAttack'?'attack':x,main=convert(value.main);if(!RUNE_STATS.includes(main))return null;
- const rawSubs=value.subs.map(convert),legacyAttackBonus=Math.max(0,rawSubs.filter(x=>x==='attack').length-(main==='attack'?0:1)),subs=rawSubs.filter((x,i,a)=>RUNE_STATS.includes(x)&&x!==main&&a.indexOf(x)===i).slice(0,3);
- for(const stat of RUNE_STATS)if(subs.length<3&&stat!==main&&!subs.includes(stat))subs.push(stat);
- const setId=typeof value.setId==='string'&&Object.hasOwn(RUNE_SET_DEFINITIONS,value.setId)?value.setId:null;
- return subs.length===3?{level:Number.isInteger(value.level)?Math.max(1,Math.min(5,value.level)):1,main,subs,setId,legacyAttackBonus,criticalRateBonus:Number.isFinite(value.criticalRateBonus)?Math.max(0,value.criticalRateBonus):0,criticalDamageBonus:Number.isFinite(value.criticalDamageBonus)?Math.max(0,value.criticalDamageBonus):0}:null
-}
-function createRune(setId){return {level:1,main:'hp',subs:['attack','physicalDefense','magicalDefense'],setId,criticalRateBonus:0,criticalDamageBonus:0}}
-function normalizeLoadout(value,cap=characterLevelCap()){
- const base=defaultLoadout();if(!value||typeof value!=='object')return base;
- base.characterDuplicates=Number.isInteger(value.characterDuplicates)?Math.max(0,Math.min(4,value.characterDuplicates)):0;
- const weapon=value.weapon&&typeof value.weapon==='object'?value.weapon:{};
- base.weapon.standardPotential=Number.isInteger(weapon.standardPotential)?Math.max(1,Math.min(5,weapon.standardPotential)):1;
- base.weapon.premiumPotential=Number.isInteger(weapon.premiumPotential)?Math.max(1,Math.min(5,weapon.premiumPotential)):1;
- base.weapon.premiumOwned=weapon.premiumOwned===true;
- for(const type of ['standard','premium']){
-  const levelKey=type+'Level',expKey=type+'Exp',level=weapon[levelKey],exp=weapon[expKey];
-  const ascended=weapon[type+'Ascended'];base.weapon[type+'Ascended']=Array.isArray(ascended)?ASCENSION_GATES.filter(gate=>ascended.includes(gate)&&gate<=(Number.isInteger(level)?level:1)):[];
-  base.weapon[levelKey]=Number.isInteger(level)?Math.max(1,Math.min(cap,level)):1;
-  base.weapon[expKey]=Number.isSafeInteger(exp)&&exp>=0&&base.weapon[levelKey]<cap?exp:0;
-  while(base.weapon[levelKey]<cap&&(!ASCENSION_GATES.includes(base.weapon[levelKey])||base.weapon[type+'Ascended'].includes(base.weapon[levelKey]))&&base.weapon[expKey]>=requiredExp(base.weapon[levelKey])){
-   base.weapon[expKey]-=requiredExp(base.weapon[levelKey]);base.weapon[levelKey]++;
-  }
-  if(base.weapon[levelKey]>=cap)base.weapon[expKey]=0;
- }
- base.weapon.selected=weapon.selected==='premium'&&base.weapon.premiumOwned?'premium':'standard';
- if(Array.isArray(value.runes))base.runes=Array.from({length:4},(_,i)=>normalizeRune(value.runes[i]));
- if(value.celestials&&typeof value.celestials==='object')for(const [key] of CELESTIALS){const n=value.celestials[key];base.celestials[key]=Number.isInteger(n)?Math.max(1,Math.min(10,n)):1}
- return base
-}
-function loadCharacterLoadouts(){let stored={};try{stored=JSON.parse(localStorage.getItem(LOADOUT_KEY)||'{}')||{}}catch(e){}return Object.fromEntries(ROSTER.map(model=>[model.id,normalizeLoadout(stored[model.id])]))}
-let characterLoadouts=loadCharacterLoadouts(),loadoutCharacterId='soul',selectedLoadoutRune=0,loadoutPage='characters',runePanelMode='slots',runeStatPicker=null,weaponBookSelection={small:0,medium:0,large:0};
-let loadoutActionPending=false;
-function loadoutFor(id=loadoutCharacterId){return characterLoadouts[id]||(characterLoadouts[id]=defaultLoadout())}
-function saveLoadouts(){try{localStorage.setItem(LOADOUT_KEY,JSON.stringify(characterLoadouts))}catch(e){}}
-function defaultItemInventory(){return {bottles:{small:0,medium:0,large:0},books:{small:0,medium:0,large:0},cores:0,gems:0,runes:Object.fromEntries(Object.keys(RUNE_SET_DEFINITIONS).map(id=>[id,[]]))}}
-function normalizeItemInventory(value){
- const base=defaultItemInventory();if(!value||typeof value!=='object'||Array.isArray(value))return base;
- for(const [group] of [['bottles'],['books']])for(const size of ['small','medium','large']){
-  const count=value[group]?.[size];base[group][size]=Number.isSafeInteger(count)&&count>=0?count:0;
- }
- for(const id of ['cores','gems']){const count=value[id];base[id]=Number.isSafeInteger(count)&&count>=0?count:0}
- for(const setId of Object.keys(RUNE_SET_DEFINITIONS))if(Array.isArray(value.runes?.[setId]))base.runes[setId]=value.runes[setId].map(normalizeRune).filter(rune=>rune?.setId===setId);
- return base;
-}
-function validItemInventory(value){
- if(!value||typeof value!=='object'||Array.isArray(value))return false;
- for(const key of ['cores','gems'])if(value[key]!==undefined&&(!Number.isSafeInteger(value[key])||value[key]<0))return false;
- for(const group of ['bottles','books'])if(value[group]!==undefined){
-  if(!value[group]||typeof value[group]!=='object'||Array.isArray(value[group]))return false;
-  for(const size of ['small','medium','large'])if(value[group][size]!==undefined&&(!Number.isSafeInteger(value[group][size])||value[group][size]<0))return false;
- }
- if(value.runes!==undefined){if(!value.runes||typeof value.runes!=='object'||Array.isArray(value.runes)||Object.keys(value.runes).some(setId=>!Object.hasOwn(RUNE_SET_DEFINITIONS,setId)))return false;for(const [setId,runes] of Object.entries(value.runes))if(!Array.isArray(runes)||runes.some(rune=>!normalizeRune(rune)||rune.setId!==setId))return false}
- return true;
-}
-function loadItemInventory(){try{return normalizeItemInventory(JSON.parse(localStorage.getItem(ITEM_INVENTORY_KEY)||'null'))}catch(e){return defaultItemInventory()}}
-let itemInventory=loadItemInventory();
-function saveItemInventory(){try{localStorage.setItem(ITEM_INVENTORY_KEY,JSON.stringify(itemInventory));return true}catch(e){return false}}
-function loadStoreCoins(){try{const raw=localStorage.getItem(STORE_COINS_KEY);if(raw!==null){const n=Number(raw);return Number.isSafeInteger(n)&&n>=0?n:0}localStorage.setItem(STORE_COINS_KEY,'0');return 0}catch(e){return 0}}
-let storeCoins=loadStoreCoins();
-function saveStoreCoins(){try{localStorage.setItem(STORE_COINS_KEY,String(storeCoins));return true}catch(e){return false}}
-function grantStoreCoins(amount){if(!Number.isSafeInteger(amount)||amount<=0||!Number.isSafeInteger(storeCoins+amount))return false;storeCoins+=amount;saveStoreCoins();return true}
-function dailyRewardPeriodKey(now=new Date()){
- const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now),part=key=>parts.find(value=>value.type===key)?.value;
- return `${part('year')}-${part('month')}-${part('day')}`
-}
-function validDailyRewardPeriod(value){return typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)}
-function loadDailyRewardPeriod(){try{const value=localStorage.getItem(DAILY_REWARD_KEY);return validDailyRewardPeriod(value)?value:null}catch(e){return null}}
-let dailyRewardClaimedPeriod=loadDailyRewardPeriod();
-function saveDailyRewardPeriod(){try{if(dailyRewardClaimedPeriod)localStorage.setItem(DAILY_REWARD_KEY,dailyRewardClaimedPeriod);else localStorage.removeItem(DAILY_REWARD_KEY);return true}catch(e){return false}}
-function canClaimDailyReward(now=new Date()){return dailyRewardClaimedPeriod!==dailyRewardPeriodKey(now)}
-async function claimDailyReward(){
- try{await window.TwoToneAccount.action('claim-daily');say('Daily reward claimed: 100 coins.');return true}
- catch(error){say(error.message==='already_claimed'?'Daily coins are already claimed. The next claim is at 12 AM Eastern.':'The daily reward could not be claimed.');return false}
-}
-function grantItem(itemId,amount=1){
- if(!Number.isSafeInteger(amount)||amount<1)return false;
- const match=/^(bottle|book):(small|medium|large)$/.exec(itemId||'');
- if(match){const group=match[1]==='bottle'?'bottles':'books',next=itemInventory[group][match[2]]+amount;if(!Number.isSafeInteger(next))return false;itemInventory[group][match[2]]=next}
- else if(['core','gem'].includes(itemId)){const key=itemId==='core'?'cores':'gems',next=itemInventory[key]+amount;if(!Number.isSafeInteger(next))return false;itemInventory[key]=next}
- else if(typeof itemId==='string'&&itemId.startsWith('rune:')){const setId=itemId.slice(5),runes=itemInventory.runes[setId];if(!runes||runes.length+amount>10000)return false;for(let i=0;i<amount;i++)runes.push(createRune(setId))}
- else return false;
- saveItemInventory();return true;
-}
-if(DEV_MODE)globalThis.TwoToneItems=Object.freeze({grant:grantItem,getInventory:()=>JSON.parse(JSON.stringify(itemInventory)),grantCoins:grantStoreCoins,getCoins:()=>storeCoins});
-window.twoToneApplyProfile=profile=>{
- if(!profile||!Number.isSafeInteger(profile.coins)||profile.coins<0)return false;
- storeCoins=profile.coins;saveStoreCoins();
- dailyRewardClaimedPeriod=profile.dailyRewardClaimedPeriod||null;saveDailyRewardPeriod();
- if(Number.isInteger(profile.playerRank)&&profile.playerRank>=1&&profile.playerRank<=50){playerRank=profile.playerRank;savePlayerRank()}
- if(profile.characterProgress&&typeof profile.characterProgress==='object'){characterProgress=profile.characterProgress;saveProgress()}
- if(profile.vitals&&typeof profile.vitals==='object'){savedVitals=profile.vitals;try{localStorage.setItem(VITALS_KEY,JSON.stringify(savedVitals))}catch(e){}}
- if(Array.isArray(profile.team)&&validTeam(profile.team,new Set(profile.ownedCharacters||['soul']))){try{localStorage.setItem(TEAM_KEY,JSON.stringify(profile.team))}catch(e){}if(phase!=='partySetup')draft=[...profile.team]}
- if(Array.isArray(profile.ownedCharacters)){ownedCharacterIds=new Set(normalizeOwnedCharacterIds(profile.ownedCharacters)||['soul']);saveOwnedCharacters()}
- if(profile.itemInventory&&validItemInventory(profile.itemInventory)){itemInventory=normalizeItemInventory(profile.itemInventory);saveItemInventory()}
- if(profile.loadouts&&typeof profile.loadouts==='object'){characterLoadouts=Object.fromEntries(ROSTER.map(model=>[model.id,normalizeLoadout(profile.loadouts[model.id]) ]));saveLoadouts()}
- if(profile.lottery)FeaturedLottery.hydrate(profile.lottery);
- return true;
-};
-function weaponLevelCap(rank=playerRank){return characterLevelCap(rank)}
-function weaponPotentialMultiplier(type,potential,level){
- if(!['standard','premium'].includes(type)||!Number.isInteger(potential)||potential<1||potential>5||!Number.isInteger(level)||level<1)return 0;
- const levelOnePercent=type==='premium'?51+(potential-1)*25:31+(potential-1)*5;
- return (levelOnePercent+level-1)/100;
-}
-function weaponBonus(record,id=loadoutCharacterId){
- const w=record.weapon,type=w.selected==='premium'&&w.premiumOwned?'premium':'standard';
- return weaponPotentialMultiplier(type,type==='premium'?w.premiumPotential:w.standardPotential,w[type+'Level']);
-}
-function equippedZeroBattleSprite(){const weapon=loadoutFor('zero').weapon;return weapon.selected==='premium'&&weapon.premiumOwned?'zeroBattlePremium':'zeroBattle'}
-function equippedSoulBattleSprite(){const weapon=loadoutFor('soul').weapon;return weapon.selected==='premium'&&weapon.premiumOwned?'soulBattlePremium':'soulBattleStandard'}
-function equippedLoganBattleSprite(){const weapon=loadoutFor('logan').weapon;return weapon.selected==='premium'&&weapon.premiumOwned?'loganBattlePremium':'loganBattle'}
-function equippedCloudBattleSprite(){const weapon=loadoutFor('cloud').weapon;return weapon.selected==='premium'&&weapon.premiumOwned?'cloudNineBattle':'cloudWindcallBattle'}
-function equippedDawnBattleSprite(){const weapon=loadoutFor('dawn').weapon;return weapon.selected==='premium'&&weapon.premiumOwned?'dawnPremiumBattle':'dawnBattle'}
-function equippedLilyBattleSprite(){const weapon=loadoutFor('lily').weapon;return weapon.selected==='premium'&&weapon.premiumOwned?'lilySignatureBattle':'lilyStandardBattle'}
-function settleWeaponProgress(weapon,type,cap=weaponLevelCap()){
- const levelKey=type+'Level',expKey=type+'Exp',ascendedKey=type+'Ascended';let levelsGained=0;
- while(weapon[levelKey]<cap){
-  if(ASCENSION_GATES.includes(weapon[levelKey])&&!weapon[ascendedKey].includes(weapon[levelKey]))break;
-  const needed=requiredExp(weapon[levelKey]);if(weapon[expKey]<needed)break;
-  weapon[expKey]-=needed;weapon[levelKey]++;levelsGained++;
- }
- if(weapon[levelKey]>=cap)weapon[expKey]=0;
- return levelsGained;
-}
-function grantWeaponXp(id,type,amount){
- if(!ROSTER_IDS.has(id)||!['standard','premium'].includes(type)||!Number.isSafeInteger(amount)||amount<=0)return false;
- const record=loadoutFor(id),weapon=record.weapon,levelKey=type+'Level',expKey=type+'Exp',cap=weaponLevelCap();
- if(type==='premium'&&!weapon.premiumOwned)return false;
- if(weapon[levelKey]>=cap)return false;
- const oldLevel=weapon[levelKey],exp=weapon[expKey]+amount;if(!Number.isSafeInteger(exp))return false;
- weapon[expKey]=exp;const levelsGained=settleWeaponProgress(weapon,type,cap);saveLoadouts();
- return {level:weapon[levelKey],exp:weapon[expKey],levelsGained,nextExp:requiredExp(weapon[levelKey])};
-}
-const ITEM_XP=Object.freeze({small:10,medium:100,large:1000});
-function loadoutStatModifiers(id,characterLevel=1){
- const record=loadoutFor(id),bonus=weaponBonus(record,id),totals=Object.fromEntries(RUNE_STATS.map(k=>[k,0]));
- for(const rune of record.runes){if(!rune)continue;totals[rune.main]+=RUNE_STAT_INFO[rune.main].main*rune.level;for(const sub of rune.subs)totals[sub]+=RUNE_STAT_INFO[sub].main*.25*rune.level;if(rune.legacyAttackBonus)totals.attack+=20*.25*rune.level*rune.legacyAttackBonus}
- const pct={signatureWeapon:bonus},criticalRateFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalRateBonus||0),0),criticalDamageFromRunes=record.runes.reduce((sum,rune)=>sum+(rune?.criticalDamageBonus||0),0);
- return {hpFlatModifiers:{},hpPercentModifiers:pct,hpEquipmentFlatModifiers:{runes:totals.hp},
- attackFlatModifiers:{},attackPercentModifiers:pct,attackEquipmentFlatModifiers:{runes:totals.attack},
- physicalDefenseFlatModifiers:{},physicalDefensePercentModifiers:pct,physicalDefenseEquipmentFlatModifiers:{runes:totals.physicalDefense},
- magicalDefenseFlatModifiers:{},magicalDefensePercentModifiers:pct,magicalDefenseEquipmentFlatModifiers:{runes:totals.magicalDefense},
- speedFlatModifiers:{},speedPercentModifiers:pct,speedEquipmentFlatModifiers:{runes:totals.speed},criticalRateModifiers:{runes:criticalRateFromRunes,premiumWeaponDuplicate2:upgradeValueFor('soul.premium-duplicate.2.critical-stats','criticalRateBonus','soul')},criticalDamageModifiers:{runes:criticalDamageFromRunes,premiumWeaponDuplicate2:upgradeValueFor('soul.premium-duplicate.2.critical-stats','criticalDamageBonus','soul')}}
-}
-function celestialMultiplier(id,key){return 1+.10*(loadoutFor(id).celestials[key]||1)}
-function characterDuplicateRank(id='soul'){return loadoutFor(id).characterDuplicates||0}
-function premiumWeaponDuplicateRank(id='soul'){const w=loadoutFor(id).weapon;return w.selected==='premium'&&w.premiumOwned?Math.max(0,w.premiumPotential-1):0}
-function upgradeValueFor(effectId,key,characterId,fallback=0){const weapon=loadoutFor(characterId).weapon,effect=getActiveCharacterUpgradeEffect(effectId,{characterDuplicates:characterDuplicateRank(characterId),premiumWeaponDuplicates:premiumWeaponDuplicateRank(characterId),weaponType:weapon.selected==='premium'&&weapon.premiumOwned?'premium':'standard'});return effect?.values?.[key]??fallback}
-function soulFollowUpLimit(){return upgradeValueFor('soul.premium-duplicate.1.follow-up-charges','followUpCharges','soul',5)}
-function resetSoulFollowUp(){const charges=soulFollowUpLimit();soulFollowUpState={type:'followUp',charges,remaining:charges,seenSources:new Set(),activations:0}}
-function soulEnhancedBasicTargetMode(stacks){if(stacks<(combatKit('soul')?.skill?.blastAtStacks??Infinity))return 'single';return upgradeValueFor('soul.premium-duplicate.3.enhanced-aoe','enhancedBasicCoverage','soul','blast')}
+^ØÛÛœİ\ÜØ\[ÙYšY\œËœ\ÜÚ]™_Ü™]\›ˆÙ]ÜØ\\İÛİ\˜ÙJ	Ü\ÜÚ]™IËLÏÌ›ŠÌJ_B™[˜İ[ÛˆÚ\™ÙU[[X]Q›Ü•\İ
+Y
+^ØÛÛœİ\\K™š[™
+OœšYOOZY
+NÚYŠ\šL]\ÙYÉÜÙ]\	Ë	Ú[›ÉË	İšXİÜIË	ÙY™X]	×Kš[˜ÛY\Ê\ÙJJ\™]\›ˆ˜[ÙNÂˆ™[™\™ŞOLLŒİ[[X]R\İÜKœ\Ú
+Ù]™[‰ÙXYËXÚ\™ÙIËXİÜšY[™\™ŞNœ™[™\™Ş_JNÜØ^J	ÕTÕÓ“Nˆ	ÊÜ›˜[YJÉÈ[™\™ŞHÚ\™ÙYÈLŒ‰ÊNÜ™]\›ˆY_B™[˜İ[ÛˆØ[˜Ù[]Y]YY[[X]\ÓÙ‘Y™X]Y
 
-function loadoutStats(id){
- const model=ROSTER.find(x=>x.id===id),level=progressFor(id)?.level||1;if(!model)return null;
- const unit={...model,level,...loadoutStatModifiers(id,level)};
- const stats={HP:calculateMaxHp(model.hp,level,unit.hpFlatModifiers,unit.hpPercentModifiers,unit.hpEquipmentFlatModifiers)};
- stats.Attack=calculateAttack(unit)
- return {...stats,
- 'Physical Defense':calculatePhysicalDefense(unit),'Magical Defense':calculateMagicalDefense(unit),Speed:calculateSpeed(unit)}
-}
-function enterLoadout(){loadoutCharacterId='soul';selectedLoadoutRune=0;loadoutPage='details';runePanelMode='slots';runeStatPicker=null;weaponBookSelection={small:0,medium:0,large:0};phase='loadout';hint=''}
-async function handleLoadoutAction(action){
- const [kind,arg]=action.split(':'),record=loadoutFor(),weapon=record.weapon,rune=record.runes[selectedLoadoutRune];
- if(kind==='back'){if(runeStatPicker){runeStatPicker=null;return}phase='menu';return}
- if(kind==='character'){if(ROSTER_IDS.has(arg)&&isCharacterOwned(arg)&&!roster(arg)?.test){loadoutCharacterId=arg;weaponBookSelection={small:0,medium:0,large:0}}return}
- if(kind==='page'){if(['details','weapons','runes','celestials'].includes(arg)){loadoutPage=arg;if(arg==='runes')runePanelMode='slots';runeStatPicker=null;weaponBookSelection={small:0,medium:0,large:0}}return}
- if(kind==='rune-view'&&['slots','inventory','detail'].includes(arg)){runePanelMode=arg;runeStatPicker=null;return}
- if(kind==='upgrade'&&arg==='weapon'){
-  const type=weapon.selected,level=weapon[type+'Level'],gate=ASCENSION_GATES.includes(level)&&!weapon[type+'Ascended'].includes(level);
-  if(gate){
-   if(loadoutActionPending)return;loadoutActionPending=true;
-   try{await window.TwoToneAccount.action('ascend',{kind:'weapon',id:loadoutCharacterId,weaponType:type});say('Weapon Ascension completed.')}
-   catch(error){say(error.message==='gem_required'?'One Gem is required to Ascend this weapon.':'Weapon Ascension could not be completed.')}
-   finally{loadoutActionPending=false}return
-  }
-  else if(level<weaponLevelCap()){
-   let used=0;const remaining={...weaponBookSelection};
-   for(const size of ['small','medium','large'])for(let i=0;i<weaponBookSelection[size];i++){
-    if(loadoutActionPending)return;loadoutActionPending=true;
-    try{await window.TwoToneAccount.action('use-xp-item',{itemType:'book',id:loadoutCharacterId,weaponType:type,size});remaining[size]--;used++}
-    catch(error){loadoutActionPending=false;break}
-    finally{loadoutActionPending=false}
-   }
-   weaponBookSelection=remaining;if(used)say(`${used} Enchanted Book${used===1?'':'s'} used.`);
-  }
-  return;
- }
- if(kind==='book-select'){
-  if(loadoutActionPending)return;
-  if(['small','medium','large'].includes(arg)&&weaponBookSelection[arg]<itemInventory.books[arg])weaponBookSelection[arg]++;
-  return;
- }
- if(kind==='book-clear'){
-  if(!loadoutActionPending)weaponBookSelection={small:0,medium:0,large:0};
-  return;
- }
- if(kind==='weapon-switch'){
-  if(weapon.premiumOwned&&!loadoutActionPending){loadoutActionPending=true;try{await window.TwoToneAccount.action('set-weapon',{id:loadoutCharacterId,type:weapon.selected==='premium'?'standard':'premium'});weaponBookSelection={small:0,medium:0,large:0}}catch(e){say('Weapon selection could not be saved.')}finally{loadoutActionPending=false}}return
- }
- if(kind==='character-duplicate'&&DEV_MODE)record.characterDuplicates=Math.max(0,Math.min(4,record.characterDuplicates+Number(arg)));
- else if(kind==='potential'&&DEV_MODE){const [type,delta]=arg.split(','),key=type==='premium'?'premiumPotential':'standardPotential';weapon[key]=Math.max(1,Math.min(5,weapon[key]+Number(delta)))}
- else if(kind==='rune-select'){selectedLoadoutRune=Math.max(0,Math.min(3,Number(arg)||0));runePanelMode=record.runes[selectedLoadoutRune]?'detail':'inventory';runeStatPicker=null}
- else if(kind==='rune-equip'){
-  const [slot,setId]=arg.split(','),index=Math.max(0,Math.min(3,Number(slot)||0));if(loadoutActionPending)return;loadoutActionPending=true;
-  try{await window.TwoToneAccount.action('equip-rune',{id:loadoutCharacterId,setId,slot:index});selectedLoadoutRune=index;runePanelMode='slots'}catch(e){say('No Rune from that set is available.')}finally{loadoutActionPending=false}return
- }
- else if(kind==='rune-remove'&&record.runes[selectedLoadoutRune]){
-  if(loadoutActionPending)return;loadoutActionPending=true;try{await window.TwoToneAccount.action('remove-rune',{id:loadoutCharacterId,slot:selectedLoadoutRune});runePanelMode='slots'}catch(e){say('Rune could not be removed.')}finally{loadoutActionPending=false}return
- }
- else if(kind==='rune-switch'&&record.runes[selectedLoadoutRune])runePanelMode='inventory';
- else if(kind==='rune-level'&&rune&&Number(arg)===1){if(loadoutActionPending)return;loadoutActionPending=true;try{await window.TwoToneAccount.action('upgrade-core',{kind:'rune',id:loadoutCharacterId,index:selectedLoadoutRune});say('Rune upgraded.')}catch(e){say('A Core is required and the Rune must be below Level 5.')}finally{loadoutActionPending=false}return}
- else if(kind==='rune-main'&&rune){runeStatPicker={slot:'main',subIndex:-1};return}
- else if(kind==='rune-sub'&&rune){const index=Number(arg);if(Number.isInteger(index)&&index>=0&&index<3){runeStatPicker={slot:'sub',subIndex:index};return}}
- else if(kind==='rune-picker-close'){runeStatPicker=null;return}
- else if(kind==='rune-stat-choice'&&rune&&runeStatPicker){
-  const [slot,key]=arg.split(',');
-  if(slot===runeStatPicker.slot&&RUNE_STATS.includes(key)&&!loadoutActionPending){loadoutActionPending=true;try{await window.TwoToneAccount.action('set-rune-stat',{id:loadoutCharacterId,slot:selectedLoadoutRune,kind:slot,subIndex:runeStatPicker.subIndex,stat:key});runeStatPicker=null}catch(e){say('Rune stat could not be changed.')}finally{loadoutActionPending=false}}return
- }
- else if(kind==='celestial'){const [key,delta]=arg.split(',');if(Number(delta)===1&&!loadoutActionPending){loadoutActionPending=true;try{await window.TwoToneAccount.action('upgrade-core',{kind:'celestial',id:loadoutCharacterId,key});say(`${key} Celestial upgraded.`)}catch(e){say('A Core is required and the Celestial must be below Level 10.')}finally{loadoutActionPending=false}}return}
- else if(kind==='bottle'){if(loadoutActionPending)return;loadoutActionPending=true;try{await window.TwoToneAccount.action('use-xp-item',{itemType:'bottle',id:loadoutCharacterId,size:arg});say(`${arg[0].toUpperCase()+arg.slice(1)} Enchanted Bottle used.`)}catch(e){say('Bottle unavailable or character is at their level cap.')}finally{loadoutActionPending=false}return}
- else if(kind==='ascend-character'){if(loadoutActionPending)return;loadoutActionPending=true;try{await window.TwoToneAccount.action('ascend',{kind:'character',id:loadoutCharacterId});say('Ascension completed.')}catch(e){say('One Gem is required at a valid Ascension gate.')}finally{loadoutActionPending=false}return}
- saveLoadouts()
-}
-function loadoutCharacter(){return roster(loadoutCharacterId)}
-function drawRuneStatPicker(rune){
- if(!runeStatPicker)return;
- rect(0,0,W,H,'rgba(4,8,18,.80)');
- choiceRects.push({x:0,y:0,w:W,h:H,action:'loadout:rune-picker-close',enabled:true});
- rect(135,170,1330,590,'rgba(13,20,39,.99)','#ccb88e',18);
- const isMain=runeStatPicker.slot==='main',heading=isMain?'CHOOSE MAIN STAT':'CHOOSE SUBSTAT '+(runeStatPicker.subIndex+1);
- text(heading,185,220,30,'#ffedd1','850');
- text(isMain?'All six stats are available. Changing the main stat refreshes the three unique substats.':'All six stats are shown. Options already used by another slot are disabled.',185,254,16,'#c4d6e5','550');
- addButton(1285,190,140,52,'loadout:rune-picker-close','CLOSE');
- for(let i=0;i<RUNE_STATS.length;i++){
-  const key=RUNE_STATS[i],info=RUNE_STAT_INFO[key],col=i%3,row=Math.floor(i/3),x=190+col*410,y=280+row*190;
-  const subIndex=runeStatPicker.subIndex,usedAsMain=key===rune.main,usedByOtherSub=!isMain&&rune.subs.some((v,j)=>j!==subIndex&&v===key);
-  const enabled=isMain||(!usedAsMain&&!usedByOtherSub),selected=isMain?usedAsMain:rune.subs[subIndex]===key;
-  const value=info.main*rune.level*(isMain?1:.25),note=selected?(isMain?'CURRENT MAIN':'CURRENT SUBSTAT'):usedAsMain?'USED BY MAIN STAT':usedByOtherSub?'USED BY ANOTHER SUBSTAT':(isMain?'MAIN STAT':'SUBSTAT')+' â€¢ LEVEL '+rune.level;
-  addButton(x,y,390,155,'loadout:rune-stat-choice:'+runeStatPicker.slot+','+key,info.label,note+'  â€¢  +'+value,enabled);
-  if(selected)rect(x-3,y-3,396,161,'rgba(0,0,0,0)','#edcf98',12);
- }
-}
-function drawLoadout(){
- const model=loadoutCharacter(),record=loadoutFor(loadoutCharacterId),progress=progressFor(loadoutCharacterId),cap=characterLevelCap();
- drawBackground();rect(0,0,W,H,'rgba(5,9,22,.52)');
- // Star-field details frame the character art without competing with the controls.
- for(let i=0;i<70;i++){const x=(i*193+61)%W,y=(i*317+37)%H,r=i%7===0?2:1;rect(x,y,r,r,'rgba(220,232,255,'+(i%3===0?'.52':'.25')+')')}
- text('CHARACTER DETAILS',42,42,14,'#d7c69f','800');text(model.name,42,72,25,'#fff1d5','850');
- // Character selector stays available across every loadout tab.
- const characters=availableCharacters();for(let i=0;i<characters.length;i++){
-  const p=characters[i],x=300+i*76,y=16,active=p.id===loadoutCharacterId,img=images[characterPortraitArt(p.id)];
-  choiceRects.push({x,y,w:68,h:68,action:'loadout:character:'+p.id,enabled:!p.test});
-  ctx.save();ctx.beginPath();ctx.arc(x+34,y+34,31,0,Math.PI*2);ctx.clip();rect(x+3,y+3,62,62,'#18243a');if(img?.complete&&img.naturalWidth)drawCharacterPortrait(img,p.id,x+3,y+3,62);ctx.restore();
-  ctx.beginPath();ctx.arc(x+34,y+34,active?34:32,0,Math.PI*2);ctx.strokeStyle=active?'#f5d897':'rgba(189,207,230,.62)';ctx.lineWidth=active?3:1.5;ctx.stroke();
- }
- addButton(1517,24,52,52,'loadout:back','Ã—','',true,28);
- const tabs=[['details','DETAILS'],['weapons','WEAPONS'],['runes','RUNES'],['celestials','CELESTIALS']];
- for(let i=0;i<tabs.length;i++){
-  const [key,label]=tabs[i],y=145+i*76,active=loadoutPage===key;
-  if(active)rect(22,y-24,232,58,'rgba(228,195,130,.14)','#d2b77e',12);
-  drawMainMenuIcon(({details:'party',weapons:'loadout',runes:'items',celestials:'settings'})[key],74,y+4,active?'#f2d28e':'#d7e2ef');
-  choiceRects.push({x:22,y:y-24,w:232,h:58,action:'loadout:page:'+key,enabled:true});
-  text(label,118,y+9,17,active?'#f4d99c':'#dce6f1',active?'800':'650');
- }
- // Small grounding glow under the character echoes the reference's luminous stage.
- const glow=ctx.createRadialGradient(680,846,8,680,846,370);glow.addColorStop(0,'rgba(163,191,255,.35)');glow.addColorStop(1,'rgba(82,114,190,0)');rect(280,720,760,180,glow);
- const artKey=characterPortraitArt(model.id);
- const art=images[artKey];if(art?.complete&&art.naturalWidth)drawStoreBannerImage(art,265,138,800,748);
- // Right-side content panel, consistent across all tabs.
- rect(1058,112,512,744,'rgba(10,16,31,.76)','rgba(190,207,230,.42)',18);
- if(loadoutPage==='weapons')text('WEAPONS',1314,96,18,'#d9c797','850','center');
- else if(loadoutPage==='runes')text('RUNES',1314,96,18,'#d9c797','850','center');
- else text(loadoutPage==='details'?'STATS & PROGRESSION':loadoutPage.toUpperCase(),1090,151,14,'#d9c797','850');
- if(loadoutPage==='details')drawLoadoutDetailsPanel(model,record,progress,cap);
- else if(loadoutPage==='weapons')drawLoadoutWeaponsPanel(model,record);
- else if(loadoutPage==='runes')drawLoadoutRunesPanel(record);
- else drawLoadoutCelestialsPanel(record);
- if(loadoutPage==='runes'&&runeStatPicker){const rune=record.runes[selectedLoadoutRune];if(rune)drawRuneStatPicker(rune)}
-}
-function drawLoadoutDetailsPanel(model,record,progress,cap){
- const stats=loadoutStats(loadoutCharacterId),needed=requiredExp(progress.level),gate=ASCENSION_GATES.includes(progress.level)&&!progress.ascended.includes(progress.level);
- text('LEVEL '+progress.level+' / '+cap,1090,234,18,'#edf3fa','750');
- text(progress.level>=cap?'LEVEL CAP REACHED':gate?'ASCENSION REQUIRED':'EXP  '+progress.exp+' / '+needed,1090,260,14,'#c6d2df','600');
- line(1090,273,445,progress.level>=cap?1:progress.exp/Math.max(1,needed),'#d9b96e','rgba(218,228,240,.18)',8);
- if(gate)addButton(1090,292,445,42,'loadout:ascend-character','ASCEND CHARACTER â€¢ 1 GEM','GEMS Ã—'+itemInventory.gems,itemInventory.gems>0,15);
- text('COMBAT STATS',1090,gate?370:329,13,'#d9c797','800');
- const rows=Object.entries(stats||{});for(let i=0;i<rows.length;i++){
-  const [name,value]=rows[i],col=i%2,row=Math.floor(i/2),x=1090+col*224,y=(gate?399:358)+row*48;
-  text(name.toUpperCase(),x,y,11,'#aebed0','650');text(String(value===null?'â€”':value),x,y+22,17,'#f0f3f7','750');
- }
- const y=gate?548:506;text('ENCHANTED BOTTLES',1090,y,13,'#d9c797','800');
- const items=[['small','SMALL','10 XP'],['medium','MEDIUM','100 XP'],['large','LARGE','1,000 XP']];
- for(let i=0;i<items.length;i++){const [size,label,xp]=items[i],x=1090+i*150;addButton(x,y+15,139,57,'loadout:bottle:'+size,label,xp+' â€¢ Ã—'+itemInventory.bottles[size],itemInventory.bottles[size]>0&&progress.level<cap,12)}
- rect(1090,gate?665:623,445,1,'rgba(185,201,222,.25)');
- text('ASCENSIONS COMPLETED',1090,gate?697:655,12,'#aebed0','700');text(progress.ascended.length?progress.ascended.join('   â€¢   '):'NONE',1090,720,14,'#e5eaf1','650');
- if(DEV_MODE){text('DUPLICATES  '+record.characterDuplicates+' / 4',1090,770,13,'#d9c797','800');addButton(1313,740,74,42,'loadout:character-duplicate:-1','âˆ’','',record.characterDuplicates>0);addButton(1400,740,74,42,'loadout:character-duplicate:1','+','',record.characterDuplicates<4)}
-}
-function drawLoadoutWeaponsPanel(model,record){
- const w=record.weapon,type=w.selected,level=w[type+'Level'],cap=weaponLevelCap(),exp=w[type+'Exp'],needed=requiredExp(level),potential=w[type+'Potential'],bonus=weaponPotentialMultiplier(type,potential,level)*100,owned=type==='standard'||w.premiumOwned,gate=ASCENSION_GATES.includes(level)&&!w[type+'Ascended'].includes(level);
- const weaponName=model.id==='soul'?(type==='premium'?'SOULBOUND':'ASHBLADE'):model.id==='cloud'?(type==='premium'?'CLOUD-NINE':'WINDCALL'):model.id==='lily'?(type==='premium'?'EVERBLOSSOM':'PETAL'):model.id==='dawn'?(type==='premium'?'RADIANT DIAMOND':'RADIANT PEARL'):model.id==='zero'?(type==='premium'?'NIGHTSHADE':'SILENT EDGE'):model.id==='logan'?(type==='premium'?'BLOODMOON':'CRIMSON EDGE'):(type==='premium'?'PREMIUM SIGNATURE':'STANDARD SIGNATURE');
- text(weaponName,1090,151,17,'#e8d6af','850');
- const weaponArt=model.id==='soul'?images[type==='premium'?'soulWeaponPremium':'soulWeaponStandard']:model.id==='cloud'?images[type==='premium'?'cloudNine':'cloudWindcall']:model.id==='lily'?images[type==='premium'?'lilyWeaponSignature':'lilyWeaponStandard']:model.id==='dawn'?images[type==='premium'?'dawnWeaponPremium':'dawnWeaponStandard']:model.id==='zero'?images[type==='premium'?'zeroWeaponPremium':'zeroWeaponStandard']:model.id==='logan'?images[type==='premium'?'loganWeaponPremium':'loganWeaponStandard']:null;if(weaponArt?.complete&&weaponArt.naturalWidth)drawStoreBannerImage(weaponArt,1090,171,445,300);
- text('POTENTIAL '+potential+' / 5     â€¢     LEVEL '+level+' / '+cap,1090,490,14,'#e1e8f0','750');
- text(gate?'ASCENSION REQUIRED':level>=cap?'WEAPON LEVEL CAP REACHED':'XP  '+exp+' / '+needed,1090,516,13,'#b9c8d7','600');
- line(1090,529,445,exp/Math.max(1,needed),'#d9b96e','rgba(218,228,240,.18)',7);
- if(DEV_MODE&&owned){addButton(1400,542,56,36,'loadout:potential:'+type+',-1','âˆ’','',potential>1);addButton(1464,542,56,36,'loadout:potential:'+type+',1','+','',potential<5)}
- const upgradeLabel=gate?'ASCEND':level>=cap?'MAX LEVEL':'UPGRADE',bookSelectionCount=weaponBookSelection.small+weaponBookSelection.medium+weaponBookSelection.large;
- text(owned?'+'+bonus.toFixed(2).replace(/0+$/,'').replace(/\.$/,'')+'% ALL STATS':'PREMIUM WEAPON NOT OWNED',1090,580,16,owned?'#f4d99c':'#aebed0','800');
- addButton(1090,600,214,48,'loadout:upgrade:weapon',upgradeLabel,'',owned&&!loadoutActionPending&&(gate?itemInventory.gems>0:level<cap&&bookSelectionCount>0),14);
- addButton(1320,600,214,48,'loadout:weapon-switch','SWITCH','',w.premiumOwned,14);
- if(gate){
-  text('GEMS',1090,675,12,'#d9c797','750');drawLoadoutMaterialCard(1090,684,139,151,'gem','GEM',itemInventory.gems);
- }else{
-  text('ENCHANTED BOOKS',1090,675,12,'#d9c797','750');
-  if(bookSelectionCount>0)addButton(1430,653,104,26,'loadout:book-clear','CLEAR','',!loadoutActionPending,12);
-  for(let i=0;i<3;i++)drawLoadoutBookCard(1090+i*150,684,139,151,['small','medium','large'][i],owned&&level<cap&&!loadoutActionPending);
- }
-}
-function drawLoadoutMaterialCard(x,y,w,h,item,label,qty){
- rect(x,y,w,h,'rgba(24,32,49,.78)','rgba(121,143,168,.45)',10);
- const icon=images[item];if(icon?.complete&&icon.naturalWidth)drawStoreBannerImage(icon,x+43,y+6,w-86,69);
- text(label,x+w/2,y+96,11,'#f3e5c9','800','center');
- text('Ã—'+qty,x+w/2,y+130,13,'#f0f3f7','750','center');
-}
-function drawLoadoutBookCard(x,y,w,h,size,enabled){
- const upper=size[0].toUpperCase()+size.slice(1),qty=itemInventory.books[size],selected=weaponBookSelection[size];
- const canAdd=enabled&&selected<qty;
- rect(x,y,w,h,selected?'#29384e':'rgba(24,32,49,.78)',selected?'#d2b77e':canAdd?'#a5c9dc':'rgba(121,143,168,.45)',10);
- choiceRects.push({x,y,w,h,action:'loadout:book-select:'+size,enabled:canAdd});
+^Âˆ›ÜŠ]O][[X]T]Y]YK›[™İLNÚOLÚKKJ^ØÛÛœİO][[X]T]Y]YVÚWK\\K™š[™
+OšYOO\K˜XİÜ’Y
+NÂˆYŠ\šL
+^ÚYŠ
+\™[™\™ŞT™\Ù\™YSX]›X^
+
+™[™\™ŞT™\Ù\™Y
+K\K˜ÛÜİ
+NÂˆ[[X]T]Y]YKœÜXÙJKJNİ[[X]R\İÜKœ\Ú
+Ù]™[‰ØØ[˜Ù[YZÛÉËXİÜœK˜XİÜ’YÙ\NœKœÙ\K[™\™ŞNœË™[™\™ŞOÏÛ[JNÂˆÙÏX	ÜË›˜[Y_K˜XİÜ’YIÜÈ]Y]YY[[X]HØ[˜Ù[YÛˆË“ËÈ[™\™ŞH™[X\ÙY˜ß_BŸB™[˜İ[ÛˆØ[˜Ù[[]Y]YY[[X]\Ê™X\ÛÛŠ^Ù›ÜŠÛÛœİHÙˆ[[X]T]Y]YJ^ØÛÛœİ\\K™š[™
+OšYOO\K˜XİÜ’Y
+NÂˆYŠ
+\™[™\™ŞT™\Ù\™YSX]›X^
+
+™[™\™ŞT™\Ù\™Y
+K\K˜ÛÜİ
+NÂˆ[[X]R\İÜKœ\Ú
+Ù]™[‰ØØ[˜Ù[YIÊÜ™X\ÛÛ‹XİÜœK˜XİÜ’YÙ\NœKœÙ\_JNßBˆ[[X]T]Y]YOV×Nİ[[X]T™\İ[YO[[İ[[X]Q^Xİ][™ÏY˜[ÙNßB‹ËÈ[ˆ[[X]HØ[ˆ™H™\]Y\İY][H[ÛY[[ˆ[ˆ[YYÜˆ[™[^H\›‹ˆXİ]™B‹ËÈXİ[ÛœÈ[™[™[^HÚ[™\È\™H™]™\ˆ[\œ\YÈH]Y]YH˜Z[œÈ]›İ[™\šY\Ë‚™[˜İ[Ûˆ]Y]YU[[X]JY[U\™Ù]Y[[
+^ÂˆÛÛœİ\\K™š[™
+OœšYOOZY
+NÂˆYŠXØ[”]Y]YU[[X]J
+J^ÜØ^J\ÉÕ[šÛ›İÛˆ[K‰ÎœšLÉÑY™X]Y[HØ[››İ[‰Îš\Õ[[™[™ÊY
+OÉÕ[[X]H[™XYH]Y]YY‰Î‰Õ[[X]H™YYÈ	Êİ[[X]Q[™\™ŞPÛÜİ
+
+JÉÈ]˜Z[X›H[™\™ŞK‰ÊNÜ™]\›ˆ˜[Ù_BˆÛÛœİO^ØXİÜ’YšYÛÜİ[[X]Q[™\™ŞPÛÜİ
+
+KÙ\NŠÊİ[[X]TÙ\]Y[˜ÙK™\]Y\İY\›\›‹[U\™Ù]YNÂˆ™[™\™ŞT™\Ù\™YJ™[™\™ŞT™\Ù\™Y
+JÜK˜ÛÜİİ[[X]T]Y]YKœ\Ú
+JNÂˆ[[X]R\İÜKœ\Ú
+Ù]™[‰Ü]Y]YY	ËXİÜšYÙ\NœKœÙ\K[™\™ŞNœ™[™\™ŞK™\Ù\™Yœ™[™\™ŞT™\Ù\™Y\Ù_JNÂˆÙÏX	Ü›˜[Y_H[[X]H]Y]YY
+	İ[[X]T]Y]YK›[™İHØZ][™ÊKˆ[™\™ŞH™\Ù\™Y›İÜ[˜ÂˆYŠ\ÙOOOIÜ^Y\‰É‰ˆX]XÚÒ[”›ÙÜ™\ÜÉ‰ˆ][[X]Q^Xİ][™É‰ˆ][[X]T™\İ[YJ^ÂˆËÈH^Y\ˆ™]Z[œÈHØ[YH›Ü›X[\›ˆY\ˆH[[X]Hš[š\Ú\Ë‚ˆ[[X]T™\İ[YOJ
+OOÜ\ÙOIÜ^Y\‰ÎØØ[Y\˜T™]šY]Ï[[ÛÙÏX	Ü›˜[Y_IÜÈ[[X]Hš[š\ÚYˆ›Ü›X[\›ˆ™]Z[™Y˜NÂˆ[“™^[[X]J
+NÂˆBˆ™]\›ˆYNÂŸB™[˜İ[Ûˆ˜Z[•[[X]T]Y]YP™Y›Ü™JÛÛ[X][ÛŠ^ÂˆØ[˜Ù[]Y]YY[[X]\ÓÙ‘Y™X]Y
 
- drawStoreBannerImage(images['enchantedBook'+upper],x+48,y+4,w-96,54);
- text(upper.toUpperCase(),x+w/2,y+67,11,'#f3e5c9','800','center');
- text(ITEM_XP[size]+' XP',x+w/2,y+84,10,'#c4d0dd','600','center');
- text(selected+' / '+qty+' selected',x+w/2,y+118,11,'#f0f3f7','750','center');
-}
-function drawLoadoutRunesPanel(record){
- if(runePanelMode==='inventory'){drawRuneInventoryPicker(record);return}
- if(runePanelMode==='detail'&&record.runes[selectedLoadoutRune]){drawRuneDetail(record.runes[selectedLoadoutRune]);return}
- text('EQUIPPED RUNES',1090,151,15,'#d9c797','850');text('CORES Ã—'+itemInventory.cores,1538,151,12,'#b9c8d7','650','right');
- for(let i=0;i<4;i++){
-  const col=i%2,row=Math.floor(i/2),x=1083+col*236,y=174+row*126,rune=record.runes[i],set=rune&&RUNE_SET_DEFINITIONS[rune.setId],active=i===selectedLoadoutRune;
-  choiceRects.push({x,y,w:224,h:114,action:'loadout:rune-select:'+i,enabled:true});rect(x,y,224,114,'rgba(27,39,59,.82)',active?'#d5ba7c':'rgba(148,169,194,.45)',12);
-  if(rune){const icon=images[set?.image];if(icon?.complete&&icon.naturalWidth)drawStoreBannerImage(icon,x+10,y+10,50,48);text(set?.name||'RUNE',x+70,y+24,12,'#f3dfb9','800');text('LEVEL '+rune.level+' / 5',x+204,y+24,10,'#c4d0dd','650','right');const main=RUNE_STAT_INFO[rune.main];text(main.label+'  +'+main.main*rune.level,x+70,y+49,10,'#e3ebf4','650');text(rune.subs.map(key=>RUNE_STAT_INFO[key].label).join(' â€¢ '),x+12,y+83,9,'#b9c8d7','600');text('VIEW',x+204,y+101,9,'#d9c797','750','right')}
-  else{text('ï¼‹',x+112,y+37,26,'#d9c797','700','center');text('SLOT '+(i+1),x+112,y+78,12,'#c4d0dd','700','center')}
- }
- text('SET EFFECTS',1314,442,14,'#d9c797','850','center');
- const activeSets=Object.keys(RUNE_SET_DEFINITIONS).map(key=>({key,set:RUNE_SET_DEFINITIONS[key],count:runeSetPieceCount(loadoutCharacterId,key)})).filter(entry=>entry.count>0);
- if(!activeSets.length){text('NO SET BONUS',1090,485,12,'#aebed0','650');return}
- activeSets.forEach((entry,index)=>{
-  const y=461+index*87,isActive=entry.count===4;rect(1083,y,462,78,isActive?'rgba(75,68,48,.62)':'rgba(27,39,59,.64)',isActive?'#d5ba7c':'rgba(148,169,194,.32)',10);
-  const icon=images[entry.set.image];if(icon?.complete&&icon.naturalWidth)drawStoreBannerImage(icon,1091,y+11,45,49);
-  text(entry.set.name.toUpperCase(),1145,y+19,11,isActive?'#f3dfb9':'#dce6f1','800');text(entry.set.lines.join(' â€¢ '),1145,y+43,9,'#b9c8d7','550');text(isActive?'ACTIVE':entry.count+'/4',1532,y+20,10,isActive?'#f3dfb9':'#c4d0dd','800','right');
- });
-}
-function drawRuneInventoryPicker(record){
- text('CHOOSE A RUNE â€¢ SLOT '+(selectedLoadoutRune+1),1090,183,13,'#d9c797','800');addButton(1411,165,124,34,'loadout:rune-view:slots','BACK','',true,11);
- const available=Object.keys(RUNE_SET_DEFINITIONS).filter(key=>(itemInventory.runes[key]?.length||0)>0);
- if(!available.length){text('NO RUNES AVAILABLE',1314,462,16,'#c4d0dd','650','center');return}
- available.forEach((key,index)=>{
-  const set=RUNE_SET_DEFINITIONS[key],col=index%3,row=Math.floor(index/3),x=1083+col*156,y=211+row*196,qty=itemInventory.runes[key].length;
-  choiceRects.push({x,y,w:146,h:178,action:'loadout:rune-equip:'+selectedLoadoutRune+','+key,enabled:true});rect(x,y,146,178,'rgba(27,39,59,.82)','rgba(148,169,194,.45)',11);
-  const icon=images[set.image];if(icon?.complete&&icon.naturalWidth)drawStoreBannerImage(icon,x+45,y+35,56,54);
-  text(set.name,x+73,y+20,11,'#f3dfb9','800','center');text(set.lines.slice(1).join(' â€¢ '),x+73,y+116,8,'#c4d2df','600','center');text('Ã—'+qty,x+73,y+151,11,'#f0f3f7','750','center');
- });
-}
-function drawRuneDetail(rune){
- const set=RUNE_SET_DEFINITIONS[rune.setId],icon=images[set?.image];text('RUNE â€¢ SLOT '+(selectedLoadoutRune+1),1090,183,13,'#d9c797','800');addButton(1411,165,124,34,'loadout:rune-view:slots','BACK','',true,11);
- if(icon?.complete&&icon.naturalWidth)drawStoreBannerImage(icon,1270,204,76,68);text(set?.name||'RUNE',1310,283,14,'#f3dfb9','850','center');
- const main=RUNE_STAT_INFO[rune.main];addButton(1090,310,445,54,'loadout:rune-main',main.label.toUpperCase(),'+'+(main.main*rune.level)+' â€¢ MAIN',true,12);
- text('SUBSTATS',1090,387,11,'#d9c797','800');
- for(let j=0;j<3;j++){const x=1090+j*151,info=RUNE_STAT_INFO[rune.subs[j]];addButton(x,402,143,61,'loadout:rune-sub:'+j,info.label,'+'+(info.main*.25*rune.level),true,10)}
- text('LEVEL '+rune.level+' / 5',1090,493,12,'#c4d0dd','700');addButton(1274,474,261,48,'loadout:rune-level:1','UPGRADE','CORE Ã—'+itemInventory.cores,rune.level<5&&itemInventory.cores>0,13);
- addButton(1090,547,214,48,'loadout:rune-switch','SWITCH','',true,12);addButton(1320,547,214,48,'loadout:rune-remove','REMOVE','',true,12);
-}
-function drawLoadoutCelestialsPanel(record){
- text('CORES Ã—'+itemInventory.cores,1090,191,12,'#b9c8d7','650');
- for(let i=0;i<CELESTIALS.length;i++){
-  const [key,label]=CELESTIALS[i],y=224+i*145,level=record.celestials[key];rect(1083,y,462,129,'rgba(27,39,59,.78)','#71869e',12);
-  text(label.toUpperCase(),1104,y+34,16,'#f3dfb9','800');text('LEVEL '+level+' / 10',1104,y+63,13,'#d6e2ef','650');
-  line(1104,y+79,260,level/10,'#d9b96e','rgba(218,228,240,.18)',7);text('+'+(level*10)+'% MULTIPLIER',1104,y+111,11,'#b9c8d7','650');
-  addButton(1390,y+35,133,56,'loadout:celestial:'+key+',1','UPGRADE','',level<10&&itemInventory.cores>0,12);
- }
-}
-function drawStartupMenu(){
- drawBackground();rect(0,0,W,H,'rgba(5,9,22,.72)');
- text('TWO-TONE',800,208,64,'#f8f4ea','900','center');
- addButton(620,420,360,112,'startup-start','START','');
-}
-function drawMainMenuIcon(kind,cx,cy,color){
- ctx.save();ctx.translate(cx,cy);ctx.strokeStyle=color;ctx.fillStyle='rgba(0,0,0,0)';ctx.lineWidth=2.6;ctx.lineCap='round';ctx.lineJoin='round';
- const line=(x1,y1,x2,y2)=>{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()};
- if(kind==='story'){
-  ctx.beginPath();ctx.moveTo(-25,-19);ctx.quadraticCurveTo(-9,-25,0,-14);ctx.quadraticCurveTo(9,-25,25,-19);ctx.lineTo(25,21);ctx.quadraticCurveTo(9,15,0,25);ctx.quadraticCurveTo(-9,15,-25,21);ctx.closePath();ctx.stroke();line(0,-14,0,25);line(-19,-11,-7,-9);line(7,-9,19,-11);
- }else if(kind==='events'){
-  ctx.beginPath();ctx.roundRect(-23,-19,46,40,5);ctx.stroke();line(-23,-8,23,-8);line(-13,-25,-13,-14);line(13,-25,13,-14);ctx.beginPath();ctx.arc(-10,3,2,0,Math.PI*2);ctx.arc(2,3,2,0,Math.PI*2);ctx.arc(14,3,2,0,Math.PI*2);ctx.stroke();
- }else if(kind==='mode'){
-  ctx.beginPath();ctx.roundRect(-27,-15,54,30,15);ctx.stroke();ctx.beginPath();ctx.arc(-11,0,10,0,Math.PI*2);ctx.stroke();line(9,-7,19,7);line(19,-7,9,7);
- }else if(kind==='store'){
-  ctx.beginPath();ctx.moveTo(-25,-11);ctx.lineTo(-20,-23);ctx.lineTo(20,-23);ctx.lineTo(25,-11);ctx.lineTo(25,-7);ctx.quadraticCurveTo(17,0,10,-7);ctx.quadraticCurveTo(2,0,-5,-7);ctx.quadraticCurveTo(-13,0,-20,-7);ctx.quadraticCurveTo(-25,-8,-25,-11);ctx.stroke();ctx.beginPath();ctx.roundRect(-20,-5,40,28,3);ctx.stroke();ctx.beginPath();ctx.roundRect(-5,6,11,17,2);ctx.stroke();line(-14,3,-14,18);
- }else if(kind==='loadout'){
-  line(-19,18,14,-19);ctx.beginPath();ctx.moveTo(14,-19);ctx.lineTo(25,-24);ctx.lineTo(20,-12);ctx.lineTo(-13,22);ctx.stroke();line(-23,13,-10,25);line(-17,7,-7,17);line(-7,22,-2,27);
- }else if(kind==='party'){
-  for(const [x,y,r] of [[0,-12,9],[-19,-5,7],[19,-5,7]]){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke()}
-  ctx.beginPath();ctx.arc(0,23,18,Math.PI,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(-21,22,12,Math.PI,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(21,22,12,Math.PI,Math.PI*2);ctx.stroke();
- }else if(kind==='items'){
-  ctx.beginPath();ctx.moveTo(-18,-14);ctx.lineTo(18,-14);ctx.lineTo(23,22);ctx.quadraticCurveTo(0,29,-23,22);ctx.closePath();ctx.stroke();ctx.beginPath();ctx.arc(0,-14,10,Math.PI,0);ctx.stroke();line(-9,1,9,1);line(-9,9,9,9);
- }else if(kind==='challenges'){
-  ctx.beginPath();ctx.moveTo(-23,-20);ctx.lineTo(-14,-20);ctx.lineTo(-10,-2);ctx.quadraticCurveTo(0,9,10,-2);ctx.lineTo(14,-20);ctx.lineTo(23,-20);ctx.lineTo(17,2);ctx.quadraticCurveTo(0,22,-17,2);ctx.closePath();ctx.stroke();line(0,13,0,23);line(-12,24,12,24);ctx.beginPath();ctx.moveTo(0,-17);ctx.lineTo(3,-10);ctx.lineTo(11,-9);ctx.lineTo(5,-4);ctx.lineTo(7,4);ctx.lineTo(0,0);ctx.lineTo(-7,4);ctx.lineTo(-5,-4);ctx.lineTo(-11,-9);ctx.lineTo(-3,-10);ctx.closePath();ctx.stroke();
- }else if(kind==='save'){
-  ctx.beginPath();ctx.moveTo(-18,-25);ctx.lineTo(10,-25);ctx.lineTo(20,-15);ctx.lineTo(20,23);ctx.lineTo(-18,23);ctx.closePath();ctx.stroke();line(10,-24,10,-14);line(-8,-12,9,-12);line(-8,-4,9,-4);line(0,2,0,16);line(-7,10,0,17);line(7,10,0,17);
- }else if(kind==='settings'){
-  ctx.beginPath();for(let i=0;i<16;i++){const a=i*Math.PI/8,r=i%2?18:25,x=Math.cos(a)*r,y=Math.sin(a)*r;i?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath();ctx.stroke();ctx.beginPath();ctx.arc(0,0,8,0,Math.PI*2);ctx.stroke();
- }else if(kind==='daily'){
-  ctx.beginPath();ctx.arc(0,0,23,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(0,0,17,0,Math.PI*2);ctx.stroke();text('Â¢',0,1,25,color.white,'800','center');
- }
- ctx.restore();
-}
-function drawMainMenuTile(item,x,y,w,h){
- const active=item.active!==false;
- choiceRects.push({x,y,w,h,action:item.action,enabled:active});
- const fill=ctx.createLinearGradient(x,y,x+w,y+h);fill.addColorStop(0,active?'rgba(30,39,55,.84)':'rgba(22,28,40,.74)');fill.addColorStop(1,active?'rgba(10,17,28,.92)':'rgba(11,15,23,.86)');
- rect(x,y,w,h,fill,active?'rgba(216,219,224,.35)':'rgba(152,160,173,.22)',15);
- if(active){ctx.save();ctx.strokeStyle='rgba(247,225,183,.14)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x+18,y+1);ctx.lineTo(x+w-18,y+1);ctx.stroke();ctx.restore()}
- drawMainMenuIcon(item.icon,x+w/2,y+72,active?'#e6dcc5':'#8993a2');
- text(item.label,x+w/2,y+154,20,active?'#f2eee7':'#bac0ca','800','center');
- if(item.detail)text(item.detail,x+w/2,y+180,12,active?'#aeb8c7':'#8993a2','650','center');
- if(!active){rect(x+w/2-56,y+h-30,112,18,'rgba(8,12,19,.78)','rgba(139,149,163,.3)',9);text('COMING SOON',x+w/2,y+h-21,9,'#9099a7','750','center')}
-}
-function drawMainMenu(){
- drawBackground();rect(0,0,W,H,'rgba(4,7,13,.72)');
- rect(78,52,1444,796,'rgba(7,11,19,.62)','rgba(224,225,225,.22)',22);
- rect(124,91,145,49,'rgba(13,20,39,.96)','#718ba4',11);
- text('RANK '+playerRank,196.5,115.5,20,'#ffedd1','850','center');
- const items=[
-  {label:'CAMPAIGN',icon:'story',action:'open-campaign'},
-  {label:'EVENTS',icon:'events',action:'open-events'},
-  {label:'STORE',icon:'store',action:'open-store'},
-  {label:'LOADOUT',icon:'loadout',action:'open-loadout'},
-  {label:'PARTY',icon:'party',action:'open-party'},
-  {label:'INVENTORY',icon:'items',action:'open-inventory'},
-  {label:'CHALLENGES',icon:'challenges',action:'open-challenges'},
-  {label:'DAILY REWARD',icon:'daily',action:'claim-daily-reward',detail:canClaimDailyReward()?'CLAIM 100 COINS':'CLAIMED â€¢ RESET AT 12 AM ET'},
-  {label:'SETTINGS',icon:'settings',action:'open-settings'}
- ];
- const x0=124,y0=91,cardW=318,cardH=226,gapX=20,gapY=16,positions=[[.5,0],[1.5,0],[2.5,0],[.5,1],[1.5,1],[2.5,1],[.5,2],[1.5,2],[2.5,2]];
- items.forEach((item,index)=>{const [column,row]=positions[index];drawMainMenuTile(item,x0+column*(cardW+gapX),y0+row*(cardH+gapY),cardW,cardH)});
-}
-function drawSettings(){
- drawBackground();rect(0,0,W,H,'rgba(5,9,22,.76)');rect(250,130,1100,640,'rgba(13,20,39,.98)','#ccb88e',20);
- text('SETTINGS',800,244,30,'#ffedd1','850','center');addButton(1130,168,170,54,'main-menu','MAIN MENU','');
- rect(330,300,940,360,'rgba(25,37,58,.94)','#718ba4',16);
- text('DISPLAY',800,280,18,'#f3dfb9','850','center');
- const standalone=isStandaloneApp();
- text('FULLSCREEN',375,382,18,'#edf3fa','700');
- if(standalone)text('Unavailable in the installed app',375,411,14,'#aebed0','550');
- addButton(905,365,320,64,'toggle-fullscreen',isFullscreen()?'EXIT FULLSCREEN':'ENTER FULLSCREEN','',!standalone);
- text('ACCOUNT',375,506,18,'#edf3fa','700');
- addButton(905,475,150,64,'account-sign-out','SIGN OUT','');
- addButton(1075,475,150,64,'account-delete','DELETE ACCOUNT','');
-}
-let lastStoreNotice='',storeReveal=null,activeStoreBanner=null,storeActionPending=false;
-const STORE_ITEM_SPRITES=Object.freeze({core:'core',gem:'gem','bottle:small':'enchantedBottleSmall','bottle:medium':'enchantedBottleMedium','bottle:large':'enchantedBottleLarge','book:small':'enchantedBookSmall','book:medium':'enchantedBookMedium','book:large':'enchantedBookLarge'});
-const STORE_REWARD_SPRITES=Object.freeze({'premium-soul':'soulWeaponPremium','premium-cloud':'cloudNine'});
-const STORE_REVEAL_TIMING=Object.freeze({cardEnterMs:1000,cardFlipMs:500});
-function getStoreRotation(){
- const ids=ROSTER.filter(model=>!model.test).map(model=>model.id);
- return FeaturedLottery.rotate(ids,new Date());
-}
-async function drawStoreLottery(type,count=1){
- if(storeActionPending)return false;
- if(!['character','weapon'].includes(type)||![1,10].includes(count)){lastStoreNotice='That lottery draw is unavailable.';return false}
- let result;
- storeActionPending=true;
- try{result=await window.TwoToneAccount.action('draw',{type,count})}
- catch(error){lastStoreNotice=error.message==='insufficient_coins'?`You need ${(100*count).toLocaleString()} coins for ${count} draw${count===1?'':'s'}.`:error.message==='target_required'?'Choose a banner target first.':'Lottery draw could not be completed.';return false}
- finally{storeActionPending=false}
- const rewards=result.rewards;
- lastStoreNotice='Your ticket is being revealedâ€¦';
- const startedAt=performance.now();storeReveal={type,rewards,index:0,phase:'enter',phaseStartedAt:startedAt,startedAt};
- return true;
-}
-function finishStoreReveal(){
- if(!storeReveal)return;
- const rewards=storeReveal.rewards;
- if(rewards.length===1){const item=rewards[0];lastStoreNotice=`${item.tier.toUpperCase()} â€¢ ${item.result}${item.featured?' â€¢ Featured target!':''}`}
- else{const counts=rewards.reduce((all,item)=>(all[item.tier]=(all[item.tier]||0)+1,all),{});lastStoreNotice=`${rewards.length} draws: ${['mythic','rare','common'].filter(tier=>counts[tier]).map(tier=>`${counts[tier]} ${tier}`).join(', ')}.`}
- storeReveal=null;
-}
-function handleStoreAction(action){
- if(storeReveal){
-  if(action==='store:reveal:flip'&&storeReveal.phase==='ready'){storeReveal.phase='flip';storeReveal.phaseStartedAt=performance.now()}
-  else if(action==='store:reveal:next'&&storeReveal.phase==='shown'&&storeReveal.rewards.length>1){if(storeReveal.index+1<storeReveal.rewards.length){storeReveal.index++;storeReveal.phase='enter'}else storeReveal.phase='summary';storeReveal.phaseStartedAt=performance.now()}
-  else if(action==='store:reveal:close'&&(storeReveal.phase==='summary'||(storeReveal.phase==='shown'&&storeReveal.rewards.length===1)))finishStoreReveal();
-  return;
- }
- const [,kind,type,value]=action.split(':');
- if(kind==='grant'&&DEV_MODE){const amount=Number(type);if(grantStoreCoins(amount))lastStoreNotice=`Dev mode: added ${amount.toLocaleString()} coins.`;else lastStoreNotice='Could not add coins.';
- }else if(kind==='target'){
-  const rotation=getStoreRotation(),ids=type==='character'?rotation.featuredCharacters:rotation.featuredWeapons;
-  if(ids.includes(value))window.TwoToneAccount.action('set-target',{type,target:value}).then(()=>{activeStoreBanner={type,id:value};lastStoreNotice=''}).catch(error=>{lastStoreNotice=error.message==='target_unavailable'?'The banner has changed. Choose a current target.':'Target could not be selected.'});
- }else if(kind==='draw')drawStoreLottery(type,Number(value)||1);
-}
-const STORE_BANNER_PORTRAITS=Object.freeze({soul:'soulFront',zero:'zeroFront',lily:'lilyFront',dawn:'dawnFront',logan:'loganFront',cloud:'cloudFront',tsunade:'portrait'});
-function storeBannerImage(type,model){
- if(type==='weapon'&&model?.id==='soul')return images.soulWeaponPremium;
- if(type==='weapon'&&model?.id==='cloud')return images.cloudNine;
- if(type==='weapon'&&model?.id==='lily')return images.lilyWeaponSignature;
- if(type==='weapon'&&model?.id==='dawn')return images.dawnWeaponPremium;
- if(type==='weapon'&&model?.id==='zero')return images.zeroWeaponPremium;
- if(type==='weapon'&&model?.id==='logan')return images.loganWeaponPremium;
- return images[STORE_BANNER_PORTRAITS[model?.id]];
-}
-function drawStoreBannerImage(img,x,y,w,h){
- if(!img?.complete||!img.naturalWidth)return;
- const scale=Math.min(w/img.naturalWidth,h/img.naturalHeight),dw=img.naturalWidth*scale,dh=img.naturalHeight*scale;
- ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(img,x+(w-dw)/2,y+h-dh,dw,dh);ctx.restore();
-}
-function drawCharacterPortrait(img,id,x,y,size){
- if(!img?.complete||!img.naturalWidth)return;
- // Portrait sources are full-body character art, so crop the centered head-and-shoulders
- // region proportionally instead of relying on offsets from the retired sprite sheets.
- const side=Math.min(img.naturalWidth,Math.round(img.naturalHeight*.34));
- const sx=Math.round((img.naturalWidth-side)/2),sy=0;
- ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(img,sx,sy,side,side,x,y,size,size);ctx.restore();
-}
-function storeBannerButton(x,y,w,h,action,label,sub,enabled,primary=false){
- choiceRects.push({x,y,w,h,action,enabled});
- const gradient=ctx.createLinearGradient(x,y,x,y+h);
- if(!enabled){gradient.addColorStop(0,'#303849');gradient.addColorStop(1,'#202a3a')}
- else if(primary){gradient.addColorStop(0,'#f3dfb2');gradient.addColorStop(1,'#bc8f50')}
- else{gradient.addColorStop(0,'#354a64');gradient.addColorStop(1,'#22334a')}
- rect(x,y,w,h,gradient,enabled?(primary?'#ffe5ad':'#b8c6d5'):'#556174',12);
- text(label,x+w/2,y+25,18,enabled&&primary?'#352817':enabled?'#fff3dc':'#9ba9b9','850','center');
- text(sub,x+w/2,y+49,12,enabled&&primary?'#5b4729':'#c3d0dc','650','center');
-}
-function storeBannerEntries(rotation){
- const entries=[];
- for(const id of rotation.featuredCharacters){const model=ROSTER.find(item=>item.id===id);if(model)entries.push({type:'character',id,name:model.name,model})}
- for(const id of rotation.featuredWeapons){const model=ROSTER.find(item=>item.id===id.replace(/^premium-/,''));if(model)entries.push({type:'weapon',id,name:model.id==='soul'?'Soulbound':model.id==='cloud'?'Cloud-nine':model.id==='lily'?'Everblossom':model.id==='dawn'?'Radiant Diamond':model.id==='zero'?'Nightshade':model.name+' Premium',model})}
- return entries;
-}
-function drawStoreBannerSidebar(entries,state){
- const x=28,y=116,w=338,h=714;
- rect(x,y,w,h,'rgba(12,20,36,.97)','#7588a0',18);
- text('BANNERS',x+22,y+32,18,'#f4dfb7','850');
- text(`${entries.length} AVAILABLE`,x+w-20,y+32,11,'#9fb1c4','700','right');
- entries.forEach((entry,index)=>{
-  const bx=x+14,by=y+54+index*105,bw=w-28,bh=95;
-  const active=activeStoreBanner?.type===entry.type&&activeStoreBanner?.id===entry.id;
-  const savedTarget=state[entry.type].target===entry.id;
-  const fill=ctx.createLinearGradient(bx,by,bx+bw,by+bh);
-  fill.addColorStop(0,active?'rgba(105,83,48,.86)':savedTarget?'rgba(44,58,77,.96)':'rgba(23,34,52,.92)');
-  fill.addColorStop(1,active?'rgba(50,45,42,.98)':'rgba(15,25,41,.98)');
-  rect(bx,by,bw,bh,fill,active?'#f0ce8b':savedTarget?'#8299b1':'rgba(126,148,171,.36)',12);
-  const art=storeBannerImage(entry.type,entry.model);if(art){ctx.save();ctx.beginPath();ctx.roundRect(bx+9,by+8,62,79,8);ctx.clip();drawStoreBannerImage(art,bx+9,by+8,62,79);ctx.restore()}
-  text(entry.type==='character'?'CHARACTER':'PREMIUM WEAPON',bx+84,by+31,10,active?'#f4d99c':'#9fb1c4','800');
-  text(entry.name,bx+84,by+59,16,'#f4f0e8','800');
-  if(savedTarget)text('âœ“',bx+bw-18,by+30,15,'#f2d391','900','center');
-  choiceRects.push({x:bx,y:by,w:bw,h:bh,action:`store:target:${entry.type}:${entry.id}`,enabled:!storeReveal});
- });
-}
-function drawStoreBannerDetail(entry,state){
- const x=386,y=116,w=1186,h=714;
- rect(x,y,w,h,'rgba(12,20,36,.98)','#7588a0',18);
- if(!entry){
-  const wash=ctx.createLinearGradient(x,y,x+w,y+h);wash.addColorStop(0,'rgba(27,56,83,.94)');wash.addColorStop(.55,'rgba(30,34,58,.96)');wash.addColorStop(1,'rgba(52,36,57,.96)');
-  rect(x+8,y+8,w-16,h-16,wash,null,14);
-  const glow=ctx.createRadialGradient(x+795,y+310,12,x+795,y+310,360);glow.addColorStop(0,'rgba(238,203,137,.22)');glow.addColorStop(1,'rgba(238,203,137,0)');rect(x+10,y+10,w-20,h-20,glow);
-  text('SELECT A BANNER',x+52,y+315,29,'#fff0cf','850');
-  text('Choose one of the featured options on the left.',x+54,y+353,16,'#c6d2df','550');
-  return;
- }
- const character=entry.type==='character',track=state[entry.type],pity=entry.type==='character'?(track.heightened?50:100):(track.heightened?25:50);
- const untilMythic=Math.max(0,pity-track.sinceMythic),untilRare=Math.max(0,10-track.sinceRare),hero=storeBannerImage(entry.type,entry.model);
- const colors=character?['#102f51','#22677d','#bd9070']:['#30233f','#5b3e64','#b98b53'];
- const banner=ctx.createLinearGradient(x+10,y+12,x+w,y+470);banner.addColorStop(0,colors[0]);banner.addColorStop(.58,colors[1]);banner.addColorStop(1,colors[2]);
- ctx.save();ctx.beginPath();ctx.roundRect(x+8,y+8,w-16,466,14);ctx.clip();rect(x+8,y+8,w-16,466,banner);
- const halo=ctx.createRadialGradient(x+890,y+245,4,x+890,y+245,420);halo.addColorStop(0,character?'rgba(164,237,255,.33)':'rgba(255,224,160,.34)');halo.addColorStop(1,'rgba(255,255,255,0)');rect(x+390,y+8,w-398,466,halo);
- ctx.strokeStyle=character?'rgba(210,245,255,.13)':'rgba(255,232,190,.14)';ctx.lineWidth=1;
- for(let i=0;i<9;i++){ctx.beginPath();ctx.arc(x+900,y+244,74+i*38,0,Math.PI*2);ctx.stroke()}
- for(let i=0;i<34;i++){const sx=x+405+(i*103%750),sy=y+18+(i*67%440),size=i%6===0?2.7:1.25;ctx.fillStyle=`rgba(255,255,255,${i%4===0?.58:.25})`;ctx.beginPath();ctx.arc(sx,sy,size,0,Math.PI*2);ctx.fill()}
- if(hero)drawStoreBannerImage(hero,x+770,y+16,390,444);
- ctx.restore();
- rect(x+36,y+38,character?142:188,30,character?'rgba(7,32,53,.72)':'rgba(34,22,42,.72)',character?'rgba(192,239,255,.45)':'rgba(255,231,188,.45)',14);
- text(character?'CHARACTER':'PREMIUM WEAPON',x+(character?107:130),y+53,12,'#fff1d8','850','center');
- text(entry.name,x+40,y+176,entry.name.length>20?31:42,'#fff4de','900');
- text(character?'FEATURED CHARACTER':'SIGNATURE WEAPON',x+42,y+211,13,character?'#c2f3ff':'#ffe4b2','800');
- const pityY=y+500;
- rect(x+36,pityY,244,78,'rgba(17,30,48,.93)','rgba(169,191,212,.48)',11);
- text('MYTHIC GUARANTEE',x+52,pityY+24,11,'#c5d5e5','750');
- text(`${untilMythic}`,x+260,pityY+38,25,track.heightened?'#f0d291':'#edf3fa','900','right');
- text(`${track.heightened?'HEIGHTENED':'STANDARD'} â€¢ ${pity} DRAW PITY`,x+52,pityY+59,10,'#aebfd0','650');
- rect(x+294,pityY,224,78,'rgba(17,30,48,.93)','rgba(169,191,212,.48)',11);
- text('RARE GUARANTEE',x+310,pityY+24,11,'#c5d5e5','750');
- text(`${untilRare}`,x+498,pityY+38,25,'#edf3fa','900','right');
- text('10 DRAW PITY',x+310,pityY+59,10,'#aebfd0','650');
- text(`MYTHIC ${track.heightened?'2%':'1%'} â€¢ RARE 10% â€¢ FEATURED MYTHIC 75%`,x+38,y+608,12,'#d4e0ed','650');
- if(track.heightened)text('HEIGHTENED â€¢ OFF-FEATURE MYTHIC RECEIVED',x+38,y+629,11,'#f0d291','750');
- const canDraw=state[entry.type].target===entry.id&&!storeReveal;
- storeBannerButton(x+38,y+645,242,58,`store:draw:${entry.type}:1`,'DRAW Ã—1','100 COINS',!storeActionPending&&canDraw&&storeCoins>=100,true);
- storeBannerButton(x+296,y+645,242,58,`store:draw:${entry.type}:10`,'DRAW Ã—10','1,000 COINS',!storeActionPending&&canDraw&&storeCoins>=1000,false);
-}
-function drawStoreReveal(now){
- if(!storeReveal)return;
- const reveal=storeReveal,rewards=reveal.rewards,elapsed=(now-reveal.startedAt)/1000,batch=rewards.length>1;
- let phaseElapsed=now-reveal.phaseStartedAt;
- if(reveal.phase==='enter'&&phaseElapsed>=STORE_REVEAL_TIMING.cardEnterMs){reveal.phase='ready';reveal.phaseStartedAt=now;phaseElapsed=0}
- else if(reveal.phase==='flip'&&phaseElapsed>=STORE_REVEAL_TIMING.cardFlipMs){reveal.phase='shown';reveal.phaseStartedAt=now;phaseElapsed=0}
- const summary=reveal.phase==='summary',current=rewards[reveal.index],color=current.tier==='mythic'?'#ffd778':current.tier==='rare'?'#d8a4ff':'#83dcff';
- const fade=Math.min(1,(now-reveal.startedAt)/.28),pulse=.5+.5*Math.sin(now*.007),spin=(now-reveal.startedAt)/1000*1.8;
- rect(0,0,W,H,`rgba(3,6,18,${.84*fade})`);
- const glow=ctx.createRadialGradient(800,455,28,800,455,470);glow.addColorStop(0,`rgba(104,163,222,${.20+pulse*.13})`);glow.addColorStop(1,'rgba(12,20,42,0)');rect(170,80,1260,760,glow);
- ctx.save();ctx.translate(800,450);ctx.rotate(spin*.22);ctx.strokeStyle=`rgba(191,225,255,${.16+pulse*.12})`;ctx.lineWidth=2;
- for(let i=0;i<30;i++){const a=i*Math.PI*2/30;ctx.beginPath();ctx.moveTo(Math.cos(a)*210,Math.sin(a)*210);ctx.lineTo(Math.cos(a)*410,Math.sin(a)*410);ctx.stroke()}
- ctx.restore();
- for(let i=0;i<24;i++){const a=i*Math.PI*2/24+spin*.7,r=145+((elapsed*95+i*37)%250),x=800+Math.cos(a)*r,y=450+Math.sin(a)*r,alpha=Math.max(0,1-Math.abs(r-260)/150)*fade;
-  ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle=i%3===0?color:'#dff6ff';ctx.translate(x,y);ctx.rotate(a+spin);ctx.fillRect(-3,-9,6,18);ctx.restore();
- }
- rect(448,192,704,525,'rgba(12,20,38,.96)',color,22);
- if(summary||batch)text(summary?'TEN DRAW RESULTS':`DRAW ${reveal.index+1} OF ${rewards.length}`,800,summary?238:216,15,'#b9cbe0','800','center');
- if(summary){
-  text(`${rewards.length} REWARDS â€¢ ${rewards.length*FeaturedLottery.RULES.ticketCost} COINS`,800,262,12,'#e6d2aa','750','center');
-  rewards.forEach((item,i)=>{const col=i%2,row=Math.floor(i/2),x=468+col*334,y=278+row*76,tierColor=item.tier==='mythic'?'#ffd778':item.tier==='rare'?'#d8a4ff':'#83dcff';rect(x,y,326,66,'rgba(35,48,69,.96)',tierColor,9);text(item.tier.toUpperCase(),x+12,y+24,12,tierColor,'850');text(item.reward.name||item.reward.id,x+105,y+23,15,'#fff3de','750');text(item.result+(item.featured?' â€¢ FEATURED':''),x+105,y+45,11,'#c2d0dd','550')});
-  addButton(648,668,304,38,'store:reveal:close','DONE','RETURN TO BANNER');
-  return;
- }
- const entryProgress=reveal.phase==='enter'?Math.max(0,Math.min(1,phaseElapsed/STORE_REVEAL_TIMING.cardEnterMs)):1,entryEase=1-Math.pow(1-entryProgress,3),cardY=H+210+(445-(H+210))*entryEase;
- const flipProgress=reveal.phase==='flip'?Math.max(0,Math.min(1,phaseElapsed/STORE_REVEAL_TIMING.cardFlipMs)):0,flip=reveal.phase==='flip'?Math.max(.08,Math.abs(Math.cos(flipProgress*Math.PI))):1,faceShown=reveal.phase==='shown';
- ctx.save();ctx.translate(800,cardY);ctx.rotate((1-entryEase)*-.12);ctx.scale(flip,1);ctx.globalAlpha*=Math.min(1,entryProgress*2.2);
- const ticket=ctx.createLinearGradient(-148,-200,148,200);
- if(faceShown){ticket.addColorStop(0,'#fff8e7');ticket.addColorStop(.52,'#f2e5cc');ticket.addColorStop(1,'#d7c4a3')}
- else{ticket.addColorStop(0,'#294a70');ticket.addColorStop(.52,'#172b4c');ticket.addColorStop(1,'#0e1c36')}
- rect(-148,-200,296,400,ticket,faceShown?color:'#e5c782',24);
- rect(-135,-187,270,374,'rgba(0,0,0,0)',faceShown?'rgba(126,91,44,.72)':'rgba(232,201,135,.88)',18);
- rect(-126,-178,252,356,'rgba(0,0,0,0)',faceShown?'rgba(153,122,75,.48)':'rgba(114,165,208,.48)',14);
- const diamond=(x,y,r,fill)=>{ctx.save();ctx.fillStyle=fill;ctx.beginPath();ctx.moveTo(x,y-r);ctx.lineTo(x+r,y);ctx.lineTo(x,y+r);ctx.lineTo(x-r,y);ctx.closePath();ctx.fill();ctx.restore()};
- for(const x of [-111,111])for(const y of [-162,162])diamond(x,y,6,faceShown?color:'#f0d58e');
- if(faceShown){
-  text(current.tier.toUpperCase(),0,-145,22,current.tier==='common'?'#45627c':current.tier==='rare'?'#79509a':'#9a6913','950','center');
-  ctx.save();
-  ctx.strokeStyle=color;
-  ctx.lineWidth=2;
-  ctx.beginPath();
-  ctx.arc(0,-32,84,0,Math.PI*2);
-  ctx.stroke();
-  ctx.restore();
-  const rewardSprite=images[STORE_ITEM_SPRITES[current.reward.inventoryItem]||STORE_REWARD_SPRITES[current.reward.id]];
-  if(rewardSprite?.complete&&rewardSprite.naturalWidth)drawStoreBannerImage(rewardSprite,-72,-104,144,144);
-  else text(current.tier==='mythic'?'âœ¦':'âœ§',0,-32,70,'#45627c','900','center');
-  const rewardName=current.reward.name||current.reward.id;
-  text(rewardName,0,82,18,'#1b3047','850','center');
-  if(current.reward.inventoryItem){
-   text('Ã—'+(current.reward.quantity??1).toLocaleString('en-US'),0,137,40,'#1b3047','900','center');
-  }else if(current.result&&current.result!==rewardName){
-   text(current.result,0,126,15,'#344b61','750','center');
-  }
- }else{
-  ctx.save();ctx.strokeStyle='rgba(232,201,135,.86)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,-15,69,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='rgba(127,171,210,.68)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(0,-15,57,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(-82,-15);ctx.lineTo(82,-15);ctx.moveTo(0,-97);ctx.lineTo(0,67);ctx.stroke();ctx.restore();
-  text('âœ¦',0,-15,58,'#f0d58e','900','center');
- }
- ctx.restore();
- const prompt=reveal.phase==='ready'?'TAP OR CLICK TO FLIP':reveal.phase==='flip'?'FLIPPINGâ€¦':faceShown?(batch?'TAP OR CLICK FOR NEXT CARD':'TAP OR CLICK TO RETURN'):'DRAWING YOUR REWARD';
- text(prompt,800,665,16,'#fff0c9','850','center');
- if(reveal.phase==='ready'||faceShown)choiceRects.push({x:652,y:245,w:296,h:400,action:reveal.phase==='ready'?'store:reveal:flip':batch?'store:reveal:next':'store:reveal:close',enabled:true});
-}
-function drawStore(){
- drawBackground();rect(0,0,W,H,'rgba(5,9,22,.84)');
- text('FEATURED SUMMONS',800,72,35,'#ffedd1','900','center');
- if(DEV_MODE){rect(24,49,118,49,'rgba(83,52,35,.96)','#e2a86f',10);text('DEV MODE',83,80,14,'#ffdfa8','850','center');[100,500,1000,5000].forEach((amount,index)=>addButton(152+index*101,49,93,49,`store:grant:${amount}`,'+'+amount.toLocaleString(),'COINS',!storeReveal))}
- rect(1190,49,116,49,'rgba(25,37,58,.96)','#cfae6e',12);if(images.coin?.complete&&images.coin.naturalWidth)ctx.drawImage(images.coin,1194,51,44,44);text(storeCoins.toLocaleString(),1240,80,16,'#f4d99c','850','left');addButton(1320,48,170,52,'main-menu','BACK','');
- const rotation=getStoreRotation(),state=FeaturedLottery.getState(),entries=storeBannerEntries(rotation);
- const current=activeStoreBanner&&entries.find(entry=>entry.type===activeStoreBanner.type&&entry.id===activeStoreBanner.id&&state[entry.type].target===entry.id);
- const saved=entries.find(entry=>state[entry.type].target===entry.id);
- activeStoreBanner=current?{type:current.type,id:current.id}:saved?{type:saved.type,id:saved.id}:null;
- const active=activeStoreBanner&&entries.find(entry=>entry.type===activeStoreBanner.type&&entry.id===activeStoreBanner.id);
- drawStoreBannerSidebar(entries,state);drawStoreBannerDetail(active,state);
- text('Banners rotate weekly at 12:00 AM Eastern.',800,856,14,'#c4d6e5','550','center');
- if(storeReveal)drawStoreReveal(performance.now());
- else if(lastStoreNotice){rect(390,837,820,36,'rgba(12,19,34,.94)','#687c93',10);text(lastStoreNotice,800,859,14,'#fff4e8','650','center')}
-}
-let loginEventPending=false,loginEventNotice='';
+NÂˆYŠX[]™J
+K›[™İ
+^ØØ[˜Ù[[]Y]YY[[X]\Ê	ÙY™X]	ÊNØÛÛ[X][ÛŠ
+NÜ™]\›ŸBˆYŠ[˜Ûİ[\ÛX\™Y
+^ØØ[˜Ù[[]Y]YY[[X]\Ê	İšXİÜIÊNØÛÛ[X][ÛŠ
+NÜ™]\›ŸBˆYŠ][[X]T]Y]YK›[™İ
+^ØÛÛ[X][ÛŠ
+NÜ™]\›ŸBˆ[[X]T™\İ[YOXÛÛ[X][ÛÜ[“™^[[X]J
+NÂŸB™[˜İ[Ûˆ[“™^[[X]J
+^ÂˆØ[˜Ù[]Y]YY[[X]\ÓÙ‘Y™X]Y
 
-async function collectLoginEvent(){
- if(phase!=='events'||loginEventPending||getLoginEventState(window.TwoToneAccount.profile.loginEvent).status!=='available')return;
- loginEventPending=true;
- loginEventNotice='';
- try{
-  await window.TwoToneAccount.action('claim-login-event');
- }catch{
-  loginEventNotice='Claim could not be completed.';
- }finally{
-  loginEventPending=false;
- }
-}
+NÂˆYŠX[]™J
+K›[™İ[˜Ûİ[\ÛX\™Y
+^ØØ[˜Ù[[]Y]YY[[X]\ÊX[]™J
+K›[™İÉÙY™X]	Î‰İšXİÜIÊ_BˆYŠ[[X]T]Y]YK›[™İ
+^ÂˆÛÛœİO][[X]T]Y]YKœÚY
 
-let soulGiftPending=false,soulGiftNotice='';
+K\\K™š[™
+OšYOO\K˜XİÜ’Y
+NÂˆYŠ\šL
+^ÚYŠ
+\™[™\™ŞT™\Ù\™YSX]›X^
+
+™[™\™ŞT™\Ù\™Y
+K\K˜ÛÜİ
+Nİ[[X]R\İÜKœ\Ú
+Ù]™[‰ØØ[˜Ù[YZÛÉËXİÜœK˜XİÜ’YÙ\NœKœÙ\_JNÜ™]\›ˆ[“™^[[X]J
+_BˆYŠ™XY™œÏËœÛÛYJY™™XİO™Y™™XİšYOOIÜİ[‰ÊJ^Ü™[™\™ŞT™\Ù\™YSX]›X^
+
+™[™\™ŞT™\Ù\™Y
+K\K˜ÛÜİ
+Nİ[[X]R\İÜKœ\Ú
+Ù]™[‰ØØ[˜Ù[Y\İ[‰ËXİÜœK˜XİÜ’YÙ\NœKœÙ\_JNÛÙÏX	Ü›˜[Y_IÜÈ]Y]YY[[X]HØ\ÈØ[˜Ù[YHİ[È[™\™ŞH™[X\ÙY˜Ü™]\›ˆ[“™^[[X]J
+_BˆYŠšYOOIÙ]Û‰É‰ˆ\\KœÛÛYJ[OO˜[KšYOO\K˜[U\™Ù]Y	‰˜[KšŒ
+J^Ü™[™\™ŞT™\Ù\™YSX]›X^
+
+™[™\™ŞT™\Ù\™Y
+K\K˜ÛÜİ
+Nİ[[X]R\İÜKœ\Ú
+Ù]™[‰ØØ[˜Ù[YX[K]\™Ù]ZÛÉËXİÜœK˜XİÜ’Y\™Ù]œK˜[U\™Ù]YÙ\NœKœÙ\_JNÛÙÏIÑ]Û¸ &\È[[X]HØ[˜Ù[Y™XØ]\ÙH]È\™Ù]Ø\ÈY™X]YÈ[™\™ŞH™[X\ÙY‰ÎÜ™]\›ˆ[“™^[[X]J
+_Bˆ™[™\™ŞT™\Ù\™YSX]›X^
+
+™[™\™ŞT™\Ù\™Y
+K\K˜ÛÜİ
+NÂˆ[[X]R\İÜKœ\Ú
+Ù]™[‰Üİ\Y	ËXİÜœK˜XİÜ’YÙ\NœKœÙ\K[™\™ŞNœ™[™\™ŞK\›ŸJNÂˆ[[X]Q^Xİ][™Ï]YNÂˆËÈØ[YH›İš\Ú[Û˜[[[X]H]XÚÈY™™Xİœ›ÛHŒˆ\È\ÈH\İ[™ÂˆËÈXÙZÛ\‹›İHØ[›ÛšXØ[[[X]HYš[š][ÛˆÜˆ\›İ™Y˜[[˜ÙK‚ˆYŠY^Xİ]PÛÛX˜]Xİ[ÛŠ	İ[[X]IËKœÙ\KK˜[U\™Ù]YÚÚ[™‰Ù]\›˜[\İ[‹XÛÜİ	Ë[™\™ŞPÛÜİœK˜ÛÜİJJ^Âˆ[[X]Q^Xİ][™ÏY˜[ÙNİ[[X]R\İÜKœ\Ú
+Ù]™[‰ØØ[˜Ù[Y[›Ë]\™Ù]	ËXİÜœK˜XİÜ’YÙ\NœKœÙ\_JNÜ™]\›ˆ[“™^[[X]J
+NÂˆBˆ™]\›ÂˆBˆ[[X]Q^Xİ][™ÏY˜[ÙNÂˆÛÛœİ™\İ[YO][[X]T™\İ[YNİ[[X]T™\İ[YO[[ÂˆYŠ™\İ[YJ\™\İ[YJ
+NÂŸB‚™[˜İ[Ûˆ[YÚX›P[U\™Ù]
+Ú[™
+^Ü™]\›ˆH\	‰ŠÚ[™OOIÜ™]š]™IÏÜšLšÚ[™OOIÚX[	ÏÜšŒ	‰œš\›X^œšŒ
+_B™[˜İ[ÛˆÚÛÜÙP]XÚÕ\™Ù]Ê[ÙO]\™Ù][™Ó[ÙKš[X\OXÚÜÙ[‘[™[^J
+J^Âˆ™]\›ˆÛÛX˜][™Ú[™Kœ™\ÛÛ™U\™Ù]ÊØØ[™Y]\Î›]™Q[™[ZY\Ê
+K[ÙKš[X\_JNÂŸB™[˜İ[ÛˆÛÜÙ\İİ\š]š[™Ñ[™[^JÛİ
+^Ü™]\›ˆ]™Q[™[ZY\Ê
+KœÛXÙJ
+KœÛÜ
 
-async function collectSoulGift(){
- if(phase!=='events'||soulGiftPending||hasClaimedSoulGift(window.TwoToneAccount.profile))return;
- soulGiftPending=true;
- soulGiftNotice='';
- try{
-  await window.TwoToneAccount.action('claim-soul-gift');
- }catch{
-  soulGiftNotice='Claim could not be completed.';
- }finally{
-  soulGiftPending=false;
- }
-}
+KŠOO“X]˜XœÊKœÛİ\Ûİ
+KSX]˜XœÊ‹œÛİ\Ûİ
+_KœÛİX‹œÛİ
+VÌ_[B‹ËÈÛİ[	ÜÈ˜\ÚXÈ™XÛÛY\È›\İ]™YH[š[˜ÙHİXÚÜÎÈH[[X]H\È[ÑK‚™[˜İ[ÛˆXİ[Û•\™Ù][ÙJXİÜ‹Xİ[ÛŠ^ÚYŠXİÜËšYOOIÜÛİ[	É‰˜Xİ[ÛOOIØ˜\ÚXÉÊ\™]\›ˆÛİ[[š[˜ÙY˜\ÚXÕ\™Ù][ÙJÛİ[[š[˜ÙTİXÚÜÊNÚYŠXİÜËšYOOIØ[™Ù[	É‰˜Xİ[ÛOOIÜÚÚ[	Ê\™]\›ˆÛÛX˜]Ú]
+	Ø[™Ù[	ÊOËœÚÚ[Ë˜ŞXÛ\ÏË–ØXİÜ‹˜İ\œ™[ŞXÛ_OË\™Ù]	ÜÚ[™ÛIÎÜ™]\›ˆÛÛX˜]Ú]
+XİÜËšY
+OË–ØXİ[Û—OË\™Ù]\™Ù][™Ó[Ù_B™[˜İ[Ûˆ™]šY]Õ\™Ù][ÙJ
+^ÚYŠ[™[™Õ\™Ù]Xİ[ÛŠ^ØÛÛœİXİÜ\\K™š[™
+OœšYOO\[™[™Õ\™Ù]Xİ[Û‹˜XİÜ’Y
+NÜ™]\›ˆXİ[Û•\™Ù][ÙJXİÜ‹[™[™Õ\™Ù]Xİ[Û‹˜Xİ[ÛŠ_\™]\›ˆ\™Ù][™Ó[Ù_B™[˜İ[Ûˆ™YÚ[‘]Û[U\™Ù]Ù[Xİ[ÛŠXİ[Û‹XİÜ’Y
+^ÂˆÛÛœİXİÜ\\K™š[™
+OœšYOOXXİÜ’Y
+NÚYŠXXİÜŸVÉÙ]Û‰Ë	ØÛİY	×Kš[˜ÛY\ÊXİÜ‹šY
+J\™]\›ˆ˜[ÙNÂˆYŠXİ[ÛOOIİ[[X]IÉ‰ˆXØ[”]Y]YU[[X]JXİÜŠJ^ÜØ^JXİÜ‹šLÉÑY™X]Y[HØ[››İ\ÙH[ˆ[[X]K‰Î‰Õ[[X]H™YYÈ	Êİ[[X]Q[™\™ŞPÛÜİ
+XİÜŠJÉÈ]˜Z[X›H[™\™ŞK‰ÊNÜ™]\›ˆ˜[Ù_BˆYŠXİ[ÛOOIÜÚÚ[	É‰œÜJ^ÜØ^J	Õ\ÈÚÚ[™YYÈHÚÚ[Ú[‰ÊNÜ™]\›ˆ˜[Ù_BˆYŠ[™[™Õ\™Ù]Xİ[ÛË\™Ù]ÚYOOOIØ[IÉ‰œ[™[™Õ\™Ù]Xİ[Û‹˜Xİ[ÛOOXXİ[Û‰‰œ[™[™Õ\™Ù]Xİ[Û‹˜XİÜ’YOOXXİÜ’Y
+^ÂˆÛÛœİ\™Ù]\\K™š[™
+OœšYOO\Ù[XİY[RY	‰œšŒ
+NÂˆYŠ]\™Ù]
+^ÜØ^J	ÔÙ[XİH]š[™È[H™Y›Ü™HÛÛ™š\›Z[™È\ÈXİ[Û‹‰ÊNÜ™]\›ˆ˜[Ù_Bˆ[™[™Õ\™Ù]Xİ[Û[[ØØ[Y\˜T™]šY]Ï[[ÜÙ[XİY[RY[[Âˆ™]\›ˆXİ[ÛOOIİ[[X]IÏÜ]Y]YU[[X]JXİÜ’Y\™Ù]šY
+N™^Xİ]PÛÛX˜]Xİ[ÛŠXİÜ‹Xİ[Û‹[\™Ù]šY
+NÂˆBˆ[™[™Õ\™Ù]Xİ[Û^ØXİ[Û‹XİÜ’Y\™Ù]ÚYN‰Ø[IßNØØ[Y\˜T™]šY]ÏIÜ\IÎÜİ\Ü[[Ï[[ÜÙ[XİY[RY\\K™š[™
+OœšŒ	‰œšYOOXXİÜ’Y
+OËšYXİÜ’YÂˆÛÛœİXİ[Û“˜[YOXXİÜ‹šYOOIØÛİY	ÏÉÔ™\İÜ˜][Û‰Î˜Xİ[ÛOOIÜÚÚ[	ÏÉÕ[™IÎ‰Õ[[X]IÎÜØ^JÙ[XİH]š[™È[H›Üˆ	ØXİÜ‹›˜[Y_IÜÈ	ØXİ[Û“˜[Y_HÛˆHšY[Üˆ[ˆZ\ˆÜ˜Z]Ø\™˜
+NÜ™]\›ˆYNÂŸB™[˜İ[Ûˆ™YÚ[•\™Ù]Ù[Xİ[ÛŠXİ[Û‹XİÜ’YXXİ]™RY
+^ÂˆÛÛœİXİÜ\\K™š[™
+OœšYOOXXİÜ’Y
+NÚYŠXXİÜŸXİÜ‹šL
+\™]\›ˆ˜[ÙNÂˆYŠ
+XİÜ‹šYOOIÙ]Û‰É‰ŠXİ[ÛOOIÜÚÚ[	ßXİ[ÛOOIİ[[X]IÊJ_
+XİÜ‹šYOOIØÛİY	É‰˜Xİ[ÛOOIÜÚÚ[	ÊJ\™]\›ˆ™YÚ[‘]Û[U\™Ù]Ù[Xİ[ÛŠXİ[Û‹XİÜ’Y
+NÂˆYŠXİ[ÛOOIÜÚÚ[	É‰˜XİÜ‹šYOOIÜÛİ[	É‰œÜJ^ÜØ^J	Ó›İ[›İYÚÚ\™YÔˆ˜\ÚXÈ™\İÜ™\ÈHÔ‰ÊNÜ™]\›ˆ˜[Ù_BˆYŠXİ[ÛOOIİ[[X]IÉ‰ˆXØ[”]Y]YU[[X]JXİÜŠJ^ÜØ^JXİÜ‹šLÉÑY™X]Y[HØ[››İ\ÙH[ˆ[[X]K‰Î‰Õ[[X]H™YYÈ	Êİ[[X]Q[™\™ŞPÛÜİ
+XİÜŠJÉÈ]˜Z[X›H[™\™ŞK‰ÊNÜ™]\›ˆ˜[Ù_BˆYŠXİ[Û•\™Ù][ÙJXİÜ‹Xİ[ÛŠOOOIØ[[Y\ÉÊ^ÂˆYŠ[™[™Õ\™Ù]Xİ[ÛË˜XİÜ’YOOXXİÜ’Y	‰œ[™[™Õ\™Ù]Xİ[Û‹˜Xİ[ÛOOXXİ[Û‰‰œ[™[™Õ\™Ù]Xİ[Û‹\™Ù]ØÛÜOOOIØ[	Ê^Âˆ[™[™Õ\™Ù]Xİ[Û[[ØØ[Y\˜T™]šY]Ï[[ÜÙ[XİY[RY[[Ü™]\›ˆ^Xİ]PÛÛX˜]Xİ[ÛŠXİÜ‹Xİ[ÛŠBˆBˆ[™[™Õ\™Ù]Xİ[Û^ØXİ[Û‹XİÜ’Y\™Ù]ÚYN‰Ø[IË\™Ù]ØÛÜN‰Ø[	ßNØØ[Y\˜T™]šY]ÏIÜ\IÎÜİ\Ü[[Ï[[ÜÙ[XİY[RY[[ÂˆØ^J[]š[™È[Y\È\™HÙ[XİY›Üˆ	ØXİÜ‹›˜[Y_IÜÈ	ØXİ[Û‹Õ\\Ø\ÙJ
+_Kˆ\H\HY[X™\ˆÜˆ™\ÜÈ	ØXİ[Û‹Õ\\Ø\ÙJ
+_HYØZ[ˆÈÛÛ™š\›K˜
+NÜ™]\›ˆYNÂˆBˆYŠ[™[™Õ\™Ù]Xİ[ÛË˜Xİ[ÛOOXXİ[Û‰‰œ[™[™Õ\™Ù]Xİ[Û‹˜XİÜ’YOOXXİÜ’Y
+^Ü[™[™Õ\™Ù]Xİ[Û[[ØØ[Y\˜T™]šY]Ï[[ÚYŠXİ[ÛOOIİ[[X]IÊ\™]\›ˆ]Y]YU[[X]JXİÜ’Y
+NÜ™]\›ˆ^Xİ]PÛÛX˜]Xİ[ÛŠXİÜ‹Xİ[ÛŠ_BˆYŠXİ[ÛOOIİ[[X]IÉ‰–ÉØ[ÙIË	ÜÙ[‰×Kš[˜ÛY\ÊXİ[Û•\™Ù][ÙJXİÜ‹Xİ[ÛŠJJ^Ü[™[™Õ\™Ù]Xİ[Û[[ØØ[Y\˜T™]šY]Ï[[Ü™]\›ˆ]Y]YU[[X]JXİÜ’Y
+_Bˆ[™[™Õ\™Ù]Xİ[Û^ØXİ[Û‹XİÜ’YNØØ[Y\˜T™]šY]ÏIİ\™Ù]	ÎÜİ\Ü[[Ï[[ÜÙ[XİY[RY[[ÂˆØ^JÙ[Xİ[ˆ[™[^H›Üˆ	ØXİÜ‹›˜[Y_IÜÈ	ØXİ[Û‹Õ\\Ø\ÙJ
+_Kˆ™\ÜÈHXš[]HYØZ[ˆÈ\ÙHHÙ[XİY\™Ù]ÜˆÚÛÜÙH[›İ\ˆXİ[ÛˆÈİÚ]Ú˜
+NÜ™]\›ˆYNÂŸB™[˜İ[ÛˆØ[˜Ù[\™Ù]Ù[Xİ[ÛŠ
+^ÚYŠ\[™[™Õ\™Ù]Xİ[ÛŠ\™]\›ˆ˜[ÙNÜ[™[™Õ\™Ù]Xİ[Û[[ØØ[Y\˜T™]šY]Ï[[ÜØ^J	Õ\™Ù]Ù[Xİ[ÛˆØ[˜Ù[Y‰ÊNÜ™]\›ˆY_B™[˜İ[ÛˆÙ]\™Ù][™Ó[ÙJ[ÙJ^ÚYŠVÉÜÚ[™ÛIË	Ø›\İ	Ë	Ø[ÙIË	Ùš]™KZ]	×Kš[˜ÛY\Ê[ÙJ_\ÙHOOIÜ^Y\‰ß]\ÙY
+\™]\›ˆ˜[ÙNİ\™Ù][™Ó[ÙO[[ÙNŞ™\›ÔÚÚ[\›YYY˜[ÙNÜİ\Ü[[Ï[[ØØ[Y\˜T™]šY]ÏIİ\™Ù]	ÎÜ™]\›ˆY_B™[˜İ[Ûˆ™\›ÔÚÚ[ÛÛ›Û
 
-const EVENT_TABS=[
- {id:'login',label:'LOGIN EVENT',type:'LIMITED',draw:drawLoginEvent},
- {id:SOUL_GIFT.id,label:SOUL_GIFT.title.toUpperCase(),type:'PERMANENT',draw:drawSoulGift},
-];
-let activeEventTab=EVENT_TABS[0];
+^Ü™]\›ˆXİ]˜]TÛİ[[š[˜ÙJ
+NßB™[˜İ[ÛˆXİ]˜]TÛİ[[š[˜ÙJ
+^ÂˆÛÛœİOXXİ]™J
+NÚYŠ\ÙHOOIÜ^Y\‰ß]\ÙYX_KšYOOIÜÛİ[	Ê^ÜØ^J	Ñ[š[˜ÙH\È]˜Z[X›HÛˆÛİ[8 &\È\›‹‰ÊNÜ™]\›ˆ˜[Ù_BˆYŠÜJ^ÜØ^J	ÔÛİ[[š[˜ÙH™YYÈHÚÚ[Ú[‰ÊNÜ™]\›ˆ˜[Ù_BˆÛÛœİ™\Ûİ\˜Ù\Ï^ÜÚÚ[Ú[ÎœÜÚÚ[Ú[Ø\™Y™™Xİ]™TÜX^
 
-function openEvents(){
- activeEventTab=EVENT_TABS[0];
- loginEventNotice='';
- soulGiftNotice='';
- phase='events';
-}
+_K[XÛÛX˜][™Ú[™Kœ™\ÛÛ™PXİ[Û”[ŠÚÚ]˜ÛÛX˜]Ú]
+	ÜÛİ[	ÊKXİ[Û‰ÜÚÚ[	ËÚ\˜Xİ\’Y‰ÜÛİ[	ßJKÙX\Û[ØYİ]›ÜŠ	ÜÛİ[	ÊKÙX\Û‹™\İ[XÛÛX˜][™Ú[™Kœ™\ÛÛ™Q[š[˜ÙPXİ[ÛŠØXİÜ˜K˜]Nœ™\Ûİ\˜Ù\Ë[‹İ\œ™[İXÚÜÎœÛİ[[š[˜ÙTİXÚÜËX^İXÚÜÎ’[™š[š]K™[Z][UÙX\ÛÙX\Û‹œÙ[XİYOOIÜ™[Z][IÉ‰ÙX\Û‹œ™[Z][SİÛ™YÜ[™[™Ô™[XZ[™\œÛİ[[š[˜ÙTÜ[™[™Ô™[XZ[™\ŸJNÚYŠ\™\İ[
+^ÜØ^J	Ñ[š[˜ÙH™YYÈHÚÚ[Ú[‰ÊNÜ™]\›ˆ˜[Ù_\Ü\™\Ûİ\˜Ù\ËœÚÚ[Ú[ÎÜÛİ[[š[˜ÙTİXÚÜÏ\™\İ[™[š[˜ÙTİXÚÜÎÜÛİ[[š[˜ÙTÜ[™[™Ô™[XZ[™\\™\İ[œÜ[™[™Ô™[XZ[™\Û]™Y[™Y\™\İ[œ™Y[™YÚÚ[Ú[ÏŒ™XŞXÛYY˜[ÙNÂˆÛÛœİ™Y›Ü™TÚÚ[[™TÜ\ÜØ\T[™TÚÚ[Y™™XİÊJNÜ™XŞXÛY\Ü˜™Y›Ü™TÚÚ[[™TÜÂˆ™\›ÔÚÚ[\›YYY˜[ÙNÜ[™[™Õ\™Ù]Xİ[Û[[ØØ[Y\˜T™]šY]Ï[[Ù^ÚÚ[™‰ÜÙ[‰Ëš\İX[‰ÜÛİ[Y[š[˜ÙIË]œ\™›Ü›X[˜ÙK››İÊ
+KXİÜ˜KšYNÂˆÙÏIÔÓÕSS’SÑNˆ	ÊÜÛİ[[š[˜ÙTİXÚÜÊÉÈÚÚ[Ú[
+ÊH˜[šÙY›ÜˆH™^˜\ÚXÈ]XÚË‰ÊÊ™XŞXÛYÉÈ™XŞXÛH™\İÜ™YHÚÚ[Ú[‰Î‰ÉÊJÊ™Y[™YÉÈİ[™\™ÚYÛ˜]\™HÙX\Ûˆ™\İÜ™YHÚÚ[Ú[‰Î‰ÉÊNÜ™]\›ˆYNÂŸB™[˜İ[Ûˆİ\İ\Ü[[ÊÚ[™
+^ÂˆYŠ\ÙHOOIÜ^Y\‰ß]\ÙYVÉÚX[	Ë	Ü™]š]™I×Kš[˜ÛY\ÊÚ[™
+J\™]\›ˆ˜[ÙNÂˆÛÛœİ[YÚX›O\\K™š[\ŠO™[YÚX›P[U\™Ù]
+Ú[™
+JNÂˆYŠY[YÚX›K›[™İ
+^ÜØ^JÚ[™OOIÜ™]š]™IÏÉÓ›ÈY™X]Y[HÈ™]š]™K‰Î‰Ó›È[YÚX›H[HÈX[‰ÊNÜ™]\›ˆ˜[Ù_Bˆİ\Ü[[ÏZÚ[™Ş™\›ÔÚÚ[\›YYY˜[ÙNÜÙ[XİY[RYY[YÚX›K™š[™
+OœšYOOXXİ]™RY
+OËšY[YÚX›VÌKšYØØ[Y\˜T™]šY]ÏIÜ\IÎÂˆÙÏXTÕÓ“NˆÚÛÜÙH	ÚÚ[™OOIÜ™]š]™IÏÉØHY™X]Y	Î‰ØH]š[™ÉßH[K[ˆÛÛ™š\›K˜Ü™]\›ˆYNÂŸB™[˜İ[ÛˆØ[˜Ù[İ\Ü[[Ê
+^Üİ\Ü[[Ï[[ÜÙ[XİY[RY[[ØØ[Y\˜T™]šY]Ï[[B™[˜İ[ÛˆÛÛ™š\›Tİ\Ü[[Ê
+^ÂˆYŠ\ÙHOOIÜ^Y\‰ß]\ÙY\İ\Ü[[Ê\™]\›ˆ˜[ÙNÂˆÛÛœİ\\K™š[™
+OœšYOO\Ù[XİY[RY
+NÂˆYŠY[YÚX›P[U\™Ù]
+İ\Ü[[ÊJ^ÜØ^J	Õ\È[H\È›İ[YÚX›H›Üˆ]Xİ[Û‹‰ÊNÜ™]\›ˆ˜[Ù_BˆÛÛœİÚ[™\İ\Ü[[Ë™Y›Ü™O\šÂˆËÈØ[™›Ş\İÛ›Nˆ›È™X[ÚÚ[\›‹[™\™ŞKÜˆÔ\™HÛÛœİ[YYÈÛÜİÈ™[XZ[ˆ[™XÚYY‚ˆYŠÚ[™OOIÚX[	ÊZX[Ú\˜Xİ\’
+MŒ
+NÂˆ[Ù^ÜšSX]›X^
+K›İ[™
+›X^
+‹ŒÍJJNÙØ]YÙ\ÖÜšYOL\Ø]™Uš][Ê
+NÂˆİ\Ü\İ\İÜKœ\Ú
+ÚÚ[™\™Ù]œšY™Y›Ü™KY\œšXİÜ˜Xİ]™RYJNÂˆÙÏXTÕÓ“Nˆ	ÚÚ[™OOIÚX[	ÏÉÚX[[™ÉÎ‰Ü™]š]˜[	ßH\™Ù]Y	Ü›˜[Y_H
+	Ø™Y›Ü™_H8¡¤ˆ	ÜšH
+K˜ÂˆØ[˜Ù[İ\Ü[[Ê
+NÜ™]\›ˆYNÂŸB‚™[˜İ[Ûˆ]™Q[™[ZY\Ê
+^Ü™]\›ˆ[™[ZY\Ë™š[\ŠOO™KšŒ
+_B™[˜İ[Ûˆ]™P˜]Sİ]ÛÛYJ
+^Ü™]\›ˆÛÛX˜][™Ú[™Kœ™\ÛÛ™P˜]Sİ]ÛÛYJØ[Y\Îœ\K[™[ZY\Î™[™[ZY\Ë™š[\ŠOO™KšŒ
+K[˜Ûİ[\ÛÛ\]N™[˜Ûİ[\ÛX\™Y›Ñ[™[^SYX[œÕšXİÜN™˜[Ù_J_B™[˜İ[Ûˆİ[[™[^R
 
-function drawEvents(){
- drawBackground();
- rect(0,0,W,H,'rgba(5,9,22,.84)');
- text('EVENTS',64,62,34,'#ffedd1','850');
- addButton(1260,35,192,52,'main-menu','MAIN MENU','');
- rect(64,110,268,720,'rgba(13,20,39,.96)','#718ba4',18);
- EVENT_TABS.forEach((tab,index)=>{
-  const x=80,y=128+70*index,w=236,h=56,selected=tab===activeEventTab;
-  rect(x,y,w,h,selected?'rgba(228,195,130,.14)':'rgba(25,37,58,.76)',selected?'#d2b77e':null,12);
-  text(tab.label,x+18,y+20,21,selected?'#f4d99c':'#dce6f1',selected?'800':'650');
-  text(tab.type,x+18,y+40,11,'#c4d3e4','750');
-  choiceRects.push({x,y,w,h,action:'event-tab:'+tab.id,enabled:true});
- });
- activeEventTab.draw();
-}
+^Ü™]\›ˆ]™Q[™[ZY\Ê
+Kœ™YXÙJ
+‹JOO›ŠÙKš
+_B™[˜İ[ÛˆŞ[˜Ñ[™[^R
 
-function drawLoginEvent(){
- text('LOGIN EVENT',906,62,36,'#ffedd1','850','center');
- const now=new Date();
- const event=getLoginEventState(window.TwoToneAccount.profile.loginEvent,now);
- const featured=getStoreRotation().featuredCharacters;
- const bannerX=360,bannerY=110,bannerW=1092,bannerH=458;
- const backdrop=ctx.createLinearGradient(bannerX,bannerY,bannerX+bannerW,bannerY+bannerH);
- backdrop.addColorStop(0,'#172747');
- backdrop.addColorStop(.48,'#352f60');
- backdrop.addColorStop(1,'#79565e');
- rect(bannerX,bannerY,bannerW,bannerH,backdrop,'#c6a873',18);
- ctx.save();
- ctx.beginPath();
- ctx.roundRect(bannerX+1,bannerY+1,bannerW-2,bannerH-2,17);
- ctx.clip();
- const glow=ctx.createRadialGradient(1040,340,20,1040,340,420);
- glow.addColorStop(0,'rgba(255,221,155,.62)');
- glow.addColorStop(1,'rgba(255,205,135,0)');
- ctx.fillStyle=glow;
- ctx.fillRect(bannerX,bannerY,bannerW,bannerH);
- ctx.strokeStyle='rgba(247,221,168,.28)';
- ctx.lineWidth=2;
- for(const radius of [180,210,245]){
-  ctx.beginPath();ctx.arc(1040,339,radius,0,Math.PI*2);ctx.stroke();
- }
- for(let i=0;i<26;i++){
-  const x=605+(i*97)%819,y=134+(i*139)%405;
-  ctx.fillStyle=i%3===0?'#f7db9e':'rgba(255,235,190,.43)';
-  ctx.fillRect(x,y,i%3===0?3:2,i%3===0?3:2);
- }
- const poses=[
-  {x:835,y:124,w:450,h:444},
-  {x:752,y:133,w:390,h:391},
-  {x:978,y:123,w:390,h:410},
- ];
- if(featured.length===1)poses[0]={x:808,y:123,w:470,h:445};
- if(featured.length===2){poses[0].x=901;poses[1].x=773}
- const lineup=featured.map((id,index)=>({id,pose:poses[index]}));
- for(const {id,pose} of [...lineup.slice(1),...lineup.slice(0,1)]){
-  drawStoreBannerImage(images[STORE_BANNER_PORTRAITS[id]],pose.x,pose.y,pose.w,pose.h);
- }
- ctx.restore();
- rect(388,128,152,52,'rgba(13,21,38,.92)','#c6a873',12);
- text(formatLoginEventCountdown(event.resetDate,now),464,154,24,'#fff4e1','850','center');
- text('Claim up to 1,000 coins',408,329,35,'#fff4e1','850');
+^Ù[™[^R]İ[[™[^R
 
- const coin=images.coin;
- LOGIN_EVENT_REWARDS.forEach((coins,index)=>{
-  const x=360+158*index,y=596,claimed=index<event.claims,next=index===event.claims&&event.status==='available';
-  rect(x,y,144,131,claimed?'#25394a':'#17243c',next?'#f6cf84':'#687e9a',12);
-  text('CLAIM '+(index+1),x+72,y+24,14,'#c4d3e4','750','center');
-  if(coin?.complete&&coin.naturalWidth)ctx.drawImage(coin,x+54,y+42,36,36);
-  text(claimed?'âœ“ '+coins+' coins':coins+' coins',x+72,y+104,19,claimed?'#bde4cd':'#f6d9a6','800','center');
- });
- const labels={available:'CLAIM',upcoming:'UPCOMING','claimed-today':'CLAIMED TODAY',complete:'CYCLE COMPLETE'};
- if(event.status==='available')text(event.nextCoins+' coins',1212,752,17,'#f4d99c','750');
- addButton(1212,769,240,60,'claim-login-event',loginEventPending?'CLAIMINGâ€¦':labels[event.status],'',!loginEventPending&&event.status==='available');
- if(loginEventNotice)text(loginEventNotice,360,800,20,'#ffccbf','650');
-}
+NÛX^[™[^R[]™Q[™[ZY\Ê
+Kœ™YXÙJ
+‹JOO›ŠÙK›X^
+_B™[˜İ[ÛˆÚÜÙ[‘[™[^J
+^Ü™]\›ˆ]™Q[™[ZY\Ê
+K™š[™
+OO™KšYOO\Ù[XİY[™[^RY
+_]™Q[™[ZY\Ê
+VÌ_[B™[˜İ[Ûˆ[™[^P˜]TÜš]J[™[^J^Ü™]\›ˆ[™[^OË˜˜]TÜš]_B™[˜İ[ÛˆZ[Ø]™T[ŠÚ^™\Ë]]Ü™YØ]™\Ï[[
+^ÂˆYŠP\œ˜^Kš\Ğ\œ˜^JÚ^™\Ê_\Ú^™\Ë›[™İ\Ú^™\Ë™]™\JO“[X™\‹š\Ò[YÙ\ŠŠI‰›LI‰›LMJJ]›İÈ\œ›ÜŠ	ÕØ]™HÚ^™\È]\İXXÚ™Hx $ÌMIÊNÂˆ™]\›ˆÚ^™\Ë›X\
 
-function drawSoulGift(){
- text(SOUL_GIFT.title.toUpperCase(),906,62,36,'#ffedd1','850','center');
- const x=360,y=110,w=1092,h=458;
- const backdrop=ctx.createLinearGradient(x,y,x+w,y+h);
- backdrop.addColorStop(0,'#10172a');
- backdrop.addColorStop(.52,'#20283e');
- backdrop.addColorStop(1,'#34314b');
- rect(x,y,w,h,backdrop,'#c6a873',18);
+Ú^™KÚJOO˜[Y]UØ]™PÛÛ\ÜÚ][ÛŠ\œ˜^K™œ›ÛJÛ[™İœÚ^™_K
+ËJOOÂˆÛÛœİZ^YÛÛ[[ÛVÉÜÛ[YIË	İÛÛ‰Ë	Ú]ÚÉ×VÊÚJÚJIL×KÛÛ[[Û’YY[™[^T›Üİ\“[ÙOOOIÛZ^Y	ÏÛZ^YÛÛ[[Û™[™[^T›Üİ\“[ÙOOOIİÛÛ‰ÏÉİÛÛ‰Î™[™[^T›Üİ\“[ÙOOOIÚ]ÚÉÏÉÚ]ÚÉÎ‰ÜÛ[YIÎÂˆÛÛœİš[˜[Z^YØ]™OY[™[^T›Üİ\“[ÙOOOIÛZ^Y	É‰ÚOOO\Ú^™\Ë›[™İLKš\œİZ^YØ]™OY[™[^T›Üİ\“[ÙOOOIÛZ^Y	É‰œÚ^™\Ë›[™İŒI‰ÚOOOLÂˆÛÛœİZ^Y›ÜÜÏYš[˜[Z^YØ]™I‰šOOOLZ^Y›ÜÜÑ[]OYš[˜[Z^YØ]™I‰ŠOOOL_OOOLŠKZ^YXY\Yš\œİZ^YØ]™I‰šOOOLÂˆÛÛœİ]]Ü™Y[™[^OX]]Ü™YØ]™\ÏË–İÚWVÚWNÂˆÛÛœİ[Ù[X]]Ü™Y[™[^OÑS‘SVWĞTÒUTTÖØ]]Ü™Y[™[^K™[™[^RYN™[™[^T›Üİ\“[ÙOOOIÙÛØ›[‰ÏÊOSÓÕS•T—ÓSRUË™[]\Ô\•Ø]™OÑS‘SVWĞTÒUTTË™ÛØ›[‘S‘SVWĞTÒUTTËœÛ[YJN™[™[^T›Üİ\“[ÙOOOIÙÙ[ÙIÏÊOSÓÕS•T—ÓSRUË™[]\Ô\•Ø]™OÑS‘SVWĞTÒUTTË™Ù[ÙN‘S‘SVWĞTÒUTTËœÛ[YJN™[™[^T›Üİ\“[ÙOOOIØ™X\‰ÏÊOOOLÑS‘SVWĞTÒUTTË˜™X\‘S‘SVWĞTÒUTTËœÛ[YJN™[™[^T›Üİ\“[ÙOOOIÚ]ÚÉÏÑS‘SVWĞTÒUTTËš]ÚÎ›Z^Y›ÜÜÏÑS‘SVWĞTÒUTTË˜™X\™š[˜[Z^YØ]™I‰šOOOLÑS‘SVWĞTÒUTTË™Ù[ÙNŠZ^Y›ÜÜÑ[]_Z^YXY\ŠOÑS‘SVWĞTÒUTTË™ÛØ›[‘S‘SVWĞTÒUTTÖØÛÛ[[Û’YNÂˆÛÛœİØ]YÛÜO]˜[Y]Q[™[^PØ]YÛÜJ[Ù[˜Ø]YÛÜJKYÜÏ]˜[Y]Q[™[^UYÜÊ[Ù[YÜËØ]YÛÜJK]™[X]]Ü™Y[™[^OË›]™[ÏÛ[Ù[›]™[ÏÌNÂˆÛÛœİİ]ÏY[™[^Tİ]Ğ]]™[
+Ú›[Ù[š]XÚÎ›[Ù[˜˜\ÙP]XÚË\ÚXØ[Y™[œÙN›[Ù[˜˜\ÙT\ÚXØ[Y™[œÙKXYÚXØ[Y™[œÙN›[Ù[˜˜\ÙSXYÚXØ[Y™[œÙKÜYY›[Ù[œÜYYK]™[
+NÂˆ™]\›ˆÚY˜Ø]™IİÚJÌ_KY[™[^IÚJÌ_X\˜Ú]\RY›[Ù[šY˜[YN›[Ù[›˜[YKYÜËˆØ]™NÚJÌKÜ™\šJÌKØ]YÛÜKX[˜\œÎ˜[Y]Q[™[^RX[˜\œÊØ]YÛÜK[Ù[šX[˜\œÏÏÌJK]™[X^œİ]ËšÜYY›[Ù[œÜYY˜\ÙTÜYY›[Ù[œÜYYˆ˜\ÙP]XÚÎ›[Ù[˜˜\ÙP]XÚËˆ˜\ÙT\ÚXØ[Y™[œÙN›[Ù[˜˜\ÙT\ÚXØ[Y™[œÙK˜\ÙSXYÚXØ[Y™[œÙN›[Ù[˜˜\ÙSXYÚXØ[Y™[œÙKY™\İX[›[Ù[›Y™\İX[ÏÌY™\İX[[ÙYšY\œÎË‹‹Š[Ù[›Y™\İX[[ÙYšY\œßßJ_K›YYİXÚÜÎ–×K›YYX^İXÚÜÎ›[Ù[˜›YYX^İXÚÜÏÏÍKˆ˜]TÜš]N›[Ù[˜˜]TÜš]K˜]P\ÜXİ˜][Î›[Ù[˜˜]P\ÜXİ˜][Ë\›[Ù[˜\ÛÜšË\ÛÜšÎ›[Ù[˜\ÛÜšË˜\œšY\”\˜Ù[›[Ù[˜˜\œšY\”\˜Ù[ÏËŒ‹\ÜÚ]™NË‹‹›[Ù[œ\ÜÚ]™_K˜\ÚXĞ]XÚÎË‹‹›[Ù[˜˜\ÚXĞ]XÚßK˜\ÚXĞ]XÚĞÛİ[Œ˜[\YÙTİXÚÜÎŒ[ÛY[[TİXÚÜÎŒNÂˆJJJNÂŸB™[˜İ[Ûˆ˜[Y]UØ]™PÛÛ\ÜÚ][ÛŠØ]™J^ÂˆÛÛœİ›ÜÜÙ\Ï]Ø]™K™š[\ŠOO˜[Y]Q[™[^PØ]YÛÜJK˜Ø]YÛÜJOOOIØ›ÜÜÉÊK›[™İ[]\Ï]Ø]™K™š[\ŠOO™K˜Ø]YÛÜOOOIÙ[]IÊK›[™İÂˆYŠ›ÜÜÙ\Ï‘SÓÕS•T—ÓSRUË˜›ÜÜÙ\Ô\•Ø]™J]›İÈ\œ›ÜŠHØ]™HØ[ˆÛÛZ[ˆ][Üİ	ÑSÓÕS•T—ÓSRUË˜›ÜÜÙ\Ô\•Ø]™_H›ÜÜË˜
+NÂˆYŠ[]\Ï‘SÓÕS•T—ÓSRUË™[]\Ô\•Ø]™J]›İÈ\œ›ÜŠHØ]™HØ[ˆÛÛZ[ˆ][Üİ	ÑSÓÕS•T—ÓSRUË™[]\Ô\•Ø]™_H[]H[™[ZY\Ë˜
+NÂˆ™]\›ˆØ]™NÂŸB™[˜İ[Ûˆ[š]X[ÛİÊÛİ[›ÜÜÕØ]™OY˜[ÙK]Y]YY[™[ZY\ÏV×J^ÂˆYŠX›ÜÜÕØ]™I‰ˆ\]Y]YY[™[ZY\ËœÛÛYJ[™[^OO™[™[^K˜Ø]YÛÜOOOIÙ[]IÊJ\™]\›ˆ
+ÌN–Ì—K–ÌK×KÎ–ÌK‹×K–ÌKËKN–ÌK‹Ë_JVØÛİ[KœÛXÙJ
+NÂˆÛÛœİZYOVÌ—KÚY\ÏVÌK×K[]PÙ[\VÌ‹K×Kİ]\VÌK˜[˜XÚÏVÌK×K\ÙY[™]ÈÙ]
 
- ctx.save();
- ctx.beginPath();
- ctx.roundRect(x+1,y+1,w-2,h-2,17);
- ctx.clip();
+NÂˆ™]\›ˆ]Y]YY[™[ZY\ËœÛXÙJÛİ[
+K›X\
+[™[^OOÂˆÛÛœİ™Y™\œ™YY[™[^K˜Ø]YÛÜOOOIØ›ÜÜÉÏÛZYN™[™[^K˜Ø]YÛÜOOOIÙ[]IÏÊ›ÜÜÕØ]™OÜÚY\Î™[]PÙ[\ŠN›İ]\ÂˆÛÛœİÛİ\™Y™\œ™YœÚY
 
- const light=ctx.createRadialGradient(1090,282,20,1090,282,400);
- light.addColorStop(0,'rgba(193,165,133,.46)');
- light.addColorStop(.56,'rgba(115,128,170,.17)');
- light.addColorStop(1,'rgba(115,128,170,0)');
- ctx.fillStyle=light;
- ctx.fillRect(x,y,w,h);
+OÏÙ˜[˜XÚË™š[™
+Ø[™Y]OOˆ]\ÙYš\ÊØ[™Y]JJNİ\ÙY˜Y
+Ûİ
+NÂˆ™]\›ˆÛİÂˆJNÂŸB™[˜İ[ÛˆØ[‘\ŞQ[™[^J[™[^J^ÂˆYŠY[™[^_[™[ZY\Ë›[™İQSÓÕS•T—ÓSRUË™[™[ZY\ÓÛ‘šY[
+\™]\›ˆ˜[ÙNÂˆÛÛœİ[]PÛİ[Y[™[ZY\Ë™š[\ŠOO™K˜Ø]YÛÜOOOIÙ[]IÉ‰™KšŒ
+K›[™İ›ÜÜÓÛ‘šY[Y[™[ZY\ËœÛÛYJOO™K˜Ø]YÛÜOOOIØ›ÜÜÉÉ‰™KšŒ
+NÂˆYŠ[™[^K˜Ø]YÛÜOOOIØ›ÜÜÉÉ‰™[]PÛİ[‘SÓÕS•T—ÓSRUË™[]\ÓÛ‘šY[[›ÜÜÕØ]™J\™]\›ˆ˜[ÙNÂˆYŠ[™[^K˜Ø]YÛÜOOOIÙ[]IÉ‰™[]PÛİ[J›ÜÜÓÛ‘šY[ÑSÓÕS•T—ÓSRUË™[]\ÓÛ‘šY[[›ÜÜÕØ]™N‘SÓÕS•T—ÓSRUË™[]\ÓÛ‘šY[
+J\™]\›ˆ˜[ÙNÂˆ™]\›ˆYNÂŸB™[˜İ[Ûˆ[\‘[™[^JÛİ
+^ÂˆYŠ]Ø]™T]Y]YK›[™İ[™[ZY\ËœÛÛYJOO™KœÛİOO\Ûİ
+J\™]\›ˆ[ÂˆÛÛœİ]Y]YR[™^]Ø]™T]Y]YK™š[™[™^
+Ø[‘\ŞQ[™[^JNÚYŠ]Y]YR[™^
+\™]\›ˆ[ÂˆÛÛœİÚ[˜ÛÛZ[™×O]Ø]™T]Y]YKœÜXÙJ]Y]YR[™^JK›Ü›X][ÛQS‘SVWÑ“Ô“PUSÓ”ÖÜÛİNÂˆÛÛœİ˜\œšY\\›İ[™
+[˜ÛÛZ[™Ë›X^
+š[˜ÛÛZ[™Ë˜˜\œšY\”\˜Ù[
+NÂˆÛÛœİO^Ë‹‹š[˜ÛÛZ[™ËXÚÔ\˜Ù[š[˜ÛÛZ[™Ë™XÚÔ\˜Ù[ÏÌÛİ™›Ü›X][Û‹N™›Ü›X][Û‹KÎ™›Ü›X][Û‹Ë™›Ü›X][Û‹šš[˜ÛÛZ[™Ë›X^ÚY[š[˜ÛÛZ[™ËœÚY[X^˜\œšY\˜˜\œšY\‹˜\œšY\‹œ›ÚÙ[•\›œÎŒXY™œÎ–×KX\šÜÎ–×K][Y™™XİÎ–×K™Z[™›Ü˜Ù[Y[Ø]™RÚ[ÏŒ[T[™[™ÎØ]™RÚ[ÏŒ[\™Y]Ø]™RÚ[ÏŒÜ\™›Ü›X[˜ÙK››İÊ
+N›[NÂˆÛÛœİ[O\\K™š[™
+OœšYOOIÛ[IÊKÛİ[X\šÕ\›œÏ[[Oİ\Ü˜YU˜[YQ›ÜŠ	Û[Kœ™[Z][KY\XØ]KŒ‹™[K[X\šÜÉË	Ù[TÛİ[X\šÕ\›œÉË	Û[IÊNŒšXÛØÚ]\›œÏ[[Oİ\Ü˜YU˜[YQ›ÜŠ	Û[Kœ™[Z][KY9ã^·¶‰ËkºwµçLNKŒÌŠIÎÙ›ÜŠ]OLÚOLÚJÊÊ^ÂˆÛÛœİJJŒNMÊÊ
+‹ŒN
+JŠJÚILÊJILMÌLMNØÛÛœİOLNJÊJÌJÊ
+‹ŒLJJŠJÚILŠJIMLÂˆİ™š[™Xİ
+
+ØØ[Y\˜K˜İ\œ™[
+‹ŒL‹K
+ILÍN
+KÊNÂŸXİœ™\İÜ™J
+_B˜ÛÛœİT•WÔÕQÑO^ÂˆN–ŞŞÌNK˜\ÙVNÍ‹ÎŒNL‹ŒÎWKˆ–ŞŞMÌ‹˜\ÙVNÍÎŒN‹ŒÍKŞÍ‹˜\ÙVNŒ‹ÎŒMKŒÌÌWKˆÎ–ŞŞN˜\ÙVNÌKÎŒMÍŒÍKŞÌM‹˜\ÙVNŒLËÎŒM‹ŒÌÌŸKŞŒL‹˜\ÙVNÌ‹ÎŒMÍŒÍWKˆ–ŞŞŒ˜\ÙVNÍÎŒMÌŒÍKŞŒ˜\ÙVNŒŒÎŒM‹ŒÌÌŸKŞLÌ˜\ÙVNŒŒÎŒM‹ŒÌÌŸKŞŒLŒÌ˜\ÙVNÍÎŒMÌŒÍWBŸNÂ™[˜İ[ÛˆØ[Y\˜P[TÜÚ][ÛŠYšY]Ê^ÂˆYŠšY]ÏOOIÜ\IÊ^ØÛÛœİO\\K™š[™[™^
+OœšYOOZY
+NÜ™]\›ˆT•WÔÕQÑVÜ\K›[™İOË–ÚW_[BˆYŠšY]ÏOOIØ[KZ[\Xİ	Ê\™]\›ˆŞŒŒLK˜\ÙVNLÎŒMÍŸNÂˆËÈ›Ü™YÜ›İ[™Ú[™[X]XÈœ˜[Z[™ÎˆH[Hİ[™ÈÛÜÙHÈØ[Y\˜K›İ[œÚYHH™\Ù\™YˆËÈ	ÜØY™IÈÛİX›İ™HH\HQˆHQ\ÜÈZ[ÈÕ‘TˆHXİÜ‰ÜÈİÙ\ˆ›ÙK‚ˆËÈ\È\ÈH™\Ù[][Û‹[Û›HÚ[™ÙKˆ›ÈÛÜ›\ÜXÙH\™Ù][™ÈYXÚ[šXÜÈ\[™Ûˆ]‚ˆ™]\›ˆŞŒŒLK˜\ÙVNLÎŒMÍŸNÂŸB™[˜İ[Ûˆ[RYÜÚ][ÛŠY
+^ÂˆÛÛœİ[™^\\K™š[™[™^
+OœšYOOZY
+NÚYŠ[™^
+\™]\›ˆ[ÂˆÛÛœİØ\™ÏLØ\LL‹İ[\\K›[™İ
+˜Ø\™ÊÓX]›X^
+\K›[™İLJJ™Ø\ÂˆÛÛœİSX]›X^
+M‹X]œ›İ[™
 
- // Frame the weapon separately so its silhouette stays clear of Soul.
- ctx.save();
- ctx.translate(1125,495);
- ctx.rotate(-Math.PI/4);
- ctx.fillStyle='rgba(185,180,218,.09)';
- ctx.fillRect(0,-42,440,84);
- ctx.fillStyle='rgba(223,212,241,.18)';
- ctx.fillRect(0,-43,440,1);
- ctx.fillRect(0,42,440,1);
- ctx.restore();
+LŒ]İ[
+KÌŠJJÚ[™^
+ŠØ\™ÊÙØ\
+NÂˆ™]\›ˆŞ
+ØØ\™ËÌ‹NNÂŸB™[˜İ[Ûˆ[P˜]P\
+YšY]Ê^Âˆ™]\›ˆYOOIÜÛİ[	ÏÊšY]ÏOOIÜ\IßšY]ÏOOIØ[KZ[\Xİ	ÏÉÜÛİ[œ›Û	Î™\]Z\YÛİ[˜]TÜš]J
+JNšYOOIŞ™\›ÉÏÊšY]ÏOOIÜ\IßšY]ÏOOIØ[KZ[\Xİ	ÏÉŞ™\›Ñœ›Û	Î™\]Z\Y™\›Ğ˜]TÜš]J
+JNšYOOIÛ[IÏÊšY]ÏOOIÜ\IßšY]ÏOOIØ[KZ[\Xİ	ÏÉÛ[Qœ›Û	Î™\]Z\Y[P˜]TÜš]J
+JNšYOOIÙ]Û‰ÏÊšY]ÏOOIÜ\IßšY]ÏOOIØ[KZ[\Xİ	ÏÉÙ]Û‘œ›Û	Î™\]Z\Y]Û˜]TÜš]J
+JNšYOOIÛÙØ[‰ÏÊšY]ÏOOIÜ\IßšY]ÏOOIØ[KZ[\Xİ	ÏÉÛÙØ[‘œ›Û	Î™\]Z\YÙØ[˜]TÜš]J
+JNšYOOIØÛİY	ÏÊšY]ÏOOIÜ\IßšY]ÏOOIØ[KZ[\Xİ	ÏÉØÛİYœ›Û	Î™\]Z\YÛİY˜]TÜš]J
+JN‰ÜÜ˜Z]	ÎÂŸB™[˜İ[Ûˆ˜]Õ[š]
+ÜËšY]ËXİ[™ÏY˜[ÙJ^ÂˆYŠ\\ÜÊ\™]\›ØÛÛœİŞ˜\ÙVKËO\ÜËÜX˜\ÙVKZÂˆÛÛœİ›ØSX]œÚ[Š
+‹ŒLŠÊšYOOIÜÛİ[	ÏÌŒJJJŠšŒÌKŒNŒ
+NÂˆÛÛœİÙ[Xİ]šY]ÏOOIÜ\IÉ‰œÙ[XİY[RYOO\šYØÛÛœİ[U\™Ù][™Ï]šY]ÏOOIÜ\IÉ‰œ[™[™Õ\™Ù]Xİ[ÛË\™Ù]ÚYOOOIØ[IË[X[U\™Ù][™ÏX[U\™Ù][™É‰œ[™[™Õ\™Ù]Xİ[ÛË\™Ù]ØÛÜOOOIØ[	Ëİ\Ü[š[X][™Ï]šY]ÏOOIØ[KZ[\Xİ	É‰œ\ÙOOOIÜ™\ÛÛ™IÉ‰™ËšÚ[™OOIÜİ\Ü	É‰™\™Ù][RYOO\šY[YÚX›O]šY]ÏOOIÜ\IÉ‰œİ\Ü[[ÏÙ[YÚX›P[U\™Ù]
+İ\Ü[[ÊN˜[U\™Ù][™ÏÜšŒYNÂˆİœØ]™J
+NØİ˜[œÛ]JØ[Y\˜K˜İ\œ™[
+ŠšY]ÏOOIÜ\IÏËŒÌ‹LŠK›ØŠNÂˆİ˜™YÚ[”]
 
- drawStoreBannerImage(images.soulWeaponPremium,1120,163,324,324);
- // Extend the full-resolution character art below the clip for a closer crop.
- drawStoreBannerImage(images.soulFront,811,136,330,660);
+NØİ™[\ÙJ
+İËÌ‹˜\ÙVJÌKÊ‹M‹X]”JŒŠNØİ™š[İ[OIÜ™Ø˜JL‹L‹JIÎØİ™š[
 
- const fade=ctx.createLinearGradient(0,416,0,y+h);
- fade.addColorStop(0,'rgba(16,23,42,0)');
- fade.addColorStop(1,'rgba(16,23,42,.86)');
- ctx.fillStyle=fade;
- ctx.fillRect(x,416,w,y+h-416);
- ctx.restore();
+NÂˆYŠXİ[™ßÙ[Xİ
+^Øİ˜™YÚ[”]
 
- text('A gift from Soul',420,295,43,'#fff4e1','850');
- text('Claim once per account',421,345,22,'#f0d8b3','650');
+NØİ™[\ÙJ
+İËÌ‹˜\ÙVJÌKÊ‹LKŒ‹X]”JŒŠNØİ›[™UÚYMØİœİ›ÚÙTİ[O\Ù[XİÊ[U\™Ù][™ßİ\Ü[š[X][™ÏÉÈÍMXXY™‰Î‰ÈÙXXØNM	ÊN‰ÈÎ™LÙ˜‰ÎØİœİ›ÚÙJ
+_BˆYŠšL
+Xİ™ÛØ˜[[OKŒÍÎÂˆÛÛœİ\X[P˜]P\
+šYšY]ÊNÂˆÛÛœİ˜]šY]ÏOOIØÛÛ[X[™	É‰œšYOOIÜÛİ[	ÏÜÛİ[˜\ÚXÔİYÙJ
+N›[ÂˆYŠ˜ˆOO[[
+\Ûİ[˜\ÚXÔZ[
+˜\ÙVKË˜‹\
+NÂˆ[ÙHYŠ\	‰š[XYÙ\ÖØ\OË˜ÛÛ\]I‰š[XYÙ\ÖØ\K›˜]\˜[ÚY
+^ÂˆÛÛœİ[YÏZ[XYÙ\ÖØ\K[\ÛÜšÏX\OOIÜÛİ[œ›Û	ß\OOIŞ™\›Ñœ›Û	ß\OOIÛ[Qœ›Û	ß\OOIÙ]Û‘œ›Û	ß\OOIÛÙØ[‘œ›Û	ß\OOIØÛİYœ›Û	ÎØİš[XYÙTÛ[Ûİ[™Ñ[˜X›YY[\ÛÜšß\OOIŞ™\›Ğ˜]Iß\OOIŞ™\›Ğ˜]T™[Z][Iß\OOIÙ]Û˜]Iß\OOIÙ]Û”™[Z][P˜]IÎÂˆYŠ[\ÛÜšÊ^ÂˆËÈ[H\™Ù][™È\Ù\ÈHØ[YH[X›ÙHœ›Û\ÛÜšÈXÜ›ÜÜÈH[\™H\K‚ˆİ™˜]Ò[XYÙJ[YËÜË
+NÂˆY[ÙHYŠ\OOIÜÛİ[	ß\OOIÜÛİ[˜]Tİ[™\™	ß\OOIÜÛİ[˜]T™[Z][Iß\OOIŞ™\›Ğ˜]Iß\OOIŞ™\›Ğ˜]T™[Z][Iß\OOIÛ[Tİ[™\™˜]Iß\OOIÛ[TÚYÛ˜]\™P˜]Iß\OOIÛÙØ[˜]Iß\OOIÛÙØ[˜]T™[Z][Iß\OOIØÛİYÚ[™Ø[˜]Iß\OOIØÛİYš[™P˜]IÊ^ÂˆËÈš]Hš\ÚX›Hİ]İ]ÈHØ[YH[›\™ÙY˜]K\İYÙHZYÚXÜ›ÜÜÂˆËÈ^XX›HÚ\˜Xİ\œË™[[İš[™È˜[œÜ\™[Ûİ\˜ÙKZ[XYÙHX\™Ú[œË‚ˆÛÛœİ\Üš]P[P›İ[™Ê[YÊKØØ[OJ
+ŒKŒLŠKØ‹š˜]ÕÏX‹ÊœØØ[K˜]ÒX‹š
+œØØ[NÂˆİ™˜]Ò[XYÙJ[YË‹‹K‹Ë‹š
+ÊËY˜]ÕÊKÌ‹˜\ÙVKY˜]Ò˜]ÕË˜]Ò
+NÂˆY[ÙHYŠ\OOIÙ]Û˜]Iß\OOIÙ]Û”™[Z][P˜]IÊ^ÂˆÛÛœİ\Üš]P[P›İ[™Ê[YÊKØØ[OJ
+ŒKŒLŠKØ‹š˜]ÕÏX‹ÊœØØ[K˜]ÒX‹š
+œØØ[NÂˆİ™˜]Ò[XYÙJ[YË‹‹K‹Ë‹š
+ÊËY˜]ÕÊKÌ‹˜\ÙVKY˜]Ò˜]ÕË˜]Ò
+NÂˆY[ÙHİ™˜]Ò[XYÙJ[YËÜË
+NÂˆY[ÙHÚ[İY]JÜË›˜[YK\İ
+NÂˆİœ™\İÜ™J
+NÂˆÛÛœİ^
+ØØ[Y\˜K˜İ\œ™[
+ŠšY]ÏOOIÜ\IÏËŒÌ‹LŠNÂˆYŠ
+[U\™Ù][™ßİ\Ü[š[X][™ÊI‰™[YÚX›I‰Š[X[U\™Ù][™ßÙ[XİY[RYOO\šY
+J^ØİœØ]™J
+NØİ˜™YÚ[”]
 
- const claimed=hasClaimedSoulGift(window.TwoToneAccount.profile);
- const rewards=[{name:'Coins',image:'coin',quantity:SOUL_GIFT.coins},...SOUL_GIFT.items];
- rewards.forEach(({name,image,quantity},index)=>{
-  const cardX=x+222*index,cardY=596,cardW=204,center=cardX+cardW/2;
-  rect(cardX,cardY,cardW,131,claimed?'#25394a':'#17243c','#687e9a',12);
-  drawStoreBannerImage(images[image],center-30,cardY+12,60,54);
-  text(quantity.toLocaleString('en-US'),center,cardY+85,22,'#f6d9a6','800','center');
-  text(name,center,cardY+110,14,'#dce6f1','650','center');
- });
- const label=claimed?'CLAIMED':soulGiftPending?'CLAIMINGâ€¦':'CLAIM';
- addButton(1212,769,240,60,'claim-soul-gift',label,'',!claimed&&!soulGiftPending);
- if(soulGiftNotice&&!claimed)text(soulGiftNotice,360,800,20,'#ffccbf','650');
-}
+NØİ˜\˜Ê
+İËÌ‹Ü
+ÚÌ‹X]›X^
+Ë
+KÌŠÎX]”JŒŠNØİœİ›ÚÙTİ[OIÈÍMXXY™‰ÎØİ›[™UÚYMØİœİ›ÚÙJ
+NØİœ™\İÜ™J
+_BˆYŠšY]ÏOOIÜ\IÊ^Âˆ™Xİ
+LM‹ÜMŒÊÌÌ‹Ù[XİÉÈÌÙŒÎYY‰ÎˆY[YÚX›OÉÈÌŒL™™MÉÎ‰ÈÌYLMY‰ËÙ[XİÉÈÙ™™L˜N	Î™[YÚX›OÉÈÎXXŒ	Î‰ÈÍMY˜IË
+NÂˆ^
+›˜[YK
+İËÌ‹ÜMK\İÌMŒNKšLÉÈØÍ˜XØŒ	Î‰ÈÙY	Ë	Î	Ë	ØÙ[\‰ÊNÂˆYŠšL
+]^
+	ÒË“Ëˆ8 (ˆÓÕ‘URS‘Q	Ë
+İËÌ‹ÜMÍËM	ÈÙ™˜˜X˜IË	Î	Ë	ØÙ[\‰ÊNÂˆ[™JL‹ÜLLËÊÍšÜ›X^šLÉÈÍÍLY‰Î‰ÈÍÌ™MŒIË	ÈÍMMÉË
+NÂˆËÈ\™Ù]\İ]›Ş\ÈÈ›İY™™XİXİX[X[[™ÈÜˆÛÛX˜]\™Ù][™ÈÙÚXË‚ˆYŠ
+\ÙOOOIÜ^Y\‰ß[U\™Ù][™ÊI‰˜Ø[Y\˜T™]šY]ÏOOIÜ\IÊXÚÚXÙT™XİËœ\Ú
+ŞLNKNÜN‹ÎÊÌÎš
+ÌLMXİ[Û‰ØØ[Y\˜K\Ù[Xİ‰ÊÜšY[˜X›Y™[YÚX›_JNÂˆB‚ŸB˜ÛÛœİS‘SVWÔÔ’UWÔĞĞSO^ØÛÛ[[ÛŒK[]NŒKŒK›ÜÜÎŒK_NÂ™[˜İ[Ûˆ˜]Ñ[™[^JÚİ
+^ØÛÛœİ[Y[™[ZY\ÎÚYŠ\ÙOOOIÜ^Y\‰É‰œ[™[™Õ\™Ù]Xİ[Û‰‰˜Ø[Y\˜T™]šY]ÈOOIÜ\IÉ‰œ™]šY]Õ\™Ù][ÙJ
+OOOIØ[ÙIÉ‰˜ÛÛX˜][™[ZY\Ê
+K›[™İ
+^ØİœØ]™J
+NØİœİ›ÚÙTİ[OIÜ™Ø˜JL‹ËŒLKŠIÎØİ›[™UÚYMNØİœÙ][™Q\Ú
+ÌŒ‹L—JNØİ˜™YÚ[”]
 
-function drawItemInventory(){
- drawBackground();rect(0,0,W,H,'rgba(5,9,22,.74)');rect(105,55,1390,790,'rgba(13,20,39,.98)','#ccb88e',20);
- text('INVENTORY',800,103,32,'#ffedd1','850','center');addButton(1280,78,165,52,'main-menu','MAIN MENU','');
- const entries=[
-  ...[['Small Enchanted Bottle','10 Character XP',itemInventory.bottles.small,'enchantedBottleSmall'],['Medium Enchanted Bottle','100 Character XP',itemInventory.bottles.medium,'enchantedBottleMedium'],['Large Enchanted Bottle','1,000 Character XP',itemInventory.bottles.large,'enchantedBottleLarge'],['Small Enchanted Book','10 Weapon XP',itemInventory.books.small,'enchantedBookSmall'],['Medium Enchanted Book','100 Weapon XP',itemInventory.books.medium,'enchantedBookMedium'],['Large Enchanted Book','1,000 Weapon XP',itemInventory.books.large,'enchantedBookLarge'],['Core','Rune / Celestial upgrade',itemInventory.cores,'core'],['Gem','Character / weapon Ascension',itemInventory.gems,'gem']].map(([name,detail,count,image])=>({name,detail,count,image})),
-  ...Object.entries(RUNE_SET_DEFINITIONS).map(([id,set])=>({name:set.name,detail:'Rune Set piece',count:ownedRuneCount(id),image:set.image}))
- ];
- const ownedEntries=entries.filter(item=>item.count>0);
- const columns=5,cardW=244,cardH=155,gapX=18,gapY=13,x0=154,y0=151;
- ownedEntries.forEach((item,index)=>{
-  const row=Math.floor(index/columns),column=index%columns;
-  const x=x0+column*(cardW+gapX),y=y0+row*(cardH+gapY),icon=images[item.image];
-  rect(x,y,cardW,cardH,'rgba(25,37,58,.94)','#718ba4',12);
-  if(icon?.complete&&icon.naturalWidth)drawStoreBannerImage(icon,x+84,y+8,76,64);
-  text(item.name,x+cardW/2,y+91,14,'#f3e5c9','800','center');
-  text(item.detail,x+cardW/2,y+113,12,'#c4d0dd','600','center');
-  text('Ã—'+item.count,x+cardW/2,y+138,14,'#f0f3f7','750','center');
- });
- if(!ownedEntries.length)text('INVENTORY EMPTY',800,475,20,'#c4d0dd','700','center');
-}
-function drawCampaignSelector(){
- drawBackground();
- rect(0,0,W,H,'rgba(5,9,22,.74)');
- text('CAMPAIGN',64,83,34,'#ffedd1','850');
- addButton(1316,53,220,58,'main-menu','MAIN MENU','');
- rect(64,148,454,660,'rgba(13,20,39,.96)','#718ba4',18);
- rect(550,148,986,660,'rgba(13,20,39,.96)','#718ba4',18);
+NØİ™[\ÙJLLÊØØ[Y\˜K˜İ\œ™[
+‹ËMNLËËX]”JŒŠNØİœİ›ÚÙJ
+NØİœ™\İÜ™J
+_Y›ÜŠÛÛœİHÙˆ[
+^ÂˆÛÛœİY™X]YYKšLX][\ÙYYY™X]YÓX]›X^
+JK™X]]
+JNŒX]›ÙÜ™\ÜÏSX]›Z[ŠKX][\ÙYÑS‘SVWÑPUĞ‘PUÓTÊK[\š[™ÏHYY™X]Y	‰™Kœ™Z[™›Ü˜Ù[Y[	‰™K™[\™Y]	‰YK™[\™Y]S‘SVWÔ‘RS‘“ÔÑSQS•ÑS•–WÓTË[T›ÙÜ™\ÜÏY[\š[™ÏÓX]›X^
+X]›Z[ŠK
+YK™[\™Y]
+KÑS‘SVWÔ‘RS‘“ÔÑSQS•ÑS•–WÓTÊJNŒKÜXÚ]OYY™X]YÓX]›X^
+KYX]›ÙÜ™\ÜÊN™[T›ÙÜ™\ÜÎÂˆİœØ]™J
+NØİ™ÛØ˜[[O[ÜXÚ]NÂˆÛÛœİ\Ñ›Øİ\Ï\\ÙOOOIÜ^Y\‰É‰˜ÚÜÙ[‘[™[^J
+OËšYOOYKšYÂˆÛÛœİ]\›’]\\ÙOOOIÜ^Y\‰É‰ˆH\[™[™Õ\™Ù]Xİ[Û‰‰˜Ø[Y\˜T™]šY]ÈOOIÜ\IÉ‰˜ÚÛÜÙP]XÚÕ\™Ù]Ê™]šY]Õ\™Ù][ÙJ
+JKœÛÛYJOšYOOYKšY
+NÂˆÛÛœİ\ĞXİÜJÚİOOIÙ[™[^K]Ú[™\	É‰˜Xİ[™Ñ[™[^RYOOYKšY
+_
+ËšÚ[™OOIÙ[™[^IÉ‰™Ë˜XİÜ‘[™[^RYOOYKšY	‰œÚİOOIÙ[™[^KZ[\Xİ	ÊNÂˆÛÛœİÚJ\ĞXİÜÌKŒNœÚİOOIØ]XÚËZ[\Xİ	É‰™Ë\™Ù][™[^RYOOYKšYÌKŒNŒJJŠS‘SVWÔÔ’UWÔĞĞSVÙK˜Ø]YÛÜWOÏÌJJŠ
+Kœ™Z[™›Ü˜Ù[Y[	‰™K™[\™Y]
+OÌLŠÙ[T›ÙÜ™\ÜÊ‹ŒŒJNÂˆÛÛœİİÏYKÊœÚYKš
+œÚYK
+ØØ[Y\˜K˜İ\œ™[
+‹ËJİËYKÊKÌ‹^OYKJÊKšZ
+JÊ[\š[™ÏÊKY[T›ÙÜ™\ÜÊJŒÎŒ
+JÊY™X]YÓX]œİÊX]›ÙÜ™\ÜËK
+JŒŒ
+NÂˆÛÛœİ˜’]YËšÚ[™OOIØ˜\ÚXÉÉ‰™Ë˜XİÜOOIÜÛİ[	É‰™\™Ù][™[^RYOOYKšYİY˜]›[ÂˆÛÛœİ]ÚXÚÏ^˜’]OO[[	‰˜’]PS’SPUSÓ—ÔÕTÓTÊŒÉ‰˜’]S’SPUSÓ—ÔÕTÓTÊÓX]œÚ[Š
+˜’]PS’SPUSÓ—ÔÕTÓTÊŒÊJ‹ŒJJŠKJ˜’]PS’SPUSÓ—ÔÕTÓTÊŒÊKĞS’SPUSÓ—ÔÕTÓTÊJŒŒÂˆ]Üš]PÙ[\–O^^JÚÌ‹Üš]Uš\ÚX›UÏ]İËÜš]Uš\ÚX›RZØÛÛœİÜš]SÙ™œÙ]YY™X]YÌš]ÚXÚËÜš]SÙ™œÙ]OYY™X]Y[\š[™ÏÌ“X]œÚ[Š
+‹ŒŠÙK
+JŒ‹ŒÂˆİœØ]™J
+NØİ™ÛØ˜[[O[ÜXÚ]NÚYŠY™X]Y
+Xİ™š[\IÙÜ˜^\ØØ[JJIÎØİ˜[œÛ]JÜš]SÙ™œÙ]Üš]SÙ™œÙ]JNÂˆİ˜™YÚ[”]
 
- const rows=campaignSelectorRows();
- const cleared=window.TwoToneAccount.profile.clearedCampaignEntries??[];
- const offset=campaignPage*CAMPAIGN_CHOICES_PER_PAGE;
- rows.slice(offset,offset+CAMPAIGN_CHOICES_PER_PAGE).forEach((row,index)=>{
-  const y=165+70*index,x=80+28*row.depth,w=422-28*row.depth;
-  const selected=row.entry&&row.entry===previewedCampaignEntry;
-  const locked=row.entry&&!isCampaignEntryUnlocked(row.entry,cleared);
-  const status=row.entry?(cleared.includes(row.entry.id)?'CLEARED':locked?'LOCKED':'AVAILABLE'):'';
-  if(selected)rect(x,y,w,56,'rgba(228,195,130,.14)','#d2b77e',12);
-  else rect(x,y,w,56,'rgba(25,37,58,.76)',null,12);
-  const label=row.entry?row.title:(row.expanded?'â–¾  ':'â–¸  ')+row.title;
-  text(label,x+18,y+28,23,selected?'#f4d99c':'#dce6f1',selected?'800':'650');
-  if(status)text(status,x+w-16,y+28,13,locked?'#aab7c9':'#dfc894','750','right');
-  choiceRects.push({x,y,w,h:56,action:'campaign-option:'+String(offset+index),enabled:true});
- });
- if(campaignPage>0)addButton(80,744,152,48,'campaign-previous','PREVIOUS','');
- if(offset+CAMPAIGN_CHOICES_PER_PAGE<rows.length)addButton(350,744,152,48,'campaign-next','NEXT','');
+NØİ™[\ÙJ
+İİËÌ‹^JÚMİÊ‹LËX]”JŒŠNØİ™š[İ[OIÈÌXŒŒLØÍÌ	ÎØİ™š[
 
- const entry=previewedCampaignEntry;
- if(!entry){text('Select a part',604,220,36,'#ffedd1','800');return}
- text(entry.title,604,223,44,'#ffedd1','850');
- const unlocked=isCampaignEntryUnlocked(entry,cleared);
- if(!unlocked){
-  const prerequisite=getCampaignEntry(entry.prerequisiteEntryId);
-  text('Clear '+prerequisite.title+' to unlock.',604,321,29,'#d6e2ef','650');
-  return;
- }
- let line='',y=318;
- ctx.font='600 30px system-ui,-apple-system,Segoe UI,sans-serif';
- for(const word of entry.summary.split(' ')){
-  const next=line?line+' '+word:word;
-  if(line&&ctx.measureText(next).width>850){
-   text(line,604,y,30,'#d6e2ef');
-   line=word;
-   y+=42;
-  }else line=next;
- }
- if(line)text(line,604,y,30,'#d6e2ef');
- addButton(1218,707,262,62,'campaign-start',cleared.includes(entry.id)?'REPLAY PART':'START PART','');
-}
+NÂˆÛÛœİÜš]RYY[™[^P˜]TÜš]JJNÚYŠ[XYÙ\ÖÜÜš]RYOË˜ÛÛ\]I‰š[XYÙ\ÖÜÜš]RYK›˜]\˜[ÚY
+^ØÛÛœİ[YÏZ[XYÙ\ÖÜÜš]RYNØİš[XYÙTÛ[Ûİ[™Ñ[˜X›Y\Üš]RYOOIÜÛ[YP˜]IÎØÛÛœİ˜][Ô\ÏTİš[™ÊK˜˜]P\ÜXİ˜][ß	ÉÊKœÜ]
+	Î‰ÊK›X\
+[X™\ŠK\ÜXİ\˜][Ô\Ë›[™İOOL‰‰œ˜][Ô\Ë™]™\J[X™\‹š\Ñš[š]JI‰œ˜][Ô\ÖÌOŒ	‰œ˜][Ô\ÖÌWOŒÜ˜][Ô\ÖÌKÜ˜][Ô\ÖÌWNš[YË›˜]\˜[ÚYÚ[YË›˜]\˜[ZYÚØ[˜\ÕÏSX]›Z[ŠİË
+˜\ÜXİ
+KØ[˜\ÒXØ[˜\ÕËØ\ÜXİØØ[VXØ[˜\ÕËÚ[YË›˜]\˜[ÚYØØ[VOXØ[˜\ÒÚ[YË›˜]\˜[ZYÚ›İ[™Ï\Üš]P[P›İ[™Ê[YÊK˜]ÕÏX›İ[™ËÊœØØ[V˜]ÒX›İ[™Ëš
+œØØ[VK˜]Ö^
+ÊİËY˜]ÕÊKÌ‹˜]ÖO^^JÚY˜]ÒÜÜš]Uš\ÚX›UÏY˜]ÕÎÜÜš]Uš\ÚX›RY˜]ÒÜÜš]PÙ[\–OY˜]ÖJÙ˜]ÒÌØİ™˜]Ò[XYÙJ[YË›İ[™Ë›İ[™ËK›İ[™ËË›İ[™Ëš˜]Ö˜]ÖK˜]ÕË˜]Ò
+_Bˆİœ™\İÜ™J
+NÂˆYŠY™X]Y
+^Øİœ™\İÜ™J
+NØÛÛ[Y_BˆYŠ\ĞXİÜŠ^Øİœİ›ÚÙTİ[OIÈØÙM™™‰ÎØİ›[™UÚYMØİœİ›ÚÙT™Xİ
+N^KM‹İÊÌM‹
+ÌLÊ_BˆYŠ]\›’]
+^ØÛÛœİš[™Ô˜Y]\ÏSX]›X^
+Üš]Uš\ÚX›UËÜš]Uš\ÚX›R
+KÌŠÎØİ˜™YÚ[”]
 
-function drawChallenges(){
- drawBackground();rect(0,0,W,H,'rgba(5,9,22,.74)');rect(180,100,1240,700,'rgba(13,20,39,.98)','#ccb88e',20);
- text('CHALLENGES',800,196,32,'#ffedd1','850','center');addButton(1200,125,165,52,'main-menu','MAIN MENU','');
- rect(345,245,910,385,'rgba(25,37,58,.94)','#718ba4',16);
- text('NO CHALLENGES AVAILABLE',800,438,22,'#d6e2ef','700','center');
-}
-function drawPartySetup(){
- drawBackground();rect(0,0,W,H,'rgba(5,9,22,.72)');
- rect(145,58,1310,780,'rgba(13,20,39,.98)','#ccb88e',20);
- text('PARTY',800,105,34,'#ffedd1','850','center');
- addButton(1226,82,190,54,'main-menu','MAIN MENU','');
- text(`CURRENT PARTY  â€¢  ${draft.length}/${MAX_PARTY_SIZE}`,208,177,21,'#bad4e9','800');
- for(let i=0;i<MAX_PARTY_SIZE;i++){
-  const x=212+i*295,y=238,w=275,h=215,id=draft[i],p=id?roster(id):null;
-  rect(x,y,w,h,p?'rgba(38,54,79,.94)':'rgba(21,33,56,.88)',p?'#9eb8d3':'#4c607a',13);
-  if(p){
-   const portrait=images[characterPortraitArt(p.id)];
-   if(portrait?.complete&&portrait.naturalWidth)drawCharacterPortrait(portrait,p.id,x+w/2-42,y+8,84);
-   text(p.name,x+w/2,y+112,21,'#f6eefa','800','center');
-   if(p.test)text('TEST PLACEHOLDER',x+w/2,y+136,12,'#e5ca99','650','center');
-   else text(`LEVEL ${progressFor(p.id).level}`,x+w/2,y+136,13,'#c4d6e5','600','center');
-   addButton(x+28,y+158,w-56,42,`remove:${i}`,'REMOVE','',draft.length>1);
-  }else{
-   text('EMPTY',x+w/2,y+91,20,'#8494a9','750','center');
-  }
- }
- text('AVAILABLE CHARACTERS',208,493,20,'#bad4e9','800');
- const characters=availableCharacters();for(let i=0;i<characters.length;i++){
-   const p=characters[i],x=172+(i%4)*344,y=520+Math.floor(i/4)*84,w=320,h=74,selected=draft.includes(p.id);
-  rect(x,y,w,h,selected?'rgba(35,59,76,.92)':'rgba(29,41,67,.94)',selected?'#8fbcad':'#7e97b0',11);
-  const portrait=images[characterPortraitArt(p.id)];
-  if(portrait?.complete&&portrait.naturalWidth)drawCharacterPortrait(portrait,p.id,x+8,y+6,58);
-  text(p.name,x+77,y+29,18,'#f5e9dc','800');
-  if(p.test)text('TEST PLACEHOLDER',x+77,y+49,10,'#e5ca99','600');
-  addButton(x+w-105,y+20,91,34,`add:${p.id}`,selected?'IN PARTY':'ADD','',!selected&&draft.length<MAX_PARTY_SIZE);
- }
- addButton(212,711,250,62,'main-menu','CANCEL','');
- addButton(1126,711,250,62,'save-party','SAVE PARTY','',validTeam(draft));
-}
-function silhouette(x,y,w,h,name,testOnly=false){ctx.save();ctx.translate(x,y);const c='#7789a3';ctx.fillStyle=c;ctx.beginPath();ctx.ellipse(w*.5,h*.16,w*.17,h*.14,0,0,Math.PI*2);ctx.fill();rect(w*.32,h*.30,w*.36,h*.38,c,null,13);rect(w*.15,h*.35,w*.15,h*.37,c,null,10);rect(w*.70,h*.35,w*.15,h*.37,c,null,10);rect(w*.34,h*.65,w*.13,h*.35,c,null,7);rect(w*.53,h*.65,w*.13,h*.35,c,null,7);ctx.restore();text(testOnly?'TEST ONLY':name.toUpperCase(),x+w/2,y+h*.55,14,'#131e33','800','center')}
-function combatEnemies(){return liveEnemies()}
-// BATTLE SCENE DEVELOPMENT STANDARD v1.0 â€” provisional rendering implementation.
-// Layered 2D views, nonuniform parallax, stateful cinematic camera; HUD remains screen-space.
-// New reverse-view arena geometry and test-slot silhouettes are development placeholders.
-let cameraPreview=null,selectedAllyId=null,devPanelOpen=false;
-// Review-only HUD arrangement. Developer controls are hidden until explicitly opened.
-const camera={shot:'command',from:'command',start:performance.now(),duration:CAMERA_TRANSITION_SAME_VIEW_MS,lastX:0,mode:'command',parallax:{},focus:null};
-function smooth01(x){x=Math.max(0,Math.min(1,x));return x*x*(3-2*x)}
-function clamp01(x){return Math.min(1,Math.max(0,x))}
-// Zero's user-approved basic-attack assembly: 256Ã—512 neutral + wind-up + slash.
-// The motion is presentation-only; all damage, targeting and turn logic stays in combat actions.
-// 1250 ms: approach 0â€“250, hold 250â€“750, strike 750â€“1000, return 1000â€“1250.
-const SOUL_BASIC_MS=ANIMATION_STEP_MS*5;
-function soulBasicStage(t){
- if(phase!=='resolve'||fx?.kind!=='basic'||fx.actor!=='soul')return null;
- const dt=Math.max(0,t-fx.at);return dt<=SOUL_BASIC_MS?dt:null;
-}
-function easeOutCubic(x){x=clamp01(x);return 1-(1-x)*(1-x)*(1-x)}
-function lerp(a,b,x){return a+(b-a)*x}
-function soulBasicTravel(t,pos){
- const dt=soulBasicStage(t),target=fx?.targetGeometry;
- if(dt===null||!target)return pos;
- // Parallax-safe destination: camera remains independent from the actor's world motion.
- let approach=dt<ANIMATION_STEP_MS?easeOutCubic(dt/ANIMATION_STEP_MS):dt<ANIMATION_STEP_MS*3?1:1-smooth01((dt-ANIMATION_STEP_MS*3)/(ANIMATION_STEP_MS*2));
- const scale=lerp(1,.50,approach);
- const targetWidth=pos.w*.50;
- const targetLeft=target.x-targetWidth*.80 + camera.currentX*(.43-.52);
- const targetFeet=target.y+target.h+12;
- return {...pos,x:lerp(pos.x,targetLeft,approach),baseY:lerp(pos.baseY,targetFeet,approach),w:pos.w*scale,h:pos.h*scale};
-}
-function soulBasicPaint(x,baseY,w,h,dt,baseSprite='soul'){
- // Anchor images using their real painted-foot margins; never crop or rewrite Approved PNGs.
- const draw=(key,opacity=1)=>{const img=images[key];if(!img?.complete||!img.naturalWidth)return;
-  const m=key==='soulBasicSlash'?{foot:485,scale:1.08,dx:-.04}:key==='soulBasicWindup'?{foot:500,scale:1,dx:0}:{foot:512,scale:1,dx:0};
-  const sh=h*m.scale,sw=w*m.scale;
-  ctx.save();ctx.globalAlpha*=opacity;ctx.imageSmoothingEnabled=true;
-  ctx.drawImage(img,x+(w-sw)/2+dxFor(m.dx,w),baseY-sh*m.foot/512,sw,sh);ctx.restore();
- };
- const mix=(before,after,a)=>{draw(before,1-a);draw(after,a)};
- if(dt<ANIMATION_STEP_MS)draw(baseSprite);
- else if(dt<ANIMATION_STEP_MS*2)mix(baseSprite,'soulBasicWindup',(dt-ANIMATION_STEP_MS)/ANIMATION_STEP_MS);
- else if(dt<ANIMATION_STEP_MS*3)draw('soulBasicWindup');
- else if(dt<ANIMATION_STEP_MS*4)draw('soulBasicSlash');
- else if(dt<ANIMATION_STEP_MS*5)mix('soulBasicSlash',baseSprite,(dt-ANIMATION_STEP_MS*4)/ANIMATION_STEP_MS);
- else draw(baseSprite);
-}
-function dxFor(relative,width){return relative*width}
-function cameraShot(t=performance.now()){
- if(phase==='setup'||phase==='victory'||phase==='defeat')return 'command';
- if(phase==='intro')return actingEnemyId?'enemy-windup':'command';
- if(cameraPreview==='party'&&pendingTargetAction?.targetSide==='ally'&&!paused)return 'party';
- if(phase==='player')return cameraPreview==='party'?'party':cameraPreview==='target'?'target':'command';
- if(phase==='enemy')return 'enemy-windup';
- if(phase==='resolve'&&fx){const dt=t-fx.at;
-  if(fx.kind==='support')return fx.targetAllyId?(fx.action==='ultimate'?'party':'ally-impact'):'command';
-  if(fx.kind==='enemy')return dt<COMBAT_ACTION_PHASE_GAP_MS?'enemy-windup':'enemy-impact';
-  if(fx.kind==='ultimate')return dt<ULTIMATE_CAMERA_INTRO_MS?'ultimate-intro':'attack-impact';
- return dt<(fx.kind==='basic'&&fx.actor==='soul'?ANIMATION_STEP_MS*2:ANIMATION_STEP_MS)?'attack-track':'attack-impact';
- }
- // Animation lifetimes can end a frame before their resolution timers. Keep
- // the impact framing, but do not retain a stale party-selection shot after
- // the support effect itself has ended.
- if(phase==='resolve'&&!fx)return camera.shot==='party'?'command':camera.shot==='command'?'attack-impact':camera.shot;
- return 'command';
-}
-function shotPan(s){
- const tgt=(s==='attack-track'||s==='attack-impact')&&fx?.targetEnemyId?(enemies.find(e=>e.id===fx.targetEnemyId)||fx?.targetGeometry||chosenEnemy()):chosenEnemy(),att=enemies.find(e=>e.id===actingEnemyId);
- if(s==='target')return Math.max(-88,Math.min(23,-35-(tgt?(tgt.x-1040)*.115:0)));
- if(s==='enemy-windup')return Math.max(-104,Math.min(30,-47-(att?(att.x-1040)*.14:0)));
- if(s==='attack-impact'||s==='attack-track')return Math.max(-110,Math.min(26,-30-(tgt?(tgt.x-1040)*.09:0)));
- return ({command:0,party:34,'enemy-impact':28,'ultimate-intro':-86})[s]||0
-}
-function shotWorld(s){return s==='party'?'reverse':'forward'}
-function prepareCamera(t){const s=cameraShot(t);const focus=phase==='resolve'&&!fx?camera.focus:s==='target'?chosenEnemy()?.id:s==='enemy-windup'?actingEnemyId:s==='attack-impact'||s==='attack-track'?fx?.targetEnemyId:null;if(s!==camera.shot||focus!==camera.focus){camera.from=camera.shot;camera.shot=s;camera.focus=focus;camera.start=t;camera.duration=shotWorld(s)!==shotWorld(camera.from)?CAMERA_TRANSITION_BETWEEN_SIDES_MS:CAMERA_TRANSITION_SAME_VIEW_MS;camera.lastX=camera.currentX??shotPan(camera.from)}
- camera.mode=shotWorld(camera.shot);
- camera.progress=smooth01((t-camera.start)/camera.duration);
- camera.currentX=camera.lastX+(shotPan(camera.shot)-camera.lastX)*camera.progress;
-}
-function withLayer(pan,rate,fn){ctx.save();ctx.translate(pan*rate,Math.sin(performance.now()*.00055)*1.6*rate);fn();ctx.restore()}
-function layerImage(key,pan,rate){const im=images[key];if(!im||!im.complete||!im.naturalWidth)return;ctx.imageSmoothingEnabled=false;
- // Overscan prevents blank edges. Every layer moves by a distinct amount.
- ctx.drawImage(im,-55+pan*rate,-18,1710,963);
-}
-function mountains(pan,reverse=false){
- withLayer(pan,.13,()=>{
-  ctx.fillStyle=reverse?'#92a4b9':'#8b9fbd';ctx.beginPath();ctx.moveTo(-100,432);
-  const ps=reverse?[[100,318],[257,405],[420,255],[670,432],[910,295],[1120,438],[1350,260],[1700,420]]:[[80,325],[315,252],[490,412],[680,286],[950,410],[1150,268],[1430,375],[1700,286]];
-  for(const [x,y] of ps)ctx.lineTo(x,y);ctx.lineTo(1710,525);ctx.lineTo(-100,525);ctx.fill();
-  ctx.fillStyle=reverse?'#658698':'#668b98';ctx.beginPath();ctx.moveTo(-100,436);
-  for(let i=0;i<=18;i++)ctx.lineTo(i*105-100,352+(i*7%5)*18);
-  ctx.lineTo(1750,510);ctx.lineTo(-100,510);ctx.fill();
- });
-}
-function sky(t,reverse=false){
- const grd=ctx.createLinearGradient(0,0,0,540);grd.addColorStop(0,reverse?'#668aa8':'#78aac8');grd.addColorStop(1,reverse?'#c0c8d4':'#afbed2');rect(0,0,W,900,grd);
- withLayer(camera.currentX,.04,()=>{
-  const x=((t*.007)%1750)-120;
-  ctx.fillStyle='#eee3e4af';for(const [cx,cy] of [[230,118],[910,77],[1360,179]]){
-   rect(cx-x*.07,cy,108,27,'#ede3e2ad');rect(cx+25-x*.07,cy-20,66,20,'#ede3e2ad');
-  }
- });
- mountains(camera.currentX,reverse);
-}
-function forwardScene(t){
- sky(t,false);
- // From back to front: distant skyline, buildings, ground, tree/canopy, drifting petals.
- layerImage('architectureLayer',camera.currentX,.32);
- layerImage('floorLayer',camera.currentX,.72);
- layerImage('treeLayer',camera.currentX,1.18);
-}
-function reverseWalls(pan){
- withLayer(pan,.34,()=>{
-  rect(-80,380,1760,80,'#656478');rect(-80,387,1760,16,'#9c9aa6');
-  for(let x=-30;x<1660;x+=116){rect(x,350,26,108,'#55576b');rect(x-6,342,38,20,'#92919a')}
-  // The reverse angle faces the opposite courtyard wall, not a mirrored castle image.
-  rect(500,270,600,202,'#797783');rect(539,285,522,176,'#96929a');
-  rect(615,325,370,146,'#53596d');rect(645,352,315,120,'#292f4b');
-  for(const [x,y] of [[390,294],[1186,289]]){rect(x, y,54,168,'#736e79');rect(x-13,y-18,80,25,'#ada29b');rect(x+20,y+29,15,65,'#dec28e')}
-  for(let x=525;x<=1090;x+=88)rect(x,283,22,34,'#b4a7a8');
- });
-}
-function reverseFloor(pan){
- withLayer(pan,.79,()=>{
-  rect(-120,463,1840,500,'#aa929d');rect(-120,463,1840,30,'#b89daa');
-  ctx.strokeStyle='#746f89';ctx.lineWidth=4;
-  for(const x of [-820,-550,-320,-140,10,140,260,390,510,630,740,850,970,1120,1270,1440,1640,1850,2110]){
-   ctx.beginPath();ctx.moveTo(800+(x-800)*.22,465);ctx.lineTo(x,945);ctx.stroke()
-  }
-  for(let yy=485;yy<980;yy+=52+(yy-460)*.055){ctx.beginPath();ctx.moveTo(-100,yy);ctx.lineTo(1700,yy);ctx.stroke()}
-  // Center circular tile marker is part of the same training courtyard.
-  ctx.strokeStyle='#d6b5ab';ctx.lineWidth=14;ctx.beginPath();ctx.ellipse(800,635,145,32,0,0,Math.PI*2);ctx.stroke();
- });
-}
-function reverseForeground(pan,t){
- withLayer(pan,1.19,()=>{
-  // New view-specific cherry arch silhouettes. Provisional environment art.
-  ctx.strokeStyle='#514450';ctx.lineWidth=35;ctx.beginPath();ctx.moveTo(1600,-30);ctx.lineTo(1454,145);ctx.lineTo(1390,340);ctx.stroke();
-  ctx.lineWidth=19;ctx.beginPath();ctx.moveTo(1454,145);ctx.lineTo(1280,34);ctx.moveTo(1454,145);ctx.lineTo(1590,77);ctx.stroke();
-  const leaf='#cd9db2';ctx.fillStyle=leaf;
-  for(let i=0;i<92;i++){let x=1260+(i*37%330),y=13+(i*43%138);if((x-1420)*(x-1420)*.2+(y-70)*(y-70)*3<9500)rect(x,y,11,9,(i%4===0)?'#d3b0bd':leaf)}
- });
-}
-function reverseScene(t){sky(t,true);reverseWalls(camera.currentX);reverseFloor(camera.currentX);reverseForeground(camera.currentX,t)}
-function petals(t){ctx.save();ctx.fillStyle='rgba(248,181,200,.72)';for(let i=0;i<10;i++){
- const x=(i*197+(t*.018)*(1+i%3))%1710-45;const y=185+(i*71+(t*.011)*(1+i%2))%500;
- ctx.fillRect(x+camera.currentX*.12,y,(i%2?5:8),3);
-}ctx.restore()}
-const PARTY_STAGE={
- 1:[{x:719,baseY:676,w:192,h:384}],
- 2:[{x:572,baseY:674,w:182,h:364},{x:876,baseY:626,w:165,h:330}],
- 3:[{x:418,baseY:671,w:174,h:348},{x:716,baseY:613,w:166,h:332},{x:1046,baseY:672,w:174,h:348}],
- 4:[{x:280,baseY:674,w:170,h:340},{x:600,baseY:620,w:166,h:332},{x:930,baseY:620,w:166,h:332},{x:1230,baseY:674,w:170,h:340}]
-};
-function cameraAllyPosition(id,view){
- if(view==='party'){const i=party.findIndex(p=>p.id===id);return PARTY_STAGE[party.length]?.[i]||null}
- if(view==='ally-impact')return {x:211,baseY:908,w:288,h:576};
- // Foreground cinematic framing: the ally stands close to camera, not inside a reserved
- // 'safe' slot above the party HUD. The HUD pass paints OVER the actor's lower body.
- // This is a presentation-only change. No world-space targeting mechanics depend on it.
- return {x:211,baseY:908,w:288,h:576};
-}
-function allyHudFxPosition(id){
- const index=party.findIndex(p=>p.id===id);if(index<0)return null;
- const cardW=248,gap=12,total=party.length*cardW+Math.max(0,party.length-1)*gap;
- const x=Math.max(16,Math.round((1060-total)/2))+index*(cardW+gap);
- return {x:x+cardW/2,y:688};
-}
-function allyBattleArt(id,view){
- return id==='soul'?(view==='party'||view==='ally-impact'?'soulFront':equippedSoulBattleSprite()):id==='zero'?(view==='party'||view==='ally-impact'?'zeroFront':equippedZeroBattleSprite()):id==='lily'?(view==='party'||view==='ally-impact'?'lilyFront':equippedLilyBattleSprite()):id==='dawn'?(view==='party'||view==='ally-impact'?'dawnFront':equippedDawnBattleSprite()):id==='logan'?(view==='party'||view==='ally-impact'?'loganFront':equippedLoganBattleSprite()):id==='cloud'?(view==='party'||view==='ally-impact'?'cloudFront':equippedCloudBattleSprite()):'portrait';
-}
-function drawUnit(p,pos,view,t,acting=false){
- if(!p||!pos)return;const {x,baseY,w,h}=pos,top=baseY-h;
- const bob=Math.sin(t*.0012+(p.id==='soul'?0:1))*(p.hp>0?1.25:0);
- const select=view==='party'&&selectedAllyId===p.id;const allyTargeting=view==='party'&&pendingTargetAction?.targetSide==='ally',allTeamTargeting=allyTargeting&&pendingTargetAction?.targetScope==='all',supportAnimating=view==='ally-impact'&&phase==='resolve'&&fx?.kind==='support'&&fx.targetAllyId===p.id,eligible=view==='party'&&supportDemo?eligibleAllyTarget(p,supportDemo):allyTargeting?p.hp>0:true;
- ctx.save();ctx.translate(camera.currentX*(view==='party'?.32:.52),bob);
- ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.44,16,0,0,Math.PI*2);ctx.fillStyle='rgba(12,12,40,.45)';ctx.fill();
- if(acting||select){ctx.beginPath();ctx.ellipse(x+w/2,baseY+1,w*.51,22,0,0,Math.PI*2);ctx.lineWidth=4;ctx.strokeStyle=select?(allyTargeting||supportAnimating?'#55aaff':'#eaca94'):'#8be3fb';ctx.stroke()}
- if(p.hp<=0)ctx.globalAlpha=.37;
- const art=allyBattleArt(p.id,view);
- const zb=view==='command'&&p.id==='soul'?soulBasicStage(t):null;
-  if(zb!==null)soulBasicPaint(x,baseY,w,h,zb,art);
-  else if(art&&images[art]?.complete&&images[art].naturalWidth){
-  const img=images[art],fullArtwork=art==='soulFront'||art==='zeroFront'||art==='lilyFront'||art==='dawnFront'||art==='loganFront'||art==='cloudFront';ctx.imageSmoothingEnabled=fullArtwork||art==='zeroBattle'||art==='zeroBattlePremium'||art==='dawnBattle'||art==='dawnPremiumBattle';
-  if(fullArtwork){
-   // Ally targeting uses the same full-body front artwork across the entire party.
-   ctx.drawImage(img,x,top,w,h);
-  }else if(art==='soul'||art==='soulBattleStandard'||art==='soulBattlePremium'||art==='zeroBattle'||art==='zeroBattlePremium'||art==='lilyStandardBattle'||art==='lilySignatureBattle'||art==='loganBattle'||art==='loganBattlePremium'||art==='cloudWindcallBattle'||art==='cloudNineBattle'){
-   // Fit the visible cutout to the same enlarged battle-stage height across
-   // playable characters, removing transparent source-image margins.
-   const b=spriteAlphaBounds(img),scale=(h*1.12)/b.h,drawW=b.w*scale,drawH=b.h*scale;
-   ctx.drawImage(img,b.x,b.y,b.w,b.h,x+(w-drawW)/2,baseY-drawH,drawW,drawH);
-  }else if(art==='dawnBattle'||art==='dawnPremiumBattle'){
-   const b=spriteAlphaBounds(img),scale=(h*1.12)/b.h,drawW=b.w*scale,drawH=b.h*scale;
-   ctx.drawImage(img,b.x,b.y,b.w,b.h,x+(w-drawW)/2,baseY-drawH,drawW,drawH);
-  }else ctx.drawImage(img,x,top,w,h);
- }else silhouette(x,top,w,h,p.name,p.test);
- ctx.restore();
- const xx=x+camera.currentX*(view==='party'?.32:.52);
- if((allyTargeting||supportAnimating)&&eligible&&(allTeamTargeting||selectedAllyId===p.id)){ctx.save();ctx.beginPath();ctx.arc(xx+w/2,top+h/2,Math.max(w,h)/2+8,0,Math.PI*2);ctx.strokeStyle='#55aaff';ctx.lineWidth=4;ctx.stroke();ctx.restore()}
- if(view==='party'){
-  rect(xx-16,top-60,w+32,40,select?'#3f3845ef':!eligible?'#24212fe7':'#1e2945df',select?'#ffe2a8':eligible?'#869ab0':'#655d6a',8);
-  text(p.name,xx+w/2,top-41,p.test?16:19,p.hp<=0?'#c6acb0':'#f4edf8','800','center');
-  if(p.hp<=0)text('K.O. â€¢ SLOT RETAINED',xx+w/2,top-77,14,'#ffbaba','800','center');
-  line(xx-2,top-13,w+4,p.hp/p.maxHp,p.hp<=0?'#74525f':'#72e4b1','#454457',8);
-  // Target test hit boxes do not affect actual healing or combat targeting logic.
-  if((phase==='player'||allyTargeting)&&cameraPreview==='party')choiceRects.push({x:xx-19,y:top-82,w:w+38,h:h+114,action:'camera-select:'+p.id,enabled:eligible});
- }
+NØİ˜\˜Ê
+İİËÌŠÜÜš]SÙ™œÙ]Üš]PÙ[\–JÜÜš]SÙ™œÙ]Kš[™Ô˜Y]\ËX]”JŒŠNØİœİ›ÚÙTİ[OIÈÍMXXY™‰ÎØİ›[™UÚYMØİœİ›ÚÙJ
+_BˆYŠK˜Ø]YÛÜHOOIØ›ÜÜÉÊ^Âˆ™Xİ
+LË^KMİÊÍ‹Ë	ÈÌXÌÙN	Ë	ÈÎM˜NIËŠNÂˆ^
+K›˜[YK
+İİËÌ‹^KMMKLË	ÈÙ™™N	Ë	Î	Ë	ØÙ[\‰ÊNÂˆÛÛœİ\›ÜÚ[Û”İXÚÜÏYK›X\šÜÏË™š[\ŠX\šÏO›X\šËšYOOIÛ[˜KY\›ÜÚ[Û‰ÊK›[™İİ]\ÓX™[ÏVË‹‹ŠK™XY™œÏËœÛÛYJY™™XİO™Y™™XİšYOOIÜİ[‰ÊOÖÉÔÕS‰×N–×JK‹‹ŠK™XY™œÏËœÛÛYJY™™XİO™Y™™XİšYOOIİİ[˜YK\\ÚXØ[YY™[œÙKYİÛ‰ÊOÖÉÑQˆ8¡¤É×N–×JK‹‹ŠK™XY™œÏËœÛÛYJY™™XİO™Y™™XİšYOOIİİ[˜YKX]XÚËYİÛ‰ÊOÖÉĞUÈ8¡¤É×N–×JK‹‹Š\›ÜÚ[Û”İXÚÜÏÖØT“ÔÒSÓˆ	Ù\›ÜÚ[Û”İXÚÜßKÍN–×JWNÂˆYŠİ]\ÓX™[Ë›[™İ
+]^
+İ]\ÓX™[Ëš›Ú[Š	È8 (ˆ	ÊK
+İİËÌ‹^KMÌ‹L	ÈÙ™™YX‰Ë	ÎL	Ë	ØÙ[\‰ÊNÂˆ[™J
+Ì‹^KLKİËMK›X^˜\œšY\ÙK˜˜\œšY\‹ÙK›X^˜\œšY\Œ	ÈØÍÎY‰Ë	ÈÍŒ˜MÍIËŠNÂˆÚY[YX[˜\Š
+Ì‹^KLNKİËLMLKšK›X^KœÚY[\Ñ›Øİ\ÏÉÈÙ™™IÎ‰ÈÙ™Í‰Ë	ÈÍŒŒÍÉÊNÂˆBˆYŠK˜œ›ÚÙ[•\›œÏŒ
+]^
+	Ğ”“ÒÑSˆ	ÊÙK˜œ›ÚÙ[•\›œË
+İİËÌ‹^JÎKL‹	ÈÎXÙXÙ™‰Ë	Î	Ë	ØÙ[\‰ÊNÂˆYŠY[\š[™É‰œ\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙY	‰˜Ø[Y\˜T™]šY]ÈOOIÜ\IÊXÚÚXÙT™XİËœ\Ú
+ŞLLËN^KMÎİÊÌ‹š
+ÍÍXİ[Û‰Ù[™[^K]\™Ù]‰ÊÙKšY[˜X›YY_JNÂˆİœ™\İÜ™J
+NÂŸ_B™[˜İ[Ûˆ˜]ĞXİÜœÑ›Ü”Úİ
+Úİ
+^ÂˆÛÛœİšY]Ï\ÚİÛÜ›
+Úİ
+OOOIÜ™]™\œÙIÏÉÜ\IÎ‰ØÛÛ[X[™	ÎÂˆYŠšY]ÏOOIÜ\IÊ^ÂˆÛÛœİÜ™\™Y\\K›X\
+OŠÜÜÎ˜Ø[Y\˜P[TÜÚ][ÛŠšY	Ü\IÊ_JJKœÛÜ
 
-}
-const ENEMY_SPRITE_SCALE={common:1,elite:1.25,boss:1.5};
-function drawEnemy(t,shot){const all=enemies;if(phase==='player'&&pendingTargetAction&&cameraPreview!=='party'&&previewTargetMode()==='aoe'&&combatEnemies().length){ctx.save();ctx.strokeStyle='rgba(102,243,211,.82)';ctx.lineWidth=5;ctx.setLineDash([22,12]);ctx.beginPath();ctx.ellipse(1093+camera.currentX*.43,558,453,67,0,0,Math.PI*2);ctx.stroke();ctx.restore()}for(const e of all){
- const defeated=e.hp<=0,deathElapsed=defeated?Math.max(0,t-(e.deathAt||t)):0,deathProgress=Math.min(1,deathElapsed/ENEMY_DEATH_BEAT_MS),entering=!defeated&&e.reinforcement&&e.enteredAt&&t-e.enteredAt<ENEMY_REINFORCEMENT_ENTRY_MS,entryProgress=entering?Math.max(0,Math.min(1,(t-e.enteredAt)/ENEMY_REINFORCEMENT_ENTRY_MS)):1,opacity=defeated?Math.max(0,1-deathProgress):entryProgress;
- ctx.save();ctx.globalAlpha=opacity;
- const isFocus=phase==='player'&&chosenEnemy()?.id===e.id;
- const patternHit=phase==='player'&&!!pendingTargetAction&&cameraPreview!=='party'&&chooseAttackTargets(previewTargetMode()).some(x=>x.id===e.id);
- const isActor=(shot==='enemy-windup'&&actingEnemyId===e.id)||(fx?.kind==='enemy'&&fx?.actorEnemyId===e.id&&shot==='enemy-impact');
- const sh=(isActor?1.09:shot==='attack-impact'&&fx?.targetEnemyId===e.id?1.045:1)*(ENEMY_SPRITE_SCALE[e.category]??1)*((e.reinforcement&&e.enteredAt)?0.92+entryProgress*.08:1);
- const ww=e.w*sh,hh=e.h*sh,xx=e.x+camera.currentX*.43-(ww-e.w)/2,yy=e.y+(e.h-hh)+(entering?(1-entryProgress)*27:0)+(defeated?Math.pow(deathProgress,1.4)*26:0);
- const zbHit=fx?.kind==='basic'&&fx?.actor==='soul'&&fx.targetEnemyId===e.id?t-fx.at:null;
- const hitKick=zbHit!==null&&zbHit>=ANIMATION_STEP_MS*3&&zbHit<ANIMATION_STEP_MS*4?Math.sin((zbHit-ANIMATION_STEP_MS*3)*.025)*(1-(zbHit-ANIMATION_STEP_MS*3)/ANIMATION_STEP_MS)*2:0;
- let spriteCenterY=yy+hh/2,spriteVisibleW=ww,spriteVisibleH=hh;const spriteOffsetX=defeated?0:hitKick,spriteOffsetY=defeated||entering?0:Math.sin(t*.0026+e.x)*2.2;
- ctx.save();ctx.globalAlpha=opacity;if(defeated)ctx.filter='grayscale(1)';ctx.translate(spriteOffsetX,spriteOffsetY);
- ctx.beginPath();ctx.ellipse(xx+ww/2,yy+hh-4,ww*.48,13,0,0,Math.PI*2);ctx.fillStyle='#1b213c70';ctx.fill();
- const spriteId=enemyBattleSprite(e);if(images[spriteId]?.complete&&images[spriteId].naturalWidth){const img=images[spriteId];ctx.imageSmoothingEnabled=spriteId==='slimeBattle';const ratioParts=String(e.battleAspectRatio||'').split(':').map(Number),aspect=ratioParts.length===2&&ratioParts.every(Number.isFinite)&&ratioParts[0]>0&&ratioParts[1]>0?ratioParts[0]/ratioParts[1]:img.naturalWidth/img.naturalHeight,canvasW=Math.min(ww,hh*aspect),canvasH=canvasW/aspect,scaleX=canvasW/img.naturalWidth,scaleY=canvasH/img.naturalHeight,bounds=spriteAlphaBounds(img),drawW=bounds.w*scaleX,drawH=bounds.h*scaleY,drawX=xx+(ww-drawW)/2,drawY=yy+hh-drawH;spriteVisibleW=drawW;spriteVisibleH=drawH;spriteCenterY=drawY+drawH/2;ctx.drawImage(img,bounds.x,bounds.y,bounds.w,bounds.h,drawX,drawY,drawW,drawH)}
- ctx.restore();
- if(defeated){ctx.restore();continue}
- if(isActor){ctx.strokeStyle='#b7e6ff';ctx.lineWidth=4;ctx.strokeRect(xx-8,yy-6,ww+16,hh+13)}
- if(patternHit){const ringRadius=Math.max(spriteVisibleW,spriteVisibleH)/2+8;ctx.beginPath();ctx.arc(xx+ww/2+spriteOffsetX,spriteCenterY+spriteOffsetY,ringRadius,0,Math.PI*2);ctx.strokeStyle='#55aaff';ctx.lineWidth=4;ctx.stroke()}
- if(e.category!=='boss'){
-  rect(xx-3,yy-68,ww+6,27,'#1c2843e8','#8d96a9',6);
-  text(e.name,xx+ww/2,yy-55,13,'#fff4e8','800','center');
-  const statusLabels=[...(e.debuffs?.some(effect=>effect.id==='stun')?['STUN']:[]),...(e.debuffs?.some(effect=>effect.id==='tsunade-physical-defense-down')?['DEF â†“']:[]),...(e.debuffs?.some(effect=>effect.id==='tsunade-attack-down')?['ATK â†“']:[])];
-  if(statusLabels.length)text(statusLabels.join(' â€¢ '),xx+ww/2,yy-72,10,'#ffd5eb','900','center');
-  line(xx+2,yy-29,ww-4,e.maxBarrier?e.barrier/e.maxBarrier:0,'#c4c9d2','#626a75',6);
-  shieldedHealthBar(xx+2,yy-19,ww-14,10,e.hp,e.maxHp,e.shield,isFocus?'#ffd88e':'#ff8276','#4b2637');
- }
- if(e.brokenTurns>0)text('BROKEN '+e.brokenTurns,xx+ww/2,yy+9,12,'#9cecff','800','center');
- if(!entering&&phase==='player'&&!paused&&cameraPreview!=='party')choiceRects.push({x:xx-13,y:yy-64,w:ww+26,h:hh+74,action:'enemy-target:'+e.id,enabled:true});
- ctx.restore();
-}}
-function drawActorsForShot(t,shot){
- const view=shotWorld(shot)==='reverse'?'party':'command';
- if(view==='party'){
-  const ordered=party.map(p=>({p,pos:cameraAllyPosition(p.id,'party')})).sort((a,b)=>a.pos.baseY-b.pos.baseY);
-  for(const {p,pos} of ordered)drawUnit(p,pos,'party',t,p.id===selectedAllyId);
-  return;
- }
- if(shot==='ally-impact'){
-  const target=party.find(p=>p.id===fx?.targetAllyId&&p.hp>0);
-  if(target)drawUnit(target,cameraAllyPosition(target.id,'ally-impact'),'ally-impact',t,true);
-  return;
- }
- const ultimateActor=(pendingTargetAction?.action==='ultimate'&&party.find(p=>p.id===pendingTargetAction.actorId))||(ultimateExecuting&&lastAttack?.action==='ultimate'&&party.find(p=>p.id===lastAttack.actor));
- const chosen=ultimateActor|| (shot==='enemy-impact'?(party.find(p=>p.id===fx?.target)||active()||alive()[0]):phase==='intro'?active():active()||alive()[0]);
- const pos=cameraAllyPosition(chosen?.id,'command');
- if(chosen&&pos){
-  // True tracked character travel is independent of the background-layer camera offsets.
-  const dt=fx?.actor===chosen.id?t-fx.at:9999;
-  const basicLunge=fx?.kind==='basic'&&fx.actor===chosen.id?74*smooth01(dt/ANIMATION_STEP_MS)*(1-smooth01((dt-ANIMATION_STEP_MS)/(ANIMATION_STEP_MS*2))):0;
-  // Enemies are in the midground; render them first, then the close foreground ally.
-  drawEnemy(t,shot);
-  drawUnit(chosen,(chosen.id==='soul'&&soulBasicStage(t)!==null)?soulBasicTravel(t,pos):{...pos,x:pos.x+basicLunge},'command',t,phase==='player'&&cameraPreview!=='target');
- }else{
-  drawEnemy(t,shot);
- }
- if(shot==='ultimate-intro'&&chosen?.id==='soul'){
-  // Zero-specific development camera cut-in. A full bespoke ultimate animation remains an art dependency.
-  ctx.save();ctx.globalAlpha=.92;
-  rect(550,130,470,505,'rgba(17,27,51,.76)','#e6c892',22);
-  if(images.soulFront?.complete&&images.soulFront.naturalWidth){ctx.drawImage(images.soulFront,644,150,279,475)}
-  text('SOUL  /  ULTIMATE',784,623,29,'#fff1cc','850','center');ctx.restore();
- }
-}
-function drawCoverImage(img,mirror=false){
- if(!img?.complete||!img.naturalWidth||!img.naturalHeight)return false;
- const scale=Math.max(W/img.naturalWidth,H/img.naturalHeight),sw=W/scale,sh=H/scale,sx=(img.naturalWidth-sw)/2,sy=(img.naturalHeight-sh)/2;
- ctx.save();ctx.imageSmoothingEnabled=true;
- if(mirror){ctx.translate(W,0);ctx.scale(-1,1)}
- ctx.drawImage(img,sx,sy,sw,sh,0,0,W,H);ctx.restore();return true;
-}
-function drawBattleAreaBackground(areaId,reverse=false){
- const area=BATTLE_AREAS[areaId]||BATTLE_AREAS[DEFAULT_BATTLE_AREA_ID];
- const hasReverse=reverse&&!!area.reverseBackground;
- return drawCoverImage(images[hasReverse?area.reverseBackground:area.background],reverse&&!hasReverse);
-}
-function drawBattleShot(t,shot){const reverse=shotWorld(shot)==='reverse',area=BATTLE_AREAS[currentBattleAreaId]||BATTLE_AREAS[DEFAULT_BATTLE_AREA_ID];
- const areaBackground=drawBattleAreaBackground(currentBattleAreaId,reverse);
- if(!areaBackground){if(reverse)reverseScene(t);else forwardScene(t)}
- drawActorsForShot(t,shot);drawCombatVisualEvents(t,shot);if(!areaBackground||area.foregroundEffect==='petals')petals(t);
- const shade=ctx.createLinearGradient(0,565,0,900);shade.addColorStop(0,'rgba(12,12,26,0)');shade.addColorStop(1,'rgba(5,10,25,.52)');rect(0,555,W,345,shade);
-}
-function drawCameraStage(t){prepareCamera(t);
- // Render the destination scene continuously. Ease its pan into place without
- // flashing the previous view or laying a dark veil over party selection.
- drawBattleShot(t,camera.shot);
- // Camera test labels are shown in the HUD; no obscured scene banners.
-}
+KŠOO˜KœÜË˜˜\ÙVKX‹œÜË˜˜\ÙVJNÂˆ›ÜŠÛÛœİÜÜßHÙˆÜ™\™Y
+Y˜]Õ[š]
+ÜË	Ü\IËšYOO\Ù[XİY[RY
+NÂˆ™]\›ÂˆBˆYŠÚİOOIØ[KZ[\Xİ	Ê^ÂˆÛÛœİ\™Ù]\\K™š[™
+OœšYOOYË\™Ù][RY	‰œšŒ
+NÂˆYŠ\™Ù]
+Y˜]Õ[š]
+\™Ù]Ø[Y\˜P[TÜÚ][ÛŠ\™Ù]šY	Ø[KZ[\Xİ	ÊK	Ø[KZ[\Xİ	ËYJNÂˆ™]\›ÂˆBˆÛÛœİ[[X]PXİÜJ[™[™Õ\™Ù]Xİ[ÛË˜Xİ[ÛOOIİ[[X]IÉ‰œ\K™š[™
+OœšYOO\[™[™Õ\™Ù]Xİ[Û‹˜XİÜ’Y
+J_
+[[X]Q^Xİ][™É‰›\İ]XÚÏË˜Xİ[ÛOOIİ[[X]IÉ‰œ\K™š[™
+OœšYOO[\İ]XÚË˜XİÜŠJNÂˆÛÛœİÚÜÙ[][[X]PXİÜŸ
+ÚİOOIÙ[™[^KZ[\Xİ	ÏÊ\K™š[™
+OœšYOOYË\™Ù]
+_Xİ]™J
+_[]™J
+VÌJNœ\ÙOOOIÚ[›ÉÏØXİ]™J
+N˜Xİ]™J
+_[]™J
+VÌJNÂˆÛÛœİÜÏXØ[Y\˜P[TÜÚ][ÛŠÚÜÙ[ËšY	ØÛÛ[X[™	ÊNÂˆYŠÚÜÙ[‰‰œÜÊ^ÂˆËÈYH˜XÚÙYÚ\˜Xİ\ˆ˜]™[\È[™\[™[ÙˆH˜XÚÙÜ›İ[™[^Y\ˆØ[Y\˜HÙ™œÙ]Ë‚ˆÛÛœİYË˜XİÜOOXÚÜÙ[‹šYİY˜]NNNNÂˆÛÛœİ˜\ÚXÓ[™ÙOYËšÚ[™OOIØ˜\ÚXÉÉ‰™˜XİÜOOXÚÜÙ[‹šYÍÍ
+œÛ[ÛİJĞS’SPUSÓ—ÔÕTÓTÊJŠK\Û[ÛİJ
+PS’SPUSÓ—ÔÕTÓTÊKÊS’SPUSÓ—ÔÕTÓTÊŒŠJJNŒÂˆËÈ[™[ZY\È\™H[ˆHZYÜ›İ[™È™[™\ˆ[Hš\œİ[ˆHÛÜÙH›Ü™YÜ›İ[™[K‚ˆ˜]Ñ[™[^JÚİ
+NÂˆ˜]Õ[š]
+ÚÜÙ[‹
+ÚÜÙ[‹šYOOIÜÛİ[	É‰œÛİ[˜\ÚXÔİYÙJ
+HOO[[
+OÜÛİ[˜\ÚXÕ˜]™[
+ÜÊNË‹‹œÜËœÜË
+Ø˜\ÚXÓ[™Ù_K	ØÛÛ[X[™	Ë\ÙOOOIÜ^Y\‰É‰˜Ø[Y\˜T™]šY]ÈOOIİ\™Ù]	ÊNÂˆY[Ù^Âˆ˜]Ñ[™[^JÚİ
+NÂˆBˆYŠÚİOOIİ[[X]KZ[›ÉÉ‰˜ÚÜÙ[ËšYOOIÜÛİ[	Ê^ÂˆËÈ™\›Ë\ÜXÚYšXÈ]™[ÜY[Ø[Y\˜Hİ]Z[‹ˆH[™\ÜÚÙH[[X]H[š[X][Ûˆ™[XZ[œÈ[ˆ\\[™[˜ŞK‚ˆİœØ]™J
+NØİ™ÛØ˜[[OKLÂˆ™Xİ
+MLLÌÌLK	Ü™Ø˜JMËËLKÍŠIË	ÈÙM˜ÎL‰ËŒŠNÂˆYŠ[XYÙ\ËœÛİ[œ›ÛË˜ÛÛ\]I‰š[XYÙ\ËœÛİ[œ›Û›˜]\˜[ÚY
+^Øİ™˜]Ò[XYÙJ[XYÙ\ËœÛİ[œ›ÛMLÎKÍJ_Bˆ^
+	ÔÓÕSÈSSPUIËÎŒŒËK	ÈÙ™™ŒXØÉË	ÎL	Ë	ØÙ[\‰ÊNØİœ™\İÜ™J
+NÂˆBŸB™[˜İ[Ûˆ˜]ĞÛİ™\’[XYÙJ[YËZ\œ›ÜY˜[ÙJ^ÂˆYŠZ[YÏË˜ÛÛ\]_Z[YË›˜]\˜[ÚYZ[YË›˜]\˜[ZYÚ
+\™]\›ˆ˜[ÙNÂˆÛÛœİØØ[OSX]›X^
+ËÚ[YË›˜]\˜[ÚYÚ[YË›˜]\˜[ZYÚ
+KİÏUËÜØØ[KÚRÜØØ[KŞJ[YË›˜]\˜[ÚY\İÊKÌ‹ŞOJ[YË›˜]\˜[ZYÚ\Ú
+KÌÂˆİœØ]™J
+NØİš[XYÙTÛ[Ûİ[™Ñ[˜X›Y]YNÂˆYŠZ\œ›ÜŠ^Øİ˜[œÛ]JË
+NØİœØØ[JLKJ_Bˆİ™˜]Ò[XYÙJ[YËŞŞKİËÚË
+NØİœ™\İÜ™J
+NÜ™]\›ˆYNÂŸB™[˜İ[Ûˆ˜]Ğ˜]P\™XP˜XÚÙÜ›İ[™
+\™XRY™]™\œÙOY˜[ÙJ^ÂˆÛÛœİ\™XOPUWĞT‘PTÖØ\™XRY_UWĞT‘PTÖÑQUSĞUWĞT‘PWÒQNÂˆÛÛœİ\Ô™]™\œÙO\™]™\œÙI‰ˆHX\™XKœ™]™\œÙP˜XÚÙÜ›İ[™Âˆ™]\›ˆ˜]ĞÛİ™\’[XYÙJ[XYÙ\ÖÚ\Ô™]™\œÙOØ\™XKœ™]™\œÙP˜XÚÙÜ›İ[™˜\™XK˜˜XÚÙÜ›İ[™K™]™\œÙI‰ˆZ\Ô™]™\œÙJNÂŸB™[˜İ[Ûˆ˜]Ğ˜]TÚİ
+Úİ
+^ØÛÛœİ™]™\œÙO\ÚİÛÜ›
+Úİ
+OOOIÜ™]™\œÙIË\™XOPUWĞT‘PTÖØİ\œ™[˜]P\™XRY_UWĞT‘PTÖÑQUSĞUWĞT‘PWÒQNÂˆÛÛœİ\™XP˜XÚÙÜ›İ[™Y˜]Ğ˜]P\™XP˜XÚÙÜ›İ[™
+İ\œ™[˜]P\™XRY™]™\œÙJNÂˆYŠX\™XP˜XÚÙÜ›İ[™
+^ÚYŠ™]™\œÙJ\™]™\œÙTØÙ[™J
+NÙ[ÙH›ÜØ\™ØÙ[™J
+_Bˆ˜]ĞXİÜœÑ›Ü”Úİ
+Úİ
+NÙ˜]ĞÛÛX˜]š\İX[]™[ÊÚİ
+NÚYŠX\™XP˜XÚÙÜ›İ[™\™XK™›Ü™YÜ›İ[™Y™™XİOOIÜ][ÉÊ\][Ê
+NÂˆÛÛœİÚYOXİ˜Ü™X]S[™X\‘Ü˜YY[
+MKL
+NÜÚYK˜YÛÛÜ”İÜ
+	Ü™Ø˜JL‹L‹‹
+IÊNÜÚYK˜YÛÛÜ”İÜ
+K	Ü™Ø˜JKLKLŠIÊNÜ™Xİ
+MMKËÍKÚYJNÂŸB™[˜İ[Ûˆ˜]ĞØ[Y\˜TİYÙJ
+^Ü™\\™PØ[Y\˜J
+NÂˆËÈ™[™\ˆH\İ[˜][ÛˆØÙ[™HÛÛ[[İ\ÛKˆX\ÙH]È[ˆ[ÈXÙHÚ]İ]ˆËÈ›\Ú[™ÈH™]š[İ\ÈšY]ÈÜˆ^Z[™ÈH\šÈ™Z[İ™\ˆ\HÙ[Xİ[Û‹‚ˆ˜]Ğ˜]TÚİ
+Ø[Y\˜KœÚİ
+NÂˆËÈØ[Y\˜H\İX™[È\™HÚİÛˆ[ˆHQÈ›ÈØœØİ\™YØÙ[™H˜[›™\œË‚ŸB‚™[˜İ[Ûˆ˜]ĞÛÛX˜]ÚYÚ[
+K‹ÛÛÜ“˜[YK[Kİ[OIÜš[™ÉÊ^ÂˆİœØ]™J
+NØİ™ÛØ˜[[OX[NØİ˜[œÛ]JJNØİœİ›ÚÙTİ[OXÛÛÜ“˜[YNØİ™š[İ[OXÛÛÜ“˜[YNØİ›[™UÚYMÂˆYŠİ[OOOIÜİ\‰Ê^Âˆİ˜™YÚ[”]
 
-function drawCombatSigil(x,y,r,colorName,alpha,style='ring'){
- ctx.save();ctx.globalAlpha=alpha;ctx.translate(x,y);ctx.strokeStyle=colorName;ctx.fillStyle=colorName;ctx.lineWidth=4;
- if(style==='star'){
-  ctx.beginPath();for(let i=0;i<8;i++){const a=-Math.PI/2+i*Math.PI/4,rr=i%2?r*.48:r;const px=Math.cos(a)*rr,py=Math.sin(a)*rr;if(!i)ctx.moveTo(px,py);else ctx.lineTo(px,py)}ctx.closePath();ctx.fill();
- }else if(style==='note'){
-  ctx.beginPath();ctx.arc(-r*.25,-r*.15,r*.19,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.moveTo(-r*.08,-r*.15);ctx.lineTo(-r*.08,-r*.85);ctx.lineTo(r*.55,-r*.68);ctx.lineTo(r*.55,-r*.05);ctx.stroke();ctx.beginPath();ctx.arc(r*.39,-r*.07,r*.17,0,Math.PI*2);ctx.fill();
- }else{
-  ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(0,0,r*.68,0,Math.PI*2);ctx.stroke();
-  for(let i=0;i<4;i++){const a=i*Math.PI/2;ctx.beginPath();ctx.moveTo(Math.cos(a)*r*.78,Math.sin(a)*r*.78);ctx.lineTo(Math.cos(a)*r*1.12,Math.sin(a)*r*1.12);ctx.stroke()}
- }
- ctx.restore();
-}
-function enemyVisualPosition(id,geometry=null){const e=enemies.find(x=>x.id===id)||geometry;return e?{x:e.x+e.w/2+camera.currentX*.43,y:e.y+e.h*.55}:null}
-function drawFx(t){
- if(!fx)return;const dt=t-fx.at,duration=fx.kind==='basic'&&fx.actor==='soul'?SOUL_BASIC_MS:fx.action==='ultimate'?ULTIMATE_PRESENTATION_MS:fx.kind==='enemy'?ENEMY_ATTACK_EFFECT_MS:lastAttack?.mode==='five-hit'?ULTIMATE_PRESENTATION_MS:COMBAT_ACTION_EFFECT_MS;if(dt>duration){fx=null;return}
- const q=clamp01(dt/duration),fade=1-q,visual=fx.visual||`${fx.actor}-${fx.kind}`;
- if(fx.kind==='self'){const pos=cameraAllyPosition(fx.actor,'command');if(pos){const x=pos.x+pos.w/2+camera.currentX*.52,y=pos.baseY-pos.h*.58;drawCombatSigil(x,y,35+q*80,'#75cfff',fade,'ring');drawCombatSigil(x,y,22+q*45,'#e2f7ff',fade*.8,'star')}return}
- if(fx.kind==='support'){
-  if(visual==='logan-blood-shield'){
-   const pos=cameraAllyPosition(fx.actor,'command');if(pos){const x=pos.x+pos.w/2+camera.currentX*.52,y=pos.baseY-pos.h*.58;drawCombatSigil(x,y,32+q*66,'#83dcff',fade,'ring');drawCombatSigil(x,y,18+q*42,'#ffe0ed',fade*.75,'star')}
-   text('BLOOD SHIELD',1050,432,20,`rgba(215,244,255,${fade})`,'900','center');return;
-  }
-  const p=party.find(x=>x.id===fx.targetAllyId),view=fx.action==='ultimate'?'party':'ally-impact',pos=p&&cameraAllyPosition(p.id,view);if(!pos)return;
-  const x=pos.x+pos.w/2+camera.currentX*(view==='party'?.32:.52),y=pos.baseY-pos.h*.58,progress=q;
-  if(visual==='dawn-tune'){
-   drawCombatSigil(x,y,45+progress*85,'#6dfff1',fade,'ring');drawCombatSigil(x-36,y-85-progress*22,25,'#e9ffe9',fade,'note');drawCombatSigil(x+43,y-40-progress*12,19,'#a1d8ff',fade*.9,'note');
-   text('TUNE',x,y-145,20,`rgba(226,255,250,${fade})`,'900','center');
-  }else{
-   drawCombatSigil(x,y,55+progress*80,'#ffd989',fade,'ring');drawCombatSigil(x,y,25+progress*44,'#fff4c1',fade*.8,'star');
-   ctx.save();ctx.globalAlpha=fade;ctx.strokeStyle='#ffe9ad';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x-100,y+80);ctx.quadraticCurveTo(x,y-120,x+100,y-190);ctx.stroke();ctx.restore();text('ADVANCE',x,y-155,18,`rgba(255,239,194,${fade})`,'900','center');
-  }
-  return;
- }
- if(fx.kind==='enemy'){
-  const view=camera.shot==='party'?'party':'command',pan=view==='party'?.32:.52,hits=fx.hits?.length?fx.hits:[{target:fx.target}];
-  for(const hit of hits){const hudHit=hits.length>1&&view!=='party',pos=hudHit?allyHudFxPosition(hit.target):cameraAllyPosition(hit.target,view);if(!pos)continue;const x=hudHit?pos.x:pos.x+pos.w/2+camera.currentX*pan,y=hudHit?pos.y:pos.baseY-pos.h*.58;ctx.save();ctx.globalAlpha=fade;
-   if(fx.visual==='enemy-slime-acid'){ctx.fillStyle='#a8ff9d';ctx.strokeStyle='#ecffbc';for(let i=0;i<4;i++){ctx.beginPath();ctx.arc(x-30+i*20,y-5-Math.sin(i+q*6)*18,10+i%2*3,0,Math.PI*2);ctx.fill();ctx.lineWidth=2;ctx.stroke()}}
-   else if(fx.visual==='goblin-pursuit'){ctx.strokeStyle='#f4d280';ctx.lineWidth=8;ctx.lineCap='round';for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(x-70+q*35+i*14,y-24+i*18);ctx.lineTo(x-15+q*55+i*14,y-24+i*18);ctx.stroke()}drawCombatSigil(x+35,y,26+q*24,'#ffdf92',fade,'ring')}
-   else if(fx.visual==='hawk-talon'){ctx.strokeStyle='#e8c78e';ctx.lineWidth=8;ctx.lineCap='round';for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(x-48+i*22,y-50);ctx.quadraticCurveTo(x-12+i*18,y+8,x+40+i*12,y+50);ctx.stroke()}drawCombatSigil(x,y,24+q*20,'#f6ddb0',fade,'ring')}
-   else if(fx.visual==='geode-impact'){ctx.strokeStyle='#b8c5d4';ctx.fillStyle='rgba(157,178,199,.3)';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(x-55,y-48);ctx.lineTo(x-24,y-65);ctx.lineTo(x+10,y-42);ctx.lineTo(x+56,y-52);ctx.lineTo(x+49,y+18);ctx.lineTo(x+12,y+61);ctx.lineTo(x-42,y+48);ctx.lineTo(x-60,y+5);ctx.closePath();ctx.fill();ctx.stroke();for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(x-25+i*24,y-34);ctx.lineTo(x-12+i*18,y+34);ctx.stroke()}drawCombatSigil(x,y,28+q*34,'#d7e5f4',fade,'ring')}
-   else if(fx.visual==='bear-claws'){ctx.strokeStyle='#dbdad5';ctx.lineWidth=12;ctx.lineCap='round';for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(x-42+i*24,y-58);ctx.lineTo(x+42+i*24,y+55);ctx.stroke()}drawCombatSigil(x,y,32+q*35,'#e4e0d8',fade,'ring')}
-   else{ctx.strokeStyle='#ff8997';ctx.lineWidth=11;ctx.lineCap='round';for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(x-54+i*15,y-66);ctx.lineTo(x+45+i*15,y+55);ctx.stroke()}}
-   ctx.restore();if(hit.dodged)drawCombatSigil(x,y,28+q*22,'#a8e8ff',fade,'ring');if(dt>ANIMATION_STEP_MS){const labelY=hudHit?y+34:y-65,damage=hit.healthDamage??hit.damage??fx.damage;if(hit.dodged)text('DODGE',x,labelY,22,'#a8e8ff','900','center');else if(damage>0)text('-'+damage,x,labelY,26,hit.critical?'#ffd66e':'#ff9d9e','900','center');else if(hit.shieldDamage>0)text('BLOCKED',x,labelY,17,'#b6efff','900','center');if(hit.critical)text('CRITICAL',x,hudHit?y+12:y-96,12,'#ffe9a9','900','center')}}return;
- }
- const targetIds=fx.targetEnemyIds?.length?fx.targetEnemyIds:[fx.targetEnemyId],targets=targetIds.map(id=>enemyVisualPosition(id,fx.targetGeometry)).filter(Boolean);
- if(!targets.length){const p=enemyVisualPosition(fx.targetEnemyId,fx.targetGeometry);if(p)targets.push(p)}
- for(let i=0;i<targets.length;i++){
-  const {x,y}=targets[i],offset=i*85;
-  if(visual==='zero-cut'){
-   ctx.save();ctx.translate(x,y);ctx.globalAlpha=fade;ctx.lineCap='round';ctx.strokeStyle='#e64559';ctx.lineWidth=15;ctx.beginPath();ctx.moveTo(-90,72);ctx.lineTo(86,-78);ctx.stroke();ctx.strokeStyle='#fff1dc';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-94,67);ctx.lineTo(82,-82);ctx.stroke();ctx.restore();
-  }else if(visual==='zero-first-strike'){
-   ctx.save();ctx.translate(x,y);ctx.globalAlpha=fade;ctx.lineCap='round';ctx.strokeStyle='#f35667';ctx.lineWidth=11;for(let k=0;k<3;k++){const a=q*2+k*Math.PI/3;ctx.beginPath();ctx.moveTo(Math.cos(a)*-68,Math.sin(a)*-54);ctx.lineTo(Math.cos(a)*68,Math.sin(a)*54);ctx.stroke()}ctx.strokeStyle='#fff3dc';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-72,65);ctx.lineTo(74,-66);ctx.stroke();ctx.restore();
-  }else if(visual==='zero-execution'){
-   drawCombatSigil(x,y,42+q*112,'#ee5868',fade,'ring');drawCombatSigil(x,y,20+q*72,'#fff0d5',fade*.9,'star');ctx.save();ctx.translate(x,y);ctx.globalAlpha=fade;ctx.strokeStyle='#ff7e89';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(-80,-45);ctx.lineTo(80,45);ctx.moveTo(80,-45);ctx.lineTo(-80,45);ctx.stroke();ctx.restore();
-  }else if(visual==='soul-sword'){
-   const a=fade*(dt>ANIMATION_STEP_MS*3?clamp01((duration-dt)/ANIMATION_STEP_MS):1);ctx.save();ctx.translate(x,y);ctx.rotate(-.4);ctx.globalAlpha=a;ctx.lineCap='round';ctx.strokeStyle='#eff8ff';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(-108,-90);ctx.quadraticCurveTo(80,-40,100,92);ctx.stroke();ctx.strokeStyle='#80dcff';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-118,-104);ctx.quadraticCurveTo(70,-55,116,85);ctx.stroke();ctx.restore();
-  }else if(visual==='soul-enhance'){
-   drawCombatSigil(x,y,44+q*70,'#75cfff',fade,'ring');drawCombatSigil(x,y,25+q*36,'#e2f7ff',fade*.8,'star');
-  }else if(visual==='soul-storm'){
-   drawCombatSigil(x,y,56+q*120,'#9bd8ff',fade,'ring');drawCombatSigil(x,y,31+q*69,'#ffe3a5',fade*.85,'star');
-  }else if(visual==='lily-petal'){
-   ctx.save();ctx.globalAlpha=fade;ctx.translate(x,y);for(let k=0;k<6;k++){const a=k*Math.PI/3+q*3;ctx.save();ctx.rotate(a);ctx.fillStyle=k%2?'#ffb5d4':'#fff0f6';ctx.beginPath();ctx.ellipse(0,-35-q*35,12,29,0,0,Math.PI*2);ctx.fill();ctx.restore()}ctx.restore();
-  }else if(visual==='lily-ricochet'||visual==='lily-ricochet-mark'||visual==='lily-ricochet-trigger'){
-   drawCombatSigil(x,y,36+q*95,'#cf91ff',fade,'ring');if(visual!=='lily-ricochet')drawCombatSigil(x,y,26+q*45,'#ffb6eb',fade*.9,'star');
-   if(visual==='lily-ricochet-trigger'){ctx.save();ctx.globalAlpha=fade;ctx.strokeStyle='#f0bcff';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x-50,y-45);ctx.lineTo(x+50,y+45);ctx.moveTo(x+50,y-45);ctx.lineTo(x-50,y+45);ctx.stroke();ctx.restore()}
-  }else if(visual==='lily-haunting'||visual==='lily-hauntling'){
-   drawCombatSigil(x,y,45+q*105,'#9d6bdf',fade,'ring');drawCombatSigil(x-35,y-26,17+q*12,'#d9b6ff',fade*.85,'star');drawCombatSigil(x+38,y+24,12+q*14,'#c78cff',fade*.75,'star');
- }else if(visual==='dawn-star'){
-   drawCombatSigil(x,y,34+q*78,'#7cf8ed',fade,'star');drawCombatSigil(x,y,22+q*42,'#fff1bd',fade*.85,'ring');
-  }else if(visual==='logan-blood-slash'){
-   ctx.save();ctx.translate(x,y);ctx.rotate(-.45);ctx.globalAlpha=fade;ctx.strokeStyle='#a90039';ctx.lineWidth=18;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-78,-78);ctx.quadraticCurveTo(55,-22,78,82);ctx.stroke();ctx.strokeStyle='#ffd0db';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-80,-84);ctx.quadraticCurveTo(49,-18,82,77);ctx.stroke();ctx.restore();
-  }else if(visual==='logan-red-tide'){
-   drawCombatSigil(x,y,46+q*112,'#c2174b',fade,'ring');drawCombatSigil(x,y,22+q*68,'#ffe0e8',fade*.8,'star');
-  }else{
-   ctx.save();ctx.translate(x,y);ctx.rotate(-.35);ctx.strokeStyle=`rgba(255,247,238,${fade})`;ctx.lineWidth=12;ctx.beginPath();ctx.ellipse(0,0,90+80*q,32+80*q,0,0,Math.PI*1.65);ctx.stroke();ctx.restore();
-  }
- }
- if(dt>ANIMATION_STEP_MS){const hits=(lastAttack?.hits||[]).filter(h=>h.phase==='initial'),ids=[...new Set(hits.filter(h=>h.damage>0).map(h=>h.target))];for(const id of ids){const p=enemyVisualPosition(id);if(!p)continue;const amount=hits.filter(h=>h.target===id).reduce((sum,h)=>sum+(h.healthDamage??h.damage??0),0),shielded=hits.some(h=>h.target===id&&(h.shieldDamage||0)>0);if(amount>0)text('-'+amount,p.x,p.y-50,33,'#fff0ba','900','center');else if(shielded)text('BLOCKED',p.x,p.y-50,17,'#b6efff','900','center');if(hits.some(h=>h.target===id&&h.critical))text('CRITICAL',p.x,p.y-80,14,'#ffe9a9','900','center')}}
-}
-function drawCombatVisualEvents(t,shot){
- combatVisualEvents=combatVisualEvents.filter(e=>t-e.at<e.duration);
- for(const event of combatVisualEvents){if(t<event.at)continue;const q=clamp01((t-event.at)/event.duration),fade=1-q;
-  if(event.type==='zero-delay'){
-   for(const id of event.targetIds){const pos=enemyVisualPosition(id);if(!pos)continue;drawCombatSigil(pos.x,pos.y,28+q*44,'#f57482',fade,'ring');text('DELAYED 20%',pos.x,pos.y-58,13,`rgba(255,220,223,${fade})`,'900','center')}continue;
-  }
-  if(event.type==='reflect-damage'){
-   const view=shotWorld(shot)==='reverse'?'party':'command',pan=view==='party'?.32:.52;
-   for(const id of event.targetIds){const ally=party.find(unit=>unit.id===id),allyPosition=ally&&cameraAllyPosition(id,view),enemyPosition=!ally&&enemyVisualPosition(id),x=allyPosition?allyPosition.x+allyPosition.w/2+camera.currentX*pan:enemyPosition?.x,y=allyPosition?allyPosition.baseY-allyPosition.h*.58:enemyPosition?.y;if(!Number.isFinite(x)||!Number.isFinite(y))continue;drawCombatSigil(x,y,30+q*24,'#ff8c86',fade,'ring');const label=event.dodged?'REFLECT DODGED':event.damage+event.shieldDamage>0?`REFLECT -${event.damage+event.shieldDamage} TRUE`:'REFLECT';text(label,x,y+34,13,`rgba(255,230,224,${fade})`,'900','center')}
-   continue;
-  }
-  if(event.type==='echo-damage'){
-   const view=shotWorld(shot)==='reverse'?'party':'command',pan=view==='party'?.32:.52,color=event.damageType==='physical'?'#f2b36f':event.damageType==='magical'?'#c595ff':'#79e3ff';
-   for(const id of event.targetIds){const ally=party.find(unit=>unit.id===id),allyPosition=ally&&cameraAllyPosition(id,view),enemyPosition=!ally&&enemyVisualPosition(id),x=allyPosition?allyPosition.x+allyPosition.w/2+camera.currentX*pan:enemyPosition?.x,y=allyPosition?allyPosition.baseY-allyPosition.h*.58:enemyPosition?.y;if(!Number.isFinite(x)||!Number.isFinite(y))continue;drawCombatSigil(x,y,27+q*26,color,fade,'ring');const label=event.healthDamage>0?`ECHO -${event.healthDamage} ${event.damageType.toUpperCase()}`:event.shieldDamage>0?'ECHO BLOCKED':'ECHO';text(label,x,y+34+(event.stackIndex%3)*16,13,`rgba(239,247,255,${fade})`,'900','center')}
-   continue;
-  }
-  if(event.type.startsWith('rune-')){
-   const runeKey=event.type.slice(5),set=RUNE_SET_DEFINITIONS[runeKey],labels={recycle:'+1 SKILL POINT â€¢ ADVANCE 80%',amplify:'BASIC ATTACK +50%',united:'ALLY LINKED â€¢ BASIC ATTACK AT 50%', 'eternal-sun':'ULTIMATE COST âˆ’20 â€¢ NEXT ACTION +20 ENERGY', 'celestial-star':'GUARANTEED CRITICAL â€¢ CRIT DAMAGE +25%', 'dark-matter':'IGNORE DEFENSES 40%', 'infinite-space':'DELAY ALL 100%'};
-   const view=shotWorld(shot)==='reverse'?'party':'command',pan=view==='party'?.32:.52;
-   for(const id of event.targetIds){const ally=party.find(unit=>unit.id===id),allyPosition=ally&&cameraAllyPosition(id,view),enemyPosition=!ally&&enemyVisualPosition(id);const x=allyPosition?allyPosition.x+allyPosition.w/2+camera.currentX*pan:enemyPosition?.x,y=allyPosition?allyPosition.baseY-allyPosition.h*.62:enemyPosition?.y;if(!Number.isFinite(x)||!Number.isFinite(y))continue;drawCombatSigil(x,y,30+q*24,set?.name==='Recycle'?'#80ecbb':'#f1d28b',fade,'ring');const icon=images[set?.image];if(icon?.complete&&icon.naturalWidth){ctx.save();ctx.globalAlpha=fade;ctx.imageSmoothingEnabled=true;ctx.drawImage(icon,x-16,y-58,32,32);ctx.restore()}text(labels[runeKey]||set?.name||'RUNE',x,y-72,13,`rgba(255,244,220,${fade})`,'900','center')}
-   continue;
-  }
-  if(event.type==='dawn-resourceful'){
-   const x=W/2,y=435;drawCombatSigil(x,y,58+q*100,'#80f2ed',fade,'ring');text('RESOURCEFUL  â€¢  +2 SP',x,y-125,24,`rgba(224,255,247,${fade})`,'900','center');continue;
-  }
-  if(event.type==='lifesteal-heal'){
-   const view=shotWorld(shot)==='reverse'?'party':'command',pan=view==='party'?.32:.52;
-   for(const id of event.targetIds){const ally=party.find(unit=>unit.id===id),allyPosition=ally&&cameraAllyPosition(id,view),enemyPosition=!ally&&enemyVisualPosition(id);const x=allyPosition?allyPosition.x+allyPosition.w/2+camera.currentX*pan:enemyPosition?.x,y=allyPosition?allyPosition.baseY-allyPosition.h*.62:enemyPosition?.y;if(!Number.isFinite(x)||!Number.isFinite(y))continue;drawCombatSigil(x,y,27+q*20,'#6ef0a5',fade,'ring');text(`LIFESTEAL +${event.healing}`,x,y-54,15,`rgba(193,255,216,${fade})`,'900','center')}
-   continue;
-  }
-  if(event.type==='bleed-applied'||event.type==='bleed-tick'){
-   for(const id of event.targetIds){const pos=enemyVisualPosition(id);if(!pos)continue;drawCombatSigil(pos.x,pos.y,32+q*24,'#e85b77',fade,'ring');const label=event.type==='bleed-tick'?`BLEED -${event.damage??0} â€¢ ${event.stacks??0} LEFT`:`BLEED ${event.stacks??0}/${enemies.find(enemy=>enemy.id===id)?.bleedMaxStacks||5}`;text(label,pos.x,pos.y-64,14,`rgba(255,197,208,${fade})`,'900','center')}
-   continue;
-  }
-  if(event.type==='taunt-applied'||event.type==='taunt-redirect'){
-   const view=shotWorld(shot)==='reverse'?'party':'command',pan=view==='party'?.32:.52;
-   for(const id of event.targetIds){const ally=party.find(unit=>unit.id===id),allyPosition=ally&&cameraAllyPosition(id,view),enemyPosition=!ally&&enemyVisualPosition(id);const x=allyPosition?allyPosition.x+allyPosition.w/2+camera.currentX*pan:enemyPosition?.x,y=allyPosition?allyPosition.baseY-allyPosition.h*.62:enemyPosition?.y;if(!Number.isFinite(x)||!Number.isFinite(y))continue;drawCombatSigil(x,y,34+q*23,'#83dcff',fade,'ring');const rate=Math.round((event.rate??tauntRateOf(ally||enemies.find(unit=>unit.id===id)))*100);text(event.type==='taunt-redirect'?`TAUNT REDIRECT â€¢ ${rate}%`:`TAUNT ${rate}% â€¢ ${event.turns} TURN${event.turns===1?'':'S'}`,x,y-62,14,`rgba(203,243,255,${fade})`,'900','center')}
-   continue;
-  }
-  if(event.type==='shield-applied'||event.type==='shield-absorbed'||event.type==='logan-signature-heal'){
-   const view=shotWorld(shot)==='reverse'?'party':'command',pan=view==='party'?.32:.52;
-   for(const id of event.targetIds){const ally=party.find(unit=>unit.id===id),allyPosition=ally&&cameraAllyPosition(id,view),enemyPosition=!ally&&enemyVisualPosition(id);const x=allyPosition?allyPosition.x+allyPosition.w/2+camera.currentX*pan:enemyPosition?.x,y=allyPosition?allyPosition.baseY-allyPosition.h*.62:enemyPosition?.y;if(!Number.isFinite(x)||!Number.isFinite(y))continue;const isShield=event.type!=='logan-signature-heal';drawCombatSigil(x,y,28+q*20,isShield?'#aeb5bd':'#6ef0a5',fade,'ring');const label=event.type==='shield-applied'?'SHIELD APPLIED':event.type==='shield-absorbed'?'SHIELD ABSORBED':`TASTE FOR BLOOD +${event.healing||0}`;text(label,x,y-54,14,isShield?`rgba(218,223,229,${fade})`:`rgba(193,255,216,${fade})`,'900','center')}
-   continue;
-  }
-  if(event.type==='slime-residue'){
-   const view=shotWorld(shot)==='reverse'?'party':'command',pan=view==='party'?.32:.52;
-   for(const id of event.targetIds){const ally=party.find(p=>p.id===id),pos=ally&&cameraAllyPosition(id,view);if(!pos)continue;const x=pos.x+pos.w/2+camera.currentX*pan,y=pos.baseY-pos.h*.58;drawCombatSigil(x,y,32+q*22,'#a5ed43',fade,'ring');text(`RESIDUE ${ally.residueStacks}/${RESIDUE_RULES.maxStacks}`,x,y-62,14,`rgba(222,255,173,${fade})`,'900','center')}
-   continue;
-  }
-  for(const id of event.targetIds){const p=enemyVisualPosition(id,event.targetGeometry?.[id]);if(!p)continue;
-   if(event.type==='lily-exposed'){drawCombatSigil(p.x,p.y,36+q*12,'#a978e8',fade,'ring');text('EXPOSED',p.x,p.y-64,14,`rgba(226,207,255,${fade})`,'900','center')}
-   else if(event.type==='lily-ricochet-mark'){drawCombatSigil(p.x,p.y,28+q*8,'#d18cff',fade,'star')}
-   else if(event.type==='lily-ricochet-trigger'){drawCombatSigil(p.x,p.y,38+q*45,'#f0b2ff',fade,'ring');text('RICOCHET',p.x,p.y-78,14,`rgba(250,224,255,${fade})`,'950','center');const damage=event.damageByTarget?.[id];if(event.dodgedTargets?.includes(id)){drawCombatSigil(p.x,p.y,29+q*17,'#a8e8ff',fade,'ring');text('DODGE',p.x,p.y-55,20,`rgba(168,232,255,${fade})`,'950','center')}else if(Number.isFinite(damage))text(`-${damage} TRUE`,p.x,p.y-55,20,`rgba(250,238,255,${fade})`,'950','center')}
-   else if(event.type==='soul-follow-up'){drawCombatSigil(p.x,p.y,34+q*46,'#64d9ff',fade,'ring');drawCombatSigil(p.x,p.y,18+q*26,'#effcff',fade,'star');ctx.save();ctx.globalAlpha=fade;ctx.strokeStyle='#e6f9ff';ctx.shadowColor='#62d5ff';ctx.shadowBlur=18;ctx.lineWidth=9*(1-q*.35);ctx.lineCap='round';ctx.beginPath();ctx.moveTo(p.x-43,p.y-42);ctx.lineTo(p.x+43,p.y+42);ctx.moveTo(p.x+43,p.y-42);ctx.lineTo(p.x-43,p.y+42);ctx.stroke();ctx.restore();text('FOLLOW-UP',p.x,p.y-75,15,`rgba(212,247,255,${fade})`,'950','center');const damage=event.damageByTarget?.[id];if(event.dodgedTargets?.includes(id)){drawCombatSigil(p.x,p.y,29+q*17,'#a8e8ff',fade,'ring');text('DODGE',p.x,p.y-52,22,`rgba(168,232,255,${fade})`,'950','center')}else if(Number.isFinite(damage))text(`-${damage}`,p.x,p.y-52,22,`rgba(238,251,255,${fade})`,'950','center')}
-  }
- }
-}
-function getOrder(n){
- const predicted=turnTimeline.preview(n).map(x=>x.id);
- const current=phase==='player'?activeId:phase==='enemy'?actingEnemyId:null;
- return current?[current,...predicted.slice(0,n-1)]:predicted;
-}
-function hudCircle(cx,cy,r,fill,stroke,lw=3){ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.lineWidth=lw;ctx.strokeStyle=stroke;ctx.stroke()}}
-function hudButton(x,y,w,h,action,label,enabled=true,active=false){
- choiceRects.push({x,y,w,h,action,enabled});rect(x,y,w,h,active?'rgba(89,120,150,.92)':enabled?'rgba(23,34,54,.88)':'rgba(18,26,42,.68)',active?'#c6eaff':enabled?'#68819b':'#435267',12);
- text(label,x+w/2,y+h/2,18,enabled?'#f2f6ff':'#7789a4','750','center');
-}
-function hudPortrait(img,x,y,w,h,headShoulders=false){
- ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,10);ctx.clip();rect(x,y,w,h,'rgba(65,93,116,.42)');
- if(img?.complete&&img.naturalWidth){ctx.imageSmoothingEnabled=true;
-   const iw=img.naturalWidth,ih=img.naturalHeight;
-   // Portraits use their own front-facing artwork; they never borrow battle sprites.
-   const cropH=Math.min(ih,Math.round(ih*(headShoulders?.31:.49))),cropW=Math.min(iw,Math.round(cropH*w/h));
-   ctx.drawImage(img,(iw-cropW)/2,0,cropW,cropH,x,y,w,h);
- }else{hudCircle(x+w/2,y+h*.39,w*.18,'#899bb1');rect(x+w*.16,y+h*.57,w*.68,h*.48,'#526e8b',null,9)}
- ctx.restore();
-}
-// Render active combat statuses beside each ally portrait.
-function hudStatusList(p){const runeState=runeCombatState[p.id],runeStatuses=[];for(const effect of ['recycle','amplify','celestial-star','united'])if(hasRuneSet(p.id,effect)&&runeState?.cooldowns[effect]>0)runeStatuses.push({kind:'debuff',image:RUNE_SET_DEFINITIONS[effect].image,turns:runeState.cooldowns[effect]});const stun=p.debuffs?.find(effect=>effect.id==='stun'),slowStart=p.marks?.filter(mark=>mark.id==='tsunade-slow-start')||[],debuffStatuses=(p.debuffs||[]).filter(effect=>['tsunade-physical-defense-down','tsunade-attack-down'].includes(effect.id)).map(effect=>({kind:'debuff',icon:effect.id==='tsunade-physical-defense-down'?'D':'A',turns:effect.turns}));return [...(Array.isArray(p.hudStatuses)?p.hudStatuses:[]),...runeStatuses,...(stun?[{kind:'debuff',icon:'âœ¹',turns:stun.turns}]:[]),...debuffStatuses,...(slowStart.length?[{kind:'buff',icon:'S',stacks:slowStart.length,turns:slowStart[0].turns}]:[]),...(p.tune?[{kind:'buff',icon:'â™«',turns:p.tune.turns}]:[]),...(p.residueStacks?[{kind:'debuff',icon:'R',stacks:p.residueStacks,turns:p.residueTurns}]:[])]}
-function drawAllyStatuses(p,x,portraitY,sz){
- const effects=hudStatusList(p);if(!effects.length)return;
- const iconSize=23,pitch=26,perRow=Math.max(1,Math.floor((sz+3)/pitch));
- const rows=Math.ceil(effects.length/perRow),areaHeight=rows*iconSize+(rows-1)*3;
- const y0=portraitY-11-areaHeight;
- for(let i=0;i<effects.length;i++){
-  const ef=effects[i],row=Math.floor(i/perRow),col=i%perRow;
-  const bx=x+col*pitch,by=y0+row*pitch;
-  const favorable=ef.kind!=='debuff';
-  rect(bx,by,iconSize,iconSize,favorable?'rgba(23,77,104,.98)':'rgba(105,45,65,.98)',favorable?'#8bd1ef':'#ec9da9',4);
-  ctx.save();ctx.beginPath();ctx.rect(bx+1,by+1,iconSize-2,iconSize-2);ctx.clip();
-  const statusImage=ef.image&&images[ef.image];if(statusImage?.complete&&statusImage.naturalWidth){ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(statusImage,bx+2,by+2,iconSize-4,iconSize-4);ctx.restore()}else text(String(ef.icon||'âœ¦').slice(0,2),bx+iconSize/2,by+15,15,'#f7f5ff','750','center');
-  if(Number.isInteger(ef.stacks)&&ef.stacks>0){
-   const count=String(ef.stacks);rect(bx+iconSize-13,by+iconSize-13,12,12,'rgba(6,15,26,.98)',null,2);text(count,bx+iconSize-7,by+iconSize-4,9,'#fffafa','900','center');
-   if(Number.isInteger(ef.turns)&&ef.turns>=0){rect(bx+1,by+1,13,10,'rgba(6,15,26,.98)',null,2);text(`${ef.turns}T`,bx+7,by+6,7,'#fffafa','900','center')}
-  }else if(Number.isInteger(ef.turns)&&ef.turns>=0){
-   const duration=String(ef.turns),font=duration.length>2?8:10;
-   rect(bx+iconSize-13,by+iconSize-13,12,12,'rgba(6,15,26,.98)',null,2);
-   text(duration,bx+iconSize-7,by+iconSize-4,font,'#fffafa','900','center');
-  }
-  ctx.restore();
- }
-}
-function drawAllyUltimate(p,x,y,sz){
- const radius=sz*.29;
- const cx=x+sz-radius-4,cy=y+sz-radius-4;
- const queued=isUltPending(p.id),ready=canQueueUltimate(p),ko=p.hp<=0,selected=pendingTargetAction?.action==='ultimate'&&pendingTargetAction.actorId===p.id;
- // Keep a 44+-CSS-pixel-equivalent hit area in the portrait itself at phone scale.
- const hit=Math.min(106,sz-4);
- choiceRects.push({x:x+sz-hit-1,y:y+sz-hit-1,w:hit,h:hit,action:'queue-ult:'+p.id,enabled:ready});
- ctx.save();ctx.beginPath();ctx.rect(x,y,sz,sz);ctx.clip();
- if(ready){ctx.shadowColor='#ffdd93';ctx.shadowBlur=18;}
- hudCircle(cx,cy,radius,'#11233b',selected?'#55aaff':ready?'#ffdfa0':queued?'#e9b77d':'#90a6bc',selected?4:ready?4:2.5);
- ctx.shadowBlur=0;
- // Interior fill is the sole energy meter: bottom-to-top and no numeric or ring indicator.
- const availableFrac=queued?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p)));
- const inner=radius-3.3;
- ctx.save();ctx.beginPath();ctx.arc(cx,cy,inner,0,Math.PI*2);ctx.clip();
- const tint=ctx.createLinearGradient(cx,cy+inner,cx,cy-inner);
- tint.addColorStop(0,ready?'#4bcce9':'#3188c4');tint.addColorStop(1,ready?'#fff0a7':'#7bddfc');
- rect(cx-inner,cy+inner-(2*inner*availableFrac),2*inner,2*inner*availableFrac,tint);
- if(queued)rect(cx-inner,cy-inner,2*inner,2*inner,'rgba(102,69,40,.74)');
- ctx.restore();
- text(queued?'â—ˆ':'âœ¦',cx,cy+radius*.29,radius*.95,ready?'#fff9df':ko?'#8996a4':'#ecf5ff','900','center');
- if(queued){ctx.beginPath();ctx.arc(cx,cy,radius-2,0,Math.PI*2);ctx.strokeStyle='#efc37e';ctx.lineWidth=2;ctx.setLineDash([4,5]);ctx.stroke();ctx.setLineDash([])}
- ctx.restore();
-}
-function drawAllyPortraitHud(){
- // Wide lower-screen cards emphasize the portrait and ultimate while keeping HP and passive indicators legible.
- const cardW=248,cardH=210,gap=12,top=678,total=party.length*cardW+Math.max(0,party.length-1)*gap;
- let x=Math.max(16,Math.round((1060-total)/2));
- for(const p of party){
-  const activeAlly=phase==='player'&&activeId===p.id&&p.hp>0,ko=p.hp<=0;
-  const selectingAlly=pendingTargetAction?.targetSide==='ally'&&phase==='player',targetSelected=selectingAlly&&(pendingTargetAction?.targetScope==='all'?p.hp>0:selectedAllyId===p.id);
-  const portraitX=x+12,portraitY=top+10,portraitSize=112;
-  ctx.save();ctx.globalAlpha=ko?.57:activeAlly?1:.84;
-  rect(x,top,cardW,cardH,'rgba(14,23,42,.96)',targetSelected?'#eaca94':activeAlly?'#f3d79e':'rgba(129,164,191,.82)',12);
-  hudPortrait(images[characterPortraitArt(p.id)],portraitX,portraitY,portraitSize,portraitSize,true);
-  if(ko)rect(portraitX,portraitY,portraitSize,portraitSize,'rgba(30,17,23,.62)',null,10);
-  drawAllyUltimate(p,x+95,top-15,136);
-  drawAllyStatuses(p,portraitX,portraitY,portraitSize);
-  text(String(ko?0:p.hp),x+cardW-12,top+132,14,ko?'#f0afb7':'#e4f3ef','750','right');
-  shieldedHealthBar(x+12,top+149,cardW-48,14,ko?0:p.hp,p.maxHp,p.shield,ko?'#b16b76':'#67e3b4','#23374d');
-  if(p.id==='soul'){
-   const maximum=soulFollowUpLimit(),current=Math.max(0,Math.min(maximum,soulFollowUpState.remaining));
-   const dotSize=12,pitch=22,rowWidth=(maximum-1)*pitch+dotSize,startX=x+(cardW-rowWidth)/2;
-   for(let i=0;i<maximum;i++)hudCircle(startX+i*pitch+dotSize/2,top+184,dotSize/2,i<current?'#72d8f5':'rgba(65,84,108,.9)',i<current?'#d7f6ff':'#8295a9',1.8);
-  }
-  ctx.restore();
-  if(selectingAlly)choiceRects.push({x,y:top,w:cardW,h:cardH,action:'camera-select:'+p.id,enabled:p.hp>0});
-  x+=cardW+gap;
- }
-}
-function toggleHudStatusDemo(){
- if(['setup','intro','victory','defeat'].includes(phase))return false;
- const enabled=party.some(p=>hudStatusList(p).length);
- for(let i=0;i<party.length;i++)party[i].hudStatuses=enabled?[]:(i===0?[
-  {kind:'buff',icon:'â¬¡',turns:3},{kind:'debuff',icon:'âœ¹',turns:2},
-  {kind:'buff',icon:'âœ¦',turns:4},{kind:'buff',icon:'â™¥',turns:null},
-  {kind:'debuff',icon:'â„',turns:1},{kind:'buff',icon:'â—†',turns:2},
-  {kind:'debuff',icon:'â—ˆ',turns:5}
- ]:i===1?[{kind:'buff',icon:'â¬¡',turns:2},{kind:'debuff',icon:'âœ¹',turns:1}]:[{kind:'buff',icon:'âœ¦',turns:null}]);
- say(enabled?'STATUS HUD TEST OFF':'STATUS HUD TEST ON â€” visual only; no gameplay effects');return true;
-}
-function drawDeveloperPanel(){
- const x=938,y=92,w=633,h=591;
- rect(x,y,w,h,'rgba(12,19,32,.97)','#aab9ce',16);
- text('COMBAT TEST CONTROLS',x+24,y+31,23,'#f2dfbd','800');text('Preview tools only â€” not canonical abilities',x+24,y+61,15,'#a9bfd2','600');
- const modes=[['single','SINGLE'],['blast','BLAST'],['aoe','AOE'],['five-hit','5-HIT']];
- for(let i=0;i<modes.length;i++){const [mode,label]=modes[i];hudButton(x+23+i*150,y+82,139,49,'mode:'+mode, label,phase==='player'&&!paused,targetingMode===mode)}
- text('TARGET / CAMERA',x+23,y+153,14,'#b9c8d8','800');
- hudButton(x+23,y+174,184,49,'camera-party','ALLY VIEW',phase==='player'&&!paused,cameraPreview==='party');
- hudButton(x+219,y+174,184,49,'camera-target','ENEMY VIEW',phase==='player'&&!paused,cameraPreview==='target');
- hudButton(x+416,y+174,191,49,'cap-test','SP MAX +1',phase==='player'&&!paused);
- hudButton(x+23,y+243,184,49,'support-heal','HEAL TEST',phase==='player'&&!paused);
- hudButton(x+219,y+243,184,49,'support-revive','REVIVE TEST',phase==='player'&&!paused);
- if(!supportDemo)hudButton(x+416,y+243,191,49,'hud-status-test','STATUS ICONS',phase==='player'&&!paused,party.some(p=>hudStatusList(p).length));
- if(supportDemo){hudButton(x+416,y+243,191,49,'confirm-support','CONFIRM',!!party.find(p=>p.id===selectedAllyId&&eligibleAllyTarget(p,supportDemo)));hudButton(x+416,y+299,191,38,'cancel-support','CANCEL');}
- text('CHARGE ULTIMATE ENERGY â€” TEST ONLY',x+23,y+323,14,'#b9c8d8','800');
- for(let i=0;i<party.length;i++)hudButton(x+23+i*146,y+345,139,45,'charge-ult:'+party[i].id,'+ ENERGY '+(i+1),party[i].hp>0&&!paused&&!['intro','victory','defeat'].includes(phase));
- text('FUNDAMENTAL 05 â€” TURN TIMING TESTS',x+23,y+412,14,'#b9c8d8','800');
- hudButton(x+23,y+429,183,40,'f05-advance','ADVANCE +25%',phase==='player'&&!paused);
- hudButton(x+222,y+429,183,40,'f05-delay','DELAY 25%',phase==='player'&&!paused);
- hudButton(x+421,y+429,187,40,'f05-speed','SPEED x1.3',phase==='player'&&!paused);
- hudButton(x+23,y+476,282,40,'f05-summon-independent','INDEPENDENT SUMMON',phase==='player'&&!paused);
- hudButton(x+321,y+476,287,40,'f05-summon-controlled','CONTROLLED SUMMON',phase==='player'&&!paused);
- const actor=active(),prog=actor?progressFor(actor.id):null;
- text(`LEVEL / HP TEST â€¢ ${actor?actor.name+' LV '+prog?.level:'NO ACTIVE ALLY'} â€¢ MATERIALS & EQUIPMENT NOT DEFINED`,x+23,y+535,13,'#b9c8d8','750');
- const canAct=phase==='player'&&!paused&&!!actor;
- hudButton(x+23,y+548,141,40,'progress-test-level','LEVEL +1',canAct&&actor.level<characterLevelCap()&&(!ASCENSION_GATES.includes(actor.level)||prog.ascended.includes(actor.level)));
- hudButton(x+174,y+548,139,40,'progress-test-ascend','ASCEND',canAct&&ASCENSION_GATES.includes(actor.level)&&!prog.ascended.includes(actor.level));
- hudButton(x+324,y+548,137,40,'hp-test-flat','FLAT +20',canAct);
- hudButton(x+471,y+548,136,40,'hp-test-percent','HP +20%',canAct);
-}
-function drawHud(t){
- const cinematic=phase==='resolve'||phase==='enemy';
- // HUD is screen-space and visually distinct from the layered battlefield.
- const shadow=ctx.createLinearGradient(0,675,0,H);shadow.addColorStop(0,'rgba(6,10,20,0)');shadow.addColorStop(.32,'rgba(7,12,24,.42)');shadow.addColorStop(1,'rgba(4,8,19,.94)');rect(0,675,W,225,shadow);
- // Small title and current wave: do not block battlefield framing.
- text('TWO-TONE',116,33,28,'#f8f4ea','850');
- text(`WAVE ${Math.max(1,waveIndex+1)} / ${wavePlan.length||1}`,120,64,16,'#e4cda2','750');
- // Vertical timeline - compact actual turn order, not additional faux turns.
- ctx.save();ctx.globalAlpha=cinematic?.48:1;
- rect(24,106,78,404,'rgba(10,18,34,.49)','rgba(179,202,223,.34)',18);
- const order=getOrder(6);for(let i=0;i<order.length;i++){
-  const id=order[i],foe=enemies.find(e=>e.id===id),ally=party.find(p=>p.id===id),summon=summons.find(s=>s.id===id),now=i===0;
-  const xx=31,yy=119+i*64;
-  rect(xx,yy,64,58,now?'rgba(38,66,90,.95)':'rgba(17,28,47,.87)',now?'#f9dea5':foe?'#a77c89':'#759bbb',12);
-  if(foe)hudPortrait(images[foe.art],xx+7,yy+5,49,44);
-  else if(summon){hudCircle(xx+31,yy+25,19,'#508c8f','#d4f5ed',2);text('âœ§',xx+31,yy+25,22,'#ffffff','800','center');}
-  else if(id==='soul')hudPortrait(images.soulFront,xx+7,yy+5,49,44);
-  else if(id==='zero')hudPortrait(images.zeroFront,xx+7,yy+5,49,44);
-  else if(id==='lily')hudPortrait(images.lilyFront,xx+7,yy+5,49,44);
-  else if(id==='dawn')hudPortrait(images.dawnFront,xx+7,yy+5,49,44);
- else if(id==='logan')hudPortrait(images.loganPortrait,xx+7,yy+5,49,44);
- else if(id==='cloud')hudPortrait(images.cloudFront,xx+7,yy+5,49,44);
- else if(ally)hudPortrait(images.portrait,xx+7,yy+5,49,44);
-  else{hudCircle(xx+31,yy+21,13,'#6e8eac');rect(xx+19,yy+33,24,16,'#6784a1',null,7)}
-  text(now?'NOW':String(i+1),xx+54,yy+48,10,now?'#fff2cb':'#bacbdf','850','right');
- }
- ctx.restore();
- // Boss barrier and HP are screen-space displays. The barrier sits above the
- // health rows; each dot sits immediately left of its corresponding HP bar.
- const bossOnField=liveEnemies().find(e=>e.category==='boss');
- if(bossOnField){
- const bx=250,by=12,bw=1070,bars=bossOnField.healthBars||1,barH=13,barX=bx+34,barW=bw-54,bh=68+bars*20,segmentMax=bossOnField.maxHp/bars;
-  rect(bx,by,bw,bh,'rgba(10,16,31,.88)','rgba(244,202,139,.68)',12);
-  text(`BOSS  â€¢  ${bossOnField.name}`,bx+18,by+13,15,'#fff0d4','850');
-  hudCircle(bx+bw-218,by+13,5,'#c4c9d2','#eff2f5',1);text('BARRIER',bx+bw-207,by+13,10,'#d5e0ec','800');
-  hudCircle(bx+bw-116,by+13,5,'#ee7882','#ffd3d7',1);text('HEALTH',bx+bw-105,by+13,10,'#f0e7eb','800');
-  line(barX,by+31,barW,bossOnField.maxBarrier?bossOnField.barrier/bossOnField.maxBarrier:0,'#c4c9d2','#3e485a',barH);
-  const activeHealthBar=Math.min(bars-1,Math.floor((bossOnField.maxHp-bossOnField.hp)/Math.max(1,segmentMax)));
-  for(let i=0;i<bars;i++){
-   const segmentHp=Math.max(0,Math.min(segmentMax,bossOnField.hp-i*segmentMax)),ratio=segmentMax?segmentHp/segmentMax:0,rowY=by+51+i*20;
-   const remaining=segmentHp>0;hudCircle(bx+19,rowY+barH/2,5,remaining?'#f3c778':'#43485a',remaining?'#fff0c5':'#72798a',2);
-   line(barX,rowY,barW,ratio,i===activeHealthBar?'#ffd57c':'#ee7882','#3e2938',barH);
-  }
- }
- // Compact expanded selected enemy information.
- const focus=chosenEnemy();
- if(phase==='player'&&cameraPreview!=='party'&&focus&&focus.category!=='boss'){
-  rect(938,22,399,72,'rgba(10,16,31,.78)','rgba(210,213,220,.40)',14);
-  text(`${focus.name}  LV. ${focus.level}`,961,44,19,'#fff3db','750');
-  text(`HP ${focus.hp} / ${focus.maxHp}`,1315,44,15,'#f0e7eb','700','right');
-  shieldedHealthBar(961,65,310,9,focus.hp,focus.maxHp,focus.shield,'#f38382','#343d51');
- }else if(cameraPreview==='party'&&!bossOnField){
-  rect(1010,24,386,62,'rgba(10,16,31,.76)','rgba(200,207,225,.38)',14);
-  text('SELECT AN ALLY',1035,55,20,'#f7e7ca','800');
- }
- // Separate compact upper-right utility controls.
- if(DEV_MODE)hudButton(1366,25,74,55,'dev-panel-toggle','DEV',true,devPanelOpen);
- hudButton(1481,25,74,55,'pause',paused?'PLAY':'PAUSE',phase==='player'||paused);
- // Invisible 104x104 touch hit regions respect iPhone's minimum target dimension.
- if(DEV_MODE)choiceRects.push({x:1348,y:7,w:106,h:100,action:'dev-panel-toggle',enabled:true});
- choiceRects.push({x:1463,y:7,w:106,h:100,action:'pause',enabled:phase==='player'||paused});
- // Show a cue only while target selection is pending. The active card and
- // action buttons already identify whose turn it is and which actions exist.
- if(phase==='player'&&pendingTargetAction){
-  const mode=previewTargetMode(),hits=pendingTargetAction?chooseAttackTargets(mode):[];
-  text(pendingTargetAction.targetSide==='ally'?(pendingTargetAction.targetScope==='all'?`SELECT ANY ALLY OR PRESS ${pendingTargetAction.action.toUpperCase()} AGAIN`:`SELECT ALLY FOR ${pendingTargetAction.action.toUpperCase()}`):`SELECT TARGET FOR ${pendingTargetAction.action.toUpperCase()} â€¢ ${hits.length} TARGETS`,1190,620,15,'#d4e9f4','700');
-  addButton(1102,642,180,30,'cancel-target','CANCEL TARGET');
- }
- // Portrait-focused Ally HUD review layout, without altering combat resource logic.
- ctx.save();ctx.globalAlpha=cinematic?.88:1;
- drawAllyPortraitHud();
- ctx.restore();
- // Shared SP glyphs above actions, wrap automatically for increased effective capacity.
- ctx.save();ctx.globalAlpha=cinematic?.3:1;
- const maximum=effectiveSpMax(),visibleCount=Math.max(0,maximum),perRow=10,pipPitch=29;
- const rowCount=Math.ceil(visibleCount/perRow),baseX=1268,baseY=696;
- text('SKILL POINTS',1270,baseY-21,15,'#e9dcbe','850');
- for(let i=0;i<visibleCount;i++){
-   const row=Math.floor(i/perRow),col=i%perRow,cx=baseX+col*pipPitch,cy=baseY-row*29;
-   ctx.save();ctx.translate(cx,cy);ctx.rotate(Math.PI/4);
-   rect(-8,-8,16,16,i<sp?'#c7f1ff':'rgba(52,77,97,.90)',i<sp?'#ecfbff':'#8094a5',3);ctx.restore();
- }
- // Battle commands: only Basic and Skill. Ultimate is inside portrait HUDs.
- const playerReady=phase==='player'&&!paused;
- const actions=[
-  {key:'basic',cx:1353,cy:816,r:51,enabled:playerReady,icon:'âš”',label:'ATTACK'},
-  {key:'skill',cx:1508,cy:800,r:64,enabled:playerReady&&sp>0,icon:'âœ¦',label:'SKILL'},
- ];
- for(const a of actions){
-  const enabled=a.enabled,selected=pendingTargetAction?.action===a.key&&pendingTargetAction.actorId===activeId;
-  choiceRects.push({x:a.cx-a.r-5,y:a.cy-a.r-5,w:(a.r+5)*2,h:(a.r+5)*2,action:a.key,enabled});
-  hudCircle(a.cx,a.cy,a.r,selected?'rgba(44,77,110,.98)':enabled?'rgba(29,48,70,.97)':'rgba(19,32,49,.87)',selected?'#55aaff':enabled?'#fff0c3':'#738092',4);
-  hudCircle(a.cx,a.cy,a.r-9,'rgba(13,25,45,.58)',selected?'rgba(134,204,255,.88)':enabled?'rgba(130,193,220,.54)':'rgba(82,100,121,.30)',2);
-  text(a.icon,a.cx,a.cy-12,a.key==='skill'?43:41,enabled?'#f5f7ff':'#8897a9','850','center');
-  text(a.label,a.cx,a.cy+31,a.key==='skill'?18:16,enabled?'#fff5dc':'#a0aebc','850','center');
- }
- ctx.restore();
- if(ultimateQueue.length){const names=ultimateQueue.map(q=>party.find(p=>p.id===q.actorId)?.name||q.actorId).join(' â†’ ');rect(965,769,287,38,'rgba(28,35,49,.82)','rgba(219,195,130,.53)',10);text(`ULT QUEUE ${names.slice(0,23)}`,978,788,14,'#f3e3bc','750')}
- if(phase==='resolve'&&log){rect(420,615,760,44,'rgba(9,17,31,.92)','rgba(177,203,226,.62)',11);text(log.length>76?log.slice(0,75)+'â€¦':log,800,637,17,'#eff6ff','750','center')}
- if(DEV_MODE&&devPanelOpen&&!['victory','defeat'].includes(phase))drawDeveloperPanel();
- if(paused)drawPause();if(phase==='victory'||phase==='defeat')drawResult();
-}
-function drawPause(){
- rect(0,0,W,H,'rgba(2,5,15,.68)');text('PAUSED',800,208,34,'#fff3e9','850','center');
- rect(366,230,868,433,'#101729f4','#e4cda4',18);
- if(DEV_MODE){
-  addButton(444,365,214,82,'test-ko','K.O. ALLY','');
-  addButton(693,365,214,82,'test-revive','REVIVE ALLY','');
-  addButton(942,365,214,82,'unpause','RESUME','');
- }else addButton(685,365,230,82,'unpause','RESUME','');
- addButton(570,548,220,66,'restart','RESTART BATTLE','');
- if(canAccessMainMenu())addButton(810,548,220,66,'main-menu','MAIN MENU','');
-}
-function drawStory(){
- const {title,story}=campaignEntry;
- const beat=story.beats[storyBeatIndex];
- rect(0,0,W,H,'#101829');
- const art=storyBeatArt;
- drawCoverImage(art.background);
- rect(0,0,W,H,'rgba(3,7,15,.28)');
- rect(180,490,1240,354,'rgba(13,21,38,.94)','#d8c38f',20);
- const textX=beat.portrait?540:238;
- text(title,textX,541,34,'#fff0d4','850');
- if(art.portrait?.complete&&art.portrait.naturalWidth)ctx.drawImage(art.portrait,238,460,262,262);
- if(prefetchedStoryBeatIndex!==storyBeatIndex&&art.background?.complete&&(!art.portrait||art.portrait.complete)){
-  const nextBeat=story.beats[storyBeatIndex+1];
-  if(nextBeat)requestStoryBeat(story,nextBeat,'low');
-  if(prefetchedStoryBeatIndex===-1)prefetchCampaignBattle(campaignEntry.encounter);
-  prefetchedStoryBeatIndex=storyBeatIndex;
- }
- const textWidth=beat.portrait?822:1110;
- let narrationY=585;
- let line='';
- ctx.font='600 28px system-ui,-apple-system,Segoe UI,sans-serif';
- for(const word of beat.text.split(' ')){
-  const next=line?line+' '+word:word;
-  if(line&&ctx.measureText(next).width>textWidth){
-   text(line,textX,narrationY,28,'#eff6ff');
-   narrationY+=31;
-   line=word;
-  }else line=next;
- }
- if(line)text(line,textX,narrationY,28,'#eff6ff');
- if(canAccessMainMenu())addButton(238,755,210,62,'main-menu','MAIN MENU','');
- const finalBeat=storyBeatIndex===story.beats.length-1;
- addButton(1120,755,242,62,'advance-story',finalBeat?'BEGIN BATTLE':'CONTINUE','');
-}
-function drawResult(){
- rect(0,0,W,H,'rgba(3,7,15,.72)');
- text(phase==='victory'?'VICTORY':'DEFEAT',800,196,42,phase==='victory'?'#f7dd9f':'#f29ba4','900','center');
- rect(310,220,980,455,'rgba(13,21,38,.98)','#d8c38f',20);
- text(phase==='victory'?'ENEMIES DEFEATED  â€¢  '+totalEnemyDefeats+'    WAVES CLEARED  â€¢  '+wavePlan.length:'ALLIES DEFEATED',370,310,23,'#edf2f7','750');
- text('TURNS  '+turn,370,356,18,'#a9bcce','600');
- text('PARTY  '+party.length+' / '+MAX_PARTY_SIZE,370,390,18,'#a9bcce','600');
- if(campaignEntry){
-  const status=campaignReward?.status;
-  if(phase==='victory'){
-   const label=DEV_MODE?'Developer battle':status==='saved'?(campaignReward.coins||campaignReward.rankXp?[campaignReward.coins&&`+${campaignReward.coins} coins`,campaignReward.rankXp&&`+${campaignReward.rankXp} Rank XP`].filter(Boolean).join(' â€¢ '):'First-clear reward already received'):status==='error'?'Progress could not be saved.':'Saving progressâ€¦';
-   text(label,370,438,23,'#f7dd9f','750');
-  }
-  const canLeave=status!=='pending'&&status!=='error';
-  addButton(430,532,220,90,status==='error'?'retry-campaign-save':'restart',status==='error'?'RETRY SAVE':phase==='defeat'?'RETRY':'REPLAY','',status!=='pending');
-  if(campaignEntry.nextEntryId&&phase==='victory'&&status==='saved')addButton(690,532,220,90,'next-campaign-entry','CONTINUE','');
-  if(canAccessMainMenu())addButton(950,532,220,90,'main-menu','MAIN MENU','',canLeave);
-  return;
- }
- addButton(430,532,220,90,'restart','REPLAY','');
- addButton(690,532,220,90,'change-team','PARTY','');
- addButton(950,532,220,90,'main-menu','MAIN MENU','');
-}
-function drawSetup(){
- rect(0,0,W,H,'rgba(4,8,20,.77)');
- rect(180,74,1240,760,'rgba(13,20,39,.98)','#ccb88e',20);
- text('STORY BATTLE SETUP',800,54,34,'#ffedd1','850','center');
- addButton(1234,96,160,52,'main-menu','MAIN MENU','');
- text('CURRENT PARTY  '+draft.length+'/'+MAX_PARTY_SIZE,240,197,20,'#bad4e9','800');
- for(let i=0;i<MAX_PARTY_SIZE;i++){
-  const x=218+i*285,y=220,w=260,h=142,p=roster(draft[i]);
-  rect(x,y,w,h,p?'rgba(38,54,79,.94)':'rgba(21,33,56,.88)',p?'#9eb8d3':'#4c607a',12);
-  if(p){
-   const portrait=images[characterPortraitArt(p.id)];
-   if(portrait?.complete&&portrait.naturalWidth)drawCharacterPortrait(portrait,p.id,x+12,y+24,68);
-   text(p.name,x+92,y+63,18,'#f6eefa','800');
-   text(p.test?'TEST PLACEHOLDER':'LEVEL '+progressFor(p.id).level,x+92,y+94,13,p.test?'#e5ca99':'#c4d6e5','600');
-  }else text('EMPTY',x+w/2,y+78,18,'#8494a9','750','center');
- }
- if(DEV_MODE){
-  text('BATTLE TEST OPTIONS',240,430,19,'#bad4e9','800');
-  text('WAVES  '+(waveOverride||WAVE_PRESETS[wavePreset]).join(' + '),240,468,16,'#d2ddec','650');
-  addButton(240,487,250,54,'toggle-waves','CHANGE WAVES','');
-  text('ENEMY ROSTER',240,582,16,'#d2ddec','700');
-  for(const [i,mode,label] of [['slime','SLIME'],['wolf','WOLF'],['hawk','HAWK'],['mixed','MIXED'],['goblin','GOBLIN'],['geode','GEODE'],['bear','BEAR']].entries())addButton(160+i*178,600,164,48,'roster-'+mode,label,enemyRosterMode===mode?'SELECTED':'');
-  text('HP RECOVERY  â€¢  '+(trainingRecoveryMode==='restore'?'RESTORE':'PRESERVE'),538,468,16,'#d2ddec','650');
-  addButton(538,487,470,54,'toggle-recovery','CHANGE HP RECOVERY','');
- }
- addButton(1039,733,313,79,'start','START BATTLE','',validTeam(draft));
-}
-// Transient hint popovers belong to menus and setup screens. Combat has
-// dedicated turn, targeting, and action-resolution cues; overlaying another
-// message on the battlefield obscures character cards and action effects.
-function drawHint(t){if(hint&&t-hintAt<2300&&['startup','menu','partySetup','loadout','inventory','challenges','settings','store','setup'].includes(phase)){rect(474,393,652,76,'rgba(15,21,39,.98)','#e6b98a',12);text(hint,800,431,20,'#fff4e8','700','center')}}
-function loop(t){choiceRects=[];ctx.clearRect(0,0,W,H);if(phase==='startup'){drawStartupMenu()}else if(phase==='menu'){drawMainMenu()}else if(phase==='partySetup'){drawPartySetup()}else if(phase==='loadout'){drawLoadout()}else if(phase==='inventory'){drawItemInventory()}else if(phase==='challenges'){drawChallenges()}else if(phase==='settings'){drawSettings()}else if(phase==='store'){drawStore()}else if(phase==='events'){drawEvents()}else if(phase==='campaign'){drawCampaignSelector()}else if(phase==='story'){drawStory()}else if(phase!=='setup'){
-  drawCameraStage(t);drawFx(t);drawHud(t)
- }else{drawCameraStage(t);drawSetup()}drawHint(t);requestAnimationFrame(loop)}
-function choose(x,y){for(let i=choiceRects.length-1;i>=0;i--){const b=choiceRects[i];if(x<b.x||x>b.x+b.w||y<b.y||y>b.y+b.h)continue;if(!b.enabled){say('Action not currently available.');return}const cmd=b.action;if(cmd.startsWith('event-tab:')){
- const tab=EVENT_TABS.find(event=>event.id===cmd.slice(10));
- if(phase==='events'&&tab)activeEventTab=tab;
- return
- }if(cmd.startsWith('campaign-option:')){chooseCampaignOption(Number(cmd.slice(16)));return}if(cmd.startsWith('roster-')){if(DEV_MODE)setEnemyRoster(cmd.slice(7));return}if(cmd.startsWith('loadout:')){handleLoadoutAction(cmd.slice(8));return}if(cmd.startsWith('store:')){handleStoreAction(cmd);return}if(cmd.startsWith('add:')){addUnit(cmd.slice(4));return}if(cmd.startsWith('remove:')){removeUnit(Number(cmd.slice(7)));return}if(cmd==='dev-panel-toggle'&&DEV_MODE){devPanelOpen=!devPanelOpen;return}if(cmd==='cancel-target'){cancelTargetSelection();return}if(cmd.startsWith('enemy-target:')){setEnemyTarget(cmd.slice(13));return}if(cmd.startsWith('camera-select:')){if(cameraPreview==='party'&&(phase==='player'||pendingTargetAction?.targetSide==='ally')){const id=cmd.slice(14),p=party.find(p=>p.id===id);if(pendingTargetAction?.targetSide==='ally'&&pendingTargetAction.targetScope==='all'){if(!p||p.hp<=0){say('Choose a living party member to confirm the team skill.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;return executeCombatAction(actor,pending.action)}if(pendingTargetAction?.targetSide==='ally'){if(!p||p.hp<=0){say('Tune and Dawnâ€™s Ultimate need a living ally.');return}const pending=pendingTargetAction,actor=party.find(x=>x.id===pending.actorId);pendingTargetAction=null;cameraPreview=null;selectedAllyId=null;if(pending.action==='ultimate')return queueUltimate(pending.actorId,id);return executeCombatAction(actor,pending.action,null,id)}if(supportDemo&&!eligibleAllyTarget(p,supportDemo)){say('Not eligible for this support test.');return}selectedAllyId=id;say((supportDemo?'TARGET TEST: ':'CAMERA TEST: ')+(p?.name||id)+' selected.')}return}if(cmd.startsWith('mode:')){if(DEV_MODE)setTargetingMode(cmd.slice(5));return}if(cmd.startsWith('queue-ult:')){beginTargetSelection('ultimate',cmd.slice(10));return}if(cmd.startsWith('charge-ult:')){if(DEV_MODE)chargeUltimateForTest(cmd.slice(11));return}
- switch(cmd){case 'startup-start':startFromTitle();break;case 'claim-daily-reward':claimDailyReward();break;case 'open-inventory':phase='inventory';hint='';break;case 'open-challenges':phase='challenges';hint='';break;case 'open-settings':phase='settings';hint='';break;case 'account-sign-out':window.TwoToneAccount?.signOut?.();break;case 'account-delete':window.TwoToneAccount?.deleteAccount?.();break;case 'open-events':openEvents();break;case 'claim-login-event':collectLoginEvent();break;case 'claim-soul-gift':collectSoulGift();break;case 'open-store':phase='store';lastStoreNotice='';break;case 'open-campaign':openCampaignSelector();break;case 'campaign-start':startPreviewedCampaignPart();break;case 'campaign-previous':campaignPage--;choiceRects=[];break;case 'campaign-next':campaignPage++;choiceRects=[];break;case 'advance-story':advanceCampaignStory();break;case 'retry-campaign-save':saveCampaignVictory();break;case 'next-campaign-entry':openCampaignEntry(campaignEntry?.nextEntryId);break;case 'open-party':enterPartySetup();break;case 'open-loadout':enterLoadout();break;case 'save-party':saveParty();break;case 'main-menu':enterMainMenu();break;case 'toggle-fullscreen':toggleFullscreen();break;case 'support-heal':if(DEV_MODE)startSupportDemo('heal');break;case 'support-revive':if(DEV_MODE)startSupportDemo('revive');break;case 'confirm-support':if(DEV_MODE)confirmSupportDemo();break;case 'cancel-support':if(DEV_MODE)cancelSupportDemo();break;case 'camera-party':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='party'?null:'party';supportDemo=null;selectedAllyId=activeId}break;case 'camera-target':if(DEV_MODE&&phase==='player'&&!paused){cameraPreview=cameraPreview==='target'?null:'target';selectedAllyId=null;if(cameraPreview==='target')say('Tap an automaton to set the target.')}break;case 'reset-draft':draft=loadTeam();break;case 'toggle-waves':if(DEV_MODE)toggleWavePreset();break;case 'toggle-recovery':if(DEV_MODE)setTrainingRecoveryMode(trainingRecoveryMode==='restore'?'preserve':'restore');break;case 'start':startBattle();break;case 'restart':replay();break;case 'change-team':enterPartySetup();break;case 'forced-select':enterPartySetup();break;case 'pause':if(phase!=='player'&&!paused){say('Pause is available on your turn.');return}paused=!paused;break;case 'unpause':paused=false;break;case 'test-ko':if(DEV_MODE)testKO();break;case 'test-revive':if(DEV_MODE)testRevive();break;case 'skill':play('skill');break;case 'cap-test':if(DEV_MODE)cycleSpCapTest();break;case 'hud-status-test':if(DEV_MODE)toggleHudStatusDemo();break;case 'f05-advance':if(DEV_MODE)addActionAdvance(activeId,25);break;case 'f05-delay':if(DEV_MODE)addActionDelay(activeId,25);break;case 'f05-speed':if(DEV_MODE)setSpeedMultiplierForTest(activeId,(speedModifiers[activeId]||1)>=1.3?1:1.3);break;case 'f05-summon-independent':if(DEV_MODE)queueSummonForTest('independent');break;case 'f05-summon-controlled':if(DEV_MODE)queueSummonForTest('controlled');break;
- case 'progress-test-level':{if(DEV_MODE){const a=active(),p=a&&progressFor(a.id);if(a&&p){const cost=Math.max(1,requiredExp(a.level)-p.exp),result=testGrantExp(a.id,cost);say(result?`TEST ONLY: level ${result.level}, ${cost} EXP injected.`:'Ascension required or level cap reached.');}}break}
- case 'progress-test-ascend':{if(DEV_MODE){const a=active();if(a)say(testAscend(a.id)?`TEST ONLY: level ${a.level} ascension unlocked (no materials).`:'Not at a locked ascension gate.');}break}
- case 'hp-test-flat':{if(DEV_MODE){const a=active();if(a)setHpBonusForTest(a.id,'debug-flat','flat',(a.hpFlatModifiers['debug-flat']||0)+20);}break}
- case 'hp-test-percent':{if(DEV_MODE){const a=active();if(a)setHpBonusForTest(a.id,'debug-percent','percent',(a.hpPercentModifiers['debug-percent']||0)+.2);}break}default:zeroSkillArmed=false;play(cmd)}return}}
-const screenElement=document.getElementById('screen');
-function isFullscreen(){return document.fullscreenElement===screenElement||document.webkitFullscreenElement===screenElement}
-function isStandaloneApp(){return navigator.standalone===true||window.matchMedia?.('(display-mode: standalone)').matches||window.matchMedia?.('(display-mode: fullscreen)').matches}
-function isIPhoneBrowser(){return /iPhone|iPod/i.test(navigator.userAgent)&&!isStandaloneApp()}
-async function toggleFullscreen(){
- try{
-  if(isStandaloneApp()){say('Two-Tone is already open as a Home Screen app.');return}
-  if(isFullscreen()){if(document.exitFullscreen)await document.exitFullscreen();else if(document.webkitExitFullscreen)document.webkitExitFullscreen();return}
-  if(screenElement.requestFullscreen)await screenElement.requestFullscreen({navigationUI:'hide'});
-  else if(screenElement.webkitRequestFullscreen)screenElement.webkitRequestFullscreen();
-  else if(isIPhoneBrowser())say('On iPhone: Share â†’ Add to Home Screen, then open Two-Tone from its icon.');
-  else say('This browser blocks page fullscreen. Try opening Two-Tone as a Home Screen app.');
- }catch(error){if(isIPhoneBrowser())say('On iPhone: Share â†’ Add to Home Screen, then open Two-Tone from its icon.');else say('Fullscreen was blocked by the browser. Try opening Two-Tone as a Home Screen app.')}
-}
-canvas.addEventListener('pointerdown',e=>{e.preventDefault();const r=canvas.getBoundingClientRect();choose((e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height)},{passive:false});
-window.addEventListener('keydown',e=>{if(e.key==='Escape'&&pendingTargetAction)cancelTargetSelection();if(e.key==='1')play('basic');if(e.key==='2')play('skill');if(e.key==='3')play('ultimate');if(DEV_MODE&&e.key.toLowerCase()==='m'&&phase==='player')cycleSpCapTest();if(DEV_MODE&&['q','w','e','f'].includes(e.key.toLowerCase())&&phase==='player')setTargetingMode(({q:'single',w:'blast',e:'aoe',f:'five-hit'})[e.key.toLowerCase()]);if(DEV_MODE&&e.key.toLowerCase()==='v'&&phase==='player'){cameraPreview=cameraPreview==='party'?null:'party';selectedAllyId=activeId}if(DEV_MODE&&e.key.toLowerCase()==='t'&&phase==='player')cameraPreview=cameraPreview==='target'?null:'target';if(DEV_MODE&&e.key.toLowerCase()==='r'&&phase!=='setup')replay()});window.addEventListener('contextmenu',e=>e.preventDefault());
-// Read-only instrumentation and explicitly labeled testing helpers for verification.
-if(DEV_MODE){
-window.twoToneStatus=()=>({phase,paused,turn,battleAreaId:currentBattleAreaId,enemyRosterMode,plannedEnemyArchetypes:wavePlan.map(wave=>wave.map(enemy=>enemy.archetypeId)),devPanelOpen,targetingMode,pendingTargetAction,zeroSkillArmed,previewTargetMode:previewTargetMode(),supportDemo,attackInProgress,pendingVacancies:[...pendingVacancies],lastAttack:lastAttack?JSON.parse(JSON.stringify(lastAttack)):null,supportTestHistory:supportTestHistory.slice(),previewTargetIds:chooseAttackTargets(previewTargetMode()).map(e=>e.id),enemyCountTotal:wavePlan.reduce((n,w)=>n+w.length,0),selectedEnemyId,actingEnemyId,enemies:enemies.map(e=>({id:e.id,archetypeId:e.archetypeId,level:e.level,category:e.category,healthBars:e.healthBars,hp:e.hp,maxHp:e.maxHp,speed:speedOf(e),barrier:e.barrier,maxBarrier:e.maxBarrier,brokenTurns:e.brokenTurns,bleedStacks:e.bleedStacks?.length||0,bleedMaxStacks:e.bleedMaxStacks||5,momentumStacks:e.momentumStacks||0,x:e.x,y:e.y,slot:e.slot,wave:e.wave,order:e.order,alive:e.hp>0})),wave:{number:waveIndex+1,total:wavePlan.length,sizes:wavePlan.map(w=>w.length),active:enemies.length,reserve:waveQueue.length,defeated:waveKills,totalDefeated:totalEnemyDefeats,cleared:encounterCleared,spawnHistory:spawnHistory.slice()},gauges:{...gauges},party:party.map(p=>({id:p.id,hp:p.hp,maxHp:p.maxHp,energy:p.energy,energyReserved:p.energyReserved||0,availableEnergy:availableEnergy(p),slot:party.indexOf(p)+1,test:p.test})),draft:[...draft],activeId,enemyHp,sp,spMax:effectiveSpMax(),spCapModifiers:{...spCapModifiers},ultimateQueue:ultimateQueue.map(q=>({...q})),ultimateExecuting,ultimateResumePending:!!ultimateResume,ultimateHistory:ultimateHistory.slice(),order:getOrder(5),summonSlotsUsed:summons.filter(s=>!s.pendingCreation).length,summons:summons.map(s=>({...s})),summonHistory:summonHistory.slice(),turnTimeline:turnTimeline.snapshot(),speedModifiers:{...speedModifiers},visibleAllyIds:cameraShot()==='party'?party.map(p=>p.id):[cameraShot()==='enemy-impact'?fx?.target:(activeId||alive()[0]?.id)].filter(Boolean),visibleEnemyIds:cameraShot()==='party'?[]:combatEnemies().map(e=>e.id),camera:{shot:cameraShot(),world:shotWorld(cameraShot()),panX:camera.currentX??0,transition:camera.progress,preview:cameraPreview,selectedAllyId,parallaxRates:[.04,.13,.32,.72,1.18],hudDrawnAfterScene:true},stagePositions:party.map(p=>({id:p.id,position:cameraAllyPosition(p.id,cameraShot()==='party'?'party':'command')}))});
-window.twoToneUi=()=>({hudPortraits:party.map(p=>({id:p.id,scale:(phase==='player'&&activeId===p.id&&p.hp>0)?1:.9,energyFill:isUltPending(p.id)?0:Math.max(0,Math.min(1,availableEnergy(p)/ultimateEnergyCost(p))),statusCount:hudStatusList(p).length})),version:'v0.1.36',debugOpen:devPanelOpen,buttons:choiceRects.map(b=>({...b}))});
-window.twoToneEchoStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,echoPercent:echoPercentOf(unit)}));
-window.twoToneReflectStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,reflectPercent:reflectPercentOf(unit)}));
-window.twoToneProgress=()=>({playerRank,rankProgressionImplemented:true,maxLevel:characterLevelCap(),absoluteMaxLevel:CHARACTER_MAX_LEVEL,ascensionGates:[...ASCENSION_GATES],recoveryMode:trainingRecoveryMode,
- characters:ROSTER.map(r=>({id:r.id,level:progressFor(r.id).level,levelCap:characterLevelCap(),exp:progressFor(r.id).exp,ascended:[...progressFor(r.id).ascended],requiredExp:progressFor(r.id).level<characterLevelCap()?requiredExp(progressFor(r.id).level):0,baseHpTestOnly:r.hp})),
- unitHP:party.map(p=>({id:p.id,level:p.level,baseHpTestOnly:p.baseHp,maxHp:p.maxHp,currentHp:p.hp,flat:{...p.hpFlatModifiers},percent:{...p.hpPercentModifiers}})),
- unitAttack:party.map(p=>({id:p.id,level:p.level,baseAttack:p.baseAttack,attack:calculateAttack(p),flat:{...p.attackFlatModifiers},percent:{...p.attackPercentModifiers}})),
- unitPhysicalDefense:party.map(p=>({id:p.id,level:p.level,basePhysicalDefense:p.basePhysicalDefense,physicalDefense:calculatePhysicalDefense(p),flat:{...p.physicalDefenseFlatModifiers},percent:{...p.physicalDefensePercentModifiers}})),
- unitMagicalDefense:party.map(p=>({id:p.id,level:p.level,baseMagicalDefense:p.baseMagicalDefense,magicalDefense:calculateMagicalDefense(p),flat:{...p.magicalDefenseFlatModifiers},percent:{...p.magicalDefensePercentModifiers}})),
- unitTrueDamageBasis:party.map(p=>({id:p.id,attack:calculateAttack(p),trueDefense:calculateTrueDefense(p),selfTrueDamageReduction:calculateTrueDamageReduction(p,p)}))});
-window.twoToneTest={testGrantExp,testAscend,setPlayerRankForTest,setHpBonusForTest,setEchoPercentForTest,setReflectPercentForTest,calculateMaxHp,calculateLevelScaledStat,calculateAttack,calculatePhysicalDefense,calculateMagicalDefense,calculateTrueDefense,calculateTrueDamageReduction,calculateDamageAfterDefense,calculatePhysicalDamageAfterDefense,calculateMagicalDamageAfterDefense,calculateTrueDamageAfterDefense,calculateTypedActionDamage,requiredExp,setTrainingRecoveryMode,roundHp,addActionAdvance,addActionDelay,setSpeedMultiplierForTest,queueSummonForTest,turnTimelineSnapshot:()=>turnTimeline.snapshot(),queueUltimate,chargeUltimateForTest,toggleHudStatusDemo,setHudStatusesForTest:(id,items)=>{const p=party.find(p=>p.id===id);if(!p||!Array.isArray(items)||items.length>80)return false;p.hudStatuses=items.map(e=>({kind:e.kind==='debuff'?'debuff':'buff',icon:String(e.icon||'âœ¦').slice(0,2),turns:e.turns===null?null:(Number.isInteger(e.turns)&&e.turns>=0?e.turns:null)}));return true;},setSpCapTestSource,cycleSpCapTest,canQueueUltimate,debugKOForTest:(id)=>{if(['setup','intro','victory','defeat'].includes(phase))return false;const p=party.find(p=>p.id===id);if(!p||p.hp<=0)return false;p.hp=0;gauges[p.id]=0;saveVitals();cancelQueuedUltimatesOfDefeated();return true},startBattle,addUnit,removeUnit,enterSelection,enterPartySetup,saveParty,testKO,testRevive,play,replay,zeroSkillControl,setTargetingMode,startSupportDemo,confirmSupportDemo,cancelSupportDemo,eligibleAllyTarget:(id,kind)=>eligibleAllyTarget(party.find(p=>p.id===id),kind),setEnemyHpForTest:(id,hp)=>{if(phase!=='player'||attackInProgress)return false;const e=liveEnemies().find(e=>e.id===id);if(!e||!Number.isFinite(hp)||hp<1||hp>e.maxHp)return false;e.hp=hp;syncEnemyHp();return true},applyBleedForTest:(enemyId,sourceId,stacks=1,maxStacks=5)=>{const enemy=liveEnemies().find(unit=>unit.id===enemyId),source=party.find(unit=>unit.id===sourceId);return enemy&&source?applyBleed(enemy,source,stacks,maxStacks):false},setEnemyTarget,setWavePlanForTest,toggleWavePreset,setEnemyRoster,debugDefeatEnemy:(id)=>{const e=liveEnemies().find(e=>e.id===id);if(!e||phase==='setup'||phase==='victory'||phase==='defeat')return false;e.hp=0;resolveEnemyDefeat(e);return true;},selectEnemy:(id)=>setEnemyTarget(id),setCameraPreview:(view)=>{if(phase==='player'){cameraPreview=view;selectedAllyId=activeId}},cameraStatus:()=>cameraShot()};
-window.twoToneTest.grantWeaponXp=grantWeaponXp;window.twoToneTest.weaponLevelCap=weaponLevelCap;window.twoToneTest.weaponPotentialMultiplier=weaponPotentialMultiplier;
-window.zeroBasicAnimationDebug=()=>({durationMs:SOUL_BASIC_MS,elapsed:fx?.kind==='basic'&&fx.actor==='soul'?Math.max(0,performance.now()-fx.at):null,active:soulBasicStage(performance.now())!==null,assets:['soul','soulBasicWindup','soulBasicSlash'].map(id=>({id,loaded:!!images[id]?.complete&&!!images[id]?.naturalWidth}))});
-window.twoToneTest.applyTauntForTest=(targetId,sourceId,rate,turns)=>{const target=party.find(unit=>unit.id===targetId)||enemies.find(unit=>unit.id===targetId),source=party.find(unit=>unit.id===sourceId)||enemies.find(unit=>unit.id===sourceId);return target&&source?applyTaunt(target,source,rate,turns):false};
-window.twoToneTauntStatus=()=>[...party,...enemies].map(unit=>({id:unit.id,activeRate:tauntRateOf(unit),effects:(unit.tauntEffects||[]).map(effect=>({...effect}))}));
-}
-requestAnimationFrame(loop);
+NÙ›ÜŠ]OLÚOÚJÊÊ^ØÛÛœİOKSX]”KÌŠÚJ“X]”KÍœZILÜŠ‹œØÛÛœİSX]˜ÛÜÊJJœœ‹OSX]œÚ[ŠJJœœÚYŠZJXİ›[İ™UÊJNÙ[ÙHİ›[™UÊJ_Xİ˜ÛÜÙT]
+
+NØİ™š[
+
+NÂˆY[ÙHYŠİ[OOOIÛ›İIÊ^Âˆİ˜™YÚ[”]
+
+NØİ˜\˜Ê\Š‹ŒK\Š‹ŒMKŠ‹ŒNKX]”JŒŠNØİ™š[
+
+NØİ˜™YÚ[”]
+
+NØİ›[İ™UÊ\Š‹Œ\Š‹ŒMJNØİ›[™UÊ\Š‹Œ\Š‹JNØİ›[™UÊŠ‹MK\Š‹
+NØİ›[™UÊŠ‹MK\Š‹ŒJNØİœİ›ÚÙJ
+NØİ˜™YÚ[”]
+
+NØİ˜\˜ÊŠ‹ŒÎK\Š‹ŒËŠ‹ŒMËX]”JŒŠNØİ™š[
+
+NÂˆY[Ù^Âˆİ˜™YÚ[”]
+
+NØİ˜\˜Ê‹X]”JŒŠNØİœİ›ÚÙJ
+NØİ˜™YÚ[”]
+
+NØİ˜\˜ÊŠ‹X]”JŒŠNØİœİ›ÚÙJ
+NÂˆ›ÜŠ]OLÚOÚJÊÊ^ØÛÛœİOZJ“X]”KÌØİ˜™YÚ[”]
+
+NØİ›[İ™UÊX]˜ÛÜÊJJœŠ‹ÎX]œÚ[ŠJJœŠ‹Î
+NØİ›[™UÊX]˜ÛÜÊJJœŠŒKŒL‹X]œÚ[ŠJJœŠŒKŒLŠNØİœİ›ÚÙJ
+_BˆBˆİœ™\İÜ™J
+NÂŸB™[˜İ[Ûˆ[™[^Uš\İX[ÜÚ][ÛŠYÙ[ÛY]O[[
+^ØÛÛœİOY[™[ZY\Ë™š[™
+OšYOOZY
+_Ù[ÛY]NÜ™]\›ˆOŞŞ™K
+ÙKËÌŠØØ[Y\˜K˜İ\œ™[
+‹ËN™KJÙKš
+‹M_N›[B™[˜İ[Ûˆ˜]Ñ
+
+^ÂˆYŠY
+\™]\›ØÛÛœİ]Y˜]\˜][ÛYšÚ[™OOIØ˜\ÚXÉÉ‰™˜XİÜOOIÜÛİ[	ÏÔÓÕSĞTÒP×ÓTÎ™˜Xİ[ÛOOIİ[[X]IÏÕSSPUWÔ‘TÑS•USÓ—ÓTÎ™šÚ[™OOIÙ[™[^IÏÑS‘SVWĞUPÒ×ÑQ‘‘PÕÓTÎ›\İ]XÚÏË›[ÙOOOIÙš]™KZ]	ÏÕSSPUWÔ‘TÑS•USÓ—ÓTÎÓÓPUĞPÕSÓ—ÑQ‘‘PÕÓTÎÚYŠ™\˜][ÛŠ^Ù[[Ü™]\›ŸBˆÛÛœİOXÛ[\JÙ\˜][ÛŠK˜YOLK\Kš\İX[Yš\İX[	Ù˜XİÜŸKIÙšÚ[™XÂˆYŠšÚ[™OOIÜÙ[‰Ê^ØÛÛœİÜÏXØ[Y\˜P[TÜÚ][ÛŠ˜XİÜ‹	ØÛÛ[X[™	ÊNÚYŠÜÊ^ØÛÛœİ\ÜË
+ÜÜËËÌŠØØ[Y\˜K˜İ\œ™[
+‹L‹O\ÜË˜˜\ÙVK\ÜËš
+‹NÙ˜]ĞÛÛX˜]ÚYÚ[
+KÍJÜJ	ÈÍÍXÙ™™‰Ë˜YK	Üš[™ÉÊNÙ˜]ĞÛÛX˜]ÚYÚ[
+KŒŠÜJK	ÈÙL™Ù™‰Ë˜YJ‹	Üİ\‰Ê_\™]\›ŸBˆYŠšÚ[™OOIÜİ\Ü	Ê^ÂˆYŠš\İX[OOIÛÙØ[‹X›ÛÙ\ÚY[	Ê^ÂˆÛÛœİÜÏXØ[Y\˜P[TÜÚ][ÛŠ˜XİÜ‹	ØÛÛ[X[™	ÊNÚYŠÜÊ^ØÛÛœİ\ÜË
+ÜÜËËÌŠØØ[Y\˜K˜İ\œ™[
+‹L‹O\ÜË˜˜\ÙVK\ÜËš
+‹NÙ˜]ĞÛÛX˜]ÚYÚ[
+KÌŠÜJ‹	ÈÎÙÙ™‰Ë˜YK	Üš[™ÉÊNÙ˜]ĞÛÛX˜]ÚYÚ[
+KN
+ÜJ‹	ÈÙ™™LY	Ë˜YJ‹ÍK	Üİ\‰Ê_Bˆ^
+	Ğ“ÓÑÒQS	ËLLÌ‹Œ™Ø˜JŒMKMK	Ù˜Y_JX	ÎL	Ë	ØÙ[\‰ÊNÜ™]\›ÂˆBˆÛÛœİ\\K™š[™
+OšYOOY\™Ù][RY
+KšY]ÏY˜Xİ[ÛOOIİ[[X]IÏÉÜ\IÎ‰Ø[KZ[\Xİ	ËÜÏ\	‰˜Ø[Y\˜P[TÜÚ][ÛŠšYšY]ÊNÚYŠ\ÜÊ\™]\›ÂˆÛÛœİ\ÜË
+ÜÜËËÌŠØØ[Y\˜K˜İ\œ™[
+ŠšY]ÏOOIÜ\IÏËŒÌ‹LŠKO\ÜË˜˜\ÙVK\ÜËš
+‹N›ÙÜ™\ÜÏ\NÂˆYŠš\İX[OOIÙ]Û‹][™IÊ^Âˆ˜]ĞÛÛX˜]ÚYÚ[
+KJÜ›ÙÜ™\ÜÊK	ÈÍ™™™ŒIË˜YK	Üš[™ÉÊNÙ˜]ĞÛÛX˜]ÚYÚ[
+LÍ‹KNK\›ÙÜ™\ÜÊŒŒ‹K	ÈÙNY™™NIË˜YK	Û›İIÊNÙ˜]ĞÛÛX˜]ÚYÚ[
+
+ÍËKM\›ÙÜ™\ÜÊŒL‹NK	ÈØLY™‰Ë˜YJ‹K	Û›İIÊNÂˆ^
+	ÕS‘IËKLMKŒ™Ø˜JŒ‹MKL	Ù˜Y_JX	ÎL	Ë	ØÙ[\‰ÊNÂˆY[Ù^Âˆ˜]ĞÛÛX˜]ÚYÚ[
+KMJÜ›ÙÜ™\ÜÊ	ÈÙ™™NIË˜YK	Üš[™ÉÊNÙ˜]ĞÛÛX˜]ÚYÚ[
+KJÜ›ÙÜ™\ÜÊ	ÈÙ™™ÌIË˜YJ‹	Üİ\‰ÊNÂˆİœØ]™J
+NØİ™ÛØ˜[[OY˜YNØİœİ›ÚÙTİ[OIÈÙ™™NXY	ÎØİ›[™UÚYMØİ˜™YÚ[”]
+
+NØİ›[İ™UÊLLJÎ
+NØİœ]XY˜]XĞİ\™UÊKLLŒ
+ÌLKLNL
+NØİœİ›ÚÙJ
+NØİœ™\İÜ™J
+Nİ^
+	ĞQSÑIËKLMMKN™Ø˜JMKŒÎKNM	Ù˜Y_JX	ÎL	Ë	ØÙ[\‰ÊNÂˆBˆ™]\›ÂˆBˆYŠšÚ[™OOIÙ[™[^IÊ^ÂˆÛÛœİšY]ÏXØ[Y\˜KœÚİOOIÜ\IÏÉÜ\IÎ‰ØÛÛ[X[™	Ë[]šY]ÏOOIÜ\IÏËŒÌ‹L‹]ÏYš]ÏË›[™İÙš]Î–Şİ\™Ù]™\™Ù]WNÂˆ›ÜŠÛÛœİ]Ùˆ]Ê^ØÛÛœİY]Z]Ë›[™İŒI‰šY]ÈOOIÜ\IËÜÏZY]Ø[RYÜÚ][ÛŠ]\™Ù]
+N˜Ø[Y\˜P[TÜÚ][ÛŠ]\™Ù]šY]ÊNÚYŠ\ÜÊXÛÛ[YNØÛÛœİZY]ÜÜËœÜË
+ÜÜËËÌŠØØ[Y\˜K˜İ\œ™[
+œ[‹OZY]ÜÜËNœÜË˜˜\ÙVK\ÜËš
+‹NØİœØ]™J
+NØİ™ÛØ˜[[OY˜YNÂˆYŠš\İX[OOIÙ[™[^K\Û[YKXXÚY	Ê^Øİ™š[İ[OIÈØN™Y	ÎØİœİ›ÚÙTİ[OIÈÙXÙ™˜˜ÉÎÙ›ÜŠ]OLÚOÚJÊÊ^Øİ˜™YÚ[”]
+
+NØİ˜\˜ÊLÌ
+ÚJŒŒKMKSX]œÚ[ŠJÜJŠJŒNL
+ÚILŠŒËX]”JŒŠNØİ™š[
+
+NØİ›[™UÚYLØİœİ›ÚÙJ
+__Bˆ[ÙHYŠš\İX[OOIÙÛØ›[‹\\œİZ]	Ê^Øİœİ›ÚÙTİ[OIÈÙ	ÎØİ›[™UÚYNØİ›[™PØ\IÜ›İ[™	ÎÙ›ÜŠ]OLÚOÎÚJÊÊ^Øİ˜™YÚ[”]
+
+NØİ›[İ™UÊMÌ
+ÜJŒÍJÚJŒMKL
+ÚJŒN
+NØİ›[™UÊLMJÜJMJÚJŒMKL
+ÚJŒN
+NØİœİ›ÚÙJ
+_Y˜]ĞÛÛX˜]ÚYÚ[
+
+ÌÍKKŠÜJŒ	ÈÙ™™L‰Ë˜YK	Üš[™ÉÊ_Bˆ[ÙHYŠš\İX[OOIÚ]ÚË][Û‰Ê^Øİœİ›ÚÙTİ[OIÈÙNÍÎIÎØİ›[™UÚYNØİ›[™PØ\IÜ›İ[™	ÎÙ›ÜŠ]OLÚOÎÚJÊÊ^Øİ˜™YÚ[”]
+
+NØİ›[İ™UÊM
+ÚJŒŒ‹KML
+NØİœ]XY˜]XĞİ\™UÊLLŠÚJŒNJÎ
+Í
+ÚJŒL‹JÍL
+NØİœİ›ÚÙJ
+_Y˜]ĞÛÛX˜]ÚYÚ[
+K
+ÜJŒŒ	ÈÙ™Œ	Ë˜YK	Üš[™ÉÊ_Bˆ[ÙHYŠš\İX[OOIÙÙ[ÙKZ[\Xİ	Ê^Øİœİ›ÚÙTİ[OIÈØÍY	ÎØİ™š[İ[OIÜ™Ø˜JMMËMÎNNKŒÊIÎØİ›[™UÚYNØİ˜™YÚ[”]
+
+NØİ›[İ™UÊMMKKM
+NØİ›[™UÊLKMJNØİ›[™UÊ
+ÌLKMŠNØİ›[™UÊ
+ÍM‹KMLŠNØİ›[™UÊ
+ÍKJÌN
+NØİ›[™UÊ
+ÌL‹JÍŒJNØİ›[™UÊM‹JÍ
+NØİ›[™UÊMŒJÍJNØİ˜ÛÜÙT]
+
+NØİ™š[
+
+NØİœİ›ÚÙJ
+NÙ›ÜŠ]OLÚOÎÚJÊÊ^Øİ˜™YÚ[”]
+
+NØİ›[İ™UÊLJÚJŒKLÍ
+NØİ›[™UÊLLŠÚJŒNJÌÍ
+NØİœİ›ÚÙJ
+_Y˜]ĞÛÛX˜]ÚYÚ[
+K
+ÜJŒÍ	ÈÙÙMY	Ë˜YK	Üš[™ÉÊ_Bˆ[ÙHYŠš\İX[OOIØ™X\‹XÛ]ÜÉÊ^Øİœİ›ÚÙTİ[OIÈÙ™YIÎØİ›[™UÚYLLØİ›[™PØ\IÜ›İ[™	ÎÙ›ÜŠ]OLÚOÎÚJÊÊ^Øİ˜™YÚ[”]
+
+NØİ›[İ™UÊMŠÚJŒKMN
+NØİ›[™UÊ
+ÍŠÚJŒJÍMJNØİœİ›ÚÙJ
+_Y˜]ĞÛÛX˜]ÚYÚ[
+KÌŠÜJŒÍK	ÈÙML	Ë˜YK	Üš[™ÉÊ_Bˆ[Ù^Øİœİ›ÚÙTİ[OIÈÙ™NMÉÎØİ›[™UÚYLLNØİ›[™PØ\IÜ›İ[™	ÎÙ›ÜŠ]OLÚOÎÚJÊÊ^Øİ˜™YÚ[”]
+
+NØİ›[İ™UÊMM
+ÚJŒMKKMŠNØİ›[™UÊ
+ÍJÚJŒMKJÍMJNØİœİ›ÚÙJ
+__Bˆİœ™\İÜ™J
+NÚYŠ]™ÙÙY
+Y˜]ĞÛÛX˜]ÚYÚ[
+K
+ÜJŒŒ‹	ÈØNN™‰Ë˜YK	Üš[™ÉÊNÚYŠS’SPUSÓ—ÔÕTÓTÊ^ØÛÛœİX™[OZY]ŞJÌÍKMK[XYÙOZ]šX[[XYÙOÏÚ]™[XYÙOÏÙ™[XYÙNÚYŠ]™ÙÙY
+]^
+	ÑÑÑIËX™[KŒ‹	ÈØNN™‰Ë	ÎL	Ë	ØÙ[\‰ÊNÙ[ÙHYŠ[XYÙOŒ
+]^
+	ËIÊÙ[XYÙKX™[K‹]˜Üš]XØ[ÉÈÙ™™™IÎ‰ÈÙ™YYIË	ÎL	Ë	ØÙ[\‰ÊNÙ[ÙHYŠ]œÚY[[XYÙOŒ
+]^
+	Ğ“ĞÒÑQ	ËX™[KMË	ÈØ™Y™™‰Ë	ÎL	Ë	ØÙ[\‰ÊNÚYŠ]˜Üš]XØ[
+]^
+	ĞÔ’UPĞS	ËY]ŞJÌLKNM‹L‹	ÈÙ™™NXNIË	ÎL	Ë	ØÙ[\‰Ê__\™]\›ÂˆBˆÛÛœİ\™Ù]YÏY\™Ù][™[^RYÏË›[™İÙ\™Ù][™[^RYÎ–Ù\™Ù][™[^RYK\™Ù]Ï]\™Ù]YË›X\
+YO™[™[^Uš\İX[ÜÚ][ÛŠY\™Ù]Ù[ÛY]JJK™š[\Š›ÛÛX[ŠNÂˆYŠ]\™Ù]Ë›[™İ
+^ØÛÛœİY[™[^Uš\İX[ÜÚ][ÛŠ\™Ù][™[^RY\™Ù]Ù[ÛY]JNÚYŠ
+]\™Ù]Ëœ\Ú
+
+_Bˆ›ÜŠ]OLÚO\™Ù]Ë›[™İÚJÊÊ^ÂˆÛÛœİŞ_O]\™Ù]ÖÚWKÙ™œÙ]ZJNÂˆYŠš\İX[OOIŞ™\›ËXİ]	Ê^ÂˆİœØ]™J
+NØİ˜[œÛ]JJNØİ™ÛØ˜[[OY˜YNØİ›[™PØ\IÜ›İ[™	ÎØİœİ›ÚÙTİ[OIÈÙMMNIÎØİ›[™UÚYLMNØİ˜™YÚ[”]
+
+NØİ›[İ™UÊNLÌŠNØİ›[™UÊ‹MÎ
+NØİœİ›ÚÙJ
+NØİœİ›ÚÙTİ[OIÈÙ™™ŒYÉÎØİ›[™UÚYMØİ˜™YÚ[”]
+
+NØİ›[İ™UÊNMÊNØİ›[™UÊ‹NŠNØİœİ›ÚÙJ
+NØİœ™\İÜ™J
+NÂˆY[ÙHYŠš\İX[OOIŞ™\›ËYš\œİ\İšZÙIÊ^ÂˆİœØ]™J
+NØİ˜[œÛ]JJNØİ™ÛØ˜[[OY˜YNØİ›[™PØ\IÜ›İ[™	ÎØİœİ›ÚÙTİ[OIÈÙŒÍMÉÎØİ›[™UÚYLLNÙ›ÜŠ]ÏLÚÏÎÚÊÊÊ^ØÛÛœİO\JŒŠÚÊ“X]”KÌÎØİ˜™YÚ[”]
+
+NØİ›[İ™UÊX]˜ÛÜÊJJ‹MX]œÚ[ŠJJ‹MM
+NØİ›[™UÊX]˜ÛÜÊJJX]œÚ[ŠJJM
+NØİœİ›ÚÙJ
+_Xİœİ›ÚÙTİ[OIÈÙ™™ŒÙÉÎØİ›[™UÚYLÎØİ˜™YÚ[”]
+
+NØİ›[İ™UÊMÌ‹JNØİ›[™UÊÍMŠNØİœİ›ÚÙJ
+NØİœ™\İÜ™J
+NÂˆY[ÙHYŠš\İX[OOIŞ™\›ËY^Xİ][Û‰Ê^Âˆ˜]ĞÛÛX˜]ÚYÚ[
+KŠÜJŒLL‹	ÈÙYMN	Ë˜YK	Üš[™ÉÊNÙ˜]ĞÛÛX˜]ÚYÚ[
+KŒ
+ÜJÌ‹	ÈÙ™™ŒIË˜YJ‹K	Üİ\‰ÊNØİœØ]™J
+NØİ˜[œÛ]JJNØİ™ÛØ˜[[OY˜YNØİœİ›ÚÙTİ[OIÈÙ™ÙNIÎØİ›[™UÚYNØİ˜™YÚ[”]
+
+NØİ›[İ™UÊNMJNØİ›[™UÊJNØİ›[İ™UÊMJNØİ›[™UÊNJNØİœİ›ÚÙJ
+NØİœ™\İÜ™J
+NÂˆY[ÙHYŠš\İX[OOIÜÛİ[\İÛÜ™	Ê^ÂˆÛÛœİOY˜YJŠS’SPUSÓ—ÔÕTÓTÊŒÏØÛ[\J
+\˜][Û‹Y
+KĞS’SPUSÓ—ÔÕTÓTÊNŒJNØİœØ]™J
+NØİ˜[œÛ]JJNØİœ›İ]JK
+NØİ™ÛØ˜[[OXNØİ›[™PØ\IÜ›İ[™	ÎØİœİ›ÚÙTİ[OIÈÙY™™‰ÎØİ›[™UÚYNØİ˜™YÚ[”]
+
+NØİ›[İ™UÊLLNL
+NØİœ]XY˜]XĞİ\™UÊMLLŠNØİœİ›ÚÙJ
+NØİœİ›ÚÙTİ[OIÈÎÙ™‰ÎØİ›[™UÚYLÎØİ˜™YÚ[”]
+
+NØİ›[İ™UÊLLNLL
+NØİœ]XY˜]XĞİ\™UÊÌMMKLM‹JNØİœİ›ÚÙJ
+NØİœ™\İÜ™J
+NÂˆY[ÙHYŠš\İX[OOIÜÛİ[Y[š[˜ÙIÊ^Âˆ˜]ĞÛÛX˜]ÚYÚ[
+K
+ÜJÌ	ÈÍÍXÙ™™‰Ë˜YK	Üš[™ÉÊNÙ˜]ĞÛÛX˜]ÚYÚ[
+KJÜJŒÍ‹	ÈÙL™Ù™‰Ë˜YJ‹	Üİ\‰ÊNÂˆY[ÙHYŠš\İX[OOIÜÛİ[\İÜ›IÊ^Âˆ˜]ĞÛÛX˜]ÚYÚ[
+KMŠÜJŒLŒ	ÈÎX™™‰Ë˜YK	Üš[™ÉÊNÙ˜]ĞÛÛX˜]ÚYÚ[
+KÌJÜJK	ÈÙ™™LØMIË˜YJ‹K	Üİ\‰ÊNÂˆY[ÙHYŠš\İX[OOIÛ[K\][	Ê^ÂˆİœØ]™J
+NØİ™ÛØ˜[[OY˜YNØİ˜[œÛ]JJNÙ›ÜŠ]ÏLÚÏÚÊÊÊ^ØÛÛœİOZÊ“X]”KÌÊÜJŒÎØİœØ]™J
+NØİœ›İ]JJNØİ™š[İ[OZÉLÉÈÙ™˜Y	Î‰ÈÙ™™Œ‰ÎØİ˜™YÚ[”]
+
+NØİ™[\ÙJLÍK\JŒÍKL‹KX]”JŒŠNØİ™š[
+
+NØİœ™\İÜ™J
+_Xİœ™\İÜ™J
+NÂˆY[ÙHYŠš\İX[OOIÛ[K\šXÛØÚ]	ßš\İX[OOIÛ[K\šXÛØÚ][X\šÉßš\İX[OOIÛ[K\šXÛØÚ]]šYÙÙ\‰Ê^Âˆ˜]ĞÛÛX˜]ÚYÚ[
+KÍŠÜJMK	ÈØÙLY™‰Ë˜YK	Üš[™ÉÊNÚYŠš\İX[OOIÛ[K\šXÛØÚ]	ÊY˜]ĞÛÛX˜]ÚYÚ[
+KŠÜJK	ÈÙ™˜™X‰Ë˜YJ‹K	Üİ\‰ÊNÂˆYŠš\İX[OOIÛ[K\šXÛØÚ]]šYÙÙ\‰Ê^ØİœØ]™J
+NØİ™ÛØ˜[[OY˜YNØİœİ›ÚÙTİ[OIÈÙŒ˜Ù™‰ÎØİ›[™UÚYMNØİ˜™YÚ[”]
+
+NØİ›[İ™UÊMLKMJNØİ›[™UÊ
+ÍLJÍJNØİ›[İ™UÊ
+ÍLKMJNØİ›[™UÊMLJÍJNØİœİ›ÚÙJ
+NØİœ™\İÜ™J
+_BˆY[ÙHYŠš\İX[OOIÛ[KZ][[™Éßš\İX[OOIÛ[KZ][[™ÉÊ^Âˆ˜]ĞÛÛX˜]ÚYÚ[
+KJÜJŒLK	ÈÎY˜™‰Ë˜YK	Üš[™ÉÊNÙ˜]ĞÛÛX˜]ÚYÚ[
+LÍKKL‹MÊÜJŒL‹	ÈÙX™™‰Ë˜YJ‹K	Üİ\‰ÊNÙ˜]ĞÛÛX˜]ÚYÚ[
+
+ÌÎJÌLŠÜJŒM	ÈØÍÎÙ™‰Ë˜YJ‹ÍK	Üİ\‰ÊNÂˆY[ÙHYŠš\İX[OOIÙ]Û‹\İ\‰Ê^Âˆ˜]ĞÛÛX˜]ÚYÚ[
+KÍ
+ÜJÎ	ÈÍØÙY	Ë˜YK	Üİ\‰ÊNÙ˜]ĞÛÛX˜]ÚYÚ[
+KŒŠÜJ‹	ÈÙ™™ŒX™	Ë˜YJ‹K	Üš[™ÉÊNÂˆY[ÙHYŠš\İX[OOIÛÙØ[‹X›ÛÙ\Û\Ú	Ê^ÂˆİœØ]™J
+NØİ˜[œÛ]JJNØİœ›İ]JKJNØİ™ÛØ˜[[OY˜YNØİœİ›ÚÙTİ[OIÈØNLÎIÎØİ›[™UÚYLNØİ›[™PØ\IÜ›İ[™	ÎØİ˜™YÚ[”]
+
+NØİ›[İ™UÊMÎMÎ
+NØİœ]XY˜]XĞİ\™UÊMKLŒ‹ÎŠNØİœİ›ÚÙJ
+NØİœİ›ÚÙTİ[OIÈÙ™™‰ÎØİ›[™UÚYMØİ˜™YÚ[”]
+
+NØİ›[İ™UÊNN
+NØİœ]XY˜]XĞİ\™UÊKLN‹ÍÊNØİœİ›ÚÙJ
+NØİœ™\İÜ™J
+NÂˆY[ÙHYŠš\İX[OOIÛÙØ[‹\™Y]YIÊ^Âˆ˜]ĞÛÛX˜]ÚYÚ[
+KŠÜJŒLL‹	ÈØÌŒMÍ‰Ë˜YK	Üš[™ÉÊNÙ˜]ĞÛÛX˜]ÚYÚ[
+KŒŠÜJ	ÈÙ™™LN	Ë˜YJ‹	Üİ\‰ÊNÂˆY[Ù^ÂˆİœØ]™J
+NØİ˜[œÛ]JJNØİœ›İ]JKŒÍJNØİœİ›ÚÙTİ[OX™Ø˜JMKËŒÎ	Ù˜Y_JXØİ›[™UÚYLLØİ˜™YÚ[”]
+
+NØİ™[\ÙJL
+Î
+œKÌŠÎ
+œKX]”JŒKJNØİœİ›ÚÙJ
+NØİœ™\İÜ™J
+NÂˆBˆBˆYŠS’SPUSÓ—ÔÕTÓTÊ^ØÛÛœİ]ÏJ\İ]XÚÏËš]ß×JK™š[\ŠOšœ\ÙOOOIÚ[š]X[	ÊKYÏVË‹‹›™]ÈÙ]
+]Ë™š[\ŠOš™[XYÙOŒ
+K›X\
+Oš\™Ù]
+JWNÙ›ÜŠÛÛœİYÙˆYÊ^ØÛÛœİY[™[^Uš\İX[ÜÚ][ÛŠY
+NÚYŠ\
+XÛÛ[YNØÛÛœİ[[İ[Z]Ë™š[\ŠOš\™Ù]OOZY
+Kœ™YXÙJ
+İ[K
+OOœİ[JÊšX[[XYÙOÏÚ™[XYÙOÏÌ
+K
+KÚY[YZ]ËœÛÛYJOš\™Ù]OOZY	‰ŠœÚY[[XYÙ_
+OŒ
+NÚYŠ[[İ[Œ
+]^
+	ËIÊØ[[İ[KMLÌË	ÈÙ™™Œ˜IË	ÎL	Ë	ØÙ[\‰ÊNÙ[ÙHYŠÚY[Y
+]^
+	Ğ“ĞÒÑQ	ËKMLMË	ÈØ™Y™™‰Ë	ÎL	Ë	ØÙ[\‰ÊNÚYŠ]ËœÛÛYJOš\™Ù]OOZY	‰š˜Üš]XØ[
+J]^
+	ĞÔ’UPĞS	ËKNM	ÈÙ™™NXNIË	ÎL	Ë	ØÙ[\‰Ê__BŸB™[˜İ[Ûˆ˜]ĞÛÛX˜]š\İX[]™[ÊÚİ
+^ÂˆÛÛX˜]š\İX[]™[ÏXÛÛX˜]š\İX[]™[Ë™š[\ŠOOYK˜]K™\˜][ÛŠNÂˆ›ÜŠÛÛœİ]™[ÙˆÛÛX˜]š\İX[]™[Ê^ÚYŠ]™[˜]
+XÛÛ[YNØÛÛœİOXÛ[\J
+Y]™[˜]
+KÙ]™[™\˜][ÛŠK˜YOLK\NÂˆYŠ]™[\OOOIŞ™\›ËY[^IÊ^Âˆ›ÜŠÛÛœİYÙˆ]™[\™Ù]YÊ^ØÛÛœİÜÏY[™[^Uš\İX[ÜÚ][ÛŠY
+NÚYŠ\ÜÊXÛÛ[YNÙ˜]ĞÛÛX˜]ÚYÚ[
+ÜËÜËK
+ÜJ	ÈÙMÍ‰Ë˜YK	Üš[™ÉÊNİ^
+	ÑSVQQŒ	IËÜËÜËKMNLË™Ø˜JMKŒŒŒŒË	Ù˜Y_JX	ÎL	Ë	ØÙ[\‰Ê_XÛÛ[YNÂˆBˆYŠ]™[\OOOIÜ™Y›XİY[XYÙIÊ^ÂˆÛÛœİšY]Ï\ÚİÛÜ›
+Úİ
+OOOIÜ™]™\œÙIÏÉÜ\IÎ‰ØÛÛ[X[™	Ë[]šY]ÏOOIÜ\IÏËŒÌ‹LÂˆ›ÜŠÛÛœİYÙˆ]™[\™Ù]YÊ^ØÛÛœİ[O\\K™š[™
+[š]O[š]šYOOZY
+K[TÜÚ][ÛX[I‰˜Ø[Y\˜P[TÜÚ][ÛŠYšY]ÊK[™[^TÜÚ][ÛHX[I‰™[™[^Uš\İX[ÜÚ][ÛŠY
+KX[TÜÚ][ÛØ[TÜÚ][Û‹
+Ø[TÜÚ][Û‹ËÌŠØØ[Y\˜K˜İ\œ™[
+œ[™[™[^TÜÚ][ÛËOX[TÜÚ][ÛØ[TÜÚ][Û‹˜˜\ÙVKX[TÜÚ][Û‹š
+‹N™[™[^TÜÚ][ÛËNÚYŠS[X™\‹š\Ñš[š]J
+_S[X™\‹š\Ñš[š]JJJXÛÛ[YNÙ˜]ĞÛÛX˜]ÚYÚ[
+KÌ
+ÜJŒ	ÈÙ™Î‰Ë˜YK	Üš[™ÉÊNØÛÛœİX™[Y]™[™ÙÙYÉÔ‘Q“PÕÑÑQ	Î™]™[™[XYÙJÙ]™[œÚY[[XYÙOŒØ‘Q“PÕIÙ]™[™[XYÙJÙ]™[œÚY[[XYÙ_H•QX‰Ô‘Q“PÕ	Îİ^
+X™[JÌÍLË™Ø˜JMKŒÌŒ	Ù˜Y_JX	ÎL	Ë	ØÙ[\‰Ê_BˆÛÛ[YNÂˆBˆYŠ]™[\OOOIÙXÚËY[XYÙIÊ^ÂˆÛÛœİšY]Ï\ÚİÛÜ›
+Úİ
+OOOIÜ™]™\œÙIÏÉÜ\IÎ‰ØÛÛ[X[™	Ë[]šY]ÏOOIÜ\IÏËŒÌ‹L‹ÛÛÜY]™[™[XYÙU\OOOIÜ\ÚXØ[	ÏÉÈÙŒ˜ŒÍ™‰Î™]™[™[XYÙU\OOOIÛXYÚXØ[	ÏÉÈØÍNMY™‰Î‰ÈÍÎYLÙ™‰ÎÂˆ›ÜŠÛÛœİYÙˆ]™[\™Ù]YÊ^ØÛÛœİ[O\\K™š[™
+[š]O[š]šYOOZY
+K[TÜÚ][ÛX[I‰˜Ø[Y\˜P[TÜÚ][ÛŠYšY]ÊK[™[^TÜÚ][ÛHX[I‰™[™[^Uš\İX[ÜÚ][ÛŠY
+KX[TÜÚ][ÛØ[TÜÚ][Û‹
+Ø[TÜÚ][Û‹ËÌŠØØ[Y\˜K˜İ\œ™[
+œ[™[™[^TÜÚ][ÛËOX[TÜÚ][ÛØ[TÜÚ][Û‹˜˜\ÙVKX[TÜÚ][Û‹š
+‹N™[™[^TÜÚ][ÛËNÚYŠS[X™\‹š\Ñš[š]J
+_S[X™\‹š\Ñš[š]JJJXÛÛ[YNÙ˜]ĞÛÛX˜]ÚYÚ[
+KÊÜJŒ‹ÛÛÜ‹˜YK	Üš[™ÉÊNØÛÛœİX™[Y]™[šX[[XYÙOŒØPÒÈIÙ]™[šX[[XYÙ_H	Ù]™[™[XYÙU\KÕ\\Ø\ÙJ
+_X™]™[œÚY[[XYÙOŒÉÑPÒÈ“ĞÒÑQ	Î‰ÑPÒÉÎİ^
+X™[JÌÍ
+Ê]™[œİXÚÒ[™^	LÊJŒM‹LË™Ø˜JŒÎKËMK	Ù˜Y_JX	ÎL	Ë	ØÙ[\‰Ê_BˆÛÛ[YNÂˆBˆYŠ]™[\Kœİ\ÕÚ]
+	Ü[™KIÊJ^ÂˆÛÛœİ[™RÙ^OY]™[\KœÛXÙJJKÙ]T•S‘WÔÑUÑQ’S’USÓ”ÖÜ[™RÙ^WKX™[Ï^Ü™XŞXÛN‰ÊÌHÒÒSÒS•8 (ˆQSÑH	IË[\YN‰ĞTÒPÈUPÒÈ
+ÍL	IË[š]Y‰ĞSHS’ÑQ8 (ˆTÒPÈUPÒÈUL	IË	Ù]\›˜[\İ[‰Î‰ÕSSPUHÓÔÕ8¢$ŒŒ8 (ˆ‘VPÕSÓˆ
+ÌŒS‘T‘ÖIË	ØÙ[\İX[\İ\‰Î‰ÑÕPTS•QQÔ’UPĞS8 (ˆÔ’USPQÑH
+ÌIIË	Ù\šË[X]\‰Î‰ÒQÓ“Ô‘HQ‘S”ÑTÈ	IË	Ú[™š[š]K\ÜXÙIÎ‰ÑSVHSL	IßNÂˆÛÛœİšY]Ï\ÚİÛÜ›
+Úİ
+OOOIÜ™]™\œÙIÏÉÜ\IÎ‰ØÛÛ[X[™	Ë[]šY]ÏOOIÜ\IÏËŒÌ‹LÂˆ›ÜŠÛÛœİYÙˆ]™[\™Ù]YÊ^ØÛÛœİ[O\\K™š[™
+[š]O[š]šYOOZY
+K[TÜÚ][ÛX[I‰˜Ø[Y\˜P[TÜÚ][ÛŠYšY]ÊK[™[^TÜÚ][ÛHX[I‰™[™[^Uš\İX[ÜÚ][ÛŠY
+NØÛÛœİX[TÜÚ][ÛØ[TÜÚ][Û‹
+Ø[TÜÚ][Û‹ËÌŠØØ[Y\˜K˜İ\œ™[
+œ[™[™[^TÜÚ][ÛËOX[TÜÚ][ÛØ[TÜÚ][Û‹˜˜\ÙVKX[TÜÚ][Û‹š
+‹Œ™[™[^TÜÚ][ÛËNÚYŠS[X™\‹š\Ñš[š]J
+_S[X™\‹š\Ñš[š]JJJXÛÛ[YNÙ˜]ĞÛÛX˜]ÚYÚ[
+KÌ
+ÜJŒÙ]Ë›˜[YOOOIÔ™XŞXÛIÏÉÈÎXØ˜‰Î‰ÈÙŒY‰Ë˜YK	Üš[™ÉÊNØÛÛœİXÛÛZ[XYÙ\ÖÜÙ]Ëš[XYÙWNÚYŠXÛÛË˜ÛÛ\]I‰šXÛÛ‹›˜]\˜[ÚY
+^ØİœØ]™J
+NØİ™ÛØ˜[[OY˜YNØİš[XYÙTÛ[Ûİ[™Ñ[˜X›Y]YNØİ™˜]Ò[XYÙJXÛÛ‹LM‹KMNÌ‹ÌŠNØİœ™\İÜ™J
+_]^
+X™[ÖÜ[™RÙ^W_Ù]Ë›˜[Y_	Ô•S‘IËKMÌ‹LË™Ø˜JMKŒŒ	Ù˜Y_JX	ÎL	Ë	ØÙ[\‰Ê_BˆÛÛ[YNÂˆBˆYŠ]™[\OOOIÙ]Û‹\™\Ûİ\˜ÙY[	Ê^ÂˆÛÛœİUËÌ‹OMÍNÙ˜]ĞÛÛX˜]ÚYÚ[
+KN
+ÜJŒL	ÈÎŒ™Y	Ë˜YK	Üš[™ÉÊNİ^
+	Ô‘TÓÕTÑQ•S8 (ˆ
+ÌˆÔ	ËKLLK™Ø˜JŒMKË	Ù˜Y_JX	ÎL	Ë	ØÙ[\‰ÊNØÛÛ[YNÂˆBˆYŠ]™[\OOOIÛY™\İX[ZX[	Ê^ÂˆÛÛœİšY]Ï\ÚİÛÜ›
+Úİ
+OOOIÜ™]™\œÙIÏÉÜ\IÎ‰ØÛÛ[X[™	Ë[]šY]ÏOOIÜ\IÏËŒÌ‹LÂˆ›ÜŠÛÛœİYÙˆ]™[\™Ù]YÊ^ØÛÛœİ[O\\K™š[™
+[š]O[š]šYOOZY
+K[TÜÚ][ÛX[I‰˜Ø[Y\˜P[TÜÚ][ÛŠYšY]ÊK[™[^TÜÚ][ÛHX[I‰™[™[^Uš\İX[ÜÚ][ÛŠY
+NØÛÛœİX[TÜÚ][ÛØ[TÜÚ][Û‹
+Ø[TÜÚ][Û‹ËÌŠØØ[Y\˜K˜İ\œ™[
+œ[™[™[^TÜÚ][ÛËOX[TÜÚ][ÛØ[TÜÚ][Û‹˜˜\ÙVKX[TÜÚ][Û‹š
+‹Œ™[™[^TÜÚ][ÛËNÚYŠS[X™\‹š\Ñš[š]J
+_S[X™\‹š\Ñš[š]JJJXÛÛ[YNÙ˜]ĞÛÛX˜]ÚYÚ[
+KÊÜJŒŒ	ÈÍ™YŒMIË˜YK	Üš[™ÉÊNİ^
+Q‘TÕPS
+ÉÙ]™[šX[[™ßXKMMMK™Ø˜JNLËMKŒM‹	Ù˜Y_JX	ÎL	Ë	ØÙ[\‰Ê_BˆÛÛ[YNÂˆBˆYŠ]™[\OOOIØ›YYX\YY	ß]™[\OOOIØ›YY]XÚÉÊ^Âˆ›ÜŠÛÛœİYÙˆ]™[\™Ù]YÊ^ØÛÛœİÜÏY[™[^Uš\İX[ÜÚ][ÛŠY
+NÚYŠ\ÜÊXÛÛ[YNÙ˜]ĞÛÛX˜]ÚYÚ[
+ÜËÜËKÌŠÜJŒ	ÈÙNXÍÉË˜YK	Üš[™ÉÊNØÛÛœİX™[Y]™[\OOOIØ›YY]XÚÉÏØ“QQIÙ]™[™[XYÙOÏÌH8 (ˆ	Ù]™[œİXÚÜÏÏÌHQ•˜“QQ	Ù]™[œİXÚÜÏÏÌKÉÙ[™[ZY\Ë™š[™
+[™[^OO™[™[^KšYOOZY
+OË˜›YYX^İXÚÜß_Xİ^
+X™[ÜËÜËKMM™Ø˜JMKNMËŒ	Ù˜Y_JX	ÎL	Ë	ØÙ[\‰Ê_BˆÛÛ[YNÂˆBˆYŠ]™[\OOOIİ][X\YY	ß]™[\OOOIİ][\™Y\™Xİ	Ê^ÂˆÛÛœİšY]Ï\ÚİÛÜ›
+Úİ
+OOOIÜ™]™\œÙIÏÉÜ\IÎ‰ØÛÛ[X[™	Ë[]šY]ÏOOIÜ\IÏËŒÌ‹LÂˆ›ÜŠÛÛœİYÙˆ]™[\™Ù]YÊ^ØÛÛœİ[O\\K™š[™
+[š]O[š]šYOOZY
+K[TÜÚ][ÛX[I‰˜Ø[Y\˜P[TÜÚ][ÛŠYšY]ÊK[™[^TÜÚ][ÛHX[I‰™[™[^Uš\İX[ÜÚ][ÛŠY
+NØÛÛœİX[TÜÚ][ÛØ[TÜÚ][Û‹
+Ø[TÜÚ][Û‹ËÌŠØØ[Y\˜K˜İ\œ™[
+œ[™[™[^TÜÚ][ÛËOX[TÜÚ][ÛØ[TÜÚ][Û‹˜˜\ÙVKX[TÜÚ][Û‹š
+‹Œ™[™[^TÜÚ][ÛËNÚYŠS[X™\‹š\Ñš[š]J
+_S[X™\‹š\Ñš[š]JJJXÛÛ[YNÙ˜]ĞÛÛX˜]ÚYÚ[
+KÍ
+ÜJŒŒË	ÈÎÙÙ™‰Ë˜YK	Üš[™ÉÊNØÛÛœİ˜]OSX]œ›İ[™
+
+]™[œ˜]OÏİ][˜]SÙŠ[_[™[ZY\Ë™š[™
+[š]O[š]šYOOZY
+JJJŒL
+Nİ^
+]™[\OOOIİ][\™Y\™Xİ	ÏØUS•‘QT‘PÕ8 (ˆ	Ü˜]_IX˜US•	Ü˜]_IH8 (ˆ	Ù]™[\›œßHT“‰Ù]™[\›œÏOOLOÉÉÎ‰ÔÉßXKMŒ‹M™Ø˜JŒËËMK	Ù˜Y_JX	ÎL	Ë	ØÙ[\‰Ê_BˆÛÛ[YNÂˆBˆYŠ]™[\OOOIÜÚY[X\YY	ß]™[\OOOIÜÚY[XXœÛÜ˜™Y	ß]™[\OOOIÛÙØ[‹\ÚYÛ˜]\™KZX[	Ê^ÂˆÛÛœİšY]Ï\ÚİÛÜ›
+Úİ
+OOOIÜ™]™\œÙIÏÉÜ\IÎ‰ØÛÛ[X[™	Ë[]šY]ÏOOIÜ\IÏËŒÌ‹LÂˆ›ÜŠÛÛœİYÙˆ]™[\™Ù]YÊ^ØÛÛœİ[O\\K™š[™
+[š]O[š]šYOOZY
+K[TÜÚ][ÛX[I‰˜Ø[Y\˜P[TÜÚ][ÛŠYšY]ÊK[™[^TÜÚ][ÛHX[I‰™[™[^Uš\İX[ÜÚ][ÛŠY
+NØÛÛœİX[TÜÚ][ÛØ[TÜÚ][Û‹
+Ø[TÜÚ][Û‹ËÌŠØØ[Y\˜K˜İ\œ™[
+œ[™[™[^TÜÚ][ÛËOX[TÜÚ][ÛØ[TÜÚ][Û‹˜˜\ÙVKX[TÜÚ][Û‹š
+‹Œ™[™[^TÜÚ][ÛËNÚYŠS[X™\‹š\Ñš[š]J
+_S[X™\‹š\Ñš[š]JJJXÛÛ[YNØÛÛœİ\ÔÚY[Y]™[\HOOIÛÙØ[‹\ÚYÛ˜]\™KZX[	ÎÙ˜]ĞÛÛX˜]ÚYÚ[
+K
+ÜJŒŒ\ÔÚY[ÉÈØYXX™	Î‰ÈÍ™YŒMIË˜YK	Üš[™ÉÊNØÛÛœİX™[Y]™[\OOOIÜÚY[X\YY	ÏÉÔÒQSTQQ	Î™]™[\OOOIÜÚY[XXœÛÜ˜™Y	ÏÉÔÒQSP”ÓÔ‘Q	Î˜TÕH“Ôˆ“ÓÑ
+ÉÙ]™[šX[[™ßXİ^
+X™[KMMM\ÔÚY[Ø™Ø˜JŒNŒŒËŒK	Ù˜Y_JX˜™Ø˜JNLËMKŒM‹	Ù˜Y_JX	ÎL	Ë	ØÙ[\‰Ê_BˆÛÛ[YNÂˆBˆYŠ]™[\OOOIÜÛ[YK\™\ÚYYIÊ^ÂˆÛÛœİšY]Ï\ÚİÛÜ›
+Úİ
+OOOIÜ™]™\œÙIÏÉÜ\IÎ‰ØÛÛ[X[™	Ë[]šY]ÏOOIÜ\IÏËŒÌ‹LÂˆ›ÜŠÛÛœİYÙˆ]™[\™Ù]YÊ^ØÛÛœİ[O\\K™š[™
+OœšYOOZY
+KÜÏX[I‰˜Ø[Y\˜P[TÜÚ][ÛŠYšY]ÊNÚYŠ\ÜÊXÛÛ[YNØÛÛœİ\ÜË
+ÜÜËËÌŠØØ[Y\˜K˜İ\œ™[
+œ[‹O\ÜË˜˜\ÙVK\ÜËš
+‹NÙ˜]ĞÛÛX˜]ÚYÚ[
+KÌŠÜJŒŒ‹	ÈØMYYÉË˜YK	Üš[™ÉÊNİ^
+‘TÒQQH	Ø[Kœ™\ÚYYTİXÚÜßKÉÔ‘TÒQQWÔ•STË›X^İXÚÜßXKMŒ‹M™Ø˜JŒŒ‹MKMÌË	Ù˜Y_JX	ÎL	Ë	ØÙ[\‰Ê_BˆÛÛ[YNÂˆBˆ›ÜŠÛÛœİYÙˆ]™[\™Ù]YÊ^ØÛÛœİY[™[^Uš\İX[ÜÚ][ÛŠY]™[\™Ù]Ù[ÛY]OË–ÚYJNÚYŠ\
+XÛÛ[YNÂˆYŠ]™[\OOOIÛ[KY^ÜÙY	Ê^Ù˜]ĞÛÛX˜]ÚYÚ[
+KÍŠÜJŒL‹	ÈØNMÎN	Ë˜YK	Üš[™ÉÊNİ^
+	ÑVÔÑQ	ËKMM™Ø˜JŒ‹ŒËMK	Ù˜Y_JX	ÎL	Ë	ØÙ[\‰Ê_Bˆ[ÙHYŠ]™[\OOOIÛ[K\šXÛØÚ][X\šÉÊ^Ù˜]ĞÛÛX˜]ÚYÚ[
+K
+ÜJ	ÈÙNÙ™‰Ë˜YK	Üİ\‰Ê_Bˆ[ÙHYŠ]™[\OOOIÛ[K\šXÛØÚ]]šYÙÙ\‰Ê^Ù˜]ĞÛÛX˜]ÚYÚ[
+KÎ
+ÜJK	ÈÙŒŒ™™‰Ë˜YK	Üš[™ÉÊNİ^
+	Ô’PÓĞÒU	ËKMÎM™Ø˜JLŒMK	Ù˜Y_JX	ÎML	Ë	ØÙ[\‰ÊNØÛÛœİ[XYÙOY]™[™[XYÙPU\™Ù]Ë–ÚYNÚYŠ]™[™ÙÙY\™Ù]ÏËš[˜ÛY\ÊY
+J^Ù˜]ĞÛÛX˜]ÚYÚ[
+KJÜJŒMË	ÈØNN™‰Ë˜YK	Üš[™ÉÊNİ^
+	ÑÑÑIËKMMKŒ™Ø˜JMŒÌ‹MK	Ù˜Y_JX	ÎML	Ë	ØÙ[\‰Ê_Y[ÙHYŠ[X™\‹š\Ñš[š]J[XYÙJJ]^
+IÙ[XYÙ_H•QXKMMKŒ™Ø˜JLŒÎMK	Ù˜Y_JX	ÎML	Ë	ØÙ[\‰Ê_Bˆ[ÙHYŠ]™[\OOOIÜÛİ[Y›ÛİË]\	Ê^Ù˜]ĞÛÛX˜]ÚYÚ[
+KÍ
+ÜJ‹	ÈÍY™‰Ë˜YK	Üš[™ÉÊNÙ˜]ĞÛÛX˜]ÚYÚ[
+KN
+ÜJŒ‹	ÈÙY™˜Ù™‰Ë˜YK	Üİ\‰ÊNØİœØ]™J
+NØİ™ÛØ˜[[OY˜YNØİœİ›ÚÙTİ[OIÈÙM™Y™‰ÎØİœÚYİĞÛÛÜIÈÍŒ™Y™‰ÎØİœÚYİĞ›\LNØİ›[™UÚYNJŠK\J‹ŒÍJNØİ›[™PØ\IÜ›İ[™	ÎØİ˜™YÚ[”]
+
+NØİ›[İ™UÊMËKMŠNØİ›[™UÊ
+ÍËJÍŠNØİ›[İ™UÊ
+ÍËKMŠNØİ›[™UÊMËJÍŠNØİœİ›ÚÙJ
+NØİœ™\İÜ™J
+Nİ^
+	Ñ“ÓÕËUT	ËKMÍKMK™Ø˜JŒL‹ËMK	Ù˜Y_JX	ÎML	Ë	ØÙ[\‰ÊNØÛÛœİ[XYÙOY]™[™[XYÙPU\™Ù]Ë–ÚYNÚYŠ]™[™ÙÙY\™Ù]ÏËš[˜ÛY\ÊY
+J^Ù˜]ĞÛÛX˜]ÚYÚ[
+KJÜJŒMË	ÈØNN™‰Ë˜YK	Üš[™ÉÊNİ^
+	ÑÑÑIËKML‹Œ‹™Ø˜JMŒÌ‹MK	Ù˜Y_JX	ÎML	Ë	ØÙ[\‰Ê_Y[ÙHYŠ[X™\‹š\Ñš[š]J[XYÙJJ]^
+IÙ[XYÙ_XKML‹Œ‹™Ø˜JŒÎLKMK	Ù˜Y_JX	ÎML	Ë	ØÙ[\‰Ê_BˆBˆBŸB™[˜İ[ÛˆÙ]Ü™\ŠŠ^ÂˆÛÛœİ™YXİY]\›•[Y[[™Kœ™]šY]ÊŠK›X\
+OšY
+NÂˆÛÛœİİ\œ™[\\ÙOOOIÜ^Y\‰ÏØXİ]™RYœ\ÙOOOIÙ[™[^IÏØXİ[™Ñ[™[^RY›[Âˆ™]\›ˆİ\œ™[ÖØİ\œ™[‹‹œ™YXİYœÛXÙJ‹LJWNœ™YXİYÂŸB™[˜İ[ÛˆYÚ\˜ÛJŞŞK‹š[İ›ÚÙKÏLÊ^Øİ˜™YÚ[”]
+
+NØİ˜\˜ÊŞŞK‹X]”JŒŠNØİ™š[İ[OYš[Øİ™š[
+
+NÚYŠİ›ÚÙJ^Øİ›[™UÚY[ÎØİœİ›ÚÙTİ[O\İ›ÚÙNØİœİ›ÚÙJ
+__B™[˜İ[ÛˆY]ÛŠKËXİ[Û‹X™[[˜X›Y]YKXİ]™OY˜[ÙJ^ÂˆÚÚXÙT™XİËœ\Ú
+ŞKËXİ[Û‹[˜X›YJNÜ™Xİ
+KËXİ]™OÉÜ™Ø˜JKLŒMLLŠIÎ™[˜X›YÉÜ™Ø˜JŒËÍM
+IÎ‰Ü™Ø˜JN‹‹
+IËXİ]™OÉÈØÍ™XY™‰Î™[˜X›YÉÈÍNX‰Î‰ÈÍÍLÉËLŠNÂˆ^
+X™[
+İËÌ‹JÚÌ‹N[˜X›YÉÈÙŒ™™™‰Î‰ÈÍÍÎXM	Ë	ÍÍL	Ë	ØÙ[\‰ÊNÂŸB™[˜İ[ÛˆYÜ˜Z]
+[YËKËXYÚİ[\œÏY˜[ÙJ^ÂˆİœØ]™J
+NØİ˜™YÚ[”]
+
+NØİœ›İ[™™Xİ
+KËL
+NØİ˜Û\
+
+NÜ™Xİ
+KË	Ü™Ø˜JKLËLM‹ŠIÊNÂˆYŠ[YÏË˜ÛÛ\]I‰š[YË›˜]\˜[ÚY
+^Øİš[XYÙTÛ[Ûİ[™Ñ[˜X›Y]YNÂˆÛÛœİ]ÏZ[YË›˜]\˜[ÚYZZ[YË›˜]\˜[ZYÚÂˆËÈÜ˜Z]È\ÙHZ\ˆİÛˆœ›ÛY˜XÚ[™È\ÛÜšÎÈ^H™]™\ˆ›Üœ›İÈ˜]HÜš]\Ë‚ˆÛÛœİÜ›ÜSX]›Z[ŠZX]œ›İ[™
+Z
+ŠXYÚİ[\œÏËŒÌN‹JJJKÜ›ÜÏSX]›Z[Š]ËX]œ›İ[™
+Ü›Ü
+ËÚ
+JNÂˆİ™˜]Ò[XYÙJ[YË
+]ËXÜ›ÜÊKÌ‹Ü›ÜËÜ›ÜKË
+NÂˆY[Ù^ÚYÚ\˜ÛJ
+İËÌ‹JÚ
+‹ŒÎKÊ‹ŒN	ÈÎNX˜ŒIÊNÜ™Xİ
+
+İÊ‹ŒM‹JÚ
+‹MËÊ‹
+‹	ÈÍL™N‰Ë[J_Bˆİœ™\İÜ™J
+NÂŸB‹ËÈ™[™\ˆXİ]™HÛÛX˜]İ]\Ù\È™\ÚYHXXÚ[HÜ˜Z]‚™[˜İ[ÛˆYİ]\Ó\İ
+
+^ØÛÛœİ[™Tİ]O\[™PÛÛX˜]İ]VÜšYK[™Tİ]\Ù\ÏV×NÙ›ÜŠÛÛœİY™™XİÙˆÉÜ™XŞXÛIË	Ø[\YIË	ØÙ[\İX[\İ\‰Ë	İ[š]Y	×JZYŠ\Ô[™TÙ]
+šYY™™Xİ
+I‰œ[™Tİ]OË˜ÛÛÛİÛœÖÙY™™XİOŒ
+\[™Tİ]\Ù\Ëœ\Ú
+ÚÚ[™‰ÙXY™‰Ë[XYÙN”•S‘WÔÑUÑQ’S’USÓ”ÖÙY™™XİKš[XYÙK\›œÎœ[™Tİ]K˜ÛÛÛİÛœÖÙY™™Xİ_JNØÛÛœİİ[\™XY™œÏË™š[™
+Y™™XİO™Y™™XİšYOOIÜİ[‰ÊKÛİÔİ\\›X\šÜÏË™š[\ŠX\šÏO›X\šËšYOOIİİ[˜YK\ÛİË\İ\	Ê_×KXY™”İ]\Ù\ÏJ™XY™œß×JK™š[\ŠY™™XİO–Éİİ[˜YK\\ÚXØ[YY™[œÙKYİÛ‰Ë	İİ[˜YKX]XÚËYİÛ‰×Kš[˜ÛY\ÊY™™XİšY
+JK›X\
+Y™™XİOŠÚÚ[™‰ÙXY™‰ËXÛÛ™Y™™XİšYOOIİİ[˜YK\\ÚXØ[YY™[œÙKYİÛ‰ÏÉÑ	Î‰ĞIË\›œÎ™Y™™Xİ\›œßJJNÜ™]\›ˆË‹‹Š\œ˜^Kš\Ğ\œ˜^JšYİ]\Ù\ÊOÜšYİ]\Ù\Î–×JK‹‹œ[™Tİ]\Ù\Ë‹‹ŠšYOOIÛ[˜IÉ‰œ›[˜U˜XÚÙYX\šÜÏŒÖŞÚÚ[™‰ØY™‰ËXÛÛ‰ø¦/‰ËİXÚÜÎœ›[˜U˜XÚÙYX\šÜßWN–×JK‹‹Šİ[ÖŞÚÚ[™‰ÙXY™‰ËXÛÛ‰ø§.IË\›œÎœİ[‹\›œßWN–×JK‹‹™XY™”İ]\Ù\Ë‹‹ŠÛİÔİ\›[™İÖŞÚÚ[™‰ØY™‰ËXÛÛ‰ÔÉËİXÚÜÎœÛİÔİ\›[™İ\›œÎœÛİÔİ\ÌK\›œßWN–×JK‹‹Š[™OÖŞÚÚ[™‰ØY™‰ËXÛÛ‰ø¦jÉË\›œÎœ[™K\›œßWN–×JK‹‹Šœ™\ÚYYTİXÚÜÏÖŞÚÚ[™‰ÙXY™‰ËXÛÛ‰Ô‰ËİXÚÜÎœœ™\ÚYYTİXÚÜË\›œÎœœ™\ÚYYU\›œßWN–×JW_B™[˜İ[Ûˆ˜]Ğ[Tİ]\Ù\ÊÜ˜Z]KŞŠ^ÂˆÛÛœİY™™XİÏZYİ]\Ó\İ
+
+NÚYŠYY™™XİË›[™İ
+\™]\›ÂˆÛÛœİXÛÛ”Ú^™OLŒË]ÚL‹\”›İÏSX]›X^
+KX]™›ÛÜŠ
+ŞŠÌÊKÜ]Ú
+JNÂˆÛÛœİ›İÜÏSX]˜ÙZ[
+Y™™XİË›[™İÜ\”›İÊK\™XRZYÚ\›İÜÊšXÛÛ”Ú^™JÊ›İÜËLJJŒÎÂˆÛÛœİL\Ü˜Z]KLLKX\™XRZYÚÂˆ›ÜŠ]OLÚOY™™XİË›[™İÚJÊÊ^ÂˆÛÛœİYYY™™XİÖÚWK›İÏSX]™›ÛÜŠKÜ\”›İÊKÛÛZI\\”›İÎÂˆÛÛœİ^
+ØÛÛ
+œ]ÚO^L
+Ü›İÊœ]ÚÂˆÛÛœİ˜]›Ü˜X›OYY‹šÚ[™OOIÙXY™‰ÎÂˆ™Xİ
+KXÛÛ”Ú^™KXÛÛ”Ú^™K˜]›Ü˜X›OÉÜ™Ø˜JŒËÍËLN
+IÎ‰Ü™Ø˜JLKKKN
+IË˜]›Ü˜X›OÉÈÎ™YY‰Î‰ÈÙXÎYNIË
+NÂˆİœØ]™J
+NØİ˜™YÚ[”]
+
+NØİœ™Xİ
+
+ÌKJÌKXÛÛ”Ú^™KL‹XÛÛ”Ú^™KLŠNØİ˜Û\
+
+NÂˆÛÛœİİ]\Ò[XYÙOYY‹š[XYÙI‰š[XYÙ\ÖÙY‹š[XYÙWNÚYŠİ]\Ò[XYÙOË˜ÛÛ\]I‰œİ]\Ò[XYÙK›˜]\˜[ÚY
+^ØİœØ]™J
+NØİš[XYÙTÛ[Ûİ[™Ñ[˜X›Y]YNØİ™˜]Ò[XYÙJİ]\Ò[XYÙK
+Ì‹JÌ‹XÛÛ”Ú^™KMXÛÛ”Ú^™KM
+NØİœ™\İÜ™J
+_Y[ÙH^
+İš[™ÊY‹šXÛÛŸ	ø§)‰ÊKœÛXÙJŠK
+ÚXÛÛ”Ú^™KÌ‹JÌMKMK	ÈÙÙY™‰Ë	ÍÍL	Ë	ØÙ[\‰ÊNÂˆYŠ[X™\‹š\Ò[YÙ\ŠY‹œİXÚÜÊI‰™Y‹œİXÚÜÏŒ
+^ÂˆÛÛœİÛİ[Tİš[™ÊY‹œİXÚÜÊNÜ™Xİ
+
+ÚXÛÛ”Ú^™KLLËJÚXÛÛ”Ú^™KLLËL‹L‹	Ü™Ø˜J‹MK‹N
+IË[ŠNİ^
+Ûİ[
+ÚXÛÛ”Ú^™KMËJÚXÛÛ”Ú^™KMK	ÈÙ™™˜Y˜IË	ÎL	Ë	ØÙ[\‰ÊNÂˆYŠ[X™\‹š\Ò[YÙ\ŠY‹\›œÊI‰™Y‹\›œÏL
+^Ü™Xİ
+
+ÌKJÌKLËL	Ü™Ø˜J‹MK‹N
+IË[ŠNİ^
+	ÙY‹\›œßU
+ÍËJÍ‹Ë	ÈÙ™™˜Y˜IË	ÎL	Ë	ØÙ[\‰Ê_BˆY[ÙHYŠ[X™\‹š\Ò[YÙ\ŠY‹\›œÊI‰™Y‹\›œÏL
+^ÂˆÛÛœİ\˜][ÛTİš[™ÊY‹\›œÊK›ÛY\˜][Û‹›[™İŒÎŒLÂˆ™Xİ
+
+ÚXÛÛ”Ú^™KLLËJÚXÛÛ”Ú^™KLLËL‹L‹	Ü™Ø˜J‹MK‹N
+IË[ŠNÂˆ^
+\˜][Û‹
+ÚXÛÛ”Ú^™KMËJÚXÛÛ”Ú^™KM›Û	ÈÙ™™˜Y˜IË	ÎL	Ë	ØÙ[\‰ÊNÂˆBˆİœ™\İÜ™J
+NÂˆBŸB™[˜İ[Ûˆ˜]Ğ[U[[X]JKŞŠ^ÂˆÛÛœİ˜Y]\Ï\ŞŠ‹ŒNÂˆÛÛœİŞ^
+ÜŞ‹\˜Y]\ËMŞO^JÜŞ‹\˜Y]\ËMÂˆÛÛœİ]Y]YYZ\Õ[[™[™ÊšY
+K™XYOXØ[”]Y]YU[[X]J
+KÛÏ\šLÙ[XİY\[™[™Õ\™Ù]Xİ[ÛË˜Xİ[ÛOOIİ[[X]IÉ‰œ[™[™Õ\™Ù]Xİ[Û‹˜XİÜ’YOO\šYÂˆËÈÙY\H
+ËPÔÔË\^[Y\]Z]˜[[]\™XH[ˆHÜ˜Z]]Ù[ˆ]Û™HØØ[K‚ˆÛÛœİ]SX]›Z[ŠL‹Ş‹M
+NÂˆÚÚXÙT™XİËœ\Ú
+Ş
+ÜŞ‹Z]LKNJÜŞ‹Z]LKÎš]š]Xİ[Û‰Ü]Y]YK][‰ÊÜšY[˜X›Yœ™XY_JNÂˆİœØ]™J
+NØİ˜™YÚ[”]
+
+NØİœ™Xİ
+KŞ‹ŞŠNØİ˜Û\
+
+NÂˆYŠ™XYJ^ØİœÚYİĞÛÛÜIÈÙ™™LÉÎØİœÚYİĞ›\LNßBˆYÚ\˜ÛJŞŞK˜Y]\Ë	ÈÌLLŒÌØ‰ËÙ[XİYÉÈÍMXXY™‰Îœ™XYOÉÈÙ™™˜L	Îœ]Y]YYÉÈÙNXÍÙ	Î‰ÈÎLM˜˜ÉËÙ[XİYÍœ™XYOÍŒ‹JNÂˆİœÚYİĞ›\LÂˆËÈ[\š[Üˆš[\ÈHÛÛH[™\™ŞHY]\ˆ›İÛK]Ë]Ü[™›È[Y\šXÈÜˆš[™È[™XØ]Ü‹‚ˆÛÛœİ]˜Z[X›Qœ˜XÏ\]Y]YYÌ“X]›X^
+X]›Z[ŠK]˜Z[X›Q[™\™ŞJ
+Kİ[[X]Q[™\™ŞPÛÜİ
+
+JJNÂˆÛÛœİ[›™\\˜Y]\ËLËŒÎÂˆİœØ]™J
+NØİ˜™YÚ[”]
+
+NØİ˜\˜ÊŞŞK[›™\‹X]”JŒŠNØİ˜Û\
+
+NÂˆÛÛœİ[Xİ˜Ü™X]S[™X\‘Ü˜YY[
+ŞŞJÚ[›™\‹ŞŞKZ[›™\ŠNÂˆ[˜YÛÛÜ”İÜ
+™XYOÉÈÍ˜ØÙNIÎ‰ÈÌÌNÍ	ÊNİ[˜YÛÛÜ”İÜ
+K™XYOÉÈÙ™™ŒMÉÎ‰ÈÍØ™˜ÉÊNÂˆ™Xİ
+ŞZ[›™\‹ŞJÚ[›™\‹JŠš[›™\Š˜]˜Z[X›Qœ˜XÊKŠš[›™\‹Šš[›™\Š˜]˜Z[X›Qœ˜XË[
+NÂˆYŠ]Y]YY
+\™Xİ
+ŞZ[›™\‹ŞKZ[›™\‹Šš[›™\‹Šš[›™\‹	Ü™Ø˜JL‹KÍ
+IÊNÂˆİœ™\İÜ™J
+NÂˆ^
+]Y]YYÉø¥â	Î‰ø§)‰ËŞŞJÜ˜Y]\Ê‹ŒK˜Y]\Ê‹MK™XYOÉÈÙ™™Y‰ÎšÛÏÉÈÎNM˜M	Î‰ÈÙXÙY™‰Ë	ÎL	Ë	ØÙ[\‰ÊNÂˆYŠ]Y]YY
+^Øİ˜™YÚ[”]
+
+NØİ˜\˜ÊŞŞK˜Y]\ËL‹X]”JŒŠNØİœİ›ÚÙTİ[OIÈÙY˜ÌÍÙIÎØİ›[™UÚYLØİœÙ][™Q\Ú
+ÍWJNØİœİ›ÚÙJ
+NØİœÙ][™Q\Ú
+×J_Bˆİœ™\İÜ™J
+NÂŸB™[˜İ[Ûˆ˜]Ğ[TÜ˜Z]Y
+
+^ÂˆËÈÚYHİÙ\‹\ØÜ™Y[ˆØ\™È[\\Ú^™HHÜ˜Z][™[[X]HÚ[HÙY\[™È[™\ÜÚ]™H[™XØ]ÜœÈYÚX›K‚ˆÛÛœİØ\™ÏLØ\™LŒLØ\LL‹ÜMÎİ[\\K›[™İ
+˜Ø\™ÊÓX]›X^
+\K›[™İLJJ™Ø\Âˆ]SX]›X^
+M‹X]œ›İ[™
+
+LŒ]İ[
+KÌŠJNÂˆ›ÜŠÛÛœİÙˆ\J^ÂˆÛÛœİXİ]™P[O\\ÙOOOIÜ^Y\‰É‰˜Xİ]™RYOO\šY	‰œšŒÛÏ\šLÂˆÛÛœİÙ[Xİ[™Ğ[O\[™[™Õ\™Ù]Xİ[ÛË\™Ù]ÚYOOOIØ[IÉ‰œ\ÙOOOIÜ^Y\‰Ë\™Ù]Ù[XİY\Ù[Xİ[™Ğ[I‰Š[™[™Õ\™Ù]Xİ[ÛË\™Ù]ØÛÜOOOIØ[	ÏÜšŒœÙ[XİY[RYOO\šY
+NÂˆÛÛœİÜ˜Z]^
+ÌL‹Ü˜Z]O]Ü
+ÌLÜ˜Z]Ú^™OLLLÂˆİœØ]™J
+NØİ™ÛØ˜[[OZÛÏËMÎ˜Xİ]™P[OÌN‹Âˆ™Xİ
+ÜØ\™ËØ\™	Ü™Ø˜JMŒË‹MŠIË\™Ù]Ù[XİYÉÈÙXXØNM	Î˜Xİ]™P[OÉÈÙŒÙÎYIÎ‰Ü™Ø˜JLKMNLKŠIËLŠNÂˆYÜ˜Z]
+[XYÙ\ÖØÚ\˜Xİ\”Ü˜Z]\
+šY
+WKÜ˜Z]Ü˜Z]KÜ˜Z]Ú^™KÜ˜Z]Ú^™KYJNÂˆYŠÛÊ\™Xİ
+Ü˜Z]Ü˜Z]KÜ˜Z]Ú^™KÜ˜Z]Ú^™K	Ü™Ø˜JÌMËŒËŒŠIË[L
+NÂˆ˜]Ğ[U[[X]J
+ÎMKÜLMKLÍŠNÂˆ˜]Ğ[Tİ]\Ù\ÊÜ˜Z]Ü˜Z]KÜ˜Z]Ú^™JNÂˆ^
+İš[™ÊÛÏÌœš
+K
+ØØ\™ËLL‹Ü
+ÌLÌ‹MÛÏÉÈÙŒY˜ÉÎ‰ÈÙMŒÙY‰Ë	ÍÍL	Ë	ÜšYÚ	ÊNÂˆÚY[YX[˜\Š
+ÌL‹Ü
+ÌMKØ\™ËMMÛÏÌœš›X^œÚY[ÛÏÉÈØŒM˜Í‰Î‰ÈÍÙLØ	Ë	ÈÌŒÌÍÍ	ÊNÂˆYŠšYOOIÜÛİ[	Ê^ÂˆÛÛœİX^[][O\Ûİ[›ÛİÕ\[Z]
+
+Kİ\œ™[SX]›X^
+X]›Z[ŠX^[][KÛİ[›ÛİÕ\İ]Kœ™[XZ[š[™ÊJNÂˆÛÛœİİÚ^™OLL‹]ÚLŒ‹›İÕÚYJX^[][KLJJœ]Ú
+ÙİÚ^™Kİ\^
+ÊØ\™Ë\›İÕÚY
+KÌÂˆ›ÜŠ]OLÚOX^[][NÚJÊÊZYÚ\˜ÛJİ\
+ÚJœ]Ú
+ÙİÚ^™KÌ‹Ü
+ÌNİÚ^™KÌ‹Oİ\œ™[ÉÈÍÌ™IÎ‰Ü™Ø˜JKLJIËOİ\œ™[ÉÈÙÙ™™‰Î‰ÈÎMXNIËK
+NÂˆBˆİœ™\İÜ™J
+NÂˆYŠÙ[Xİ[™Ğ[JXÚÚXÙT™XİËœ\Ú
+ŞNÜÎ˜Ø\™Ë˜Ø\™Xİ[Û‰ØØ[Y\˜K\Ù[Xİ‰ÊÜšY[˜X›YœšŒJNÂˆ
+ÏXØ\™ÊÙØ\ÂˆBŸB™[˜İ[ÛˆÙÙÛRYİ]\Ñ[[Ê
+^ÂˆYŠÉÜÙ]\	Ë	Ú[›ÉË	İšXİÜIË	ÙY™X]	×Kš[˜ÛY\Ê\ÙJJ\™]\›ˆ˜[ÙNÂˆÛÛœİ[˜X›Y\\KœÛÛYJOšYİ]\Ó\İ
+
+K›[™İ
+NÂˆ›ÜŠ]OLÚO\K›[™İÚJÊÊ\\VÚWKšYİ]\Ù\ÏY[˜X›YÖ×NŠOOOLÖÂˆÚÚ[™‰ØY™‰ËXÛÛ‰ø«(IË\›œÎŒßKÚÚ[™‰ÙXY™‰ËXÛÛ‰ø§.IË\›œÎŒŸKˆÚÚ[™‰ØY™‰ËXÛÛ‰ø§)‰Ë\›œÎKÚÚ[™‰ØY™‰ËXÛÛ‰ø¦iIË\›œÎ›[KˆÚÚ[™‰ÙXY™‰ËXÛÛ‰ø§a	Ë\›œÎŒ_KÚÚ[™‰ØY™‰ËXÛÛ‰ø¥á‰Ë\›œÎŒŸKˆÚÚ[™‰ÙXY™‰ËXÛÛ‰ø¥â	Ë\›œÎ_BˆNšOOOLOÖŞÚÚ[™‰ØY™‰ËXÛÛ‰ø«(IË\›œÎŒŸKÚÚ[™‰ÙXY™‰ËXÛÛ‰ø§.IË\›œÎŒ_WN–ŞÚÚ[™‰ØY™‰ËXÛÛ‰ø§)‰Ë\›œÎ›[WJNÂˆØ^J[˜X›YÉÔÕUTÈQTÕÑ‘‰Î‰ÔÕUTÈQTÕÓˆ8 %š\İX[Û›NÈ›ÈØ[Y\^HY™™XİÉÊNÜ™]\›ˆYNÂŸB™[˜İ[Ûˆ˜]Ñ]™[Ü\”[™[
+
+^ÂˆÛÛœİNLÎONL‹ÏMŒÌËMNLNÂˆ™Xİ
+KË	Ü™Ø˜JL‹NKÌ‹MÊIË	ÈØXXXÙIËMŠNÂˆ^
+	ĞÓÓPUTÕÓÓ•“ÓÉË
+ÌJÌÌKŒË	ÈÙŒ™˜™	Ë	Î	ÊNİ^
+	Ô™]šY]ÈÛÛÈÛ›H8 %›İØ[›ÛšXØ[Xš[]Y\ÉË
+ÌJÍŒKMK	ÈØNX™™‰Ë	ÍŒ	ÊNÂˆÛÛœİ[Ù\ÏVÖÉÜÚ[™ÛIË	ÔÒS‘ÓI×KÉØ›\İ	Ë	Ğ“TÕ	×KÉØ[ÙIË	ĞSÑI×KÉÙš]™KZ]	Ë	ÍKRU	×WNÂˆ›ÜŠ]OLÚO[Ù\Ë›[™İÚJÊÊ^ØÛÛœİÛ[ÙKX™[O[[Ù\ÖÚWNÚY]ÛŠ
+ÌŒÊÚJŒMLJÎ‹LÎKK	Û[ÙN‰ÊÛ[ÙKX™[\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙY\™Ù][™Ó[ÙOOO[[ÙJ_Bˆ^
+	ÕT‘ÑUÈĞSQTIË
+ÌŒËJÌMLËM	ÈØXÎ	Ë	Î	ÊNÂˆY]ÛŠ
+ÌŒËJÌMÍNK	ØØ[Y\˜K\\IË	ĞSH’QUÉË\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙYØ[Y\˜T™]šY]ÏOOIÜ\IÊNÂˆY]ÛŠ
+ÌŒNKJÌMÍNK	ØØ[Y\˜K]\™Ù]	Ë	ÑS‘SVH’QUÉË\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙYØ[Y\˜T™]šY]ÏOOIİ\™Ù]	ÊNÂˆY]ÛŠ
+ÍM‹JÌMÍNLKK	ØØ\]\İ	Ë	ÔÔPV
+ÌIË\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙY
+NÂˆY]ÛŠ
+ÌŒËJÌËNK	Üİ\ÜZX[	Ë	ÒPSTÕ	Ë\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙY
+NÂˆY]ÛŠ
+ÌŒNKJÌËNK	Üİ\Ü\™]š]™IË	Ô‘U’U‘HTÕ	Ë\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙY
+NÂˆYŠ\İ\Ü[[ÊZY]ÛŠ
+ÍM‹JÌËNLKK	ÚY\İ]\Ë]\İ	Ë	ÔÕUTÈPÓÓ”ÉË\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙY\KœÛÛYJOšYİ]\Ó\İ
+
+K›[™İ
+JNÂˆYŠİ\Ü[[Ê^ÚY]ÛŠ
+ÍM‹JÌËNLKK	ØÛÛ™š\›K\İ\Ü	Ë	ĞÓÓ‘’T“IËH\\K™š[™
+OœšYOO\Ù[XİY[RY	‰™[YÚX›P[U\™Ù]
+İ\Ü[[ÊJJNÚY]ÛŠ
+ÍM‹JÌNKNLKÎ	ØØ[˜Ù[\İ\Ü	Ë	ĞĞSÑS	ÊNßBˆ^
+	ĞÒT‘ÑHSSPUHS‘T‘ÖH8 %TÕÓ“IË
+ÌŒËJÌÌŒËM	ÈØXÎ	Ë	Î	ÊNÂˆ›ÜŠ]OLÚO\K›[™İÚJÊÊZY]ÛŠ
+ÌŒÊÚJŒM‹JÌÍKLÎKK	ØÚ\™ÙK][‰ÊÜ\VÚWKšY	ÊÈS‘T‘ÖH	ÊÊJÌJK\VÚWKšŒ	‰ˆ\]\ÙY	‰ˆVÉÚ[›ÉË	İšXİÜIË	ÙY™X]	×Kš[˜ÛY\Ê\ÙJJNÂˆ^
+	Ñ•S‘SQS•SH8 %T“ˆSRS‘ÈTÕÉË
+ÌŒËJÍL‹M	ÈØXÎ	Ë	Î	ÊNÂˆY]ÛŠ
+ÌŒËJÍKNË	ÙŒKXY˜[˜ÙIË	ĞQSÑH
+ÌIIË\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙY
+NÂˆY]ÛŠ
+ÌŒŒ‹JÍKNË	ÙŒKY[^IË	ÑSVHIIË\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙY
+NÂˆY]ÛŠ
+ÍŒKJÍKNË	ÙŒK\ÜYY	Ë	ÔÔQQKŒÉË\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙY
+NÂˆY]ÛŠ
+ÌŒËJÍÍ‹‹	ÙŒK\İ[[[Û‹Z[™\[™[	Ë	ÒS‘TS‘S•ÕSSSÓ‰Ë\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙY
+NÂˆY]ÛŠ
+ÌÌŒKJÍÍ‹Ë	ÙŒK\İ[[[Û‹XÛÛ›ÛY	Ë	ĞÓÓ•“ÓQÕSSSÓ‰Ë\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙY
+NÂˆÛÛœİXİÜXXİ]™J
+K›ÙÏXXİÜÜ›ÙÜ™\ÜÑ›ÜŠXİÜ‹šY
+N›[Âˆ^
+U‘SÈTÕ8 (ˆ	ØXİÜØXİÜ‹›˜[YJÉÈˆ	ÊÜ›ÙÏË›]™[‰Ó“ÈPÕU‘HSIßH8 (ˆPUT’PSÈ	ˆTURTQS•“ÕQ’S‘Q
+ÌŒËJÍLÍKLË	ÈØXÎ	Ë	ÍÍL	ÊNÂˆÛÛœİØ[Xİ\\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙY	‰ˆHXXİÜÂˆY]ÛŠ
+ÌŒËJÍMMK	Ü›ÙÜ™\ÜË]\İ[]™[	Ë	ÓU‘S
+ÌIËØ[Xİ	‰˜XİÜ‹›]™[Ú\˜Xİ\“]™[Ø\
+
+I‰ŠPTĞÑS”ÒSÓ—ÑĞUTËš[˜ÛY\ÊXİÜ‹›]™[
+_›ÙË˜\ØÙ[™Yš[˜ÛY\ÊXİÜ‹›]™[
+JJNÂˆY]ÛŠ
+ÌMÍJÍMLÎK	Ü›ÙÜ™\ÜË]\İX\ØÙ[™	Ë	ĞTĞÑS‘	ËØ[Xİ	‰TĞÑS”ÒSÓ—ÑĞUTËš[˜ÛY\ÊXİÜ‹›]™[
+I‰ˆ\›ÙË˜\ØÙ[™Yš[˜ÛY\ÊXİÜ‹›]™[
+JNÂˆY]ÛŠ
+ÌÌJÍMLÍË	Ú]\İY›]	Ë	Ñ“U
+ÌŒ	ËØ[Xİ
+NÂˆY]ÛŠ
+ÍÌKJÍMLÍ‹	Ú]\İ\\˜Ù[	Ë	Ò
+ÌŒ	IËØ[Xİ
+NÂŸB™[˜İ[Ûˆ˜]ÒY
+
+^ÂˆÛÛœİÚ[™[X]XÏ\\ÙOOOIÜ™\ÛÛ™Iß\ÙOOOIÙ[™[^IÎÂˆËÈQ\ÈØÜ™Y[‹\ÜXÙH[™š\İX[H\İ[˜İœ›ÛHH^Y\™Y˜]YšY[‚ˆÛÛœİÚYİÏXİ˜Ü™X]S[™X\‘Ü˜YY[
+ÍK
+NÜÚYİË˜YÛÛÜ”İÜ
+	Ü™Ø˜J‹LŒ
+IÊNÜÚYİË˜YÛÛÜ”İÜ
+ŒÌ‹	Ü™Ø˜JËL‹ŠIÊNÜÚYİË˜YÛÛÜ”İÜ
+K	Ü™Ø˜JNKM
+IÊNÜ™Xİ
+ÍKËŒKÚYİÊNÂˆËÈÛX[]H[™İ\œ™[Ø]™NˆÈ›İ›ØÚÈ˜]YšY[œ˜[Z[™Ë‚ˆ^
+	ÕÓËUÓ‘IËLM‹ÌË	ÈÙXIË	ÎL	ÊNÂˆ^
+ĞU‘H	ÓX]›X^
+KØ]™R[™^
+ÌJ_HÈ	İØ]™T[‹›[™İ_XLŒM‹	ÈÙMÙL‰Ë	ÍÍL	ÊNÂˆËÈ™\XØ[[Y[[™HHÛÛ\XİXİX[\›ˆÜ™\‹›İY][Û˜[˜]^\›œË‚ˆİœØ]™J
+NØİ™ÛØ˜[[OXÚ[™[X]XÏËŒNÂˆ™Xİ
+L‹Î	Ü™Ø˜JLNÍJIË	Ü™Ø˜JMÎKŒ‹ŒŒËŒÍ
+IËN
+NÂˆÛÛœİÜ™\YÙ]Ü™\ŠŠNÙ›ÜŠ]OLÚOÜ™\‹›[™İÚJÊÊ^ÂˆÛÛœİY[Ü™\–ÚWK›ÙOY[™[ZY\Ë™š[™
+OO™KšYOOZY
+K[O\\K™š[™
+OœšYOOZY
+Kİ[[[Û\İ[[[ÛœË™š[™
+ÏOœËšYOOZY
+K›İÏZOOOLÂˆÛÛœİLÌK^OLLNJÚJÂˆ™Xİ
+^KN›İÏÉÜ™Ø˜JÎ‹LMJIÎ‰Ü™Ø˜JMËËÊIË›İÏÉÈÙYXMIÎ™›ÙOÉÈØMÍØÎIÎ‰ÈÍÍNX˜˜‰ËLŠNÂˆYŠ›ÙJZYÜ˜Z]
+[XYÙ\ÖÙ›ÙK˜\K
+ÍË^JÍKK
+NÂˆ[ÙHYŠİ[[[ÛŠ^ÚYÚ\˜ÛJ
+ÌÌK^JÌKNK	ÈÍLÎ‰Ë	ÈÙYY	ËŠNİ^
+	ø§)ÉË
+ÌÌK^JÌKŒ‹	ÈÙ™™™™™‰Ë	Î	Ë	ØÙ[\‰ÊNßBˆ[ÙHYŠYOOIÜÛİ[	ÊZYÜ˜Z]
+[XYÙ\ËœÛİ[œ›Û
+ÍË^JÍKK
+NÂˆ[ÙHYŠYOOIŞ™\›ÉÊZYÜ˜Z]
+[XYÙ\Ë™\›Ñœ›Û
+ÍË^JÍKK
+NÂˆ[ÙHYŠYOOIÛ[IÊZYÜ˜Z]
+[XYÙ\Ë›[Qœ›Û
+ÍË^JÍKK
+NÂˆ[ÙHYŠYOOIÙ]Û‰ÊZYÜ˜Z]
+[XYÙ\Ë™]Û‘œ›Û
+ÍË^JÍKK
+NÂˆ[ÙHYŠYOOIÛÙØ[‰ÊZYÜ˜Z]
+[XYÙ\Ë›ÙØ[”Ü˜Z]
+ÍË^JÍKK
+NÂˆ[ÙHYŠYOOIØÛİY	ÊZYÜ˜Z]
+[XYÙ\Ë˜ÛİYœ›Û
+ÍË^JÍKK
+NÂˆ[ÙHYŠ[JZYÜ˜Z]
+[XYÙ\ËœÜ˜Z]
+ÍË^JÍKK
+NÂˆ[Ù^ÚYÚ\˜ÛJ
+ÌÌK^JÌŒKLË	ÈÍ™NXXÉÊNÜ™Xİ
+
+ÌNK^JÌÌËM‹	ÈÍÎLIË[Ê_Bˆ^
+›İÏÉÓ“ÕÉÎ”İš[™ÊJÌJK
+ÍM^JÍL›İÏÉÈÙ™™Œ˜Ø‰Î‰ÈØ˜XØ™‰Ë	ÎL	Ë	ÜšYÚ	ÊNÂˆBˆİœ™\İÜ™J
+NÂˆËÈ›ÜÜÈ˜\œšY\ˆ[™\™HØÜ™Y[‹\ÜXÙH\Ü^\ËˆH˜\œšY\ˆÚ]ÈX›İ™HBˆËÈX[›İÜÎÈXXÚİÚ]È[[YYX][HYÙˆ]ÈÛÜœ™\ÜÛ™[™È˜\‹‚ˆÛÛœİ›ÜÜÓÛ‘šY[[]™Q[™[ZY\Ê
+K™š[™
+OO™K˜Ø]YÛÜOOOIØ›ÜÜÉÊNÂˆYŠ›ÜÜÓÛ‘šY[
+^ÂˆÛÛœİLLOLL‹ÏLLÌ˜\œÏX›ÜÜÓÛ‘šY[šX[˜\œßK˜\’LLË˜\–X
+ÌÍ˜\•ÏXËMMšM
+Ø˜\œÊŒŒÙYÛY[X^X›ÜÜÓÛ‘šY[›X^Ø˜\œÎÂˆ™Xİ
+KËš	Ü™Ø˜JLM‹ÌK
+IË	Ü™Ø˜JŒ‹LÎK
+IËLŠNÂˆ^
+“ÔÔÈ8 (ˆ	Ø›ÜÜÓÛ‘šY[›˜[Y_X
+ÌNJÌLËMK	ÈÙ™™Œ	Ë	ÎL	ÊNÂˆYÚ\˜ÛJ
+ØËLŒNJÌLËK	ÈØÍÎY‰Ë	ÈÙY™Œ™IËJNİ^
+	ĞT”’QT‰Ë
+ØËLŒËJÌLËL	ÈÙYLXÉË	Î	ÊNÂˆYÚ\˜ÛJ
+ØËLLM‹JÌLËK	ÈÙYMÎ‰Ë	ÈÙ™™ÙÉËJNİ^
+	ÒPS	Ë
+ØËLLKJÌLËL	ÈÙŒMÙX‰Ë	Î	ÊNÂˆ[™J˜\–JÌÌK˜\•Ë›ÜÜÓÛ‘šY[›X^˜\œšY\Ø›ÜÜÓÛ‘šY[˜˜\œšY\‹Ø›ÜÜÓÛ‘šY[›X^˜\œšY\Œ	ÈØÍÎY‰Ë	ÈÌÙMXIË˜\’
+NÂˆÛÛœİXİ]™RX[˜\SX]›Z[Š˜\œËLKX]™›ÛÜŠ
+›ÜÜÓÛ‘šY[›X^X›ÜÜÓÛ‘šY[š
+KÓX]›X^
+KÙYÛY[X^
+JJNÂˆ›ÜŠ]OLÚO˜\œÎÚJÊÊ^ÂˆÛÛœİÙYÛY[SX]›X^
+X]›Z[ŠÙYÛY[X^›ÜÜÓÛ‘šY[šZJœÙYÛY[X^
+JK˜][Ï\ÙYÛY[X^ÜÙYÛY[ÜÙYÛY[X^Œ›İÖOXJÍLJÚJŒŒÂˆÛÛœİ™[XZ[š[™Ï\ÙYÛY[ŒÚYÚ\˜ÛJ
+ÌNK›İÖJØ˜\’Ì‹K™[XZ[š[™ÏÉÈÙŒØÍÍÎ	Î‰ÈÍÍXIË™[XZ[š[™ÏÉÈÙ™™ŒÍIÎ‰ÈÍÌÎNIËŠNÂˆ[™J˜\–›İÖK˜\•Ë˜][ËOOOXXİ]™RX[˜\ÉÈÙ™™MØÉÎ‰ÈÙYMÎ‰Ë	ÈÌÙLLÎ	Ë˜\’
+NÂˆBˆBˆËÈÛÛ\Xİ^[™YÙ[XİY[™[^H[™›Ü›X][Û‹‚ˆÛÛœİ›Øİ\ÏXÚÜÙ[‘[™[^J
+NÂˆYŠ\ÙOOOIÜ^Y\‰É‰˜Ø[Y\˜T™]šY]ÈOOIÜ\IÉ‰™›Øİ\É‰™›Øİ\Ë˜Ø]YÛÜHOOIØ›ÜÜÉÊ^Âˆ™Xİ
+LÎŒ‹ÎNKÌ‹	Ü™Ø˜JLM‹ÌKÎ
+IË	Ü™Ø˜JŒLŒLËŒŒ
+IËM
+NÂˆ^
+	Ù›Øİ\Ë›˜[Y_H‹ˆ	Ù›Øİ\Ë›]™[XMŒKNK	ÈÙ™™ŒÙ‰Ë	ÍÍL	ÊNÂˆ^
+	Ù›Øİ\ËšHÈ	Ù›Øİ\Ë›X^XLÌMKMK	ÈÙŒMÙX‰Ë	ÍÌ	Ë	ÜšYÚ	ÊNÂˆÚY[YX[˜\ŠMŒKKÌLK›Øİ\Ëš›Øİ\Ë›X^›Øİ\ËœÚY[	ÈÙŒÎÎ‰Ë	ÈÌÍÙLIÊNÂˆY[ÙHYŠØ[Y\˜T™]šY]ÏOOIÜ\IÉ‰ˆX›ÜÜÓÛ‘šY[
+^Âˆ™Xİ
+LLÎ‹Œ‹	Ü™Ø˜JLM‹ÌKÍŠIË	Ü™Ø˜JŒŒËŒKŒÎ
+IËM
+NÂˆ^
+	ÔÑSPÕSˆSIËLÍKMKŒ	ÈÙÙMØØIË	Î	ÊNÂˆBˆËÈÙ\\˜]HÛÛ\Xİ\\‹\šYÚ][]HÛÛ›ÛË‚ˆYŠU—ÓSÑJZY]ÛŠLÍ‹KÍMK	Ù]‹\[™[]ÙÙÛIË	ÑU‰ËYK]”[™[Ü[ŠNÂˆY]ÛŠMKKÍMK	Ü]\ÙIË]\ÙYÉÔVIÎ‰ÔUTÑIË\ÙOOOIÜ^Y\‰ß]\ÙY
+NÂˆËÈ[š\ÚX›HLLİXÚ]™YÚ[ÛœÈ™\ÜXİTÛ™IÜÈZ[š[][H\™Ù][Y[œÚ[Û‹‚ˆYŠU—ÓSÑJXÚÚXÙT™XİËœ\Ú
+ŞŒLÍNËÎŒL‹ŒLXİ[Û‰Ù]‹\[™[]ÙÙÛIË[˜X›YY_JNÂˆÚÚXÙT™XİËœ\Ú
+ŞŒMŒËNËÎŒL‹ŒLXİ[Û‰Ü]\ÙIË[˜X›Yœ\ÙOOOIÜ^Y\‰ß]\ÙYJNÂˆËÈÚİÈHİYHÛ›HÚ[H\™Ù]Ù[Xİ[Ûˆ\È[™[™ËˆHXİ]™HØ\™[™ˆËÈXİ[Ûˆ]ÛœÈ[™XYHY[YHÚÜÙH\›ˆ]\È[™ÚXÚXİ[ÛœÈ^\İ‚ˆYŠ\ÙOOOIÜ^Y\‰É‰œ[™[™Õ\™Ù]Xİ[ÛŠ^ÂˆÛÛœİ[ÙO\™]šY]Õ\™Ù][ÙJ
+K]Ï\[™[™Õ\™Ù]Xİ[ÛØÚÛÜÙP]XÚÕ\™Ù]Ê[ÙJN–×NÂˆ^
+[™[™Õ\™Ù]Xİ[Û‹\™Ù]ÚYOOOIØ[IÏÊ[™[™Õ\™Ù]Xİ[Û‹\™Ù]ØÛÜOOOIØ[	ÏØÑSPÕS–HSHÔˆ‘TÔÈ	Ü[™[™Õ\™Ù]Xİ[Û‹˜Xİ[Û‹Õ\\Ø\ÙJ
+_HQĞRS˜˜ÑSPÕSH“Ôˆ	Ü[™[™Õ\™Ù]Xİ[Û‹˜Xİ[Û‹Õ\\Ø\ÙJ
+_X
+N˜ÑSPÕT‘ÑU“Ôˆ	Ü[™[™Õ\™Ù]Xİ[Û‹˜Xİ[Û‹Õ\\Ø\ÙJ
+_H8 (ˆ	Ú]Ë›[™İHT‘ÑUØLNLŒŒMK	ÈÙNY	Ë	ÍÌ	ÊNÂˆY]ÛŠLL‹‹NÌ	ØØ[˜Ù[]\™Ù]	Ë	ĞĞSÑST‘ÑU	ÊNÂˆBˆËÈÜ˜Z]Y›Øİ\ÙY[HQ™]šY]È^[İ]Ú]İ][\š[™ÈÛÛX˜]™\Ûİ\˜ÙHÙÚXË‚ˆİœØ]™J
+NØİ™ÛØ˜[[OXÚ[™[X]XÏËŒNÂˆ˜]Ğ[TÜ˜Z]Y
+
+NÂˆİœ™\İÜ™J
+NÂˆËÈÚ\™YÔÛ\ÈX›İ™HXİ[ÛœËÜ˜\]]ÛX]XØ[H›Üˆ[˜Ü™X\ÙYY™™Xİ]™HØ\XÚ]K‚ˆİœØ]™J
+NØİ™ÛØ˜[[OXÚ[™[X]XÏËŒÎŒNÂˆÛÛœİX^[][OYY™™Xİ]™TÜX^
+
+Kš\ÚX›PÛİ[SX]›X^
+X^[][JK\”›İÏLL\]ÚLNÂˆÛÛœİ›İĞÛİ[SX]˜ÙZ[
+š\ÚX›PÛİ[Ü\”›İÊK˜\ÙVLL˜\ÙVOMMÂˆ^
+	ÔÒÒSÒS•ÉËLÌ˜\ÙVKLŒKMK	ÈÙNYØ™IË	ÎL	ÊNÂˆ›ÜŠ]OLÚOš\ÚX›PÛİ[ÚJÊÊ^ÂˆÛÛœİ›İÏSX]™›ÛÜŠKÜ\”›İÊKÛÛZI\\”›İËŞX˜\ÙV
+ØÛÛ
+œ\]ÚŞOX˜\ÙVK\›İÊŒNÂˆİœØ]™J
+NØİ˜[œÛ]JŞŞJNØİœ›İ]JX]”KÍ
+NÂˆ™Xİ
+NNM‹M‹OÜÉÈØÍÙŒY™‰Î‰Ü™Ø˜JL‹ÍËMËL
+IËOÜÉÈÙXÙ˜™™‰Î‰ÈÎMMIËÊNØİœ™\İÜ™J
+NÂˆBˆËÈ˜]HÛÛ[X[™ÎˆÛ›H˜\ÚXÈ[™ÚÚ[ˆ[[X]H\È[œÚYHÜ˜Z]QË‚ˆÛÛœİ^Y\”™XYO\\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙYÂˆÛÛœİXİ[ÛœÏVÂˆÚÙ^N‰Ø˜\ÚXÉËŞŒLÍLËŞNM‹LK[˜X›Yœ^Y\”™XYKXÛÛ‰ø¦¥	ËX™[‰ĞUPÒÉßKˆÚÙ^N‰ÜÚÚ[	ËŞŒMLŞN[˜X›Yœ^Y\”™XYI‰œÜŒXÛÛ‰ø§)‰ËX™[‰ÔÒÒS	ßKˆNÂˆ›ÜŠÛÛœİHÙˆXİ[ÛœÊ^ÂˆÛÛœİ[˜X›YXK™[˜X›YÙ[XİY\[™[™Õ\™Ù]Xİ[ÛË˜Xİ[ÛOOXKšÙ^I‰œ[™[™Õ\™Ù]Xİ[Û‹˜XİÜ’YOOXXİ]™RYÂˆÚÚXÙT™XİËœ\Ú
+Ş˜K˜ŞXKœ‹MKN˜K˜ŞKXKœ‹MKÎŠKœŠÍJJŒ‹ŠKœŠÍJJŒ‹Xİ[Û˜KšÙ^K[˜X›YJNÂˆYÚ\˜ÛJK˜ŞK˜ŞKKœ‹Ù[XİYÉÜ™Ø˜JÍËLLN
+IÎ™[˜X›YÉÜ™Ø˜JKÌMÊIÎ‰Ü™Ø˜JNKÌ‹KÊIËÙ[XİYÉÈÍMXXY™‰Î™[˜X›YÉÈÙ™™ŒÌÉÎ‰ÈÍÌÎL‰Ë
+NÂˆYÚ\˜ÛJK˜ŞK˜ŞKKœ‹NK	Ü™Ø˜JLËKKN
+IËÙ[XİYÉÜ™Ø˜JLÍŒMK
+IÎ™[˜X›YÉÜ™Ø˜JLÌNLËŒŒM
+IÎ‰Ü™Ø˜J‹LLŒKŒÌ
+IËŠNÂˆ^
+KšXÛÛ‹K˜ŞK˜ŞKLL‹KšÙ^OOOIÜÚÚ[	ÏÍÎK[˜X›YÉÈÙYÙ™‰Î‰ÈÎMØNIË	ÎL	Ë	ØÙ[\‰ÊNÂˆ^
+K›X™[K˜ŞK˜ŞJÌÌKKšÙ^OOOIÜÚÚ[	ÏÌNŒM‹[˜X›YÉÈÙ™™YÉÎ‰ÈØLYX˜ÉË	ÎL	Ë	ØÙ[\‰ÊNÂˆBˆİœ™\İÜ™J
+NÂˆYŠ[[X]T]Y]YK›[™İ
+^ØÛÛœİ˜[Y\Ï][[X]T]Y]YK›X\
+OOœ\K™š[™
+OœšYOO\K˜XİÜ’Y
+OË›˜[Y_K˜XİÜ’Y
+Kš›Ú[Š	È8¡¤ˆ	ÊNÜ™Xİ
+MKÍKËÎ	Ü™Ø˜JÍKKŠIË	Ü™Ø˜JŒNKNMKLÌLÊIËL
+Nİ^
+SUQUQH	Û˜[Y\ËœÛXÙJŒÊ_XMÎÎM	ÈÙŒÙLØ˜ÉË	ÍÍL	Ê_BˆYŠ\ÙOOOIÜ™\ÛÛ™IÉ‰›ÙÊ^Ü™Xİ
+ŒŒMKÍŒ	Ü™Ø˜JKMËÌKLŠIË	Ü™Ø˜JMÍËŒËŒ‹ŒŠIËLJNİ^
+ÙË›[™İÍÛÙËœÛXÙJÍJJÉø )‰Î›ÙËŒÍËMË	ÈÙY™™™‰Ë	ÍÍL	Ë	ØÙ[\‰Ê_BˆYŠU—ÓSÑI‰™]”[™[Ü[‰‰ˆVÉİšXİÜIË	ÙY™X]	×Kš[˜ÛY\Ê\ÙJJY˜]Ñ]™[Ü\”[™[
+
+NÂˆYŠ]\ÙY
+Y˜]Ô]\ÙJ
+NÚYŠ\ÙOOOIİšXİÜIß\ÙOOOIÙY™X]	ÊY˜]Ô™\İ[
+
+NÂŸB™[˜İ[Ûˆ˜]Ô]\ÙJ
+^Âˆ™Xİ
+Ë	Ü™Ø˜J‹KMK
+IÊNİ^
+	ÔUTÑQ	ËŒÍ	ÈÙ™™ŒÙNIË	ÎL	Ë	ØÙ[\‰ÊNÂˆ™Xİ
+Í‹ŒÌÌË	ÈÌLMÌY	Ë	ÈÙMÙM	ËN
+NÂˆYŠU—ÓSÑJ^ÂˆY]ÛŠÍKŒM‹	İ\İZÛÉË	ÒË“ËˆSIË	ÉÊNÂˆY]ÛŠLËÍKŒM‹	İ\İ\™]š]™IË	Ô‘U’U‘HSIË	ÉÊNÂˆY]ÛŠM‹ÍKŒM‹	İ[œ]\ÙIË	Ô‘TÕSQIË	ÉÊNÂˆY[ÙHY]ÛŠKÍKŒÌ‹	İ[œ]\ÙIË	Ô‘TÕSQIË	ÉÊNÂˆY]ÛŠMÌMŒŒ‹	Ü™\İ\	Ë	Ô‘TÕT•UIË	ÉÊNÂˆYŠØ[XØÙ\ÜÓXZ[“Y[J
+JXY]ÛŠLMŒŒ‹	ÛXZ[‹[Y[IË	ÓPRSˆQS•IË	ÉÊNÂŸB™[˜İ[Ûˆ˜]ÔİÜJ
+^ÂˆÛÛœİİ]KİÜ_OXØ[\ZYÛ‘[NÂˆÛÛœİ™X]\İÜK˜™X]ÖÜİÜP™X][™^NÂˆ™Xİ
+Ë	ÈÌLNIÊNÂˆÛÛœİ\\İÜP™X]\Âˆ˜]ĞÛİ™\’[XYÙJ\˜˜XÚÙÜ›İ[™
+NÂˆ™Xİ
+Ë	Ü™Ø˜JËËMKŒ
+IÊNÂˆ™Xİ
+NLLÍM	Ü™Ø˜JLËŒKÎM
+IË	ÈÙÌÎ‰ËŒ
+NÂˆÛÛœİ^X™X]œÜ˜Z]ÍMŒŒÎÂˆ^
+]K^MKÍ	ÈÙ™™Œ	Ë	ÎL	ÊNÂˆYŠ\œÜ˜Z]Ë˜ÛÛ\]I‰˜\œÜ˜Z]›˜]\˜[ÚY
+Xİ™˜]Ò[XYÙJ\œÜ˜Z]ŒÎŒŒ‹ŒŠNÂˆYŠ™Y™]ÚYİÜP™X][™^OO\İÜP™X][™^	‰˜\˜˜XÚÙÜ›İ[™Ë˜ÛÛ\]I‰ŠX\œÜ˜Z]\œÜ˜Z]˜ÛÛ\]JJ^ÂˆÛÛœİ™^™X]\İÜK˜™X]ÖÜİÜP™X][™^
+ÌWNÂˆYŠ™^™X]
+\™\]Y\İİÜP™X]
+İÜK™^™X]	ÛİÉÊNÂˆYŠ™Y™]ÚYİÜP™X][™^OOKLJ\™Y™]ÚØ[\ZYÛ˜]JØ[\ZYÛ‘[K™[˜Ûİ[\ŠNÂˆ™Y™]ÚYİÜP™X][™^\İÜP™X][™^ÂˆBˆÛÛœİ^ÚYX™X]œÜ˜Z]ÎŒŒLLLÂˆ]˜\œ˜][Û–OMNNÂˆ][™OIÉÎÂˆİ™›ÛIÍŒŞ\İ[K]ZKX\K\Ş\İ[KÙYÛÙHRKØ[œË\Ù\šY‰ÎÂˆ›ÜŠÛÛœİÛÜ™Ùˆ™X]^œÜ]
+	È	ÊJ^ÂˆÛÛœİ™^[[™OÛ[™JÉÈ	ÊİÛÜ™ÛÜ™ÂˆYŠ[™I‰˜İ›YX\İ\™U^
+™^
+KÚY^ÚY
+^Âˆ^
+[™K^˜\œ˜][Û–K	ÈÙY™™™‰ÊNÂˆ˜\œ˜][Û–JÏLÌNÂˆ[™O]ÛÜ™ÂˆY[ÙH[™O[™^ÂˆBˆYŠ[™J]^
+[™K^˜\œ˜][Û–K	ÈÙY™™™‰ÊNÂˆYŠØ[XØÙ\ÜÓXZ[“Y[J
+JXY]ÛŠŒÎÍMKŒLŒ‹	ÛXZ[‹[Y[IË	ÓPRSˆQS•IË	ÉÊNÂˆÛÛœİš[˜[™X]\İÜP™X][™^OO\İÜK˜™X]Ë›[™İLNÂˆY]ÛŠLLŒÍMK‹Œ‹	ØY˜[˜ÙK\İÜIËš[˜[™X]ÉĞ‘QÒSˆUIÎ‰ĞÓÓ•S•QIË	ÉÊNÂŸB™[˜İ[Ûˆ˜]Ô™\İ[
+
+^Âˆ™Xİ
+Ë	Ü™Ø˜JËËMKÌŠIÊNÂˆ^
+\ÙOOOIİšXİÜIÏÉÕ’PÕÔ–IÎ‰ÑQ‘PU	ËNM‹‹\ÙOOOIİšXİÜIÏÉÈÙÙY‰Î‰ÈÙŒX˜M	Ë	ÎL	Ë	ØÙ[\‰ÊNÂˆ™Xİ
+ÌLŒŒNMK	Ü™Ø˜JLËŒKÎN
+IË	ÈÙÌÎ‰ËŒ
+NÂˆ^
+\ÙOOOIİšXİÜIÏÉÑS‘SRQTÈQ‘PUQ8 (ˆ	Êİİ[[™[^QY™X]ÊÉÈĞU‘TÈÓPT‘Q8 (ˆ	ÊİØ]™T[‹›[™İ‰ĞSQTÈQ‘PUQ	ËÍÌÌLŒË	ÈÙYŒ™ÉË	ÍÍL	ÊNÂˆ^
+	ÕT“”È	Êİ\›‹ÍÌÍM‹N	ÈØNX˜ØÙIË	ÍŒ	ÊNÂˆ^
+	ÔT•H	ÊÜ\K›[™İ
+ÉÈÈ	ÊÓPVÔT•WÔÒV‘KÍÌÎLN	ÈØNX˜ØÙIË	ÍŒ	ÊNÂˆYŠØ[\ZYÛ‘[J^ÂˆÛÛœİİ]\ÏXØ[\ZYÛ”™]Ø\™Ëœİ]\ÎÂˆYŠ\ÙOOOIİšXİÜIÊ^ÂˆÛÛœİX™[QU—ÓSÑOÉÑ]™[Ü\ˆ˜]IÎœİ]\ÏOOIÜØ]™Y	ÏÊØ[\ZYÛ”™]Ø\™˜ÛÚ[œßØ[\ZYÛ”™]Ø\™œ˜[šÖÖØØ[\ZYÛ”™]Ø\™˜ÛÚ[œÉ‰˜
+ÉØØ[\ZYÛ”™]Ø\™˜ÛÚ[œßHÛÚ[œØØ[\ZYÛ”™]Ø\™œ˜[šÖ	‰˜
+ÉØØ[\ZYÛ”™]Ø\™œ˜[šÖH˜[šÈK™š[\Š›ÛÛX[ŠKš›Ú[Š	È8 (ˆ	ÊN‰Ñš\œİXÛX\ˆ™]Ø\™[™XYH™XÙZ]™Y	ÊNœİ]\ÏOOIÙ\œ›Ü‰ÏÉÔ›ÙÜ™\ÜÈÛİ[›İ™HØ]™Y‰Î‰ÔØ]š[™È›ÙÜ™\Üø )‰ÎÂˆ^
+X™[ÍÌÎŒË	ÈÙÙY‰Ë	ÍÍL	ÊNÂˆBˆÛÛœİØ[“X]™O\İ]\ÈOOIÜ[™[™ÉÉ‰œİ]\ÈOOIÙ\œ›Ü‰ÎÂˆY]ÛŠÌLÌ‹ŒŒLİ]\ÏOOIÙ\œ›Ü‰ÏÉÜ™]KXØ[\ZYÛ‹\Ø]™IÎ‰Ü™\İ\	Ëİ]\ÏOOIÙ\œ›Ü‰ÏÉÔ‘U–HĞU‘IÎœ\ÙOOOIÙY™X]	ÏÉÔ‘U–IÎ‰Ô‘TVIË	ÉËİ]\ÈOOIÜ[™[™ÉÊNÂˆYŠØ[\ZYÛ‘[K›™^[RY	‰œ\ÙOOOIİšXİÜIÉ‰œİ]\ÏOOIÜØ]™Y	ÊXY]ÛŠLLÌ‹ŒŒL	Û™^XØ[\ZYÛ‹Y[IË	ĞÓÓ•S•QIË	ÉÊNÂˆYŠØ[XØÙ\ÜÓXZ[“Y[J
+JXY]ÛŠMLLÌ‹ŒŒL	ÛXZ[‹[Y[IË	ÓPRSˆQS•IË	ÉËØ[“X]™JNÂˆ™]\›ÂˆBˆY]ÛŠÌLÌ‹ŒŒL	Ü™\İ\	Ë	Ô‘TVIË	ÉÊNÂˆY]ÛŠLLÌ‹ŒŒL	ØÚ[™ÙK]X[IË	ÔT•IË	ÉÊNÂˆY]ÛŠMLLÌ‹ŒŒL	ÛXZ[‹[Y[IË	ÓPRSˆQS•IË	ÉÊNÂŸB™[˜İ[Ûˆ˜]ÔÙ]\
+
+^Âˆ™Xİ
+Ë	Ü™Ø˜JŒÍÊIÊNÂˆ™Xİ
+NÍLÍŒ	Ü™Ø˜JLËŒÎKN
+IË	ÈØØØIËŒ
+NÂˆ^
+	ÔÕÔ–HUHÑUT	ËMÍ	ÈÙ™™YIË	ÎL	Ë	ØÙ[\‰ÊNÂˆY]ÛŠLŒÍM‹MŒL‹	ÛXZ[‹[Y[IË	ÓPRSˆQS•IË	ÉÊNÂˆ^
+	ĞÕT”‘S•T•H	ÊÙ˜Y›[™İ
+ÉËÉÊÓPVÔT•WÔÒV‘KNMËŒ	ÈØ˜YNIË	Î	ÊNÂˆ›ÜŠ]OLÚOPVÔT•WÔÒV‘NÚJÊÊ^ÂˆÛÛœİLŒN
+ÚJŒKOLŒŒÏLŒLM‹\›Üİ\Š˜YÚWJNÂˆ™Xİ
+KËÉÜ™Ø˜JÎMÎKM
+IÎ‰Ü™Ø˜JŒKÌËM‹
+IËÉÈÎYXÉÎ‰ÈÍÍŒØIËLŠNÂˆYŠ
+^ÂˆÛÛœİÜ˜Z]Z[XYÙ\ÖØÚ\˜Xİ\”Ü˜Z]\
+šY
+WNÂˆYŠÜ˜Z]Ë˜ÛÛ\]I‰œÜ˜Z]›˜]\˜[ÚY
+Y˜]ĞÚ\˜Xİ\”Ü˜Z]
+Ü˜Z]šY
+ÌL‹JÌ
+NÂˆ^
+›˜[YK
+ÎL‹JÍŒËN	ÈÙ™YY˜IË	Î	ÊNÂˆ^
+\İÉÕTÕPÑRÓT‰Î‰ÓU‘S	ÊÜ›ÙÜ™\ÜÑ›ÜŠšY
+K›]™[
+ÎL‹JÎMLË\İÉÈÙMXØNNIÎ‰ÈØÍ™MIË	ÍŒ	ÊNÂˆY[ÙH^
+	ÑSTIË
+İËÌ‹JÍÎN	ÈÎMNIË	ÍÍL	Ë	ØÙ[\‰ÊNÂˆBˆYŠU—ÓSÑJ^Âˆ^
+	ĞUHTÕÔSÓ”ÉËÌNK	ÈØ˜YNIË	Î	ÊNÂˆ^
+	ÕĞU‘TÈ	ÊÊØ]™Sİ™\œšY_ĞU‘WÔ‘TÑUÖİØ]™T™\Ù]JKš›Ú[Š	È
+È	ÊKM‹	ÈÙ™XÉË	ÍL	ÊNÂˆY]ÛŠËLM	İÙÙÛK]Ø]™\ÉË	ĞÒS‘ÑHĞU‘TÉË	ÉÊNÂˆ^
+	ÑS‘SVH“ÔÕT‰ËN‹M‹	ÈÙ™XÉË	ÍÌ	ÊNÂˆ›ÜŠÛÛœİÚK[ÙKX™[HÙˆÖÉÜÛ[YIË	ÔÓSQI×KÉİÛÛ‰Ë	ÕÓÓ‰×KÉÚ]ÚÉË	ÒUÒÉ×KÉÛZ^Y	Ë	ÓRVQ	×KÉÙÛØ›[‰Ë	ÑÓĞ“S‰×KÉÙÙ[ÙIË	ÑÑSÑI×KÉØ™X\‰Ë	Ğ‘PT‰×WK™[šY\Ê
+JXY]ÛŠMŒ
+ÚJŒMÎŒM	Ü›Üİ\‹IÊÛ[ÙKX™[[™[^T›Üİ\“[ÙOOO[[ÙOÉÔÑSPÕQ	Î‰ÉÊNÂˆ^
+	Ò‘PÓÕ‘T–H8 (ˆ	ÊÊ˜Z[š[™Ô™XÛİ™\S[ÙOOOIÜ™\İÜ™IÏÉÔ‘TÕÔ‘IÎ‰Ô‘TÑT•‘IÊKLÎM‹	ÈÙ™XÉË	ÍL	ÊNÂˆY]ÛŠLÎËÌM	İÙÙÛK\™XÛİ™\IË	ĞÒS‘ÑH‘PÓÕ‘T–IË	ÉÊNÂˆBˆY]ÛŠLÎKÌÌËÌLËÎK	Üİ\	Ë	ÔÕT•UIË	ÉË˜[YX[J˜Y
+JNÂŸB‹ËÈ˜[œÚY[[Üİ™\œÈ™[Û™ÈÈY[\È[™Ù]\ØÜ™Y[œËˆÛÛX˜]\Â‹ËÈYXØ]Y\›‹\™Ù][™Ë[™Xİ[Û‹\™\ÛÛ][ÛˆİY\ÎÈİ™\›^Z[™È[›İ\‚‹ËÈY\ÜØYÙHÛˆH˜]YšY[ØœØİ\™\ÈÚ\˜Xİ\ˆØ\™È[™Xİ[ÛˆY™™XİË‚™[˜İ[Ûˆ˜]Ò[
+
+^ÚYŠ[	‰Z[]ŒÌ	‰–ÉÜİ\\	Ë	ÛY[IË	Ü\TÙ]\	Ë	ÛØYİ]	Ë	Ú[™[ÜIË	ØÚ[[™Ù\ÉË	ÜÙ][™ÜÉË	ÜİÜ™IË	ÜÙ]\	×Kš[˜ÛY\Ê\ÙJJ^Ü™Xİ
+ÍÎLËL‹Í‹	Ü™Ø˜JMKŒKÎKN
+IË	ÈÙM˜NIËLŠNİ^
+[ÌKŒ	ÈÙ™™N	Ë	ÍÌ	Ë	ØÙ[\‰Ê__B™[˜İ[ÛˆÛÜ
+
+^ØÚÚXÙT™XİÏV×NØİ˜ÛX\”™Xİ
+Ë
+NÚYŠ\ÙOOOIÜİ\\	Ê^Ù˜]Ôİ\\Y[J
+_Y[ÙHYŠ\ÙOOOIÛY[IÊ^Ù˜]ÓXZ[“Y[J
+_Y[ÙHYŠ\ÙOOOIÜ\TÙ]\	Ê^Ù˜]Ô\TÙ]\
+
+_Y[ÙHYŠ\ÙOOOIÛØYİ]	Ê^Ù˜]ÓØYİ]
+
+_Y[ÙHYŠ\ÙOOOIÚ[™[ÜIÊ^Ù˜]Ò][R[™[ÜJ
+_Y[ÙHYŠ\ÙOOOIØÚ[[™Ù\ÉÊ^Ù˜]ĞÚ[[™Ù\Ê
+_Y[ÙHYŠ\ÙOOOIÜÙ][™ÜÉÊ^Ù˜]ÔÙ][™ÜÊ
+_Y[ÙHYŠ\ÙOOOIÜİÜ™IÊ^Ù˜]ÔİÜ™J
+_Y[ÙHYŠ\ÙOOOIÙ]™[ÉÊ^Ù˜]Ñ]™[Ê
+_Y[ÙHYŠ\ÙOOOIØØ[\ZYÛ‰Ê^Ù˜]ĞØ[\ZYÛ”Ù[XİÜŠ
+_Y[ÙHYŠ\ÙOOOIÜİÜIÊ^Ù˜]ÔİÜJ
+_Y[ÙHYŠ\ÙHOOIÜÙ]\	Ê^Âˆ˜]ĞØ[Y\˜TİYÙJ
+NÙ˜]Ñ
+
+NÙ˜]ÒY
+
+BˆY[Ù^Ù˜]ĞØ[Y\˜TİYÙJ
+NÙ˜]ÔÙ]\
+
+_Y˜]Ò[
+
+NÜ™\]Y\İ[š[X][Û‘œ˜[YJÛÜ
+_B™[˜İ[ÛˆÚÛÜÙJJ^Ù›ÜŠ]OXÚÚXÙT™XİË›[™İLNÚOLÚKKJ^ØÛÛœİXÚÚXÙT™XİÖÚWNÚYŠ‹˜‹
+Ø‹ßO‹_O˜‹JØ‹š
+XÛÛ[YNÚYŠX‹™[˜X›Y
+^ÜØ^J	ĞXİ[Ûˆ›İİ\œ™[H]˜Z[X›K‰ÊNÜ™]\›ŸXÛÛœİÛYX‹˜Xİ[ÛÚYŠÛYœİ\ÕÚ]
+	Ù]™[]X‰ÊJ^ÂˆÛÛœİXQU‘S•ÕP”Ë™š[™
+]™[O™]™[šYOOXÛYœÛXÙJL
+JNÂˆYŠ\ÙOOOIÙ]™[ÉÉ‰XŠXXİ]™Q]™[X]XÂˆ™]\›‚ˆZYŠÛYœİ\ÕÚ]
+	ØØ[\ZYÛ‹[Ü[Û‰ÊJ^ØÚÛÜÙPØ[\ZYÛ“Ü[ÛŠ[X™\ŠÛYœÛXÙJMŠJJNÜ™]\›ŸZYŠÛYœİ\ÕÚ]
+	Ü›Üİ\‹IÊJ^ÚYŠU—ÓSÑJ\Ù][™[^T›Üİ\ŠÛYœÛXÙJÊJNÜ™]\›ŸZYŠÛYœİ\ÕÚ]
+	ÛØYİ]‰ÊJ^Ú[™SØYİ]Xİ[ÛŠÛYœÛXÙJ
+JNÜ™]\›ŸZYŠÛYœİ\ÕÚ]
+	ÜİÜ™N‰ÊJ^Ú[™TİÜ™PXİ[ÛŠÛY
+NÜ™]\›ŸZYŠÛYœİ\ÕÚ]
+	ØY‰ÊJ^ØY[š]
+ÛYœÛXÙJ
+JNÜ™]\›ŸZYŠÛYœİ\ÕÚ]
+	Ü™[[İ™N‰ÊJ^Ü™[[İ™U[š]
+[X™\ŠÛYœÛXÙJÊJJNÜ™]\›ŸZYŠÛYOOIÙ]‹\[™[]ÙÙÛIÉ‰‘U—ÓSÑJ^Ù]”[™[Ü[HY]”[™[Ü[Ü™]\›ŸZYŠÛYOOIØØ[˜Ù[]\™Ù]	Ê^ØØ[˜Ù[\™Ù]Ù[Xİ[ÛŠ
+NÜ™]\›ŸZYŠÛYœİ\ÕÚ]
+	Ù[™[^K]\™Ù]‰ÊJ^ÜÙ][™[^U\™Ù]
+ÛYœÛXÙJLÊJNÜ™]\›ŸZYŠÛYœİ\ÕÚ]
+	ØØ[Y\˜K\Ù[Xİ‰ÊJ^ÚYŠØ[Y\˜T™]šY]ÏOOIÜ\IÉ‰Š\ÙOOOIÜ^Y\‰ß[™[™Õ\™Ù]Xİ[ÛË\™Ù]ÚYOOOIØ[IÊJ^ØÛÛœİYXÛYœÛXÙJM
+K\\K™š[™
+OœšYOOZY
+NÚYŠ[™[™Õ\™Ù]Xİ[ÛË\™Ù]ÚYOOOIØ[IÉ‰œ[™[™Õ\™Ù]Xİ[Û‹\™Ù]ØÛÜOOOIØ[	Ê^ÚYŠ\šL
+^ÜØ^J	ĞÚÛÜÙHH]š[™È\HY[X™\ˆÈÛÛ™š\›HHX[HÚÚ[‰ÊNÜ™]\›ŸXÛÛœİ[™[™Ï\[™[™Õ\™Ù]Xİ[Û‹XİÜ\\K™š[™
+OšYOO\[™[™Ë˜XİÜ’Y
+NÜ[™[™Õ\™Ù]Xİ[Û[[ØØ[Y\˜T™]šY]Ï[[ÜÙ[XİY[RY[[Ü™]\›ˆ^Xİ]PÛÛX˜]Xİ[ÛŠXİÜ‹[™[™Ë˜Xİ[ÛŠ_ZYŠ[™[™Õ\™Ù]Xİ[ÛË\™Ù]ÚYOOOIØ[IÊ^ÚYŠ\šL
+^ÜØ^J	Õ[™H[™]Û¸ &\È[[X]H™YYH]š[™È[K‰ÊNÜ™]\›ŸXÛÛœİ[™[™Ï\[™[™Õ\™Ù]Xİ[Û‹XİÜ\\K™š[™
+OšYOO\[™[™Ë˜XİÜ’Y
+NÜ[™[™Õ\™Ù]Xİ[Û[[ØØ[Y\˜T™]šY]Ï[[ÜÙ[XİY[RY[[ÚYŠ[™[™Ë˜Xİ[ÛOOIİ[[X]IÊ\™]\›ˆ]Y]YU[[X]J[™[™Ë˜XİÜ’YY
+NÜ™]\›ˆ^Xİ]PÛÛX˜]Xİ[ÛŠXİÜ‹[™[™Ë˜Xİ[Û‹[Y
+_ZYŠİ\Ü[[É‰ˆY[YÚX›P[U\™Ù]
+İ\Ü[[ÊJ^ÜØ^J	Ó›İ[YÚX›H›Üˆ\Èİ\Ü\İ‰ÊNÜ™]\›Ÿ\Ù[XİY[RYZYÜØ^J
+İ\Ü[[ÏÉÕT‘ÑUTÕˆ	Î‰ĞĞSQTHTÕˆ	ÊJÊË›˜[Y_Y
+JÉÈÙ[XİY‰Ê_\™]\›ŸZYŠÛYœİ\ÕÚ]
+	Û[ÙN‰ÊJ^ÚYŠU—ÓSÑJ\Ù]\™Ù][™Ó[ÙJÛYœÛXÙJJJNÜ™]\›ŸZYŠÛYœİ\ÕÚ]
+	Ü]Y]YK][‰ÊJ^Ø™YÚ[•\™Ù]Ù[Xİ[ÛŠ	İ[[X]IËÛYœÛXÙJL
+JNÜ™]\›ŸZYŠÛYœİ\ÕÚ]
+	ØÚ\™ÙK][‰ÊJ^ÚYŠU—ÓSÑJXÚ\™ÙU[[X]Q›Ü•\İ
+ÛYœÛXÙJLJJNÜ™]\›ŸBˆİÚ]Ú
+ÛY
+^ØØ\ÙH	Üİ\\\İ\	Îœİ\œ›ÛU]J
+NØœ™XZÎØØ\ÙH	ØÛZ[KYZ[K\™]Ø\™	Î˜ÛZ[QZ[T™]Ø\™
+
+NØœ™XZÎØØ\ÙH	ÛÜ[‹Z[™[ÜIÎœ\ÙOIÚ[™[ÜIÎÚ[IÉÎØœ™XZÎØØ\ÙH	ÛÜ[‹XÚ[[™Ù\ÉÎœ\ÙOIØÚ[[™Ù\ÉÎÚ[IÉÎØœ™XZÎØØ\ÙH	ÛÜ[‹\Ù][™ÜÉÎœ\ÙOIÜÙ][™ÜÉÎÚ[IÉÎØœ™XZÎØØ\ÙH	ØXØÛİ[\ÚYÛ‹[İ]	ÎÚ[™İË•ÛÕÛ™PXØÛİ[ËœÚYÛ“İ]ËŠ
+NØœ™XZÎØØ\ÙH	ØXØÛİ[Y[]IÎÚ[™İË•ÛÕÛ™PXØÛİ[Ë™[]PXØÛİ[ËŠ
+NØœ™XZÎØØ\ÙH	ÛÜ[‹Y]™[ÉÎ›Ü[‘]™[Ê
+NØœ™XZÎØØ\ÙH	ØÛZ[K[ÙÚ[‹Y]™[	Î˜ÛÛXİÙÚ[‘]™[
+
+NØœ™XZÎØØ\ÙH	ØÛZ[K\Ûİ[YÚY	Î˜ÛÛXİÛİ[ÚY
+
+NØœ™XZÎØØ\ÙH	ÛÜ[‹\İÜ™IÎœ\ÙOIÜİÜ™IÎÛ\İİÜ™S›İXÙOIÉÎØœ™XZÎØØ\ÙH	ÛÜ[‹XØ[\ZYÛ‰Î›Ü[Ø[\ZYÛ”Ù[XİÜŠ
+NØœ™XZÎØØ\ÙH	ØØ[\ZYÛ‹\İ\	Îœİ\™]šY]ÙYØ[\ZYÛ”\
+
+NØœ™XZÎØØ\ÙH	ØØ[\ZYÛ‹\™]š[İ\ÉÎ˜Ø[\ZYÛ”YÙKKNØÚÚXÙT™XİÏV×NØœ™XZÎØØ\ÙH	ØØ[\ZYÛ‹[™^	Î˜Ø[\ZYÛ”YÙJÊÎØÚÚXÙT™XİÏV×NØœ™XZÎØØ\ÙH	ØY˜[˜ÙK\İÜIÎ˜Y˜[˜ÙPØ[\ZYÛ”İÜJ
+NØœ™XZÎØØ\ÙH	Ü™]KXØ[\ZYÛ‹\Ø]™IÎœØ]™PØ[\ZYÛ•šXİÜJ
+NØœ™XZÎØØ\ÙH	Û™^XØ[\ZYÛ‹Y[IÎ›Ü[Ø[\ZYÛ‘[JØ[\ZYÛ‘[OË›™^[RY
+NØœ™XZÎØØ\ÙH	ÛÜ[‹\\IÎ™[\”\TÙ]\
+
+NØœ™XZÎØØ\ÙH	ÛÜ[‹[ØYİ]	Î™[\“ØYİ]
+
+NØœ™XZÎØØ\ÙH	ÜØ]™K\\IÎœØ]™T\J
+NØœ™XZÎØØ\ÙH	ÛXZ[‹[Y[IÎ™[\“XZ[“Y[J
+NØœ™XZÎØØ\ÙH	İÙÙÛKY[ØÜ™Y[‰ÎÙÙÛQ[ØÜ™Y[Š
+NØœ™XZÎØØ\ÙH	Üİ\ÜZX[	ÎšYŠU—ÓSÑJ\İ\İ\Ü[[Ê	ÚX[	ÊNØœ™XZÎØØ\ÙH	Üİ\Ü\™]š]™IÎšYŠU—ÓSÑJ\İ\İ\Ü[[Ê	Ü™]š]™IÊNØœ™XZÎØØ\ÙH	ØÛÛ™š\›K\İ\Ü	ÎšYŠU—ÓSÑJXÛÛ™š\›Tİ\Ü[[Ê
+NØœ™XZÎØØ\ÙH	ØØ[˜Ù[\İ\Ü	ÎšYŠU—ÓSÑJXØ[˜Ù[İ\Ü[[Ê
+NØœ™XZÎØØ\ÙH	ØØ[Y\˜K\\IÎšYŠU—ÓSÑI‰œ\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙY
+^ØØ[Y\˜T™]šY]ÏXØ[Y\˜T™]šY]ÏOOIÜ\IÏÛ[‰Ü\IÎÜİ\Ü[[Ï[[ÜÙ[XİY[RYXXİ]™RYXœ™XZÎØØ\ÙH	ØØ[Y\˜K]\™Ù]	ÎšYŠU—ÓSÑI‰œ\ÙOOOIÜ^Y\‰É‰ˆ\]\ÙY
+^ØØ[Y\˜T™]šY]ÏXØ[Y\˜T™]šY]ÏOOIİ\™Ù]	ÏÛ[‰İ\™Ù]	ÎÜÙ[XİY[RY[[ÚYŠØ[Y\˜T™]šY]ÏOOIİ\™Ù]	Ê\Ø^J	Õ\[ˆ]]ÛX]ÛˆÈÙ]H\™Ù]‰Ê_Xœ™XZÎØØ\ÙH	Ü™\Ù]Y˜Y	Î™˜Y[ØYX[J
+NØœ™XZÎØØ\ÙH	İÙÙÛK]Ø]™\ÉÎšYŠU—ÓSÑJ]ÙÙÛUØ]™T™\Ù]
+
+NØœ™XZÎØØ\ÙH	İÙÙÛK\™XÛİ™\IÎšYŠU—ÓSÑJ\Ù]˜Z[š[™Ô™XÛİ™\S[ÙJ˜Z[š[™Ô™XÛİ™\S[ÙOOOIÜ™\İÜ™IÏÉÜ™\Ù\™IÎ‰Ü™\İÜ™IÊNØœ™XZÎØØ\ÙH	Üİ\	Îœİ\˜]J
+NØœ™XZÎØØ\ÙH	Ü™\İ\	Îœ™\^J
+NØœ™XZÎØØ\ÙH	ØÚ[™ÙK]X[IÎ™[\”\TÙ]\
+
+NØœ™XZÎØØ\ÙH	Ù›Ü˜ÙY\Ù[Xİ	Î™[\”\TÙ]\
+
+NØœ™XZÎØØ\ÙH	Ü]\ÙIÎšYŠ\ÙHOOIÜ^Y\‰É‰ˆ\]\ÙY
+^ÜØ^J	Ô]\ÙH\È]˜Z[X›HÛˆ[İ\ˆ\›‹‰ÊNÜ™]\›Ÿ\]\ÙYH\]\ÙYØœ™XZÎØØ\ÙH	İ[œ]\ÙIÎœ]\ÙYY˜[ÙNØœ™XZÎØØ\ÙH	İ\İZÛÉÎšYŠU—ÓSÑJ]\İÓÊ
+NØœ™XZÎØØ\ÙH	İ\İ\™]š]™IÎšYŠU—ÓSÑJ]\İ™]š]™J
+NØœ™XZÎØØ\ÙH	ÜÚÚ[	Îœ^J	ÜÚÚ[	ÊNØœ™XZÎØØ\ÙH	ØØ\]\İ	ÎšYŠU—ÓSÑJXŞXÛTÜØ\\İ
+
+NØœ™XZÎØØ\ÙH	ÚY\İ]\Ë]\İ	ÎšYŠU—ÓSÑJ]ÙÙÛRYİ]\Ñ[[Ê
+NØœ™XZÎØØ\ÙH	ÙŒKXY˜[˜ÙIÎšYŠU—ÓSÑJXYXİ[ÛY˜[˜ÙJXİ]™RYJNØœ™XZÎØØ\ÙH	ÙŒKY[^IÎšYŠU—ÓSÑJXYXİ[Û‘[^JXİ]™RYJNØœ™XZÎØØ\ÙH	ÙŒK\ÜYY	ÎšYŠU—ÓSÑJ\Ù]ÜYY][\Y\‘›Ü•\İ
+Xİ]™RY
+ÜYY[ÙYšY\œÖØXİ]™RY_JOLKŒÏÌNŒKŒÊNØœ™XZÎØØ\ÙH	ÙŒK\İ[[[Û‹Z[™\[™[	ÎšYŠU—ÓSÑJ\]Y]YTİ[[[Û‘›Ü•\İ
+	Ú[™\[™[	ÊNØœ™XZÎØØ\ÙH	ÙŒK\İ[[[Û‹XÛÛ›ÛY	ÎšYŠU—ÓSÑJ\]Y]YTİ[[[Û‘›Ü•\İ
+	ØÛÛ›ÛY	ÊNØœ™XZÎÂˆØ\ÙH	Ü›ÙÜ™\ÜË]\İ[]™[	ÎÚYŠU—ÓSÑJ^ØÛÛœİOXXİ]™J
+KXI‰œ›ÙÜ™\ÜÑ›ÜŠKšY
+NÚYŠI‰œ
+^ØÛÛœİÛÜİSX]›X^
+K™\]Z\™Y^
+K›]™[
+K\™^
+K™\İ[]\İÜ˜[^
+KšYÛÜİ
+NÜØ^J™\İ[ØTÕÓ“Nˆ]™[	Ü™\İ[›]™[K	ØÛÜİHV[š™XİY˜‰Ğ\ØÙ[œÚ[Ûˆ™\]Z\™YÜˆ]™[Ø\™XXÚY‰ÊNß_Xœ™XZßBˆØ\ÙH	Ü›ÙÜ™\ÜË]\İX\ØÙ[™	ÎÚYŠU—ÓSÑJ^ØÛÛœİOXXİ]™J
+NÚYŠJ\Ø^J\İ\ØÙ[™
+KšY
+OØTÕÓ“Nˆ]™[	ØK›]™[H\ØÙ[œÚ[Ûˆ[›ØÚÙY
+›ÈX]\šX[ÊK˜‰Ó›İ]HØÚÙY\ØÙ[œÚ[ÛˆØ]K‰ÊNßXœ™XZßBˆØ\ÙH	Ú]\İY›]	ÎÚYŠU—ÓSÑJ^ØÛÛœİOXXİ]™J
+NÚYŠJ\Ù]›Û\Ñ›Ü•\İ
+KšY	ÙXYËY›]	Ë	Ù›]	Ë
+Kš›][ÙYšY\œÖÉÙXYËY›]	×_
+JÌŒ
+NßXœ™XZßBˆØ\ÙH	Ú]\İ\\˜Ù[	ÎÚYŠU—ÓSÑJ^ØÛÛœİOXXİ]™J
+NÚYŠJ\Ù]›Û\Ñ›Ü•\İ
+KšY	ÙXYË\\˜Ù[	Ë	Ü\˜Ù[	Ë
+Kš\˜Ù[[ÙYšY\œÖÉÙXYË\\˜Ù[	×_
+JËŒŠNßXœ™XZßYY˜][™\›ÔÚÚ[\›YYY˜[ÙNÜ^JÛY
+_\™]\›Ÿ_B˜ÛÛœİØÜ™Y[‘[[Y[YØİ[Y[™Ù][[Y[RY
+	ÜØÜ™Y[‰ÊNÂ™[˜İ[Ûˆ\Ñ[ØÜ™Y[Š
+^Ü™]\›ˆØİ[Y[™[ØÜ™Y[‘[[Y[OO\ØÜ™Y[‘[[Y[Øİ[Y[ÙXšÚ][ØÜ™Y[‘[[Y[OO\ØÜ™Y[‘[[Y[B™[˜İ[Ûˆ\Ôİ[™[Û™P\
+
+^Ü™]\›ˆ˜]šYØ]Ü‹œİ[™[Û™OOO]Y_Ú[™İË›X]ÚYYXOËŠ	Ê\Ü^K[[ÙNˆİ[™[Û™JIÊK›X]Ú\ßÚ[™İË›X]ÚYYXOËŠ	Ê\Ü^K[[ÙNˆ[ØÜ™Y[ŠIÊK›X]Ú\ßB™[˜İ[Ûˆ\ÒTÛ™Pœ›İÜÙ\Š
+^Ü™]\›ˆÚTÛ™_TÙÚK\İ
+˜]šYØ]Ü‹\Ù\YÙ[
+I‰ˆZ\Ôİ[™[Û™P\
+
+_B˜\Ş[˜È[˜İ[ÛˆÙÙÛQ[ØÜ™Y[Š
+^Âˆ^ÂˆYŠ\Ôİ[™[Û™P\
+
+J^ÜØ^J	ÕÛËUÛ™H\È[™XYHÜ[ˆ\ÈHÛYHØÜ™Y[ˆ\‰ÊNÜ™]\›ŸBˆYŠ\Ñ[ØÜ™Y[Š
+J^ÚYŠØİ[Y[™^][ØÜ™Y[ŠX]ØZ]Øİ[Y[™^][ØÜ™Y[Š
+NÙ[ÙHYŠØİ[Y[ÙXšÚ]^][ØÜ™Y[ŠYØİ[Y[ÙXšÚ]^][ØÜ™Y[Š
+NÜ™]\›ŸBˆYŠØÜ™Y[‘[[Y[œ™\]Y\İ[ØÜ™Y[ŠX]ØZ]ØÜ™Y[‘[[Y[œ™\]Y\İ[ØÜ™Y[ŠÛ˜]šYØ][Û•RN‰ÚYIßJNÂˆ[ÙHYŠØÜ™Y[‘[[Y[ÙXšÚ]™\]Y\İ[ØÜ™Y[Š\ØÜ™Y[‘[[Y[ÙXšÚ]™\]Y\İ[ØÜ™Y[Š
+NÂˆ[ÙHYŠ\ÒTÛ™Pœ›İÜÙ\Š
+J\Ø^J	ÓÛˆTÛ™NˆÚ\™H8¡¤ˆYÈÛYHØÜ™Y[‹[ˆÜ[ˆÛËUÛ™Hœ›ÛH]ÈXÛÛ‹‰ÊNÂˆ[ÙHØ^J	Õ\Èœ›İÜÙ\ˆ›ØÚÜÈYÙH[ØÜ™Y[‹ˆHÜ[š[™ÈÛËUÛ™H\ÈHÛYHØÜ™Y[ˆ\‰ÊNÂˆXØ]Ú
+\œ›ÜŠ^ÚYŠ\ÒTÛ™Pœ›İÜÙ\Š
+J\Ø^J	ÓÛˆTÛ™NˆÚ\™H8¡¤ˆYÈÛYHØÜ™Y[‹[ˆÜ[ˆÛËUÛ™Hœ›ÛH]ÈXÛÛ‹‰ÊNÙ[ÙHØ^J	Ñ[ØÜ™Y[ˆØ\È›ØÚÙYHHœ›İÜÙ\‹ˆHÜ[š[™ÈÛËUÛ™H\ÈHÛYHØÜ™Y[ˆ\‰Ê_BŸB˜Ø[˜\Ë˜Y]™[\İ[™\Š	ÜÚ[\™İÛ‰ËOOÙKœ™]™[Y˜][
+
+NØÛÛœİXØ[˜\Ë™Ù]›İ[™[™ĞÛY[™Xİ
+
+NØÚÛÜÙJ
+K˜ÛY[\‹›Y
+J•ËÜ‹ÚY
+K˜ÛY[K\‹Ü
+J’Ü‹šZYÚ
+_KÜ\ÜÚ]™N™˜[Ù_JNÂÚ[™İË˜Y]™[\İ[™\Š	ÚÙ^YİÛ‰ËOOÚYŠKšÙ^OOOIÑ\ØØ\IÉ‰œ[™[™Õ\™Ù]Xİ[ÛŠXØ[˜Ù[\™Ù]Ù[Xİ[ÛŠ
+NÚYŠKšÙ^OOOIÌIÊ\^J	Ø˜\ÚXÉÊNÚYŠKšÙ^OOOIÌ‰Ê\^J	ÜÚÚ[	ÊNÚYŠKšÙ^OOOIÌÉÊ\^J	İ[[X]IÊNÚYŠU—ÓSÑI‰™KšÙ^KÓİÙ\Ø\ÙJ
+OOOIÛIÉ‰œ\ÙOOOIÜ^Y\‰ÊXŞXÛTÜØ\\İ
+
+NÚYŠU—ÓSÑI‰–ÉÜIË	İÉË	ÙIË	Ù‰×Kš[˜ÛY\ÊKšÙ^KÓİÙ\Ø\ÙJ
+JI‰œ\ÙOOOIÜ^Y\‰Ê\Ù]\™Ù][™Ó[ÙJ
+ÜN‰ÜÚ[™ÛIËÎ‰Ø›\İ	ËN‰Ø[ÙIË‰Ùš]™KZ]	ßJVÙKšÙ^KÓİÙ\Ø\ÙJ
+WJNÚYŠU—ÓSÑI‰™KšÙ^KÓİÙ\Ø\ÙJ
+OOOIİ‰É‰œ\ÙOOOIÜ^Y\‰Ê^ØØ[Y\˜T™]šY]ÏXØ[Y\˜T™]šY]ÏOOIÜ\IÏÛ[‰Ü\IÎÜÙ[XİY[RYXXİ]™RYZYŠU—ÓSÑI‰™KšÙ^KÓİÙ\Ø\ÙJ
+OOOIİ	É‰œ\ÙOOOIÜ^Y\‰ÊXØ[Y\˜T™]šY]ÏXØ[Y\˜T™]šY]ÏOOIİ\™Ù]	ÏÛ[‰İ\™Ù]	ÎÚYŠU—ÓSÑI‰™KšÙ^KÓİÙ\Ø\ÙJ
+OOOIÜ‰É‰œ\ÙHOOIÜÙ]\	Ê\™\^J
+_JNİÚ[™İË˜Y]™[\İ[™\Š	ØÛÛ^Y[IËOO™Kœ™]™[Y˜][
+
+JNÂ‹ËÈ™XY[Û›H[œİ[Y[][Ûˆ[™^XÚ]HX™[Y\İ[™È[\œÈ›Üˆ™\šYšXØ][Û‹‚šYŠU—ÓSÑJ^ÂÚ[™İËÛÕÛ™Tİ]\ÏJ
+OOŠÜ\ÙK]\ÙY\›‹˜]P\™XRY˜İ\œ™[˜]P\™XRY[™[^T›Üİ\“[ÙK[›™Y[™[^P\˜Ú]\\ÎØ]™T[‹›X\
+Ø]™OOØ]™K›X\
+[™[^OO™[™[^K˜\˜Ú]\RY
+JK]”[™[Ü[‹\™Ù][™Ó[ÙK[™[™Õ\™Ù]Xİ[Û‹™\›ÔÚÚ[\›YY™]šY]Õ\™Ù][ÙNœ™]šY]Õ\™Ù][ÙJ
+Kİ\Ü[[Ë]XÚÒ[”›ÙÜ™\ÜË[™[™Õ˜XØ[˜ÚY\Î–Ë‹‹œ[™[™Õ˜XØ[˜ÚY\×K\İ]XÚÎ›\İ]XÚÏÒ”ÓÓ‹œ\œÙJ”ÓÓ‹œİš[™ÚYJ\İ]XÚÊJN›[İ\Ü\İ\İÜNœİ\Ü\İ\İÜKœÛXÙJ
+K™]šY]Õ\™Ù]YÎ˜ÚÛÜÙP]XÚÕ\™Ù]Ê™]šY]Õ\™Ù][ÙJ
+JK›X\
+OO™KšY
+K[™[^PÛİ[İ[Ø]™T[‹œ™YXÙJ
+‹ÊOO›ŠİË›[™İ
+KÙ[XİY[™[^RYXİ[™Ñ[™[^RY[™[ZY\Î™[™[ZY\Ë›X\
+OOŠÚY™KšY\˜Ú]\RY™K˜\˜Ú]\RY]™[™K›]™[Ø]YÛÜN™K˜Ø]YÛÜK™KšX^™K›X^ÜYYœÜYYÙŠJK˜\œšY\™K˜˜\œšY\‹X^˜\œšY\™K›X^˜\œšY\‹œ›ÚÙ[•\›œÎ™K˜œ›ÚÙ[•\›œË›YYİXÚÜÎ™K˜›YYİXÚÜÏË›[™İ›YYX^İXÚÜÎ™K˜›YYX^İXÚÜßK[ÛY[[TİXÚÜÎ™K›[ÛY[[TİXÚÜß\›ÜÚ[Û”İXÚÜÎ™K›X\šÜÏË™š[\ŠX\šÏO›X\šËšYOOIÛ[˜KY\›ÜÚ[Û‰ÊK›[™İ™KN™KKÛİ™KœÛİØ]™N™KØ]™KÜ™\™K›Ü™\‹[]™N™KšŒJJKØ]™NÛ[X™\Ø]™R[™^
+ÌKİ[Ø]™T[‹›[™İÚ^™\ÎØ]™T[‹›X\
+ÏOË›[™İ
+KXİ]™N™[™[ZY\Ë›[™İ™\Ù\™NØ]™T]Y]YK›[™İY™X]YØ]™RÚ[Ëİ[Y™X]Yİ[[™[^QY™X]ËÛX\™Y™[˜Ûİ[\ÛX\™YÜ]Û’\İÜNœÜ]Û’\İÜKœÛXÙJ
+_KØ]YÙ\ÎË‹‹™Ø]YÙ\ßK\Nœ\K›X\
+OŠÚYœšYœšX^œ›X^[™\™ŞNœ™[™\™ŞK[™\™ŞT™\Ù\™Yœ™[™\™ŞT™\Ù\™Y]˜Z[X›Q[™\™ŞN˜]˜Z[X›Q[™\™ŞJ
+K[˜U˜XÚÙYX\šÜÎœ›[˜U˜XÚÙYX\šÜÏÏÛ[[˜Q[XYÙPY™œ›[˜Q[XYÙPY™ÏÛ[[˜P]XÚĞY™œ›[˜P]XÚĞY™ÏÛ[Ûİœ\Kš[™^ÙŠ
+JÌK\İœ\İJJK˜Y–Ë‹‹™˜YKXİ]™RY[™[^RÜÜX^™Y™™Xİ]™TÜX^
+
+KÜØ\[ÙYšY\œÎË‹‹œÜØ\[ÙYšY\œßK[[X]T]Y]YN[[X]T]Y]YK›X\
+OOŠË‹‹œ_JJK[[X]Q^Xİ][™Ë[[X]T™\İ[YT[™[™ÎˆH][[X]T™\İ[YK[[X]R\İÜN[[X]R\İÜKœÛXÙJ
+KÜ™\™Ù]Ü™\ŠJKİ[[[Û”ÛİÕ\ÙYœİ[[[ÛœË™š[\ŠÏOˆ\Ëœ[™[™ĞÜ™X][ÛŠK›[™İİ[[[ÛœÎœİ[[[ÛœË›X\
+ÏOŠË‹‹œßJJKİ[[[Û’\İÜNœİ[[[Û’\İÜKœÛXÙJ
+K\›•[Y[[™N\›•[Y[[™KœÛ˜\Úİ
+
+KÜYY[ÙYšY\œÎË‹‹œÜYY[ÙYšY\œßKš\ÚX›P[RYÎ˜Ø[Y\˜TÚİ
+
+OOOIÜ\IÏÜ\K›X\
+OœšY
+N–ØØ[Y\˜TÚİ
+
+OOOIÙ[™[^KZ[\Xİ	ÏÙË\™Ù]ŠXİ]™RY[]™J
+VÌOËšY
+WK™š[\Š›ÛÛX[ŠKš\ÚX›Q[™[^RYÎ˜Ø[Y\˜TÚİ
+
+OOOIÜ\IÏÖ×N˜ÛÛX˜][™[ZY\Ê
+K›X\
+OO™KšY
+KØ[Y\˜NÜÚİ˜Ø[Y\˜TÚİ
+
+KÛÜ›œÚİÛÜ›
+Ø[Y\˜TÚİ
+
+JK[–˜Ø[Y\˜K˜İ\œ™[ÏÌ˜[œÚ][Û˜Ø[Y\˜Kœ›ÙÜ™\ÜË™]šY]Î˜Ø[Y\˜T™]šY]ËÙ[XİY[RY\˜[^˜]\Î–ËŒŒLËŒÌ‹Ì‹KŒNKY˜]ÛY\”ØÙ[™NY_KİYÙTÜÚ][ÛœÎœ\K›X\
+OŠÚYœšYÜÚ][Û˜Ø[Y\˜P[TÜÚ][ÛŠšYØ[Y\˜TÚİ
+
+OOOIÜ\IÏÉÜ\IÎ‰ØÛÛ[X[™	Ê_JJ_JNÂÚ[™İËÛÕÛ™UZOJ
+OOŠÚYÜ˜Z]Îœ\K›X\
+OŠÚYœšYØØ[NŠ\ÙOOOIÜ^Y\‰É‰˜Xİ]™RYOO\šY	‰œšŒ
+OÌN‹K[™\™ŞQš[š\Õ[[™[™ÊšY
+OÌ“X]›X^
+X]›Z[ŠK]˜Z[X›Q[™\™ŞJ
+Kİ[[X]Q[™\™ŞPÛÜİ
+
+JJKİ]\ĞÛİ[šYİ]\Ó\İ
+
+K›[™İJJK™\œÚ[Û‰İŒŒKŒÍ‰ËXYÓÜ[™]”[™[Ü[‹]ÛœÎ˜ÚÚXÙT™XİË›X\
+OŠË‹‹˜ŸJJ_JNÂÚ[™İËÛÕÛ™QXÚÔİ]\ÏJ
+OO–Ë‹‹œ\K‹‹™[™[ZY\×K›X\
+[š]OŠÚY[š]šYXÚÔ\˜Ù[™XÚÔ\˜Ù[ÙŠ[š]
+_JJNÂÚ[™İËÛÕÛ™T™Y›Xİİ]\ÏJ
+OO–Ë‹‹œ\K‹‹™[™[ZY\×K›X\
+[š]OŠÚY[š]šY™Y›Xİ\˜Ù[œ™Y›Xİ\˜Ù[ÙŠ[š]
+_JJNÂÚ[™İËÛÕÛ™T›ÙÜ™\ÜÏJ
+OOŠÜ^Y\”˜[šË˜[šÔ›ÙÜ™\ÜÚ[Û’[\[Y[YYKX^]™[˜Ú\˜Xİ\“]™[Ø\
+
+KXœÛÛ]SX^]™[ÒTPÕT—ÓPVÓU‘S\ØÙ[œÚ[Û‘Ø]\Î–Ë‹‹TĞÑS”ÒSÓ—ÑĞUT×K™XÛİ™\S[ÙN˜Z[š[™Ô™XÛİ™\S[ÙKˆÚ\˜Xİ\œÎ”“ÔÕT‹›X\
+OŠÚYœ‹šY]™[œ›ÙÜ™\ÜÑ›ÜŠ‹šY
+K›]™[]™[Ø\˜Ú\˜Xİ\“]™[Ø\
+
+K^œ›ÙÜ™\ÜÑ›ÜŠ‹šY
+K™^\ØÙ[™Y–Ë‹‹œ›ÙÜ™\ÜÑ›ÜŠ‹šY
+K˜\ØÙ[™YK™\]Z\™Y^œ›ÙÜ™\ÜÑ›ÜŠ‹šY
+K›]™[Ú\˜Xİ\“]™[Ø\
+
+OÜ™\]Z\™Y^
+›ÙÜ™\ÜÑ›ÜŠ‹šY
+K›]™[
+NŒ˜\ÙR\İÛ›Nœ‹šJJKˆ[š]œ\K›X\
+OŠÚYœšY]™[œ›]™[˜\ÙR\İÛ›Nœ˜˜\ÙRX^œ›X^İ\œ™[œš›]Ë‹‹œš›][ÙYšY\œßK\˜Ù[Ë‹‹œš\˜Ù[[ÙYšY\œß_JJKˆ[š]]XÚÎœ\K›X\
+OŠÚYœšY]™[œ›]™[˜\ÙP]XÚÎœ˜˜\ÙP]XÚË]XÚÎ˜Ø[İ[]P]XÚÊ
+K›]Ë‹‹œ˜]XÚÑ›][ÙYšY\œßK\˜Ù[Ë‹‹œ˜]XÚÔ\˜Ù[[ÙYšY\œß_JJKˆ[š]\ÚXØ[Y™[œÙNœ\K›X\
+OŠÚYœšY]™[œ›]™[˜\ÙT\ÚXØ[Y™[œÙNœ˜˜\ÙT\ÚXØ[Y™[œÙK\ÚXØ[Y™[œÙN˜Ø[İ[]T\ÚXØ[Y™[œÙJ
+K›]Ë‹‹œœ\ÚXØ[Y™[œÙQ›][ÙYšY\œßK\˜Ù[Ë‹‹œœ\ÚXØ[Y™[œÙT\˜Ù[[ÙYšY\œß_JJKˆ[š]XYÚXØ[Y™[œÙNœ\K›X\
+OŠÚYœšY]™[œ›]™[˜\ÙSXYÚXØ[Y™[œÙNœ˜˜\ÙSXYÚXØ[Y™[œÙKXYÚXØ[Y™[œÙN˜Ø[İ[]SXYÚXØ[Y™[œÙJ
+K›]Ë‹‹œ›XYÚXØ[Y™[œÙQ›][ÙYšY\œßK\˜Ù[Ë‹‹œ›XYÚXØ[Y™[œÙT\˜Ù[[ÙYšY\œß_JJKˆ[š]YQ[XYÙP˜\Ú\Îœ\K›X\
+OŠÚYœšY]XÚÎ˜Ø[İ[]P]XÚÊ
+KYQY™[œÙN˜Ø[İ[]UYQY™[œÙJ
+KÙ[•YQ[XYÙT™YXİ[Û˜Ø[İ[]UYQ[XYÙT™YXİ[ÛŠ
+_JJ_JNÂÚ[™İËÛÕÛ™U\İ^İ\İÜ˜[^\İ\ØÙ[™Ù]^Y\”˜[šÑ›Ü•\İÙ]›Û\Ñ›Ü•\İÙ]XÚÔ\˜Ù[›Ü•\İÙ]™Y›Xİ\˜Ù[›Ü•\İØ[İ[]SX^Ø[İ[]S]™[ØØ[Yİ]Ø[İ[]P]XÚËØ[İ[]T\ÚXØ[Y™[œÙKØ[İ[]SXYÚXØ[Y™[œÙKØ[İ[]UYQY™[œÙKØ[İ[]UYQ[XYÙT™YXİ[Û‹Ø[İ[]Q[XYÙPY\‘Y™[œÙKØ[İ[]T\ÚXØ[[XYÙPY\‘Y™[œÙKØ[İ[]SXYÚXØ[[XYÙPY\‘Y™[œÙKØ[İ[]UYQ[XYÙPY\‘Y™[œÙKØ[İ[]U\YXİ[Û‘[XYÙK™\]Z\™Y^Ù]˜Z[š[™Ô™XÛİ™\S[ÙK›İ[™YXİ[ÛY˜[˜ÙKYXİ[Û‘[^KÙ]ÜYY][\Y\‘›Ü•\İ]Y]YTİ[[[Û‘›Ü•\İ\›•[Y[[™TÛ˜\ÚİŠ
+OO\›•[Y[[™KœÛ˜\Úİ
+
+K]Y]YU[[X]KÚ\™ÙU[[X]Q›Ü•\İÙÙÛRYİ]\Ñ[[ËÙ]Yİ]\Ù\Ñ›Ü•\İŠY][\ÊOOØÛÛœİ\\K™š[™
+OœšYOOZY
+NÚYŠ\P\œ˜^Kš\Ğ\œ˜^J][\Ê_][\Ë›[™İ
+\™]\›ˆ˜[ÙNÜšYİ]\Ù\ÏZ][\Ë›X\
+OOŠÚÚ[™™KšÚ[™OOIÙXY™‰ÏÉÙXY™‰Î‰ØY™‰ËXÛÛ”İš[™ÊKšXÛÛŸ	ø§)‰ÊKœÛXÙJŠK\›œÎ™K\›œÏOO[[Û[Š[X™\‹š\Ò[YÙ\ŠK\›œÊI‰™K\›œÏLÙK\›œÎ›[
+_JJNÜ™]\›ˆYNßKÙ]ÜØ\\İÛİ\˜ÙKŞXÛTÜØ\\İØ[”]Y]YU[[X]KXYÒÓÑ›Ü•\İŠY
+OOÚYŠÉÜÙ]\	Ë	Ú[›ÉË	İšXİÜIË	ÙY™X]	×Kš[˜ÛY\Ê\ÙJJ\™]\›ˆ˜[ÙNØÛÛœİ\\K™š[™
+OœšYOOZY
+NÚYŠ\šL
+\™]\›ˆ˜[ÙNÜšLÙØ]YÙ\ÖÜšYOLÜØ]™Uš][Ê
+NØØ[˜Ù[]Y]YY[[X]\ÓÙ‘Y™X]Y
+
+NÜ™]\›ˆY_Kİ\˜]KY[š]™[[İ™U[š][\”Ù[Xİ[Û‹[\”\TÙ]\Ø]™T\K\İÓË\İ™]š]™K^K™\^K™\›ÔÚÚ[ÛÛ›ÛÙ]\™Ù][™Ó[ÙKİ\İ\Ü[[ËÛÛ™š\›Tİ\Ü[[ËØ[˜Ù[İ\Ü[[Ë[YÚX›P[U\™Ù]ŠYÚ[™
+OO™[YÚX›P[U\™Ù]
+\K™š[™
+OœšYOOZY
+KÚ[™
+KÙ][™[^R›Ü•\İŠY
+OOÚYŠ\ÙHOOIÜ^Y\‰ß]XÚÒ[”›ÙÜ™\ÜÊ\™]\›ˆ˜[ÙNØÛÛœİO[]™Q[™[ZY\Ê
+K™š[™
+OO™KšYOOZY
+NÚYŠY_S[X™\‹š\Ñš[š]J
+__™K›X^
+\™]\›ˆ˜[ÙNÙKšZÜŞ[˜Ñ[™[^R
+
+NÜ™]\›ˆY_K\P›YY›Ü•\İŠ[™[^RYÛİ\˜ÙRYİXÚÜÏLKX^İXÚÜÏMJOOØÛÛœİ[™[^O[]™Q[™[ZY\Ê
+K™š[™
+[š]O[š]šYOOY[™[^RY
+KÛİ\˜ÙO\\K™š[™
+[š]O[š]šYOO\Ûİ\˜ÙRY
+NÜ™]\›ˆ[™[^I‰œÛİ\˜ÙOØ\P›YY
+[™[^KÛİ\˜ÙKİXÚÜËX^İXÚÜÊN™˜[Ù_KÙ][™[^U\™Ù]Ù]Ø]™T[‘›Ü•\İÙÙÛUØ]™T™\Ù]Ù][™[^T›Üİ\‹XYÑY™X][™[^NŠY
+OOØÛÛœİO[]™Q[™[ZY\Ê
+K™š[™
+OO™KšYOOZY
+NÚYŠY_\ÙOOOIÜÙ]\	ß\ÙOOOIİšXİÜIß\ÙOOOIÙY™X]	Ê\™]\›ˆ˜[ÙNÙKšLÜ™\ÛÛ™Q[™[^QY™X]
+JNÜ™]\›ˆYNßKÙ[Xİ[™[^NŠY
+OOœÙ][™[^U\™Ù]
+Y
+KÙ]Ø[Y\˜T™]šY]ÎŠšY]ÊOOÚYŠ\ÙOOOIÜ^Y\‰Ê^ØØ[Y\˜T™]šY]Ï]šY]ÎÜÙ[XİY[RYXXİ]™RY_KØ[Y\˜Tİ]\ÎŠ
+OO˜Ø[Y\˜TÚİ
+
+_NÂÚ[™İËÛÕÛ™U\İ™Ü˜[ÙX\Û–YÜ˜[ÙX\Û–İÚ[™İËÛÕÛ™U\İÙX\Û“]™[Ø\]ÙX\Û“]™[Ø\İÚ[™İËÛÕÛ™U\İÙX\Û”İ[X[][\Y\]ÙX\Û”İ[X[][\Y\ÂÚ[™İË™\›Ğ˜\ÚXĞ[š[X][Û‘XYÏJ
+OOŠÙ\˜][Û“\Î”ÓÕSĞTÒP×ÓTË[\ÙY™ËšÚ[™OOIØ˜\ÚXÉÉ‰™˜XİÜOOIÜÛİ[	ÏÓX]›X^
+\™›Ü›X[˜ÙK››İÊ
+KY˜]
+N›[Xİ]™NœÛİ[˜\ÚXÔİYÙJ\™›Ü›X[˜ÙK››İÊ
+JHOO[[\ÜÙ]Î–ÉÜÛİ[	Ë	ÜÛİ[˜\ÚXÕÚ[™\	Ë	ÜÛİ[˜\ÚXÔÛ\Ú	×K›X\
+YOŠÚYØYYˆHZ[XYÙ\ÖÚYOË˜ÛÛ\]I‰ˆHZ[XYÙ\ÖÚYOË›˜]\˜[ÚYJJ_JNÂÚ[™İËÛÕÛ™U\İ˜\U][›Ü•\İJ\™Ù]YÛİ\˜ÙRY˜]K\›œÊOOØÛÛœİ\™Ù]\\K™š[™
+[š]O[š]šYOO]\™Ù]Y
+_[™[ZY\Ë™š[™
+[š]O[š]šYOO]\™Ù]Y
+KÛİ\˜ÙO\\K™š[™
+[š]O[š]šYOO\Ûİ\˜ÙRY
+_[™[ZY\Ë™š[™
+[š]O[š]šYOO\Ûİ\˜ÙRY
+NÜ™]\›ˆ\™Ù]	‰œÛİ\˜ÙOØ\U][
+\™Ù]Ûİ\˜ÙK˜]K\›œÊN™˜[Ù_NÂÚ[™İËÛÕÛ™U][İ]\ÏJ
+OO–Ë‹‹œ\K‹‹™[™[ZY\×K›X\
+[š]OŠÚY[š]šYXİ]™T˜]N][˜]SÙŠ[š]
+KY™™XİÎŠ[š]][Y™™Xİß×JK›X\
+Y™™XİOŠË‹‹™Y™™XİJJ_JJNÂŸBœ™\]Y\İ[š[X][Û‘œ˜[YJÛÜ
+NÂ
